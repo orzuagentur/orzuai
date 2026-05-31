@@ -1,0 +1,9 @@
+export { getGeminiClient, getGeminiModel } from "./client";
+export {
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_GENERATION,
+  GEMINI_MAX_HISTORY_MESSAGES,
+  GEMINI_MAX_KNOWLEDGE_ENTRIES,
+  GEMINI_MAX_MESSAGE_LENGTH,
+  GEMINI_MAX_SYSTEM_PROMPT_LENGTH,
+} from "./constants";
