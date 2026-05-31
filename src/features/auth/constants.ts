@@ -44,3 +44,16 @@ export const PASSWORD_RESET_MESSAGES = {
     "This password reset link is invalid or has expired. Please request a new one.",
   genericError: "Unable to reset your password. Please try again.",
 } as const;
+
+export const ACCOUNT_DELETION_MESSAGES = {
+  sectionTitle: "Delete Account",
+  sectionDescription:
+    "Permanently delete your account and all associated business data.",
+  warning:
+    "This action cannot be undone. Your profile, business, conversations, contacts, knowledge base, WhatsApp connection, and analytics will be permanently removed.",
+  confirmationLabel: 'Type "DELETE" to confirm',
+  buttonLabel: "Delete my account",
+  success: "Your account has been deleted.",
+  genericError: "Unable to delete your account. Please try again or contact support.",
+  termsRequired: "You must accept the Terms of Service and Privacy Policy.",
+} as const;

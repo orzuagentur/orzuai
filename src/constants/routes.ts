@@ -3,6 +3,12 @@ export const APP_ROUTES = {
   dashboard: "/dashboard",
 } as const;
 
+export const LEGAL_ROUTES = {
+  privacy: "/privacy",
+  terms: "/terms",
+  dataDeletion: "/data-deletion",
+} as const;
+
 export const AUTH_ROUTES = {
   callback: "/auth/callback",
   confirm: "/auth/confirm",

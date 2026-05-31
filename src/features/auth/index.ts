@@ -5,3 +5,4 @@ export { signInWithEmailAction } from "./actions/sign-in-with-email";
 export { signOutAction } from "./actions/sign-out";
 export { requestPasswordResetAction } from "./actions/request-password-reset";
 export { updatePasswordAction } from "./actions/update-password";
+export { deleteAccountAction } from "./actions/delete-account";

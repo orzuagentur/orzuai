@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRightIcon, BotIcon, MessageSquareIcon, SparklesIcon } from "lucide-react";
 
 import { AuthModal } from "@/components/landing/AuthModal";
+import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,8 +78,9 @@ export function LandingPage() {
         </div>
       </main>
 
-      <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} OrzuAI. Built for modern small businesses.
+      <footer className="relative z-10 space-y-3 px-6 pb-8 text-center text-xs text-muted-foreground">
+        <LegalFooterLinks />
+        <p>© {new Date().getFullYear()} OrzuAI. Built for modern small businesses.</p>
       </footer>
 
       <AuthModal open={authOpen} onOpenChange={setAuthOpen} />

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { LEGAL_ROUTES } from "@/constants/routes";
 import { LANDING_COPY } from "@/features/landing/constants";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,30 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           </div>
 
           <GoogleSignInButton />
+
+          {view === "register" ? (
+            <p className="text-center text-xs leading-5 text-muted-foreground">
+              By continuing, you agree to our{" "}
+              <a
+                href={LEGAL_ROUTES.terms}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href={LEGAL_ROUTES.privacy}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Privacy Policy
+              </a>
+              .
+            </p>
+          ) : null}
 
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />

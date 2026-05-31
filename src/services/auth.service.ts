@@ -4,11 +4,13 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 
 import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
 import {
+  ACCOUNT_DELETION_MESSAGES,
   LOGIN_MESSAGES,
   PASSWORD_RESET_MESSAGES,
   REGISTRATION_MESSAGES,
   VERIFICATION_MESSAGES,
 } from "@/features/auth/constants";
+import { BUSINESS_LOGOS_BUCKET } from "@/features/business/constants";
 import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +19,8 @@ import {
   sendVerificationEmail,
 } from "@/services/email.service";
 import type {
+  DeleteAccountInput,
+  DeleteAccountResult,
   LoginResult,
   PasswordResetRequestResult,
   PasswordUpdateResult,
@@ -29,6 +33,7 @@ import type {
   VerificationResult,
 } from "@/types/auth.types";
 import {
+  deleteAccountSchema,
   registerWithEmailInputSchema,
   requestPasswordResetSchema,
   resendVerificationEmailSchema,
@@ -548,4 +553,108 @@ export async function updatePassword(
   }
 
   return { success: true };
+}
+
+async function cleanupUserStorage(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<void> {
+  const { data: businessFolders } = await admin.storage
+    .from(BUSINESS_LOGOS_BUCKET)
+    .list(userId);
+
+  if (!businessFolders?.length) {
+    return;
+  }
+
+  const paths: string[] = [];
+
+  for (const folder of businessFolders) {
+    const folderPath = `${userId}/${folder.name}`;
+    const { data: files } = await admin.storage
+      .from(BUSINESS_LOGOS_BUCKET)
+      .list(folderPath);
+
+    for (const file of files ?? []) {
+      paths.push(`${folderPath}/${file.name}`);
+    }
+  }
+
+  if (paths.length > 0) {
+    await admin.storage.from(BUSINESS_LOGOS_BUCKET).remove(paths);
+  }
+}
+
+export async function deleteAccount(
+  input: DeleteAccountInput,
+): Promise<DeleteAccountResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message:
+          "Authentication services are not configured. Missing required environment variables.",
+      },
+    };
+  }
+
+  const parsed = deleteAccountSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          parsed.error.issues[0]?.message ??
+          ACCOUNT_DELETION_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: ACCOUNT_DELETION_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const admin = createAdminClient();
+
+  try {
+    await cleanupUserStorage(admin, user.id);
+
+    const { error } = await admin.auth.admin.deleteUser(user.id);
+
+    if (error) {
+      return {
+        success: false,
+        error: {
+          code: "DELETE_FAILED",
+          message: error.message || ACCOUNT_DELETION_MESSAGES.genericError,
+        },
+      };
+    }
+
+    await supabase.auth.signOut();
+
+    return { success: true };
+  } catch {
+    return {
+      success: false,
+      error: {
+        code: "DELETE_FAILED",
+        message: ACCOUNT_DELETION_MESSAGES.genericError,
+      },
+    };
+  }
 }

@@ -8,8 +8,8 @@ import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AUTH_ROUTES } from "@/constants/routes";
-import { PASSWORD_MIN_LENGTH } from "@/features/auth/constants";
+import { AUTH_ROUTES, LEGAL_ROUTES } from "@/constants/routes";
+import { ACCOUNT_DELETION_MESSAGES, PASSWORD_MIN_LENGTH } from "@/features/auth/constants";
 import { useEmailRegistration } from "@/hooks/use-email-registration";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,7 @@ type FormErrors = {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  acceptedTerms?: string;
 };
 
 export function EmailRegistrationForm({
@@ -49,11 +50,20 @@ export function EmailRegistrationForm({
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
+    const acceptedTerms = formData.get("acceptedTerms") === "on";
+
+    if (!acceptedTerms) {
+      setErrors({
+        acceptedTerms: ACCOUNT_DELETION_MESSAGES.termsRequired,
+      });
+      return;
+    }
 
     const result = await register({
       email,
       password,
       confirmPassword,
+      acceptedTerms: true,
     });
 
     if (!result.success && result.error.code === "VALIDATION_ERROR") {
@@ -61,6 +71,11 @@ export function EmailRegistrationForm({
 
       if (message.includes("email")) {
         setErrors((current) => ({ ...current, email: result.error.message }));
+      } else if (message.includes("terms") || message.includes("privacy")) {
+        setErrors((current) => ({
+          ...current,
+          acceptedTerms: result.error.message,
+        }));
       } else if (message.includes("confirm")) {
         setErrors((current) => ({
           ...current,
@@ -128,6 +143,40 @@ export function EmailRegistrationForm({
         />
         {errors.confirmPassword ? (
           <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <label className="flex items-start gap-3 text-sm leading-6">
+          <input
+            type="checkbox"
+            name="acceptedTerms"
+            disabled={isLoading}
+            className="mt-1 size-4 rounded border border-input"
+            aria-invalid={Boolean(errors.acceptedTerms)}
+          />
+          <span className="text-muted-foreground">
+            I agree to the{" "}
+            <Link
+              href={LEGAL_ROUTES.terms}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              target="_blank"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              href={LEGAL_ROUTES.privacy}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              target="_blank"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+        {errors.acceptedTerms ? (
+          <p className="text-sm text-destructive">{errors.acceptedTerms}</p>
         ) : null}
       </div>
 

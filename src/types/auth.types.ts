@@ -83,11 +83,20 @@ export const resetPasswordInputSchema = z.object({
 export const registerWithEmailSchema = registerWithEmailInputSchema
   .extend({
     confirmPassword: z.string().trim().min(1, "Confirm your password"),
+    acceptedTerms: z.literal(true, {
+      message: "You must accept the Terms of Service and Privacy Policy.",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
+
+export const deleteAccountSchema = z.object({
+  confirmation: z.literal("DELETE", {
+    message: 'Type "DELETE" to confirm account deletion.',
+  }),
+});
 
 export type AuthCallbackQuery = z.infer<typeof authCallbackQuerySchema>;
 export type AuthConfirmQuery = z.infer<typeof authConfirmQuerySchema>;
@@ -102,6 +111,8 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ResetPasswordPayload = z.infer<typeof resetPasswordInputSchema>;
 
 export type RegisterWithEmailInput = z.infer<typeof registerWithEmailSchema>;
+
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 
 export type RegisterWithEmailPayload = z.infer<
   typeof registerWithEmailInputSchema
@@ -184,6 +195,22 @@ export type PasswordUpdateResult =
       success: false;
       error: {
         code: PasswordResetErrorCode;
+        message: string;
+      };
+    };
+
+export type DeleteAccountErrorCode =
+  | "VALIDATION_ERROR"
+  | "MISSING_CONFIG"
+  | "UNAUTHORIZED"
+  | "DELETE_FAILED";
+
+export type DeleteAccountResult =
+  | { success: true }
+  | {
+      success: false;
+      error: {
+        code: DeleteAccountErrorCode;
         message: string;
       };
     };

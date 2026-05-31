@@ -12,7 +12,7 @@ export default async function SettingsPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Manage your business profile, logo, and contact information.
+          Manage your business profile, logo, contact information, and account.
         </p>
       </div>
 

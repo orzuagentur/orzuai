@@ -1,0 +1,6 @@
+export { LEGAL_COMPANY, LEGAL_MESSAGES } from "./constants";
+export {
+  DATA_DELETION_SECTIONS,
+  PRIVACY_POLICY_SECTIONS,
+  TERMS_OF_SERVICE_SECTIONS,
+} from "./content";
