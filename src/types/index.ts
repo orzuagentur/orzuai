@@ -113,22 +113,18 @@ export type {
 } from "./business.types";
 
 export type {
-  ConnectWhatsAppInput,
-  ConnectWhatsAppResult,
+  CompleteEmbeddedSignupInput,
+  CompleteEmbeddedSignupResult,
   SyncWhatsAppResult,
-  VerifyWhatsAppInput,
-  VerifyWhatsAppResult,
   WhatsAppActionError,
   WhatsAppActionResult,
   WhatsAppConnectionData,
+  WhatsAppEmbeddedSignupConfig,
   WhatsAppErrorCode,
   WhatsAppWebhookMessage,
   WhatsAppWebhookPayload,
 } from "./whatsapp.types";
-export {
-  connectWhatsAppSchema,
-  verifyWhatsAppSchema,
-} from "./whatsapp.types";
+export { completeEmbeddedSignupSchema } from "./whatsapp.types";
 
 export type {
   ChatMessageData,

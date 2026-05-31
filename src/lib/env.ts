@@ -74,6 +74,25 @@ export function hasGoogleOAuthEnv(): boolean {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
+export function getMetaAppId(): string | undefined {
+  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || undefined;
+}
+
+export function getWhatsAppEmbeddedSignupConfigId(): string | undefined {
+  return (
+    process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]?.trim() ||
+    undefined
+  );
+}
+
+export function hasEmbeddedSignupEnv(): boolean {
+  return Boolean(
+    getMetaAppId() &&
+      getWhatsAppEmbeddedSignupConfigId() &&
+      process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim(),
+  );
+}
+
 export {
   getDefaultGeminiModel,
   getMissingEnvKeys,

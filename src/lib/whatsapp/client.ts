@@ -21,6 +21,10 @@ export function getWhatsAppAppSecret(): string | undefined {
   return process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim() || undefined;
 }
 
+export function getMetaAppId(): string | undefined {
+  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || undefined;
+}
+
 export function buildWhatsAppApiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
   return `${WHATSAPP_GRAPH_API_BASE}/${getWhatsAppApiVersion()}/${normalizedPath}`;
@@ -115,6 +119,86 @@ export async function sendWhatsAppTextMessage(
   return {
     success: true,
     messageId,
+  };
+}
+
+type ExchangeTokenResult =
+  | { success: true; accessToken: string }
+  | { success: false; message: string };
+
+export async function exchangeEmbeddedSignupCode(
+  code: string,
+): Promise<ExchangeTokenResult> {
+  const appId = getMetaAppId();
+  const appSecret = getWhatsAppAppSecret();
+
+  if (!appId || !appSecret) {
+    return {
+      success: false,
+      message: "Meta Embedded Signup is not configured on the server.",
+    };
+  }
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    client_secret: appSecret,
+    code,
+  });
+
+  const response = await fetch(
+    `${buildWhatsAppApiUrl("oauth/access_token")}?${params.toString()}`,
+    { cache: "no-store" },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | { access_token?: string; error?: { message?: string } }
+    | null;
+
+  if (!response.ok || !payload?.access_token) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message ||
+        "Unable to exchange the Meta authorization code for an access token.",
+    };
+  }
+
+  return {
+    success: true,
+    accessToken: payload.access_token,
+  };
+}
+
+type SubscribeWabaResult =
+  | { success: true }
+  | { success: false; message: string };
+
+export async function subscribeAppToWaba(
+  wabaId: string,
+  accessToken: string,
+): Promise<SubscribeWabaResult> {
+  const response = await fetch(buildWhatsAppApiUrl(`${wabaId}/subscribed_apps`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (response.ok) {
+    return { success: true };
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: { message?: string } }
+    | null;
+
+  return {
+    success: false,
+    message:
+      payload?.error?.message ||
+      "Unable to subscribe the app to the WhatsApp Business Account.",
   };
 }
 

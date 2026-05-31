@@ -1,12 +1,9 @@
-import { createHash, randomInt } from "crypto";
-
 import type { WhatsappConnection } from "@/types/database.types";
 import type {
   WhatsAppConnectionData,
   WhatsAppWebhookMessage,
   WhatsAppWebhookPayload,
 } from "@/types/whatsapp.types";
-import { WHATSAPP_VERIFICATION_CODE_LENGTH } from "@/lib/whatsapp/constants";
 
 export function mapWhatsAppConnection(
   connection: WhatsappConnection,
@@ -17,7 +14,6 @@ export function mapWhatsAppConnection(
     phoneNumber: connection.phone_number,
     status: connection.whatsapp_status,
     connectedAt: connection.connected_at,
-    metaPhoneNumberId: connection.meta_phone_number_id,
     lastSyncedAt: connection.last_synced_at,
     createdAt: connection.created_at,
   };
@@ -25,16 +21,6 @@ export function mapWhatsAppConnection(
 
 export function normalizePhoneNumber(value: string): string {
   return value.replace(/[^\d+]/g, "");
-}
-
-export function generateVerificationCode(): string {
-  const max = 10 ** WHATSAPP_VERIFICATION_CODE_LENGTH;
-  const min = 10 ** (WHATSAPP_VERIFICATION_CODE_LENGTH - 1);
-  return String(randomInt(min, max));
-}
-
-export function hashVerificationCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
 }
 
 export function parseWhatsAppWebhookPayload(
@@ -77,8 +63,4 @@ export function parseWhatsAppWebhookPayload(
   }
 
   return messages;
-}
-
-export function buildVerificationMessage(code: string): string {
-  return `Your OrzuAI verification code is ${code}. It expires in 10 minutes.`;
 }

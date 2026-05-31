@@ -32,6 +32,12 @@ export const clientEnvSchema = z.object({
     .string()
     .trim()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
+  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: z.string().trim().min(1).optional(),
+  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: z
+    .string()
+    .trim()
+    .min(1)
+    .optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -59,6 +65,12 @@ export const serverEnvSchema = z.object({
   [ENV_KEYS.WHATSAPP_VERIFY_TOKEN]: z.string().trim().min(1).optional(),
   [ENV_KEYS.WHATSAPP_APP_SECRET]: z.string().trim().min(1).optional(),
   [ENV_KEYS.WHATSAPP_API_VERSION]: z.string().trim().min(1).optional(),
+  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: z.string().trim().min(1).optional(),
+  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: z
+    .string()
+    .trim()
+    .min(1)
+    .optional(),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
@@ -80,6 +92,10 @@ function collectClientEnv(): Record<string, string | undefined> {
       process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL],
     [ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]:
       process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY],
+    [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID],
+    [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID],
   };
 }
 
@@ -100,6 +116,10 @@ function collectServerEnv(): Record<string, string | undefined> {
     [ENV_KEYS.WHATSAPP_APP_SECRET]: process.env[ENV_KEYS.WHATSAPP_APP_SECRET],
     [ENV_KEYS.WHATSAPP_API_VERSION]:
       process.env[ENV_KEYS.WHATSAPP_API_VERSION],
+    [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID],
+    [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID],
   };
 }
 

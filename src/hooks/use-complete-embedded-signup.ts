@@ -3,29 +3,33 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import { verifyWhatsAppAction } from "@/features/whatsapp/actions/verify-whatsapp";
+import { completeEmbeddedSignupAction } from "@/features/whatsapp/actions/complete-embedded-signup";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import type {
-  VerifyWhatsAppInput,
-  VerifyWhatsAppResult,
+  CompleteEmbeddedSignupInput,
+  CompleteEmbeddedSignupResult,
 } from "@/types/whatsapp.types";
 
-type UseVerifyWhatsAppOptions = {
+type UseCompleteEmbeddedSignupOptions = {
   onSuccess?: () => void;
 };
 
-export function useVerifyWhatsApp({ onSuccess }: UseVerifyWhatsAppOptions = {}) {
+export function useCompleteEmbeddedSignup({
+  onSuccess,
+}: UseCompleteEmbeddedSignupOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const verify = useCallback(
-    async (input: VerifyWhatsAppInput): Promise<VerifyWhatsAppResult> => {
+  const completeSignup = useCallback(
+    async (
+      input: CompleteEmbeddedSignupInput,
+    ): Promise<CompleteEmbeddedSignupResult> => {
       setIsLoading(true);
 
       try {
-        const result = await verifyWhatsAppAction(input);
+        const result = await completeEmbeddedSignupAction(input);
 
         if (result.success) {
-          toast.success(WHATSAPP_MESSAGES.verifySuccess);
+          toast.success(WHATSAPP_MESSAGES.connectSuccess);
           onSuccess?.();
           return result;
         }
@@ -40,7 +44,7 @@ export function useVerifyWhatsApp({ onSuccess }: UseVerifyWhatsAppOptions = {}) 
   );
 
   return {
-    verify,
+    completeSignup,
     isLoading,
   };
 }

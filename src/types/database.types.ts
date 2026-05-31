@@ -151,6 +151,8 @@ export type Database = {
           created_at: string;
           meta_phone_number_id: string | null;
           meta_access_token: string | null;
+          meta_waba_id: string | null;
+          meta_business_account_id: string | null;
           verification_code_hash: string | null;
           verification_expires_at: string | null;
           last_synced_at: string | null;
@@ -164,6 +166,8 @@ export type Database = {
           created_at?: string;
           meta_phone_number_id?: string | null;
           meta_access_token?: string | null;
+          meta_waba_id?: string | null;
+          meta_business_account_id?: string | null;
           verification_code_hash?: string | null;
           verification_expires_at?: string | null;
           last_synced_at?: string | null;
@@ -177,6 +181,8 @@ export type Database = {
           created_at?: string;
           meta_phone_number_id?: string | null;
           meta_access_token?: string | null;
+          meta_waba_id?: string | null;
+          meta_business_account_id?: string | null;
           verification_code_hash?: string | null;
           verification_expires_at?: string | null;
           last_synced_at?: string | null;

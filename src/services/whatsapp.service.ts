@@ -4,12 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
-import { hasSupabaseEnv } from "@/lib/env";
+import { getMetaAppId, getWhatsAppEmbeddedSignupConfigId, hasEmbeddedSignupEnv, hasSupabaseEnv } from "@/lib/env";
 import {
+  exchangeEmbeddedSignupCode,
+  getWhatsAppApiVersion,
   sendWhatsAppTextMessage,
+  subscribeAppToWaba,
   verifyWhatsAppCredentials,
 } from "@/lib/whatsapp/client";
-import { WHATSAPP_VERIFICATION_TTL_MS } from "@/lib/whatsapp/constants";
+import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -17,22 +20,17 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { generateAssistantReply } from "@/services/gemini.service";
 import type { WhatsappConnection } from "@/types/database.types";
 import type {
-  ConnectWhatsAppInput,
-  ConnectWhatsAppResult,
+  CompleteEmbeddedSignupInput,
+  CompleteEmbeddedSignupResult,
   SyncWhatsAppResult,
-  VerifyWhatsAppInput,
-  VerifyWhatsAppResult,
   WhatsAppConnectionData,
+  WhatsAppEmbeddedSignupConfig,
   WhatsAppWebhookPayload,
 } from "@/types/whatsapp.types";
 import {
-  connectWhatsAppSchema,
-  verifyWhatsAppSchema,
+  completeEmbeddedSignupSchema,
 } from "@/types/whatsapp.types";
 import {
-  buildVerificationMessage,
-  generateVerificationCode,
-  hashVerificationCode,
   mapWhatsAppConnection,
   normalizePhoneNumber,
   parseWhatsAppWebhookPayload,
@@ -81,14 +79,26 @@ export async function getWhatsAppConnection(
   return data ? mapWhatsAppConnection(data) : null;
 }
 
-export async function connectWhatsApp(
-  input: ConnectWhatsAppInput,
-): Promise<ConnectWhatsAppResult> {
-  if (!hasSupabaseEnv()) {
+export async function getWhatsAppEmbeddedSignupConfig(): Promise<WhatsAppEmbeddedSignupConfig> {
+  const appId = getMetaAppId();
+  const configId = getWhatsAppEmbeddedSignupConfigId();
+
+  return {
+    appId: appId ?? "",
+    configId: configId ?? "",
+    graphApiVersion: getWhatsAppApiVersion(),
+    isConfigured: hasEmbeddedSignupEnv(),
+  };
+}
+
+export async function completeEmbeddedSignup(
+  input: CompleteEmbeddedSignupInput,
+): Promise<CompleteEmbeddedSignupResult> {
+  if (!hasSupabaseEnv() || !hasEmbeddedSignupEnv()) {
     return missingConfigError();
   }
 
-  const parsed = connectWhatsAppSchema.safeParse(input);
+  const parsed = completeEmbeddedSignupSchema.safeParse(input);
 
   if (!parsed.success) {
     return {
@@ -96,6 +106,26 @@ export async function connectWhatsApp(
       error: {
         code: "VALIDATION_ERROR",
         message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  if (!isEmbeddedSignupFinishEvent(parsed.data.finishEvent)) {
+    if (parsed.data.finishEvent === "FINISH_ONLY_WABA") {
+      return {
+        success: false,
+        error: {
+          code: "SIGNUP_INCOMPLETE",
+          message: WHATSAPP_MESSAGES.whatsappBusinessRequired,
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: {
+        code: "SIGNUP_INCOMPLETE",
+        message: WHATSAPP_MESSAGES.signupIncomplete,
       },
     };
   }
@@ -112,25 +142,10 @@ export async function connectWhatsApp(
     };
   }
 
-  const credentialCheck = await verifyWhatsAppCredentials(
-    parsed.data.metaPhoneNumberId,
-    parsed.data.metaAccessToken,
-  );
-
-  if (!credentialCheck.success) {
-    return {
-      success: false,
-      error: {
-        code: "INVALID_CREDENTIALS",
-        message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
-      },
-    };
-  }
-
   const supabase = await createClient();
   const { data: existingConnection } = await supabase
     .from("whatsapp_connections")
-    .select("*")
+    .select("id")
     .eq("business_id", businessId)
     .eq("whatsapp_status", "connected")
     .maybeSingle();
@@ -145,30 +160,66 @@ export async function connectWhatsApp(
     };
   }
 
-  const verificationCode = generateVerificationCode();
-  const verificationExpiresAt = new Date(
-    Date.now() + WHATSAPP_VERIFICATION_TTL_MS,
-  ).toISOString();
-  const phoneNumber =
-    credentialCheck.displayPhoneNumber ??
-    normalizePhoneNumber(parsed.data.phoneNumber);
+  const tokenResult = await exchangeEmbeddedSignupCode(parsed.data.code);
 
-  const sendResult = await sendWhatsAppTextMessage(
-    parsed.data.metaPhoneNumberId,
-    parsed.data.metaAccessToken,
-    normalizePhoneNumber(parsed.data.phoneNumber).replace(/^\+/, ""),
-    buildVerificationMessage(verificationCode),
-  );
-
-  if (!sendResult.success) {
+  if (!tokenResult.success) {
     return {
       success: false,
       error: {
-        code: "CONNECT_FAILED",
-        message: sendResult.message,
+        code: "TOKEN_EXCHANGE_FAILED",
+        message: tokenResult.message,
       },
     };
   }
+
+  const subscribeResult = await subscribeAppToWaba(
+    parsed.data.wabaId,
+    tokenResult.accessToken,
+  );
+
+  if (!subscribeResult.success) {
+    return {
+      success: false,
+      error: {
+        code: "SUBSCRIBE_FAILED",
+        message: subscribeResult.message,
+      },
+    };
+  }
+
+  const credentialCheck = await verifyWhatsAppCredentials(
+    parsed.data.phoneNumberId,
+    tokenResult.accessToken,
+  );
+
+  if (!credentialCheck.success) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
+      },
+    };
+  }
+
+  const connectedAt = new Date().toISOString();
+  const phoneNumber =
+    credentialCheck.displayPhoneNumber ??
+    normalizePhoneNumber(parsed.data.phoneNumberId);
+
+  const connectionPayload = {
+    business_id: businessId,
+    phone_number: phoneNumber,
+    whatsapp_status: "connected" as const,
+    meta_phone_number_id: parsed.data.phoneNumberId,
+    meta_access_token: tokenResult.accessToken,
+    meta_waba_id: parsed.data.wabaId,
+    meta_business_account_id: parsed.data.businessAccountId ?? null,
+    verification_code_hash: null,
+    verification_expires_at: null,
+    connected_at: connectedAt,
+    last_synced_at: connectedAt,
+  };
 
   const { data: existingPending } = await supabase
     .from("whatsapp_connections")
@@ -176,17 +227,6 @@ export async function connectWhatsApp(
     .eq("business_id", businessId)
     .neq("whatsapp_status", "connected")
     .maybeSingle();
-
-  const connectionPayload = {
-    business_id: businessId,
-    phone_number: phoneNumber,
-    whatsapp_status: "pending" as const,
-    meta_phone_number_id: parsed.data.metaPhoneNumberId,
-    meta_access_token: parsed.data.metaAccessToken,
-    verification_code_hash: hashVerificationCode(verificationCode),
-    verification_expires_at: verificationExpiresAt,
-    connected_at: null,
-  };
 
   const { data, error } = existingPending
     ? await supabase
@@ -217,156 +257,7 @@ export async function connectWhatsApp(
     success: true,
     data: {
       connection: mapWhatsAppConnection(data),
-      requiresVerification: true,
     },
-  };
-}
-
-export async function verifyWhatsAppNumber(
-  input: VerifyWhatsAppInput,
-): Promise<VerifyWhatsAppResult> {
-  if (!hasSupabaseEnv()) {
-    return missingConfigError();
-  }
-
-  const parsed = verifyWhatsAppSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: parsed.error.issues[0]?.message ?? "Invalid input.",
-      },
-    };
-  }
-
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return {
-      success: false,
-      error: {
-        code: "NO_BUSINESS",
-        message: WHATSAPP_MESSAGES.noBusinessDescription,
-      },
-    };
-  }
-
-  const supabase = await createClient();
-  const { data: connection } = await supabase
-    .from("whatsapp_connections")
-    .select("*")
-    .eq("id", parsed.data.connectionId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (!connection) {
-    return {
-      success: false,
-      error: {
-        code: "NOT_FOUND",
-        message: WHATSAPP_MESSAGES.genericError,
-      },
-    };
-  }
-
-  if (connection.whatsapp_status === "connected") {
-    return {
-      success: true,
-      data: mapWhatsAppConnection(connection),
-    };
-  }
-
-  if (
-    !connection.verification_code_hash ||
-    !connection.verification_expires_at
-  ) {
-    return {
-      success: false,
-      error: {
-        code: "VERIFY_FAILED",
-        message: WHATSAPP_MESSAGES.genericError,
-      },
-    };
-  }
-
-  if (new Date(connection.verification_expires_at).getTime() < Date.now()) {
-    return {
-      success: false,
-      error: {
-        code: "CODE_EXPIRED",
-        message: WHATSAPP_MESSAGES.codeExpired,
-      },
-    };
-  }
-
-  const submittedHash = hashVerificationCode(parsed.data.verificationCode);
-
-  if (submittedHash !== connection.verification_code_hash) {
-    return {
-      success: false,
-      error: {
-        code: "INVALID_CODE",
-        message: WHATSAPP_MESSAGES.invalidCode,
-      },
-    };
-  }
-
-  if (!connection.meta_phone_number_id || !connection.meta_access_token) {
-    return {
-      success: false,
-      error: {
-        code: "VERIFY_FAILED",
-        message: WHATSAPP_MESSAGES.genericError,
-      },
-    };
-  }
-
-  const credentialCheck = await verifyWhatsAppCredentials(
-    connection.meta_phone_number_id,
-    connection.meta_access_token,
-  );
-
-  if (!credentialCheck.success) {
-    return {
-      success: false,
-      error: {
-        code: "INVALID_CREDENTIALS",
-        message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
-      },
-    };
-  }
-
-  const connectedAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("whatsapp_connections")
-    .update({
-      whatsapp_status: "connected",
-      connected_at: connectedAt,
-      verification_code_hash: null,
-      verification_expires_at: null,
-      last_synced_at: connectedAt,
-    })
-    .eq("id", connection.id)
-    .select("*")
-    .single();
-
-  if (error || !data) {
-    return {
-      success: false,
-      error: {
-        code: "VERIFY_FAILED",
-        message: error?.message || WHATSAPP_MESSAGES.genericError,
-      },
-    };
-  }
-
-  revalidateWhatsAppPaths();
-
-  return {
-    success: true,
-    data: mapWhatsAppConnection(data),
   };
 }
 

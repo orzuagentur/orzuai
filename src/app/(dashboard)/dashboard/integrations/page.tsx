@@ -1,15 +1,19 @@
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
-import { getAppUrl } from "@/lib/env";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { getWhatsAppConnection } from "@/services/whatsapp.service";
+import {
+  getWhatsAppConnection,
+  getWhatsAppEmbeddedSignupConfig,
+} from "@/services/whatsapp.service";
 
 export default async function IntegrationsPage() {
   const user = await getCurrentUser();
   const business = user ? await getPrimaryBusiness(user.id) : null;
-  const connection = business ? await getWhatsAppConnection(business.id) : null;
-  const webhookUrl = new URL("/api/webhooks/whatsapp", getAppUrl()).toString();
+  const [connection, embeddedSignupConfig] = await Promise.all([
+    business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
+    getWhatsAppEmbeddedSignupConfig(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -25,7 +29,7 @@ export default async function IntegrationsPage() {
       <WhatsAppIntegrationPanel
         connection={connection}
         hasBusiness={Boolean(business)}
-        webhookUrl={webhookUrl}
+        embeddedSignupConfig={embeddedSignupConfig}
       />
     </div>
   );

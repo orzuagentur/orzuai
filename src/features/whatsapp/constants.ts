@@ -3,23 +3,20 @@ export const WHATSAPP_MESSAGES = {
   pageDescription: "Connect WhatsApp Business and enable AI-powered replies.",
   connectTitle: "Connect WhatsApp",
   connectDescription:
-    "Link your Meta WhatsApp Business phone number to OrzuAI.",
-  verifyTitle: "Verify your number",
-  verifyDescription:
-    "Enter the 6-digit verification code sent to your WhatsApp number.",
-  connectSuccess: "WhatsApp connection created. Verify your number to finish.",
-  verifySuccess: "WhatsApp number verified and connected successfully.",
+    "Sign in with Meta and authorize OrzuAI to connect your WhatsApp Business account.",
+  connectSuccess: "WhatsApp connected successfully.",
   syncSuccess: "WhatsApp sync completed successfully.",
   alreadyConnected: "WhatsApp is already connected for this business.",
   noBusinessTitle: "Create your business profile first",
   noBusinessDescription:
     "Set up your business profile before connecting WhatsApp.",
-  invalidCredentials: "Meta rejected the WhatsApp credentials. Check your IDs and token.",
-  invalidCode: "The verification code is incorrect.",
-  codeExpired: "The verification code has expired. Connect again to receive a new code.",
+  invalidCredentials: "Meta could not verify the WhatsApp connection.",
+  signupIncomplete:
+    "WhatsApp setup was not completed. Please finish Meta Embedded Signup and try again.",
+  whatsappBusinessHelpTitle: "WhatsApp Business required",
+  whatsappBusinessRequired:
+    "To connect WhatsApp, you need a WhatsApp Business account. You can install WhatsApp Business for free on your phone, set up your business profile, and then continue the connection here.",
+  embeddedSignupNotConfigured:
+    "Meta Embedded Signup is not configured yet. Add NEXT_PUBLIC_META_APP_ID, NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, and WHATSAPP_APP_SECRET to your environment.",
   genericError: "Unable to complete the WhatsApp request. Please try again.",
-  missingWebhookConfig:
-    "WhatsApp webhook is not configured. Set WHATSAPP_VERIFY_TOKEN in your environment.",
-  webhookUrlHint:
-    "Use this webhook URL in Meta Developer Console for message delivery.",
 } as const;
