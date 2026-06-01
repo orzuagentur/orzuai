@@ -1,5 +1,9 @@
 import { ENV_KEYS } from "@/constants/env-keys";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
+import {
+  META_APP_ID,
+  WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
+} from "@/lib/whatsapp/constants";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -74,14 +78,14 @@ export function hasGoogleOAuthEnv(): boolean {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
-export function getMetaAppId(): string | undefined {
-  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || undefined;
+export function getMetaAppId(): string {
+  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || META_APP_ID;
 }
 
-export function getWhatsAppEmbeddedSignupConfigId(): string | undefined {
+export function getWhatsAppEmbeddedSignupConfigId(): string {
   return (
     process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]?.trim() ||
-    undefined
+    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID
   );
 }
 

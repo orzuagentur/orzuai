@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
+import { getMetaAppId } from "@/lib/env";
 import {
   DEFAULT_WHATSAPP_API_VERSION,
   WHATSAPP_GRAPH_API_BASE,
@@ -19,10 +20,6 @@ export function getWhatsAppVerifyToken(): string | undefined {
 
 export function getWhatsAppAppSecret(): string | undefined {
   return process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim() || undefined;
-}
-
-export function getMetaAppId(): string | undefined {
-  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || undefined;
 }
 
 export function buildWhatsAppApiUrl(path: string): string {
