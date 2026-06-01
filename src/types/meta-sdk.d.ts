@@ -20,7 +20,11 @@ declare global {
           config_id: string;
           response_type: string;
           override_default_response_type: boolean;
-          extras: { setup: Record<string, never> };
+          extras: {
+            feature: "whatsapp_embedded_signup";
+            sessionInfoVersion: "3";
+            setup: Record<string, never>;
+          };
         },
       ) => void;
     };

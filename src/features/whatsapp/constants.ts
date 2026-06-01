@@ -5,6 +5,11 @@ export const WHATSAPP_MESSAGES = {
   connectDescription:
     "Sign in with Meta and authorize OrzuAI to connect your WhatsApp Business account.",
   connectSuccess: "WhatsApp connected successfully.",
+  connectWaiting:
+    "Complete the Meta popup. You will add your WhatsApp number and confirm it with the code from Meta.",
+  connectCancelled: "WhatsApp setup was cancelled. You can try again.",
+  connectMissingCode:
+    "Meta did not return an authorization code. Please close the popup and try again.",
   syncSuccess: "WhatsApp sync completed successfully.",
   alreadyConnected: "WhatsApp is already connected for this business.",
   noBusinessTitle: "Create your business profile first",
@@ -13,6 +18,8 @@ export const WHATSAPP_MESSAGES = {
   invalidCredentials: "Meta could not verify the WhatsApp connection.",
   signupIncomplete:
     "WhatsApp setup was not completed. Please finish Meta Embedded Signup and try again.",
+  signupPhoneNumberRequired:
+    "Please add and verify a WhatsApp phone number in the Meta popup to finish setup.",
   whatsappBusinessHelpTitle: "WhatsApp Business required",
   whatsappBusinessRequired:
     "To connect WhatsApp, you need a WhatsApp Business account. You can install WhatsApp Business for free on your phone, set up your business profile, and then continue the connection here.",

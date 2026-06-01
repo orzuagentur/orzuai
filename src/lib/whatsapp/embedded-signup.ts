@@ -21,6 +21,18 @@ export type EmbeddedSignupMessage = {
   };
 };
 
+export function isTrustedEmbeddedSignupOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "facebook.com" || url.hostname.endsWith(".facebook.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isEmbeddedSignupFinishEvent(
   event: string,
 ): event is EmbeddedSignupFinishEvent {
@@ -39,7 +51,12 @@ export function parseEmbeddedSignupMessage(data: unknown): EmbeddedSignupMessage
 
   const message = data as EmbeddedSignupMessage;
 
-  if (message.type !== "WA_EMBEDDED_SIGNUP") {
+  if (
+    message.type !== "WA_EMBEDDED_SIGNUP" ||
+    typeof message.event !== "string" ||
+    !message.data ||
+    typeof message.data !== "object"
+  ) {
     return null;
   }
 

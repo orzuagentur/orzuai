@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import { useCompleteEmbeddedSignup } from "@/hooks/use-complete-embedded-signup";
 import {
+  isTrustedEmbeddedSignupOrigin,
   isEmbeddedSignupFinishEvent,
   parseEmbeddedSignupMessage,
 } from "@/lib/whatsapp/embedded-signup";
@@ -27,10 +28,14 @@ type PendingSignupPayload = {
   finishEvent: string;
 };
 
+type SignupStatus = "idle" | "waiting" | "finishing" | "error";
+
 export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) {
   const router = useRouter();
   const [sdkReady, setSdkReady] = useState(false);
   const [showBusinessHelp, setShowBusinessHelp] = useState(false);
+  const [status, setStatus] = useState<SignupStatus>("idle");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const authCodeRef = useRef<string | null>(null);
   const signupDataRef = useRef<Omit<PendingSignupPayload, "code"> | null>(null);
   const isSubmittingRef = useRef(false);
@@ -51,20 +56,33 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
       !signupData.wabaId ||
       !isEmbeddedSignupFinishEvent(signupData.finishEvent)
     ) {
+      setStatus("error");
+      setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
       setShowBusinessHelp(true);
       return;
     }
 
     isSubmittingRef.current = true;
+    setStatus("finishing");
+    setStatusMessage("Finishing WhatsApp connection...");
 
     try {
-      await completeSignup({
+      const result = await completeSignup({
         code,
         phoneNumberId: signupData.phoneNumberId,
         wabaId: signupData.wabaId,
         businessAccountId: signupData.businessAccountId,
         finishEvent: signupData.finishEvent,
       });
+
+      if (!result.success) {
+        setStatus("error");
+        setStatusMessage(result.error.message);
+        return;
+      }
+
+      setStatus("idle");
+      setStatusMessage(null);
     } finally {
       isSubmittingRef.current = false;
       authCodeRef.current = null;
@@ -74,7 +92,7 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (!event.origin.endsWith("facebook.com")) {
+      if (!isTrustedEmbeddedSignupOrigin(event.origin)) {
         return;
       }
 
@@ -95,13 +113,23 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
       }
 
       if (message.event === "CANCEL") {
-        if (message.data.current_step) {
-          setShowBusinessHelp(true);
-        }
+        setStatus("error");
+        setStatusMessage(WHATSAPP_MESSAGES.connectCancelled);
+        setShowBusinessHelp(Boolean(message.data.current_step));
+        return;
+      }
+
+      if (message.event === "ERROR") {
+        setStatus("error");
+        setStatusMessage(
+          message.data.error_message ?? WHATSAPP_MESSAGES.signupIncomplete,
+        );
         return;
       }
 
       if (message.event === "FINISH_ONLY_WABA") {
+        setStatus("error");
+        setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
         setShowBusinessHelp(true);
         return;
       }
@@ -149,6 +177,8 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
     }
 
     setShowBusinessHelp(false);
+    setStatus("waiting");
+    setStatusMessage(WHATSAPP_MESSAGES.connectWaiting);
     authCodeRef.current = null;
     signupDataRef.current = null;
 
@@ -157,6 +187,8 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
         const code = response.authResponse?.code;
 
         if (!code) {
+          setStatus("error");
+          setStatusMessage(WHATSAPP_MESSAGES.connectMissingCode);
           return;
         }
 
@@ -168,6 +200,8 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
         response_type: "code",
         override_default_response_type: true,
         extras: {
+          feature: "whatsapp_embedded_signup",
+          sessionInfoVersion: "3",
           setup: {},
         },
       },
@@ -200,10 +234,10 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
       <Button
         type="button"
         size="lg"
-        disabled={!sdkReady || isLoading}
+        disabled={!sdkReady || isLoading || status === "finishing"}
         onClick={launchEmbeddedSignup}
       >
-        {isLoading ? (
+        {isLoading || status === "finishing" ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
             Connecting...
@@ -212,6 +246,16 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
           WHATSAPP_MESSAGES.connectTitle
         )}
       </Button>
+
+      {statusMessage ? (
+        <p
+          className={`text-sm ${
+            status === "error" ? "text-destructive" : "text-muted-foreground"
+          }`}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
 
       {showBusinessHelp ? <WhatsAppBusinessHelp /> : null}
     </div>
