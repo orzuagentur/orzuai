@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
 import { ChannelAnalyticsPanel } from "@/components/channel-workspace/ChannelAnalyticsPanel";
 import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
 import { ChannelWorkspaceBanner } from "@/components/integrations/ChannelWorkspaceBanner";
@@ -23,7 +22,6 @@ import {
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
-  getChannelAiSettings,
   getChannelAnalytics,
   getChannelConnectionStatuses,
   getChannelContacts,
@@ -102,16 +100,9 @@ export async function ChannelWorkspacePage({
   }
 
   if (section === "ai-assistant") {
-    const data = await getChannelAiSettings(channel);
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <ChannelWorkspaceBanner channel={channel} />
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
-        </div>
-        <ChannelAiPanel data={data} />
-      </div>
-    );
+    const { redirect } = await import("next/navigation");
+    const { DASHBOARD_ROUTES } = await import("@/constants/routes");
+    redirect(`${DASHBOARD_ROUTES.aiAssistant}?channel=${channel}`);
   }
 
   const data = await getChannelAnalytics(channel);

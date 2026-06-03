@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bot, Loader2Icon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -16,12 +17,22 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import {
   CHANNEL_WORKSPACE_MESSAGES,
   getChannelLabel,
   saveChannelAiSettingsAction,
   testChannelAiReplyAction,
 } from "@/features/channel-workspace";
+import {
+  buildIntegrationActivateHref,
+  type IntegrationChannelId,
+} from "@/features/integrations";
+import {
+  GEMINI_MODEL_OPTIONS,
+  isRecommendedGeminiModel,
+  type GeminiModelId,
+} from "@/lib/gemini/constants";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
 import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
 
@@ -30,8 +41,10 @@ type ChannelAiPanelProps = {
 };
 
 export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
+  const router = useRouter();
   const label = getChannelLabel(data.channel);
   const [aiEnabled, setAiEnabled] = useState(data.aiEnabled);
+  const [model, setModel] = useState<GeminiModelId>(data.model as GeminiModelId);
   const [language, setLanguage] = useState(data.language);
   const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt);
   const [testMessage, setTestMessage] = useState("");
@@ -50,12 +63,14 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
       const result = await saveChannelAiSettingsAction({
         channel: data.channel,
         aiEnabled,
+        model,
         language,
         systemPrompt,
       });
 
       if (result.success) {
         toast.success(CHANNEL_WORKSPACE_MESSAGES.aiSaved);
+        router.refresh();
         return;
       }
 
@@ -75,6 +90,14 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
     setTestReply(null);
 
     try {
+      await saveChannelAiSettingsAction({
+        channel: data.channel,
+        aiEnabled,
+        model,
+        language,
+        systemPrompt,
+      });
+
       const result = await testChannelAiReplyAction({
         channel: data.channel,
         testMessage: testMessage.trim(),
@@ -91,8 +114,25 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
     }
   }
 
+  const selectedModel = GEMINI_MODEL_OPTIONS.find((option) => option.id === model);
+
   return (
     <div className="flex max-w-3xl flex-col gap-6">
+      {!data.isChannelConnected ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+          <p>{AI_ASSISTANT_MESSAGES.channelNotConnected}</p>
+          <Button asChild variant="link" className="mt-1 h-auto p-0">
+            <Link
+              href={buildIntegrationActivateHref(
+                data.channel as IntegrationChannelId,
+              )}
+            >
+              {AI_ASSISTANT_MESSAGES.goToIntegrations}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+
       <Card className="shadow-none">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -127,6 +167,35 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
             >
               {aiEnabled ? "Enabled" : "Disabled"}
             </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`ai-model-${data.channel}`}>
+              {CHANNEL_WORKSPACE_MESSAGES.aiModelLabel}
+            </Label>
+            <select
+              id={`ai-model-${data.channel}`}
+              className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={model}
+              onChange={(event) => setModel(event.target.value as GeminiModelId)}
+              disabled={!data.geminiConfigured}
+            >
+              {GEMINI_MODEL_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {selectedModel ? (
+              <p className="text-xs text-muted-foreground">
+                {selectedModel.description}
+              </p>
+            ) : null}
+            {!isRecommendedGeminiModel(model) ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                {CHANNEL_WORKSPACE_MESSAGES.aiModelLegacyHint}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -172,13 +241,6 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
               Knowledge Base
             </Link>
           </p>
-
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              <span className="font-medium text-foreground">Model:</span>{" "}
-              {data.model}
-            </span>
-          </div>
 
           <Button
             type="button"

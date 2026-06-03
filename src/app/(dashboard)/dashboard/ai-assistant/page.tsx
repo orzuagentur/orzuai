@@ -1,4 +1,11 @@
-import { ChannelWorkspacePage } from "@/components/dashboard/ChannelWorkspacePage";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+import { AiAssistantHub } from "@/components/ai-assistant/AiAssistantHub";
+import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { isIntegrationChannelId } from "@/features/integrations";
+import { getAiAssistantPageData } from "@/services/ai-assistant.service";
 
 type AiAssistantPageProps = {
   searchParams: Promise<{ channel?: string }>;
@@ -9,11 +16,32 @@ export default async function AiAssistantPage({
 }: AiAssistantPageProps) {
   const { channel } = await searchParams;
 
+  if (channel && !isIntegrationChannelId(channel)) {
+    redirect(`${DASHBOARD_ROUTES.aiAssistant}?channel=whatsapp`);
+  }
+
+  const data = await getAiAssistantPageData(channel ?? "whatsapp");
+
+  if (!data.hasBusiness) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <DashboardComingSoon title="AI Assistant" />
+      </div>
+    );
+  }
+
   return (
-    <ChannelWorkspacePage
-      title="AI Assistant"
-      channelParam={channel}
-      section="ai-assistant"
-    />
+    <Suspense fallback={<AiAssistantFallback />}>
+      <AiAssistantHub data={data} />
+    </Suspense>
+  );
+}
+
+function AiAssistantFallback() {
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
+      <div className="min-h-[32rem] animate-pulse rounded-xl border bg-muted/30" />
+    </div>
   );
 }
