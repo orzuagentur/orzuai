@@ -9,9 +9,23 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   aiTitle: "AI Assistant",
   aiDescription: "Control automated replies for this channel.",
   aiEnabledLabel: "AI auto-replies",
-  aiEnabledOn: "AI is enabled for this channel.",
-  aiEnabledOff: "AI is disabled for this channel.",
-  aiSave: "Save",
+  aiEnabledOn: "AI auto-replies are enabled for this channel.",
+  aiEnabledOff: "AI auto-replies are disabled for this channel.",
+  aiSave: "Save settings",
+  aiSaved: "AI Assistant settings saved.",
+  aiSystemPromptLabel: "Business instructions",
+  aiSystemPromptHint:
+    "Tell the assistant how to represent your business. Used for incoming messages on this channel.",
+  aiLanguageLabel: "Reply language",
+  aiTestTitle: "Test reply",
+  aiTestDescription:
+    "Simulate a customer message and preview how the assistant would respond.",
+  aiTestPlaceholder: "e.g. What are your opening hours?",
+  aiTestButton: "Generate test reply",
+  aiTestEmpty: "Enter a sample message to test the assistant.",
+  aiGeminiMissing:
+    "Gemini is not configured. Add GEMINI_API_KEY to enable AI replies.",
+  aiKnowledgeHint: "Add FAQs and policies in Knowledge Base to improve answers.",
   analyticsTitle: "Analytics",
   analyticsDescription: "Performance metrics for this channel.",
   notConnectedHint:
@@ -20,7 +34,13 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   totalMessages: "Total Messages",
   uniqueContacts: "Contacts",
   aiReplies: "AI Replies",
-  conversionRate: "Conversion Rate",
+  conversionRate: "AI share",
+  activeConversations: "Active chats",
+  manualReplies: "Manual / other",
+  activityTitle: "Messages — last 7 days",
+  recentTitle: "Recent messages",
+  recentEmpty: "No messages on this channel yet.",
+  openChatsHint: "Reply manually or review AI messages in Chats.",
 } as const;
 
 export function getChannelLabel(channel: string): string {

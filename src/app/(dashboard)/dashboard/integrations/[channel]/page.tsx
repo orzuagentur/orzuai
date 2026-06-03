@@ -20,12 +20,17 @@ import {
 import {
   buildIntegrationChannelStatuses,
   DEFAULT_INTEGRATION_SECTION,
+  isChannelConnectedForWorkspace,
   isIntegrationChannelId,
   isIntegrationSectionId,
   type IntegrationChannelId,
   type IntegrationSectionId,
 } from "@/features/integrations";
-import { getChannelWorkspaceSummary } from "@/services/channel-workspace.service";
+import {
+  getChannelAiSettings,
+  getChannelAnalytics,
+  getChannelWorkspaceSummary,
+} from "@/services/channel-workspace.service";
 
 type IntegrationsChannelPageProps = {
   params: Promise<{ channel: string }>;
@@ -73,9 +78,24 @@ export default async function IntegrationsChannelPage({
     telegramConnection,
   });
 
-  const workspaceSummary = business
-    ? await getChannelWorkspaceSummary(business.id, channel)
-    : undefined;
+  const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
+
+  const workspaceSummary =
+    business && isConnected
+      ? await getChannelWorkspaceSummary(business.id, channel)
+      : undefined;
+
+  const [aiSettings, analytics] =
+    business && isConnected
+      ? await Promise.all([
+          section === "ai-assistant"
+            ? getChannelAiSettings(channel)
+            : Promise.resolve(null),
+          section === "analytics"
+            ? getChannelAnalytics(channel)
+            : Promise.resolve(null),
+        ])
+      : [null, null];
 
   return (
     <Suspense fallback={<IntegrationsHubFallback channel={channel} />}>
@@ -86,6 +106,8 @@ export default async function IntegrationsChannelPage({
           hasBusiness={Boolean(business)}
           channelStatuses={channelStatuses}
           workspaceSummary={workspaceSummary}
+          aiSettings={aiSettings}
+          analytics={analytics}
           whatsapp={{
             connection: whatsappConnection,
             embeddedSignupConfig: whatsappConfig,

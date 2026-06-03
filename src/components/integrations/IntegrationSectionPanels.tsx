@@ -1,4 +1,6 @@
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
+import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
+import { ChannelAnalyticsPanel } from "@/components/channel-workspace/ChannelAnalyticsPanel";
 import { ChannelWorkspacePreview } from "@/components/channel-workspace/ChannelWorkspacePreview";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
@@ -18,7 +20,11 @@ import {
   type IntegrationChannelStatusMap,
   type IntegrationSectionId,
 } from "@/features/integrations";
-import type { ChannelWorkspaceSummary } from "@/types/channel-workspace.types";
+import type {
+  ChannelAiSettingsData,
+  ChannelAnalyticsData,
+  ChannelWorkspaceSummary,
+} from "@/types/channel-workspace.types";
 import type {
   InstagramConnectionData,
   InstagramEmbeddedSignupConfig,
@@ -38,6 +44,8 @@ type IntegrationSectionPanelsProps = {
   hasBusiness: boolean;
   channelStatuses: IntegrationChannelStatusMap;
   workspaceSummary?: ChannelWorkspaceSummary;
+  aiSettings?: ChannelAiSettingsData | null;
+  analytics?: ChannelAnalyticsData | null;
   whatsapp?: {
     connection: WhatsAppConnectionData | null;
     embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
@@ -58,6 +66,8 @@ export function IntegrationSectionPanels({
   hasBusiness,
   channelStatuses,
   workspaceSummary,
+  aiSettings,
+  analytics,
   whatsapp,
   instagram,
   telegram,
@@ -93,12 +103,30 @@ export function IntegrationSectionPanels({
   }
 
   if (section === "ai-assistant") {
+    if (aiSettings) {
+      return (
+        <div className="space-y-4">
+          <ChannelAiPanel data={aiSettings} />
+          <IntegrationQuickLinks channel={channel} showHubSections={false} />
+        </div>
+      );
+    }
+
     return (
       <WorkspaceLinkSection
         channel={channel}
         kind="ai-assistant"
         summary={summary}
       />
+    );
+  }
+
+  if (analytics) {
+    return (
+      <div className="space-y-4">
+        <ChannelAnalyticsPanel data={analytics} />
+        <IntegrationQuickLinks channel={channel} showHubSections={false} />
+      </div>
     );
   }
 

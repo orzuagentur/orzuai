@@ -50,7 +50,7 @@ export function ChannelWorkspacePreview({
         ? summary.aiEnabled
           ? CHANNEL_WORKSPACE_MESSAGES.aiEnabledOn
           : CHANNEL_WORKSPACE_MESSAGES.aiEnabledOff
-        : `${summary.totalMessages} messages on ${label}`;
+        : `${summary.totalMessages} messages · ${summary.contactsCount} contacts on ${label}`;
 
   return (
     <Card className="max-w-2xl shadow-none">
