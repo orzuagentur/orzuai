@@ -5,6 +5,7 @@ import { ChannelWorkspacePreview } from "@/components/channel-workspace/ChannelW
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
+import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
 import {
   Card,
@@ -34,6 +35,10 @@ import type {
   TelegramConnectionData,
 } from "@/types/telegram.types";
 import type {
+  WebsiteFormConnectConfig,
+  WebsiteFormConnectionData,
+} from "@/types/website-forms.types";
+import type {
   WhatsAppConnectionData,
   WhatsAppEmbeddedSignupConfig,
 } from "@/types/whatsapp.types";
@@ -58,6 +63,10 @@ type IntegrationSectionPanelsProps = {
     connection: TelegramConnectionData | null;
     connectConfig: TelegramConnectConfig;
   };
+  websiteForms?: {
+    connection: WebsiteFormConnectionData | null;
+    connectConfig: WebsiteFormConnectConfig;
+  };
 };
 
 export function IntegrationSectionPanels({
@@ -71,6 +80,7 @@ export function IntegrationSectionPanels({
   whatsapp,
   instagram,
   telegram,
+  websiteForms,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
 
@@ -82,6 +92,7 @@ export function IntegrationSectionPanels({
         whatsapp={whatsapp}
         instagram={instagram}
         telegram={telegram}
+        websiteForms={websiteForms}
       />
     );
   }
@@ -141,12 +152,14 @@ function ActivateSection({
   whatsapp,
   instagram,
   telegram,
+  websiteForms,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
   whatsapp?: IntegrationSectionPanelsProps["whatsapp"];
   instagram?: IntegrationSectionPanelsProps["instagram"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
+  websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -181,6 +194,17 @@ function ActivateSection({
     );
   }
 
+  if (channel === "website_forms" && websiteForms) {
+    return (
+      <WebsiteFormsActivatePanel
+        connection={websiteForms.connection}
+        hasBusiness={hasBusiness}
+        config={websiteForms.connectConfig}
+        embeddedInHub
+      />
+    );
+  }
+
   return <ComingSoonChannelPanel channel={channel} />;
 }
 
@@ -190,7 +214,9 @@ function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) 
       ? "Instagram"
       : channel === "telegram"
         ? "Telegram"
-        : channel;
+        : channel === "website_forms"
+          ? "Website Forms"
+          : channel;
 
   return (
     <Card className="max-w-2xl shadow-none">

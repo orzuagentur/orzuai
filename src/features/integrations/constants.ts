@@ -1,9 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Camera, MessageCircle, Send } from "lucide-react";
+import { Camera, Globe, MessageCircle, Send } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 
-export const INTEGRATION_CHANNELS = ["whatsapp", "instagram", "telegram"] as const;
+export const INTEGRATION_CHANNELS = [
+  "whatsapp",
+  "instagram",
+  "telegram",
+  "website_forms",
+] as const;
 
 export type IntegrationChannelId = (typeof INTEGRATION_CHANNELS)[number];
 
@@ -47,6 +52,13 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     label: "Telegram",
     description: "Telegram Bot API",
     icon: Send,
+    available: true,
+  },
+  {
+    id: "website_forms",
+    label: "Website Forms",
+    description: "Leads from any website or CMS",
+    icon: Globe,
     available: true,
   },
 ];

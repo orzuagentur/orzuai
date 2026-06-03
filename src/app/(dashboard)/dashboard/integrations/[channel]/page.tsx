@@ -14,6 +14,10 @@ import {
   getTelegramConnectConfig,
 } from "@/services/telegram.service";
 import {
+  getWebsiteFormConnection,
+  getWebsiteFormConnectConfig,
+} from "@/services/website-forms.service";
+import {
   getWhatsAppConnection,
   getWhatsAppEmbeddedSignupConfig,
 } from "@/services/whatsapp.service";
@@ -63,6 +67,8 @@ export default async function IntegrationsChannelPage({
     instagramConfig,
     telegramConnection,
     telegramConfig,
+    websiteFormConnection,
+    websiteFormConfig,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     getWhatsAppEmbeddedSignupConfig(),
@@ -70,12 +76,15 @@ export default async function IntegrationsChannelPage({
     getInstagramEmbeddedSignupConfig(),
     business ? getTelegramConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getTelegramConnectConfig()),
+    business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
+    Promise.resolve(getWebsiteFormConnectConfig()),
   ]);
 
   const channelStatuses = buildIntegrationChannelStatuses({
     whatsappConnection,
     instagramConnection,
     telegramConnection,
+    websiteFormConnection,
   });
 
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
@@ -119,6 +128,10 @@ export default async function IntegrationsChannelPage({
           telegram={{
             connection: telegramConnection,
             connectConfig: telegramConfig,
+          }}
+          websiteForms={{
+            connection: websiteFormConnection,
+            connectConfig: websiteFormConfig,
           }}
         />
       </IntegrationsHub>

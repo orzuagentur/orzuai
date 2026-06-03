@@ -18,7 +18,7 @@ const geminiModelSchema = z.enum(GEMINI_MODEL_IDS, {
 });
 
 export const saveChannelAiSettingsSchema = z.object({
-  channel: z.enum(["whatsapp", "instagram", "telegram"]),
+  channel: z.enum(["whatsapp", "instagram", "telegram", "website_forms"]),
   aiEnabled: z.boolean(),
   model: geminiModelSchema,
   language: z.string().trim().min(1, "Language is required.").max(32),
@@ -40,7 +40,7 @@ export const applyGlobalAiDefaultsSchema = z.object({
 export type ApplyGlobalAiDefaultsInput = z.infer<typeof applyGlobalAiDefaultsSchema>;
 
 export const testChannelAiReplySchema = z.object({
-  channel: z.enum(["whatsapp", "instagram", "telegram"]),
+  channel: z.enum(["whatsapp", "instagram", "telegram", "website_forms"]),
   testMessage: z
     .string()
     .trim()

@@ -51,7 +51,12 @@ function revalidateBusinessPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.settings);
 }
 
-const MESSAGING_CHANNELS = ["whatsapp", "instagram", "telegram"] as const;
+const MESSAGING_CHANNELS = [
+  "whatsapp",
+  "instagram",
+  "telegram",
+  "website_forms",
+] as const;
 
 async function bootstrapBusinessDefaults(businessId: string): Promise<void> {
   const supabase = await createClient();

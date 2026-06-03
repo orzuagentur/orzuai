@@ -1,5 +1,6 @@
 import type { InstagramConnectionData } from "@/types/instagram.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
+import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
 import type { WhatsAppConnectionData } from "@/types/whatsapp.types";
 
 import type { IntegrationChannelId } from "./constants";
@@ -23,12 +24,14 @@ type BuildChannelStatusesInput = {
   whatsappConnection: WhatsAppConnectionData | null;
   instagramConnection: InstagramConnectionData | null;
   telegramConnection: TelegramConnectionData | null;
+  websiteFormConnection: WebsiteFormConnectionData | null;
 };
 
 export function buildIntegrationChannelStatuses({
   whatsappConnection,
   instagramConnection,
   telegramConnection,
+  websiteFormConnection,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
   let whatsappStatus: IntegrationChannelStatus = "disconnected";
   let whatsappDetail: string | undefined;
@@ -64,6 +67,17 @@ export function buildIntegrationChannelStatuses({
     telegramStatus = "pending";
   }
 
+  let websiteFormsStatus: IntegrationChannelStatus = "disconnected";
+  let websiteFormsDetail: string | undefined;
+
+  if (websiteFormConnection?.status === "connected") {
+    websiteFormsStatus = "connected";
+    websiteFormsDetail =
+      websiteFormConnection.siteName ?? websiteFormConnection.siteUrl ?? undefined;
+  } else if (websiteFormConnection?.status === "pending") {
+    websiteFormsStatus = "pending";
+  }
+
   return {
     whatsapp: {
       status: whatsappStatus,
@@ -76,6 +90,10 @@ export function buildIntegrationChannelStatuses({
     telegram: {
       status: telegramStatus,
       detail: telegramDetail,
+    },
+    website_forms: {
+      status: websiteFormsStatus,
+      detail: websiteFormsDetail,
     },
   };
 }

@@ -22,12 +22,23 @@ export const sendPasswordResetEmailSchema = z.object({
   resetUrl: urlSchema,
 });
 
+export const sendLeadFollowUpEmailSchema = z.object({
+  to: emailAddressSchema,
+  businessName: z.string().trim().min(1).max(200),
+  recipientName: z.string().trim().min(1).max(200),
+  message: z.string().trim().min(1).max(8000),
+});
+
 export type SendVerificationEmailInput = z.infer<
   typeof sendVerificationEmailSchema
 >;
 
 export type SendPasswordResetEmailInput = z.infer<
   typeof sendPasswordResetEmailSchema
+>;
+
+export type SendLeadFollowUpEmailInput = z.infer<
+  typeof sendLeadFollowUpEmailSchema
 >;
 
 export type EmailSendSuccess = {

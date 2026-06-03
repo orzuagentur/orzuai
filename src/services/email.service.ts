@@ -1,15 +1,18 @@
 import "server-only";
 
+import { renderLeadFollowUpEmail } from "@/lib/email/templates/lead-follow-up-email";
 import { renderPasswordResetEmail } from "@/lib/email/templates/password-reset-email";
 import { renderVerificationEmail } from "@/lib/email/templates/verification-email";
 import { getResendFromEmail, hasResendEnv } from "@/lib/env";
 import { getResendClient } from "@/lib/resend/client";
 import type {
   EmailServiceResult,
+  SendLeadFollowUpEmailInput,
   SendPasswordResetEmailInput,
   SendVerificationEmailInput,
 } from "@/types/email.types";
 import {
+  sendLeadFollowUpEmailSchema,
   sendPasswordResetEmailSchema,
   sendVerificationEmailSchema,
 } from "@/types/email.types";
@@ -93,6 +96,28 @@ export async function sendVerificationEmail(
 
   const { subject, html } = renderVerificationEmail({
     verificationUrl: parsed.data.verificationUrl,
+  });
+
+  return sendTransactionalEmail({
+    to: parsed.data.to,
+    subject,
+    html,
+  });
+}
+
+export async function sendLeadFollowUpEmail(
+  input: SendLeadFollowUpEmailInput,
+): Promise<EmailServiceResult> {
+  const parsed = sendLeadFollowUpEmailSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  const { subject, html } = renderLeadFollowUpEmail({
+    businessName: parsed.data.businessName,
+    recipientName: parsed.data.recipientName,
+    message: parsed.data.message,
   });
 
   return sendTransactionalEmail({

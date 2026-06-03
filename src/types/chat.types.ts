@@ -15,7 +15,12 @@ export const sendChatMessageSchema = z.object({
     .max(4096, "Message is too long."),
 });
 
-const messagingChannelSchema = z.enum(["whatsapp", "instagram", "telegram"]);
+const messagingChannelSchema = z.enum([
+  "whatsapp",
+  "instagram",
+  "telegram",
+  "website_forms",
+]);
 
 export const toggleChatAiSchema = z.object({
   enabled: z.boolean(),

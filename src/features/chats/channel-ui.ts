@@ -9,7 +9,11 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
     return "Instagram";
   }
 
-  return "Telegram";
+  if (channel === "telegram") {
+    return "Telegram";
+  }
+
+  return "Website";
 }
 
 export function getChannelBadgeVariant(
@@ -21,6 +25,10 @@ export function getChannelBadgeVariant(
 
   if (channel === "instagram") {
     return "secondary";
+  }
+
+  if (channel === "telegram") {
+    return "outline";
   }
 
   return "outline";

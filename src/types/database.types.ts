@@ -20,7 +20,19 @@ export type InstagramStatus = "connected" | "disconnected" | "pending";
 
 export type TelegramStatus = "connected" | "disconnected" | "pending";
 
-export type MessagingChannel = "whatsapp" | "instagram" | "telegram";
+export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
+
+export type WebsiteFormFollowUp =
+  | "whatsapp"
+  | "telegram"
+  | "email"
+  | "none";
+
+export type MessagingChannel =
+  | "whatsapp"
+  | "instagram"
+  | "telegram"
+  | "website_forms";
 
 export type ConversationStatus = "active" | "archived" | "closed";
 
@@ -300,6 +312,65 @@ export type Database = {
           },
         ];
       };
+      website_form_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          webhook_token: string;
+          api_key_hash: string;
+          api_key_prefix: string;
+          site_name: string | null;
+          site_url: string | null;
+          connection_status: WebsiteFormStatus;
+          auto_follow_up_enabled: boolean;
+          follow_up_channel: WebsiteFormFollowUp;
+          connected_at: string | null;
+          last_submission_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          webhook_token: string;
+          api_key_hash: string;
+          api_key_prefix?: string;
+          site_name?: string | null;
+          site_url?: string | null;
+          connection_status?: WebsiteFormStatus;
+          auto_follow_up_enabled?: boolean;
+          follow_up_channel?: WebsiteFormFollowUp;
+          connected_at?: string | null;
+          last_submission_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          webhook_token?: string;
+          api_key_hash?: string;
+          api_key_prefix?: string;
+          site_name?: string | null;
+          site_url?: string | null;
+          connection_status?: WebsiteFormStatus;
+          auto_follow_up_enabled?: boolean;
+          follow_up_channel?: WebsiteFormFollowUp;
+          connected_at?: string | null;
+          last_submission_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "website_form_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contacts: {
         Row: {
           id: string;
@@ -551,6 +622,8 @@ export type Database = {
       whatsapp_status: WhatsappStatus;
       instagram_status: InstagramStatus;
       telegram_status: TelegramStatus;
+      website_form_status: WebsiteFormStatus;
+      website_form_follow_up: WebsiteFormFollowUp;
       messaging_channel: MessagingChannel;
       conversation_status: ConversationStatus;
       message_sender_type: MessageSenderType;
@@ -568,6 +641,8 @@ export type InstagramConnection =
   Database["public"]["Tables"]["instagram_connections"]["Row"];
 export type TelegramConnection =
   Database["public"]["Tables"]["telegram_connections"]["Row"];
+export type WebsiteFormConnection =
+  Database["public"]["Tables"]["website_form_connections"]["Row"];
 export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];
