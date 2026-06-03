@@ -7,7 +7,12 @@ import { MessageSquareIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  getChannelBadgeLabel,
+  getChannelBadgeVariant,
+} from "@/features/chats/channel-ui";
 import type { ConversationListItem } from "@/types/chat.types";
+import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
 
 type ChatListProps = {
@@ -80,7 +85,15 @@ export function ChatList({
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate font-medium">{conversation.contactName}</p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate font-medium">{conversation.contactName}</p>
+                  <Badge
+                    variant={getChannelBadgeVariant(conversation.channel)}
+                    className="shrink-0 px-1.5 py-0 text-[10px]"
+                  >
+                    {getChannelBadgeLabel(conversation.channel)}
+                  </Badge>
+                </div>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatRelativeTime(
                     conversation.lastMessageAt ?? conversation.updatedAt,
@@ -88,7 +101,7 @@ export function ChatList({
                 </span>
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {conversation.contactPhone}
+                {formatContactIdentifier(conversation.contactPhone)}
               </p>
               {conversation.lastMessagePreview ? (
                 <p className="truncate text-sm text-muted-foreground">

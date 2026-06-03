@@ -38,6 +38,11 @@ export const clientEnvSchema = z.object({
     .trim()
     .min(1)
     .optional(),
+  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: z
+    .string()
+    .trim()
+    .min(1)
+    .optional(),
 });
 
 export const serverEnvSchema = z.object({
@@ -71,6 +76,13 @@ export const serverEnvSchema = z.object({
     .trim()
     .min(1)
     .optional(),
+  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: z
+    .string()
+    .trim()
+    .min(1)
+    .optional(),
+  [ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]: z.string().trim().min(1).optional(),
+  [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]: z.string().trim().min(1).optional(),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
@@ -96,6 +108,8 @@ function collectClientEnv(): Record<string, string | undefined> {
       process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID],
     [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]:
       process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID],
+    [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID],
   };
 }
 
@@ -120,6 +134,12 @@ function collectServerEnv(): Record<string, string | undefined> {
       process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID],
     [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]:
       process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID],
+    [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]:
+      process.env[ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID],
+    [ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]:
+      process.env[ENV_KEYS.INSTAGRAM_VERIFY_TOKEN],
+    [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]:
+      process.env[ENV_KEYS.TELEGRAM_WEBHOOK_SECRET],
   };
 }
 

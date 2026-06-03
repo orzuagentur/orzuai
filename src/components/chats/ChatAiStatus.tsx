@@ -4,14 +4,17 @@ import { BotIcon, Loader2Icon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
 import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
+import type { MessagingChannel } from "@/types/database.types";
 
 type ChatAiStatusProps = {
+  channel: MessagingChannel;
   aiEnabled: boolean | null;
   onToggle?: (enabled: boolean) => void;
 };
 
-export function ChatAiStatus({ aiEnabled, onToggle }: ChatAiStatusProps) {
+export function ChatAiStatus({ channel, aiEnabled, onToggle }: ChatAiStatusProps) {
   const { toggleAi, isLoading } = useToggleChatAi({
     onSuccess: onToggle,
   });
@@ -28,9 +31,9 @@ export function ChatAiStatus({ aiEnabled, onToggle }: ChatAiStatusProps) {
           <p className="text-xs text-muted-foreground">
             {isConfigured
               ? isEnabled
-                ? "AI is responding to incoming messages."
-                : "Manual replies only."
-              : "Configure AI in AI Assistant settings."}
+                ? `AI is responding on ${getChannelBadgeLabel(channel)}.`
+                : `Manual replies only on ${getChannelBadgeLabel(channel)}.`
+              : `Configure ${getChannelBadgeLabel(channel)} AI in AI Assistant settings.`}
           </p>
         </div>
       </div>
@@ -45,7 +48,7 @@ export function ChatAiStatus({ aiEnabled, onToggle }: ChatAiStatusProps) {
             size="sm"
             disabled={isLoading}
             onClick={() => {
-              void toggleAi(!isEnabled);
+              void toggleAi({ enabled: !isEnabled, channel });
             }}
           >
             {isLoading ? (

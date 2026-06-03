@@ -17,7 +17,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { generateAssistantReply } from "@/services/gemini.service";
+import {
+  incrementMessagingAnalytics,
+  insertChannelMessage,
+  processChannelAutoReply,
+} from "@/services/messaging.service";
 import type { WhatsappConnection } from "@/types/database.types";
 import type {
   CompleteEmbeddedSignupInput,
@@ -330,124 +334,6 @@ export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {
   };
 }
 
-async function incrementAnalytics(
-  admin: ReturnType<typeof createAdminClient>,
-  businessId: string,
-  updates: {
-    totalMessages?: number;
-    totalContacts?: number;
-    aiReplies?: number;
-  },
-): Promise<void> {
-  const { data: analytics } = await admin
-    .from("analytics")
-    .select("total_messages, total_contacts, ai_replies")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  await admin.from("analytics").upsert(
-    {
-      business_id: businessId,
-      total_messages:
-        (analytics?.total_messages ?? 0) + (updates.totalMessages ?? 0),
-      total_contacts:
-        (analytics?.total_contacts ?? 0) + (updates.totalContacts ?? 0),
-      ai_replies: (analytics?.ai_replies ?? 0) + (updates.aiReplies ?? 0),
-    },
-    { onConflict: "business_id" },
-  );
-}
-
-async function processAutoReply(
-  admin: ReturnType<typeof createAdminClient>,
-  connection: WhatsappConnection,
-  conversationId: string,
-  businessId: string,
-  clientMessage: string,
-  recipientPhone: string,
-): Promise<void> {
-  const { data: aiSettings } = await admin
-    .from("ai_settings")
-    .select("*")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (!aiSettings?.ai_enabled) {
-    return;
-  }
-
-  if (!connection.meta_phone_number_id || !connection.meta_access_token) {
-    return;
-  }
-
-  const { data: history } = await admin
-    .from("messages")
-    .select("sender_type, content")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(20);
-
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
-
-  const reply = await generateAssistantReply({
-    model: aiSettings.model,
-    systemPrompt: aiSettings.system_prompt,
-    language: aiSettings.language,
-    userMessage: clientMessage,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
-      title: entry.title,
-      content: entry.content,
-      category: entry.category,
-    })),
-    conversationHistory:
-      history?.map((message) => ({
-        role: message.sender_type === "client" ? "user" : "assistant",
-        content: message.content,
-      })) ?? [],
-  });
-
-  if (!reply.success) {
-    return;
-  }
-
-  const sendResult = await sendWhatsAppTextMessage(
-    connection.meta_phone_number_id,
-    connection.meta_access_token,
-    recipientPhone.replace(/^\+/, ""),
-    reply.data.text,
-  );
-
-  if (!sendResult.success) {
-    return;
-  }
-
-  await admin.from("messages").insert({
-    conversation_id: conversationId,
-    sender_type: "ai",
-    content: reply.data.text,
-    ai_generated: true,
-  });
-
-  await incrementAnalytics(admin, businessId, {
-    totalMessages: 1,
-    aiReplies: 1,
-  });
-}
-
-async function listKnowledgeEntriesForBusiness(
-  admin: ReturnType<typeof createAdminClient>,
-  businessId: string,
-) {
-  const { data } = await admin
-    .from("knowledge_base")
-    .select("title, content, category")
-    .eq("business_id", businessId)
-    .order("updated_at", { ascending: false })
-    .limit(25);
-
-  return data ?? [];
-}
-
 async function ingestIncomingMessage(
   admin: ReturnType<typeof createAdminClient>,
   connection: WhatsappConnection,
@@ -464,6 +350,7 @@ async function ingestIncomingMessage(
     .from("contacts")
     .select("id")
     .eq("business_id", businessId)
+    .eq("channel", "whatsapp")
     .eq("phone_number", normalizedPhone)
     .maybeSingle();
 
@@ -475,6 +362,7 @@ async function ingestIncomingMessage(
       .from("contacts")
       .insert({
         business_id: businessId,
+        channel: "whatsapp",
         name: message.contactName,
         phone_number: normalizedPhone,
         last_message_at: new Date().toISOString(),
@@ -503,6 +391,7 @@ async function ingestIncomingMessage(
     .select("id")
     .eq("business_id", businessId)
     .eq("contact_id", contactId)
+    .eq("channel", "whatsapp")
     .eq("status", "active")
     .maybeSingle();
 
@@ -513,6 +402,7 @@ async function ingestIncomingMessage(
       .from("conversations")
       .insert({
         business_id: businessId,
+        channel: "whatsapp",
         contact_id: contactId,
         status: "active",
       })
@@ -526,14 +416,14 @@ async function ingestIncomingMessage(
     return;
   }
 
-  await admin.from("messages").insert({
-    conversation_id: conversationId,
-    sender_type: "client",
+  await insertChannelMessage(admin, {
+    conversationId,
+    channel: "whatsapp",
+    senderType: "client",
     content: message.body,
-    ai_generated: false,
   });
 
-  await incrementAnalytics(admin, businessId, {
+  await incrementMessagingAnalytics(admin, businessId, "whatsapp", {
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
@@ -543,14 +433,27 @@ async function ingestIncomingMessage(
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await processAutoReply(
+  await processChannelAutoReply({
     admin,
-    connection,
-    conversationId,
     businessId,
-    message.body,
-    normalizedPhone,
-  );
+    channel: "whatsapp",
+    conversationId,
+    clientMessage: message.body,
+    sendReply: async (text) => {
+      if (!connection.meta_phone_number_id || !connection.meta_access_token) {
+        return { success: false };
+      }
+
+      const sendResult = await sendWhatsAppTextMessage(
+        connection.meta_phone_number_id,
+        connection.meta_access_token,
+        normalizedPhone.replace(/^\+/, ""),
+        text,
+      );
+
+      return { success: sendResult.success };
+    },
+  });
 }
 
 export async function processWhatsAppWebhook(

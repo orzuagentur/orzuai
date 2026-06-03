@@ -21,6 +21,8 @@ type ChatsPanelProps = ChatsPageData;
 export function ChatsPanel({
   hasBusiness,
   whatsappConnected,
+  instagramConnected,
+  telegramConnected,
   aiEnabled,
   conversations,
   activeConversation,
@@ -73,6 +75,8 @@ export function ChatsPanel({
           conversation={activeConversation}
           aiEnabled={aiEnabled}
           whatsappConnected={whatsappConnected}
+          instagramConnected={instagramConnected}
+          telegramConnected={telegramConnected}
         />
       </section>
     </div>

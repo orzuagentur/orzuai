@@ -1,16 +1,20 @@
 export const CHAT_MESSAGES = {
   pageTitle: "Chats",
   pageDescription:
-    "Read WhatsApp conversations, send manual replies, and control AI auto-replies.",
+    "Unified inbox for WhatsApp, Instagram, and Telegram — send replies and control AI per channel.",
   noBusinessTitle: "Create your business profile first",
   noBusinessDescription:
     "Set up your business profile before viewing customer conversations.",
   emptyListTitle: "No conversations yet",
   emptyListDescription:
-    "Connect WhatsApp and start receiving customer messages to see them here.",
+    "Connect a channel in Integrations and receive customer messages to see them here.",
   selectConversation: "Select a conversation to view message history.",
   whatsappNotConnected:
     "WhatsApp is not connected. Connect it in Integrations to send replies.",
+  instagramNotConnected:
+    "Instagram is not connected. Connect it in Integrations to send replies.",
+  telegramNotConnected:
+    "Telegram is not connected. Connect it in Integrations to send replies.",
   sendSuccess: "Message sent successfully.",
   sendFailed: "Unable to send message. Please try again.",
   aiEnabledSuccess: "AI auto-replies enabled.",

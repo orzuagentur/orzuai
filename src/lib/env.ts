@@ -97,6 +97,40 @@ export function hasEmbeddedSignupEnv(): boolean {
   );
 }
 
+export function getInstagramEmbeddedSignupConfigId(): string | undefined {
+  return (
+    process.env[ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]?.trim() ||
+    undefined
+  );
+}
+
+export function getInstagramVerifyToken(): string | undefined {
+  return process.env[ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]?.trim() || undefined;
+}
+
+export function hasInstagramEnv(): boolean {
+  return Boolean(
+    getMetaAppId() &&
+      getInstagramEmbeddedSignupConfigId() &&
+      process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim(),
+  );
+}
+
+export function getTelegramWebhookSecret(): string | undefined {
+  return process.env[ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]?.trim() || undefined;
+}
+
+export function hasTelegramEnv(): boolean {
+  return Boolean(
+    process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim()?.startsWith("https://"),
+  );
+}
+
+/** @deprecated Per-bot webhook secrets are stored in telegram_connections. */
+export function hasTelegramWebhookEnv(): boolean {
+  return hasTelegramEnv();
+}
+
 export {
   getDefaultGeminiModel,
   getMissingEnvKeys,

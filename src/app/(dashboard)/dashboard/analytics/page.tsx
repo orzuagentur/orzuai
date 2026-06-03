@@ -1,5 +1,19 @@
-import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { ChannelWorkspacePage } from "@/components/dashboard/ChannelWorkspacePage";
 
-export default function AnalyticsPage() {
-  return <DashboardComingSoon title="Analytics" />;
+type AnalyticsPageProps = {
+  searchParams: Promise<{ channel?: string }>;
+};
+
+export default async function AnalyticsPage({
+  searchParams,
+}: AnalyticsPageProps) {
+  const { channel } = await searchParams;
+
+  return (
+    <ChannelWorkspacePage
+      title="Analytics"
+      channelParam={channel}
+      section="analytics"
+    />
+  );
 }

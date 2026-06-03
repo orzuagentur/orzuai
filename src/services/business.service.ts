@@ -51,30 +51,46 @@ function revalidateBusinessPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.settings);
 }
 
+const MESSAGING_CHANNELS = ["whatsapp", "instagram", "telegram"] as const;
+
 async function bootstrapBusinessDefaults(businessId: string): Promise<void> {
   const supabase = await createClient();
 
-  await Promise.all([
-    supabase.from("analytics").upsert(
-      {
-        business_id: businessId,
-        total_messages: 0,
-        total_contacts: 0,
-        ai_replies: 0,
-      },
-      { onConflict: "business_id" },
-    ),
-    supabase.from("ai_settings").upsert(
-      {
-        business_id: businessId,
-        model: getDefaultGeminiModel(),
-        language: DEFAULT_AI_LANGUAGE,
-        system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
-        ai_enabled: false,
-      },
-      { onConflict: "business_id" },
-    ),
-  ]);
+  await supabase.from("analytics").upsert(
+    {
+      business_id: businessId,
+      total_messages: 0,
+      total_contacts: 0,
+      ai_replies: 0,
+    },
+    { onConflict: "business_id" },
+  );
+
+  for (const channel of MESSAGING_CHANNELS) {
+    await Promise.all([
+      supabase.from("channel_analytics").upsert(
+        {
+          business_id: businessId,
+          channel,
+          total_messages: 0,
+          total_contacts: 0,
+          ai_replies: 0,
+        },
+        { onConflict: "business_id,channel" },
+      ),
+      supabase.from("ai_settings").upsert(
+        {
+          business_id: businessId,
+          channel,
+          model: getDefaultGeminiModel(),
+          language: DEFAULT_AI_LANGUAGE,
+          system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
+          ai_enabled: false,
+        },
+        { onConflict: "business_id,channel" },
+      ),
+    ]);
+  }
 }
 
 function mapPayloadToRow(payload: BusinessPayload) {

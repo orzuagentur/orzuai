@@ -230,6 +230,9 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
       <p className="text-sm text-muted-foreground">
         {WHATSAPP_MESSAGES.connectDescription}
       </p>
+      <p className="text-xs text-muted-foreground">
+        {WHATSAPP_MESSAGES.connectLoginHint}
+      </p>
 
       <Button
         type="button"
@@ -243,7 +246,7 @@ export function WhatsAppEmbeddedSignup({ config }: WhatsAppEmbeddedSignupProps) 
             Connecting...
           </>
         ) : (
-          WHATSAPP_MESSAGES.connectTitle
+          WHATSAPP_MESSAGES.connectWithFacebook
         )}
       </Button>
 

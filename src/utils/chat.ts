@@ -1,9 +1,10 @@
-import type { MessageSenderType } from "@/types/database.types";
+import type { MessageSenderType, MessagingChannel } from "@/types/database.types";
 import type { ChatMessageData, ConversationListItem } from "@/types/chat.types";
 
 type RawMessageRow = {
   id: string;
   conversation_id: string;
+  channel: MessagingChannel;
   sender_type: MessageSenderType;
   content: string;
   ai_generated: boolean;
@@ -12,6 +13,7 @@ type RawMessageRow = {
 
 type RawConversationRow = {
   id: string;
+  channel: MessagingChannel;
   status: ConversationListItem["status"];
   updated_at: string;
   contact:
@@ -24,6 +26,7 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
   return {
     id: row.id,
     conversationId: row.conversation_id,
+    channel: row.channel,
     senderType: row.sender_type,
     content: row.content,
     aiGenerated: row.ai_generated,
@@ -92,6 +95,7 @@ export function mapConversationListItem(
     id: row.id,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    channel: row.channel,
     status: row.status,
     updatedAt: row.updated_at,
     lastMessagePreview: lastMessage?.preview ?? null,

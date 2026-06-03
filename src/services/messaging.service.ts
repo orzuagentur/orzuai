@@ -1,0 +1,150 @@
+import "server-only";
+
+import { incrementChannelAnalytics } from "@/lib/channel-analytics";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { generateAssistantReply } from "@/services/gemini.service";
+import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
+
+type MessagingDbClient = SupabaseClient<Database>;
+
+export type ChannelMessageInsert = {
+  conversationId: string;
+  channel: MessagingChannel;
+  senderType: MessageSenderType;
+  content: string;
+  aiGenerated?: boolean;
+};
+
+export async function insertChannelMessage(
+  admin: MessagingDbClient,
+  input: ChannelMessageInsert,
+): Promise<void> {
+  await admin.from("messages").insert({
+    conversation_id: input.conversationId,
+    channel: input.channel,
+    sender_type: input.senderType,
+    content: input.content,
+    ai_generated: input.aiGenerated ?? false,
+  });
+}
+
+export async function incrementMessagingAnalytics(
+  admin: MessagingDbClient,
+  businessId: string,
+  channel: MessagingChannel,
+  updates: {
+    totalMessages?: number;
+    totalContacts?: number;
+    aiReplies?: number;
+  },
+): Promise<void> {
+  const { data: analytics } = await admin
+    .from("analytics")
+    .select("total_messages, total_contacts, ai_replies")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  await admin.from("analytics").upsert(
+    {
+      business_id: businessId,
+      total_messages:
+        (analytics?.total_messages ?? 0) + (updates.totalMessages ?? 0),
+      total_contacts:
+        (analytics?.total_contacts ?? 0) + (updates.totalContacts ?? 0),
+      ai_replies: (analytics?.ai_replies ?? 0) + (updates.aiReplies ?? 0),
+    },
+    { onConflict: "business_id" },
+  );
+
+  await incrementChannelAnalytics(admin, businessId, channel, updates);
+}
+
+export async function listKnowledgeEntriesForBusiness(
+  admin: MessagingDbClient,
+  businessId: string,
+) {
+  const { data } = await admin
+    .from("knowledge_base")
+    .select("title, content, category")
+    .eq("business_id", businessId)
+    .order("updated_at", { ascending: false })
+    .limit(25);
+
+  return data ?? [];
+}
+
+export async function processChannelAutoReply(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+  sendReply: (text: string) => Promise<{ success: boolean }>;
+}): Promise<void> {
+  const { admin, businessId, channel, conversationId, clientMessage, sendReply } =
+    input;
+
+  const { data: aiSettings } = await admin
+    .from("ai_settings")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("channel", channel)
+    .maybeSingle();
+
+  if (!aiSettings?.ai_enabled) {
+    return;
+  }
+
+  const { data: history } = await admin
+    .from("messages")
+    .select("sender_type, content")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  const knowledgeEntries = await listKnowledgeEntriesForBusiness(
+    admin,
+    businessId,
+  );
+
+  const reply = await generateAssistantReply({
+    model: aiSettings.model,
+    systemPrompt: aiSettings.system_prompt,
+    language: aiSettings.language,
+    userMessage: clientMessage,
+    knowledgeContext: knowledgeEntries.map((entry) => ({
+      title: entry.title,
+      content: entry.content,
+      category: entry.category,
+    })),
+    conversationHistory:
+      history?.map((message) => ({
+        role: message.sender_type === "client" ? "user" : "assistant",
+        content: message.content,
+      })) ?? [],
+  });
+
+  if (!reply.success) {
+    return;
+  }
+
+  const sendResult = await sendReply(reply.data.text);
+
+  if (!sendResult.success) {
+    return;
+  }
+
+  await insertChannelMessage(admin, {
+    conversationId,
+    channel,
+    senderType: "ai",
+    content: reply.data.text,
+    aiGenerated: true,
+  });
+
+  await incrementMessagingAnalytics(admin, businessId, channel, {
+    totalMessages: 1,
+    aiReplies: 1,
+  });
+}

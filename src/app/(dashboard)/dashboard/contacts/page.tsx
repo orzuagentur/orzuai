@@ -1,5 +1,17 @@
-import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { ChannelWorkspacePage } from "@/components/dashboard/ChannelWorkspacePage";
 
-export default function ContactsPage() {
-  return <DashboardComingSoon title="Contacts" />;
+type ContactsPageProps = {
+  searchParams: Promise<{ channel?: string }>;
+};
+
+export default async function ContactsPage({ searchParams }: ContactsPageProps) {
+  const { channel } = await searchParams;
+
+  return (
+    <ChannelWorkspacePage
+      title="Contacts"
+      channelParam={channel}
+      section="contacts"
+    />
+  );
 }

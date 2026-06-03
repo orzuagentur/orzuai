@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { ConversationStatus, MessageSenderType } from "./database.types";
+import type {
+  ConversationStatus,
+  MessageSenderType,
+  MessagingChannel,
+} from "./database.types";
 
 export const sendChatMessageSchema = z.object({
   conversationId: z.string().uuid("Invalid conversation identifier."),
@@ -11,8 +15,11 @@ export const sendChatMessageSchema = z.object({
     .max(4096, "Message is too long."),
 });
 
+const messagingChannelSchema = z.enum(["whatsapp", "instagram", "telegram"]);
+
 export const toggleChatAiSchema = z.object({
   enabled: z.boolean(),
+  channel: messagingChannelSchema,
 });
 
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
@@ -21,6 +28,7 @@ export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
 export type ChatMessageData = {
   id: string;
   conversationId: string;
+  channel: MessagingChannel;
   senderType: MessageSenderType;
   content: string;
   aiGenerated: boolean;
@@ -31,6 +39,7 @@ export type ConversationListItem = {
   id: string;
   contactName: string;
   contactPhone: string;
+  channel: MessagingChannel;
   status: ConversationStatus;
   updatedAt: string;
   lastMessagePreview: string | null;
@@ -41,6 +50,7 @@ export type ConversationDetail = {
   id: string;
   contactName: string;
   contactPhone: string;
+  channel: MessagingChannel;
   status: ConversationStatus;
   updatedAt: string;
   messages: ChatMessageData[];
@@ -49,6 +59,8 @@ export type ConversationDetail = {
 export type ChatsPageData = {
   hasBusiness: boolean;
   whatsappConnected: boolean;
+  instagramConnected: boolean;
+  telegramConnected: boolean;
   aiEnabled: boolean | null;
   conversations: ConversationListItem[];
   activeConversation: ConversationDetail | null;

@@ -17,6 +17,10 @@ export type {
   TablesInsert,
   TablesUpdate,
   User,
+  InstagramConnection,
+  InstagramStatus,
+  TelegramConnection,
+  TelegramStatus,
   WhatsappConnection,
   WhatsappStatus,
 } from "./database.types";
@@ -125,6 +129,23 @@ export type {
   WhatsAppWebhookPayload,
 } from "./whatsapp.types";
 export { completeEmbeddedSignupSchema } from "./whatsapp.types";
+
+export type {
+  InstagramActionError,
+  InstagramActionResult,
+  InstagramConnectionData,
+  InstagramEmbeddedSignupConfig,
+  InstagramErrorCode,
+} from "./instagram.types";
+
+export type {
+  TelegramActionError,
+  TelegramActionResult,
+  TelegramConnectConfig,
+  TelegramConnectionData,
+  TelegramErrorCode,
+} from "./telegram.types";
+export { telegramConnectSchema } from "./telegram.types";
 
 export type {
   ChatMessageData,

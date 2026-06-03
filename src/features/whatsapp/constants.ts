@@ -2,8 +2,11 @@ export const WHATSAPP_MESSAGES = {
   pageTitle: "Integrations",
   pageDescription: "Connect WhatsApp Business and enable AI-powered replies.",
   connectTitle: "Connect WhatsApp",
+  connectWithFacebook: "Continue with Facebook",
+  connectLoginHint:
+    "Log in with your existing Facebook account. After login, Meta will let you select or create a business portfolio — do not create a new personal Facebook profile.",
   connectDescription:
-    "Sign in with Meta and authorize OrzuAI to connect your WhatsApp Business account.",
+    "Sign in with Meta (Facebook) and authorize OrzuAI to connect your WhatsApp Business account.",
   connectSuccess: "WhatsApp connected successfully.",
   connectWaiting:
     "Complete the Meta popup. You will add your WhatsApp number and confirm it with the code from Meta.",

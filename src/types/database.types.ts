@@ -16,6 +16,12 @@ export type KnowledgeCategory =
 
 export type WhatsappStatus = "connected" | "disconnected" | "pending";
 
+export type InstagramStatus = "connected" | "disconnected" | "pending";
+
+export type TelegramStatus = "connected" | "disconnected" | "pending";
+
+export type MessagingChannel = "whatsapp" | "instagram" | "telegram";
+
 export type ConversationStatus = "active" | "archived" | "closed";
 
 export type MessageSenderType = "user" | "client" | "ai";
@@ -197,12 +203,110 @@ export type Database = {
           },
         ];
       };
+      instagram_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          instagram_username: string;
+          instagram_status: InstagramStatus;
+          meta_page_id: string | null;
+          meta_ig_user_id: string | null;
+          meta_access_token: string | null;
+          meta_business_account_id: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          instagram_username?: string;
+          instagram_status?: InstagramStatus;
+          meta_page_id?: string | null;
+          meta_ig_user_id?: string | null;
+          meta_access_token?: string | null;
+          meta_business_account_id?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          instagram_username?: string;
+          instagram_status?: InstagramStatus;
+          meta_page_id?: string | null;
+          meta_ig_user_id?: string | null;
+          meta_access_token?: string | null;
+          meta_business_account_id?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      telegram_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          bot_username: string;
+          telegram_status: TelegramStatus;
+          telegram_bot_id: string | null;
+          bot_token: string | null;
+          webhook_secret: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          bot_username?: string;
+          telegram_status?: TelegramStatus;
+          telegram_bot_id?: string | null;
+          bot_token?: string | null;
+          webhook_secret?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          bot_username?: string;
+          telegram_status?: TelegramStatus;
+          telegram_bot_id?: string | null;
+          bot_token?: string | null;
+          webhook_secret?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "telegram_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contacts: {
         Row: {
           id: string;
           business_id: string;
           name: string;
           phone_number: string;
+          channel: MessagingChannel;
           last_message_at: string | null;
           created_at: string;
         };
@@ -211,6 +315,7 @@ export type Database = {
           business_id: string;
           name: string;
           phone_number: string;
+          channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
         };
@@ -219,6 +324,7 @@ export type Database = {
           business_id?: string;
           name?: string;
           phone_number?: string;
+          channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
         };
@@ -237,6 +343,7 @@ export type Database = {
           id: string;
           business_id: string;
           contact_id: string;
+          channel: MessagingChannel;
           status: ConversationStatus;
           created_at: string;
           updated_at: string;
@@ -245,6 +352,7 @@ export type Database = {
           id?: string;
           business_id: string;
           contact_id: string;
+          channel?: MessagingChannel;
           status?: ConversationStatus;
           created_at?: string;
           updated_at?: string;
@@ -253,6 +361,7 @@ export type Database = {
           id?: string;
           business_id?: string;
           contact_id?: string;
+          channel?: MessagingChannel;
           status?: ConversationStatus;
           created_at?: string;
           updated_at?: string;
@@ -278,6 +387,7 @@ export type Database = {
         Row: {
           id: string;
           conversation_id: string;
+          channel: MessagingChannel;
           sender_type: MessageSenderType;
           content: string;
           ai_generated: boolean;
@@ -286,6 +396,7 @@ export type Database = {
         Insert: {
           id?: string;
           conversation_id: string;
+          channel?: MessagingChannel;
           sender_type: MessageSenderType;
           content: string;
           ai_generated?: boolean;
@@ -294,6 +405,7 @@ export type Database = {
         Update: {
           id?: string;
           conversation_id?: string;
+          channel?: MessagingChannel;
           sender_type?: MessageSenderType;
           content?: string;
           ai_generated?: boolean;
@@ -313,6 +425,7 @@ export type Database = {
         Row: {
           id: string;
           business_id: string;
+          channel: MessagingChannel;
           model: string;
           language: string;
           system_prompt: string;
@@ -323,6 +436,7 @@ export type Database = {
         Insert: {
           id?: string;
           business_id: string;
+          channel?: MessagingChannel;
           model: string;
           language: string;
           system_prompt: string;
@@ -333,6 +447,7 @@ export type Database = {
         Update: {
           id?: string;
           business_id?: string;
+          channel?: MessagingChannel;
           model?: string;
           language?: string;
           system_prompt?: string;
@@ -344,7 +459,42 @@ export type Database = {
           {
             foreignKeyName: "ai_settings_business_id_fkey";
             columns: ["business_id"];
-            isOneToOne: true;
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      channel_analytics: {
+        Row: {
+          business_id: string;
+          channel: MessagingChannel;
+          total_messages: number;
+          total_contacts: number;
+          ai_replies: number;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          channel: MessagingChannel;
+          total_messages?: number;
+          total_contacts?: number;
+          ai_replies?: number;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          channel?: MessagingChannel;
+          total_messages?: number;
+          total_contacts?: number;
+          ai_replies?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "channel_analytics_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },
@@ -399,6 +549,9 @@ export type Database = {
       auth_provider: AuthProvider;
       knowledge_category: KnowledgeCategory;
       whatsapp_status: WhatsappStatus;
+      instagram_status: InstagramStatus;
+      telegram_status: TelegramStatus;
+      messaging_channel: MessagingChannel;
       conversation_status: ConversationStatus;
       message_sender_type: MessageSenderType;
     };
@@ -411,6 +564,10 @@ export type Business = Database["public"]["Tables"]["businesses"]["Row"];
 export type KnowledgeEntry = Database["public"]["Tables"]["knowledge_base"]["Row"];
 export type WhatsappConnection =
   Database["public"]["Tables"]["whatsapp_connections"]["Row"];
+export type InstagramConnection =
+  Database["public"]["Tables"]["instagram_connections"]["Row"];
+export type TelegramConnection =
+  Database["public"]["Tables"]["telegram_connections"]["Row"];
 export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];

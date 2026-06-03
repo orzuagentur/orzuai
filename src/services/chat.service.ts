@@ -5,8 +5,16 @@ import { revalidatePath } from "next/cache";
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { sendInstagramChatMessage } from "@/services/instagram.service";
+import {
+  incrementMessagingAnalytics,
+  insertChannelMessage,
+} from "@/services/messaging.service";
+import { sendTelegramChatMessage } from "@/services/telegram.service";
+import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
+import type { MessagingChannel } from "@/types/database.types";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
@@ -51,27 +59,6 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-async function incrementMessageAnalytics(
-  businessId: string,
-  totalMessages = 1,
-): Promise<void> {
-  const supabase = await createClient();
-  const { data: analytics } = await supabase
-    .from("analytics")
-    .select("total_messages, total_contacts, ai_replies")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  await supabase.from("analytics").upsert(
-    {
-      business_id: businessId,
-      total_messages: (analytics?.total_messages ?? 0) + totalMessages,
-      total_contacts: analytics?.total_contacts ?? 0,
-      ai_replies: analytics?.ai_replies ?? 0,
-    },
-    { onConflict: "business_id" },
-  );
-}
 
 export async function listConversations(
   businessId: string,
@@ -84,7 +71,7 @@ export async function listConversations(
   const { data: conversations } = await supabase
     .from("conversations")
     .select(
-      "id, status, updated_at, contact:contacts(name, phone_number)",
+      "id, channel, status, updated_at, contact:contacts(name, phone_number)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -124,7 +111,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, status, updated_at, contact:contacts(name, phone_number)",
+      "id, channel, status, updated_at, contact:contacts(name, phone_number)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -142,7 +129,9 @@ export async function getConversationDetail(
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("id, conversation_id, sender_type, content, ai_generated, created_at")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+    )
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
 
@@ -150,6 +139,7 @@ export async function getConversationDetail(
     id: conversation.id,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    channel: conversation.channel,
     status: conversation.status,
     updatedAt: conversation.updated_at,
     messages: (messages ?? []).map(mapChatMessage),
@@ -169,12 +159,42 @@ async function isWhatsAppConnected(businessId: string): Promise<boolean> {
   return data?.whatsapp_status === "connected";
 }
 
-async function getAiEnabled(businessId: string): Promise<boolean | null> {
+async function isInstagramConnected(businessId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("instagram_connections")
+    .select("instagram_status")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.instagram_status === "connected";
+}
+
+async function isTelegramConnected(businessId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("telegram_connections")
+    .select("telegram_status")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.telegram_status === "connected";
+}
+
+async function getAiEnabledForChannel(
+  businessId: string,
+  channel: MessagingChannel,
+): Promise<boolean | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("ai_settings")
     .select("ai_enabled")
     .eq("business_id", businessId)
+    .eq("channel", channel)
     .maybeSingle();
 
   if (!data) {
@@ -191,6 +211,8 @@ export async function getChatsPageData(
     return {
       hasBusiness: false,
       whatsappConnected: false,
+      instagramConnected: false,
+      telegramConnected: false,
       aiEnabled: null,
       conversations: [],
       activeConversation: null,
@@ -204,17 +226,21 @@ export async function getChatsPageData(
     return {
       hasBusiness: false,
       whatsappConnected: false,
+      instagramConnected: false,
+      telegramConnected: false,
       aiEnabled: null,
       conversations: [],
       activeConversation: null,
     };
   }
 
-  const [conversations, whatsappConnected, aiEnabled] = await Promise.all([
-    listConversations(business.id),
-    isWhatsAppConnected(business.id),
-    getAiEnabled(business.id),
-  ]);
+  const [conversations, whatsappConnected, instagramConnected, telegramConnected] =
+    await Promise.all([
+      listConversations(business.id),
+      isWhatsAppConnected(business.id),
+      isInstagramConnected(business.id),
+      isTelegramConnected(business.id),
+    ]);
 
   const selectedId =
     activeConversationId &&
@@ -226,9 +252,15 @@ export async function getChatsPageData(
     ? await getConversationDetail(selectedId, business.id)
     : null;
 
+  const aiEnabled = activeConversation
+    ? await getAiEnabledForChannel(business.id, activeConversation.channel)
+    : null;
+
   return {
     hasBusiness: true,
     whatsappConnected,
+    instagramConnected,
+    telegramConnected,
     aiEnabled,
     conversations,
     activeConversation,
@@ -266,22 +298,10 @@ export async function sendChatMessage(
     };
   }
 
-  const connected = await isWhatsAppConnected(businessId);
-
-  if (!connected) {
-    return {
-      success: false,
-      error: {
-        code: "WHATSAPP_NOT_CONNECTED",
-        message: CHAT_MESSAGES.whatsappNotConnected,
-      },
-    };
-  }
-
   const supabase = await createClient();
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, contact:contacts(id, phone_number)")
+    .select("id, channel, contact:contacts(id, phone_number)")
     .eq("id", parsed.data.conversationId)
     .eq("business_id", businessId)
     .maybeSingle();
@@ -296,68 +316,162 @@ export async function sendChatMessage(
     };
   }
 
-  const contact = resolveContactFromRow(conversation.contact);
+  if (conversation.channel === "instagram") {
+    const sendResult = await sendInstagramChatMessage(
+      businessId,
+      parsed.data.conversationId,
+      parsed.data.content,
+    );
 
-  if (!contact) {
-    return {
-      success: false,
-      error: {
-        code: "NOT_FOUND",
-        message: CHAT_MESSAGES.genericError,
-      },
-    };
-  }
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: {
+          code: "SEND_FAILED",
+          message: sendResult.message,
+        },
+      };
+    }
+  } else if (conversation.channel === "telegram") {
+    const sendResult = await sendTelegramChatMessage(
+      businessId,
+      parsed.data.conversationId,
+      parsed.data.content,
+    );
 
-  const { data: connection } = await supabase
-    .from("whatsapp_connections")
-    .select("meta_phone_number_id, meta_access_token")
-    .eq("business_id", businessId)
-    .eq("whatsapp_status", "connected")
-    .maybeSingle();
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: {
+          code: "SEND_FAILED",
+          message: sendResult.message,
+        },
+      };
+    }
+  } else {
+    const connected = await isWhatsAppConnected(businessId);
 
-  if (
-    !connection?.meta_phone_number_id ||
-    !connection.meta_access_token
-  ) {
-    return {
-      success: false,
-      error: {
-        code: "WHATSAPP_NOT_CONNECTED",
-        message: CHAT_MESSAGES.whatsappNotConnected,
-      },
-    };
-  }
+    if (!connected) {
+      return {
+        success: false,
+        error: {
+          code: "WHATSAPP_NOT_CONNECTED",
+          message: CHAT_MESSAGES.whatsappNotConnected,
+        },
+      };
+    }
 
-  const sendResult = await sendWhatsAppTextMessage(
-    connection.meta_phone_number_id,
-    connection.meta_access_token,
-    contact.phone_number.replace(/^\+/, ""),
-    parsed.data.content,
-  );
+    const contact = resolveContactFromRow(conversation.contact);
 
-  if (!sendResult.success) {
-    return {
-      success: false,
-      error: {
-        code: "SEND_FAILED",
-        message: sendResult.message,
-      },
-    };
+    if (!contact) {
+      return {
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: CHAT_MESSAGES.genericError,
+        },
+      };
+    }
+
+    const { data: connection } = await supabase
+      .from("whatsapp_connections")
+      .select("meta_phone_number_id, meta_access_token")
+      .eq("business_id", businessId)
+      .eq("whatsapp_status", "connected")
+      .maybeSingle();
+
+    if (
+      !connection?.meta_phone_number_id ||
+      !connection.meta_access_token
+    ) {
+      return {
+        success: false,
+        error: {
+          code: "WHATSAPP_NOT_CONNECTED",
+          message: CHAT_MESSAGES.whatsappNotConnected,
+        },
+      };
+    }
+
+    const sendResult = await sendWhatsAppTextMessage(
+      connection.meta_phone_number_id,
+      connection.meta_access_token,
+      contact.phone_number.replace(/^\+/, ""),
+      parsed.data.content,
+    );
+
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: {
+          code: "SEND_FAILED",
+          message: sendResult.message,
+        },
+      };
+    }
   }
 
   const now = new Date().toISOString();
-  const { data: message, error } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: parsed.data.conversationId,
-      sender_type: "user",
-      content: parsed.data.content,
-      ai_generated: false,
-    })
-    .select("id, conversation_id, sender_type, content, ai_generated, created_at")
-    .single();
 
-  if (error || !message) {
+  if (
+    conversation.channel === "instagram" ||
+    conversation.channel === "telegram"
+  ) {
+    const { data: latestMessage } = await supabase
+      .from("messages")
+      .select(
+        "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+      )
+      .eq("conversation_id", parsed.data.conversationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!latestMessage) {
+      return {
+        success: false,
+        error: {
+          code: "SEND_FAILED",
+          message: CHAT_MESSAGES.sendFailed,
+        },
+      };
+    }
+
+    await supabase
+      .from("conversations")
+      .update({ updated_at: now })
+      .eq("id", parsed.data.conversationId);
+
+    revalidateChatPaths();
+
+    return {
+      success: true,
+      data: {
+        message: mapChatMessage(latestMessage),
+      },
+    };
+  }
+
+  const contact = resolveContactFromRow(conversation.contact);
+
+  await insertChannelMessage(supabase, {
+    conversationId: parsed.data.conversationId,
+    channel: conversation.channel,
+    senderType: "user",
+    content: parsed.data.content,
+  });
+
+  const { data: insertedMessage } = await supabase
+    .from("messages")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+    )
+    .eq("conversation_id", parsed.data.conversationId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!insertedMessage) {
     return {
       success: false,
       error: {
@@ -367,7 +481,7 @@ export async function sendChatMessage(
     };
   }
 
-  const contactUpdates = contact.id
+  const contactUpdates = contact?.id
     ? [
         supabase
           .from("contacts")
@@ -382,7 +496,9 @@ export async function sendChatMessage(
       .update({ updated_at: now })
       .eq("id", parsed.data.conversationId),
     ...contactUpdates,
-    incrementMessageAnalytics(businessId),
+    incrementMessagingAnalytics(createAdminClient(), businessId, conversation.channel, {
+      totalMessages: 1,
+    }),
   ]);
 
   revalidateChatPaths();
@@ -390,7 +506,7 @@ export async function sendChatMessage(
   return {
     success: true,
     data: {
-      message: mapChatMessage(message),
+      message: mapChatMessage(insertedMessage),
     },
   };
 }
@@ -428,7 +544,8 @@ export async function toggleChatAi(input: unknown): Promise<ToggleChatAiResult> 
   const { error } = await supabase
     .from("ai_settings")
     .update({ ai_enabled: parsed.data.enabled })
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .eq("channel", parsed.data.channel);
 
   if (error) {
     return {

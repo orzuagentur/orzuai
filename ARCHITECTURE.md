@@ -38,6 +38,12 @@ features/
 
 ├── whatsapp/
 
+├── instagram/
+
+├── telegram/
+
+├── integrations/
+
 ├── chats/
 
 ├── settings/

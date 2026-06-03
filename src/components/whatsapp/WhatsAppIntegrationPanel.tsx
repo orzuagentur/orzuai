@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import { useSyncWhatsApp } from "@/hooks/use-sync-whatsapp";
@@ -26,6 +27,8 @@ type WhatsAppIntegrationPanelProps = {
   connection: WhatsAppConnectionData | null;
   hasBusiness: boolean;
   embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
+  /** When true, panel is shown inside the integrations hub (no outer page title). */
+  embeddedInHub?: boolean;
 };
 
 function getStatusVariant(
@@ -46,6 +49,7 @@ export function WhatsAppIntegrationPanel({
   connection,
   hasBusiness,
   embeddedSignupConfig,
+  embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
   const router = useRouter();
   const { sync, isLoading: isSyncing } = useSyncWhatsApp({
@@ -70,12 +74,20 @@ export function WhatsAppIntegrationPanel({
     );
   }
 
+  const cardClassName = embeddedInHub
+    ? "w-full max-w-none shadow-none border-0 bg-transparent"
+    : "mx-auto w-full max-w-3xl shadow-none";
+
   return (
-    <Card className="mx-auto w-full max-w-3xl shadow-none">
-      <CardHeader>
+    <Card className={cardClassName}>
+      <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle>{WHATSAPP_MESSAGES.connectTitle}</CardTitle>
+            <CardTitle>
+              {embeddedInHub
+                ? WHATSAPP_MESSAGES.connectWithFacebook
+                : WHATSAPP_MESSAGES.connectTitle}
+            </CardTitle>
             <CardDescription>
               {WHATSAPP_MESSAGES.connectDescription}
             </CardDescription>
@@ -87,47 +99,52 @@ export function WhatsAppIntegrationPanel({
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className={embeddedInHub ? "space-y-6 px-0 pb-0" : "space-y-6"}>
         {connection?.status === "connected" ? (
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="space-y-1 text-sm">
-              <p>
-                <span className="font-medium">Connected number:</span>{" "}
-                {connection.phoneNumber}
-              </p>
-              {connection.connectedAt ? (
+          <div className="space-y-4">
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-1 text-sm">
                 <p>
-                  <span className="font-medium">Connected:</span>{" "}
-                  {new Date(connection.connectedAt).toLocaleString("en-US")}
+                  <span className="font-medium">Connected number:</span>{" "}
+                  {connection.phoneNumber}
                 </p>
-              ) : null}
-              {connection.lastSyncedAt ? (
-                <p>
-                  <span className="font-medium">Last synced:</span>{" "}
-                  {new Date(connection.lastSyncedAt).toLocaleString("en-US")}
-                </p>
-              ) : null}
+                {connection.connectedAt ? (
+                  <p>
+                    <span className="font-medium">Connected:</span>{" "}
+                    {new Date(connection.connectedAt).toLocaleString("en-US")}
+                  </p>
+                ) : null}
+                {connection.lastSyncedAt ? (
+                  <p>
+                    <span className="font-medium">Last synced:</span>{" "}
+                    {new Date(connection.lastSyncedAt).toLocaleString("en-US")}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSyncing}
+                onClick={() => {
+                  void sync();
+                }}
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCwIcon className="size-4" />
+                    Sync messages
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isSyncing}
-              onClick={() => {
-                void sync();
-              }}
-            >
-              {isSyncing ? (
-                <>
-                  <Loader2Icon className="size-4 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCwIcon className="size-4" />
-                  Sync messages
-                </>
-              )}
-            </Button>
+            {embeddedInHub ? (
+              <IntegrationQuickLinks channel="whatsapp" showHubSections />
+            ) : null}
           </div>
         ) : (
           <WhatsAppEmbeddedSignup config={embeddedSignupConfig} />

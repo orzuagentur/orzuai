@@ -9,6 +9,8 @@ export type EmbeddedSignupFinishData = {
   phone_number_id?: string;
   waba_id?: string;
   business_id?: string;
+  page_id?: string;
+  instagram_account_id?: string;
 };
 
 export type EmbeddedSignupMessage = {
