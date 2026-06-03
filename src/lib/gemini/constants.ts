@@ -1,4 +1,4 @@
-export const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 export const GEMINI_GENERATION = {
   temperature: 0.7,
