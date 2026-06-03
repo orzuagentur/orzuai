@@ -2,12 +2,17 @@ import type { KnowledgeEntry } from "@/types/database.types";
 import type { KnowledgeEntryData } from "@/types/knowledge.types";
 
 export function mapKnowledgeEntry(entry: KnowledgeEntry): KnowledgeEntryData {
+  const source =
+    entry.source === "website_sync" ? "website_sync" : ("manual" as const);
+
   return {
     id: entry.id,
     businessId: entry.business_id,
     title: entry.title,
     content: entry.content,
     category: entry.category,
+    source,
+    sourceUrl: entry.source_url ?? null,
     createdAt: entry.created_at,
     updatedAt: entry.updated_at,
   };

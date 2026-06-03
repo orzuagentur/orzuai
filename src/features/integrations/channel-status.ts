@@ -1,6 +1,7 @@
 import type { InstagramConnectionData } from "@/types/instagram.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
+import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type { WhatsAppConnectionData } from "@/types/whatsapp.types";
 
 import type { IntegrationChannelId } from "./constants";
@@ -25,6 +26,7 @@ type BuildChannelStatusesInput = {
   instagramConnection: InstagramConnectionData | null;
   telegramConnection: TelegramConnectionData | null;
   websiteFormConnection: WebsiteFormConnectionData | null;
+  websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
 };
 
 export function buildIntegrationChannelStatuses({
@@ -32,6 +34,7 @@ export function buildIntegrationChannelStatuses({
   instagramConnection,
   telegramConnection,
   websiteFormConnection,
+  websiteKnowledgeSync,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
   let whatsappStatus: IntegrationChannelStatus = "disconnected";
   let whatsappDetail: string | undefined;
@@ -78,6 +81,22 @@ export function buildIntegrationChannelStatuses({
     websiteFormsStatus = "pending";
   }
 
+  let websiteKnowledgeStatus: IntegrationChannelStatus = "disconnected";
+  let websiteKnowledgeDetail: string | undefined;
+
+  if (websiteKnowledgeSync?.syncStatus === "ready") {
+    websiteKnowledgeStatus = "connected";
+    websiteKnowledgeDetail = websiteKnowledgeSync.siteUrl.replace(/^https?:\/\//, "");
+  } else if (websiteKnowledgeSync?.syncStatus === "syncing") {
+    websiteKnowledgeStatus = "pending";
+    websiteKnowledgeDetail = "Syncing…";
+  } else if (websiteKnowledgeSync?.syncStatus === "error") {
+    websiteKnowledgeStatus = "pending";
+    websiteKnowledgeDetail = "Sync error";
+  } else if (websiteKnowledgeSync) {
+    websiteKnowledgeStatus = "pending";
+  }
+
   return {
     whatsapp: {
       status: whatsappStatus,
@@ -94,6 +113,10 @@ export function buildIntegrationChannelStatuses({
     website_forms: {
       status: websiteFormsStatus,
       detail: websiteFormsDetail,
+    },
+    website_knowledge: {
+      status: websiteKnowledgeStatus,
+      detail: websiteKnowledgeDetail,
     },
   };
 }

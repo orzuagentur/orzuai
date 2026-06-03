@@ -1,4 +1,4 @@
--- Website Forms integration: inbound leads via webhook + API key
+-- Step 2: Website Forms tables and backfill (run after 20250602160000_* is applied)
 
 CREATE TYPE public.website_form_status AS ENUM (
   'connected',
@@ -12,8 +12,6 @@ CREATE TYPE public.website_form_follow_up AS ENUM (
   'email',
   'none'
 );
-
-ALTER TYPE public.messaging_channel ADD VALUE IF NOT EXISTS 'website_forms';
 
 CREATE TABLE public.website_form_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

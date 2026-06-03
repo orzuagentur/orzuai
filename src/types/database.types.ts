@@ -28,6 +28,8 @@ export type WebsiteFormFollowUp =
   | "email"
   | "none";
 
+export type WebsiteKnowledgeSyncStatus = "idle" | "syncing" | "ready" | "error";
+
 export type MessagingChannel =
   | "whatsapp"
   | "instagram"
@@ -121,6 +123,62 @@ export type Database = {
           },
         ];
       };
+      website_knowledge_syncs: {
+        Row: {
+          id: string;
+          business_id: string;
+          site_url: string;
+          sync_status: WebsiteKnowledgeSyncStatus;
+          auto_sync_enabled: boolean;
+          sync_interval_hours: number;
+          last_synced_at: string | null;
+          next_sync_at: string | null;
+          last_sync_error: string | null;
+          pages_indexed: number;
+          entries_synced: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          site_url: string;
+          sync_status?: WebsiteKnowledgeSyncStatus;
+          auto_sync_enabled?: boolean;
+          sync_interval_hours?: number;
+          last_synced_at?: string | null;
+          next_sync_at?: string | null;
+          last_sync_error?: string | null;
+          pages_indexed?: number;
+          entries_synced?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          site_url?: string;
+          sync_status?: WebsiteKnowledgeSyncStatus;
+          auto_sync_enabled?: boolean;
+          sync_interval_hours?: number;
+          last_synced_at?: string | null;
+          next_sync_at?: string | null;
+          last_sync_error?: string | null;
+          pages_indexed?: number;
+          entries_synced?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "website_knowledge_syncs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       knowledge_base: {
         Row: {
           id: string;
@@ -128,6 +186,8 @@ export type Database = {
           title: string;
           content: string;
           category: KnowledgeCategory;
+          source: string;
+          source_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -137,6 +197,8 @@ export type Database = {
           title: string;
           content: string;
           category: KnowledgeCategory;
+          source?: string;
+          source_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -146,6 +208,8 @@ export type Database = {
           title?: string;
           content?: string;
           category?: KnowledgeCategory;
+          source?: string;
+          source_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -624,6 +688,7 @@ export type Database = {
       telegram_status: TelegramStatus;
       website_form_status: WebsiteFormStatus;
       website_form_follow_up: WebsiteFormFollowUp;
+      website_knowledge_sync_status: WebsiteKnowledgeSyncStatus;
       messaging_channel: MessagingChannel;
       conversation_status: ConversationStatus;
       message_sender_type: MessageSenderType;
@@ -643,6 +708,8 @@ export type TelegramConnection =
   Database["public"]["Tables"]["telegram_connections"]["Row"];
 export type WebsiteFormConnection =
   Database["public"]["Tables"]["website_form_connections"]["Row"];
+export type WebsiteKnowledgeSync =
+  Database["public"]["Tables"]["website_knowledge_syncs"]["Row"];
 export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];

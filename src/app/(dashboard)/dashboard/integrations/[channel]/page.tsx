@@ -17,6 +17,8 @@ import {
   getWebsiteFormConnection,
   getWebsiteFormConnectConfig,
 } from "@/services/website-forms.service";
+import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
+import { hasGeminiEnv } from "@/lib/env";
 import {
   getWhatsAppConnection,
   getWhatsAppEmbeddedSignupConfig,
@@ -27,6 +29,7 @@ import {
   isChannelConnectedForWorkspace,
   isIntegrationChannelId,
   isIntegrationSectionId,
+  isMessagingIntegrationChannel,
   type IntegrationChannelId,
   type IntegrationSectionId,
 } from "@/features/integrations";
@@ -69,6 +72,7 @@ export default async function IntegrationsChannelPage({
     telegramConfig,
     websiteFormConnection,
     websiteFormConfig,
+    websiteKnowledgeSync,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     getWhatsAppEmbeddedSignupConfig(),
@@ -78,6 +82,7 @@ export default async function IntegrationsChannelPage({
     Promise.resolve(getTelegramConnectConfig()),
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWebsiteFormConnectConfig()),
+    business ? getWebsiteKnowledgeSync(business.id) : Promise.resolve(null),
   ]);
 
   const channelStatuses = buildIntegrationChannelStatuses({
@@ -85,17 +90,19 @@ export default async function IntegrationsChannelPage({
     instagramConnection,
     telegramConnection,
     websiteFormConnection,
+    websiteKnowledgeSync,
   });
 
+  const isMessagingChannel = isMessagingIntegrationChannel(channel);
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
 
   const workspaceSummary =
-    business && isConnected
+    business && isConnected && isMessagingChannel
       ? await getChannelWorkspaceSummary(business.id, channel)
       : undefined;
 
   const [aiSettings, analytics] =
-    business && isConnected
+    business && isConnected && isMessagingChannel
       ? await Promise.all([
           section === "ai-assistant"
             ? getChannelAiSettings(channel)
@@ -132,6 +139,10 @@ export default async function IntegrationsChannelPage({
           websiteForms={{
             connection: websiteFormConnection,
             connectConfig: websiteFormConfig,
+          }}
+          websiteKnowledge={{
+            sync: websiteKnowledgeSync,
+            geminiConfigured: hasGeminiEnv(),
           }}
         />
       </IntegrationsHub>

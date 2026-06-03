@@ -1,11 +1,10 @@
 import { z } from "zod";
 
 import { GEMINI_MODEL_IDS } from "@/lib/gemini/constants";
-import type { IntegrationChannelId } from "@/features/integrations";
 import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
-import type { MessageSenderType } from "./database.types";
+import type { MessageSenderType, MessagingChannel } from "./database.types";
 
-export type MessagingChannel = IntegrationChannelId;
+export type { MessagingChannel };
 
 export const AI_LANGUAGE_OPTIONS = [
   { value: "English", label: "English" },

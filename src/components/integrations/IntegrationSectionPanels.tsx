@@ -6,7 +6,11 @@ import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuic
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
+import { WebsiteKnowledgeActivatePanel } from "@/components/website-knowledge/WebsiteKnowledgeActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
+import Link from "next/link";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   Card,
   CardContent,
@@ -14,13 +18,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   INTEGRATIONS_MESSAGES,
   isChannelConnectedForWorkspace,
+  isMessagingIntegrationChannel,
   type IntegrationChannelId,
   type IntegrationChannelStatusMap,
   type IntegrationSectionId,
 } from "@/features/integrations";
+import { WEBSITE_KNOWLEDGE_MESSAGES } from "@/features/website-knowledge";
 import type {
   ChannelAiSettingsData,
   ChannelAnalyticsData,
@@ -38,6 +45,7 @@ import type {
   WebsiteFormConnectConfig,
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
+import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type {
   WhatsAppConnectionData,
   WhatsAppEmbeddedSignupConfig,
@@ -67,6 +75,10 @@ type IntegrationSectionPanelsProps = {
     connection: WebsiteFormConnectionData | null;
     connectConfig: WebsiteFormConnectConfig;
   };
+  websiteKnowledge?: {
+    sync: WebsiteKnowledgeSyncData | null;
+    geminiConfigured: boolean;
+  };
 };
 
 export function IntegrationSectionPanels({
@@ -81,8 +93,10 @@ export function IntegrationSectionPanels({
   instagram,
   telegram,
   websiteForms,
+  websiteKnowledge,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
+  const isMessagingChannel = isMessagingIntegrationChannel(channel);
 
   if (section === "activate") {
     return (
@@ -93,7 +107,29 @@ export function IntegrationSectionPanels({
         instagram={instagram}
         telegram={telegram}
         websiteForms={websiteForms}
+        websiteKnowledge={websiteKnowledge}
       />
+    );
+  }
+
+  if (!isMessagingChannel) {
+    return (
+      <Card className="max-w-2xl shadow-none">
+        <CardHeader>
+          <CardTitle>{WEBSITE_KNOWLEDGE_MESSAGES.connectTitle}</CardTitle>
+          <CardDescription>{WEBSITE_KNOWLEDGE_MESSAGES.aiUsageNote}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={`${DASHBOARD_ROUTES.integrations}/website_knowledge?section=activate`}>
+              Open setup
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={DASHBOARD_ROUTES.knowledgeBase}>Knowledge base</Link>
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -153,6 +189,7 @@ function ActivateSection({
   instagram,
   telegram,
   websiteForms,
+  websiteKnowledge,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
@@ -160,6 +197,7 @@ function ActivateSection({
   instagram?: IntegrationSectionPanelsProps["instagram"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
+  websiteKnowledge?: IntegrationSectionPanelsProps["websiteKnowledge"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -200,6 +238,17 @@ function ActivateSection({
         connection={websiteForms.connection}
         hasBusiness={hasBusiness}
         config={websiteForms.connectConfig}
+        embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "website_knowledge" && websiteKnowledge) {
+    return (
+      <WebsiteKnowledgeActivatePanel
+        sync={websiteKnowledge.sync}
+        hasBusiness={hasBusiness}
+        geminiConfigured={websiteKnowledge.geminiConfigured}
         embeddedInHub
       />
     );

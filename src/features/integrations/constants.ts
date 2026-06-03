@@ -1,16 +1,30 @@
 import type { LucideIcon } from "lucide-react";
-import { Camera, Globe, MessageCircle, Send } from "lucide-react";
+import { BookOpen, Camera, Globe, MessageCircle, Send } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 
-export const INTEGRATION_CHANNELS = [
+export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
   "instagram",
   "telegram",
   "website_forms",
 ] as const;
 
+export const INTEGRATION_CHANNELS = [
+  ...MESSAGING_INTEGRATION_CHANNELS,
+  "website_knowledge",
+] as const;
+
+export type MessagingIntegrationChannelId =
+  (typeof MESSAGING_INTEGRATION_CHANNELS)[number];
+
 export type IntegrationChannelId = (typeof INTEGRATION_CHANNELS)[number];
+
+export function isMessagingIntegrationChannel(
+  channel: IntegrationChannelId,
+): channel is MessagingIntegrationChannelId {
+  return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
+}
 
 export const INTEGRATION_SECTIONS = [
   "activate",
@@ -59,6 +73,13 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     label: "Website Forms",
     description: "Leads from any website or CMS",
     icon: Globe,
+    available: true,
+  },
+  {
+    id: "website_knowledge",
+    label: "Website Knowledge",
+    description: "Sync site content into AI knowledge",
+    icon: BookOpen,
     available: true,
   },
 ];

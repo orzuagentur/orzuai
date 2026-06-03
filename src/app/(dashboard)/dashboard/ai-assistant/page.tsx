@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { AiAssistantHub } from "@/components/ai-assistant/AiAssistantHub";
 import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { isIntegrationChannelId } from "@/features/integrations";
+import { isMessagingIntegrationChannel } from "@/features/integrations";
+import type { IntegrationChannelId } from "@/features/integrations";
 import { getAiAssistantPageData } from "@/services/ai-assistant.service";
 
 type AiAssistantPageProps = {
@@ -16,7 +17,10 @@ export default async function AiAssistantPage({
 }: AiAssistantPageProps) {
   const { channel } = await searchParams;
 
-  if (channel && !isIntegrationChannelId(channel)) {
+  if (
+    channel &&
+    !isMessagingIntegrationChannel(channel as IntegrationChannelId)
+  ) {
     redirect(`${DASHBOARD_ROUTES.aiAssistant}?channel=whatsapp`);
   }
 

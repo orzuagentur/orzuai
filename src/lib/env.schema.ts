@@ -83,6 +83,7 @@ export const serverEnvSchema = z.object({
     .optional(),
   [ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]: z.string().trim().min(1).optional(),
   [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]: z.string().trim().min(1).optional(),
+  [ENV_KEYS.CRON_SECRET]: z.string().trim().min(16).optional(),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
@@ -140,6 +141,7 @@ function collectServerEnv(): Record<string, string | undefined> {
       process.env[ENV_KEYS.INSTAGRAM_VERIFY_TOKEN],
     [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]:
       process.env[ENV_KEYS.TELEGRAM_WEBHOOK_SECRET],
+    [ENV_KEYS.CRON_SECRET]: process.env[ENV_KEYS.CRON_SECRET],
   };
 }
 

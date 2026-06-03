@@ -17,8 +17,9 @@ import {
   buildIntegrationActivateHref,
   INTEGRATION_CHANNEL_LIST,
   isIntegrationChannelId,
-  type IntegrationChannelId,
+  isMessagingIntegrationChannel,
 } from "@/features/integrations";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
@@ -43,7 +44,31 @@ export async function ChannelWorkspacePage({
     return <DashboardComingSoon title={title} />;
   }
 
-  const channel: IntegrationChannelId = channelParam;
+  if (!isMessagingIntegrationChannel(channelParam)) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <Card className="max-w-2xl shadow-none">
+          <CardHeader>
+            <CardTitle>Website Knowledge</CardTitle>
+            <CardDescription>
+              Manage website knowledge sync from Integrations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link
+                href={`${DASHBOARD_ROUTES.integrations}/website_knowledge?section=activate`}
+              >
+                Open Website Knowledge
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const channel = channelParam;
   const channelLabel =
     INTEGRATION_CHANNEL_LIST.find((c) => c.id === channel)?.label ?? channel;
   const pageTitle = `${title} — ${channelLabel}`;

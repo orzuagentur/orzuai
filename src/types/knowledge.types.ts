@@ -32,12 +32,16 @@ export const updateKnowledgeEntrySchema = knowledgeEntrySchema.extend({
 export type KnowledgeEntryInput = z.infer<typeof knowledgeEntrySchema>;
 export type UpdateKnowledgeEntryInput = z.infer<typeof updateKnowledgeEntrySchema>;
 
+export type KnowledgeEntrySource = "manual" | "website_sync";
+
 export type KnowledgeEntryData = {
   id: string;
   businessId: string;
   title: string;
   content: string;
   category: KnowledgeCategory;
+  source: KnowledgeEntrySource;
+  sourceUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };

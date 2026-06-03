@@ -51,6 +51,9 @@ export function KnowledgeEntryCard({
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="truncate text-base">{entry.title}</CardTitle>
               <Badge variant="secondary">{entry.category}</Badge>
+            {entry.source === "website_sync" ? (
+              <Badge variant="outline">Website sync</Badge>
+            ) : null}
             </div>
             <CardDescription>
               Updated {new Date(entry.updatedAt).toLocaleDateString("en-US")}

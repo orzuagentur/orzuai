@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-website-knowledge",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

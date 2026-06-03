@@ -3,7 +3,11 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
-import { INTEGRATION_CHANNELS, isIntegrationChannelId } from "@/features/integrations";
+import {
+  MESSAGING_INTEGRATION_CHANNELS,
+  isMessagingIntegrationChannel,
+} from "@/features/integrations";
+import type { IntegrationChannelId } from "@/features/integrations";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -21,7 +25,7 @@ import type {
 } from "@/types/channel-workspace.types";
 import { applyGlobalAiDefaultsSchema } from "@/types/channel-workspace.types";
 
-const MESSAGING_CHANNELS = INTEGRATION_CHANNELS;
+const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
 
 function revalidateAiAssistantPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
@@ -42,9 +46,10 @@ export async function getAiAssistantPageData(
   activeChannelParam?: string | null,
 ): Promise<AiAssistantPageData> {
   const defaultModel = getDefaultGeminiModel();
+  const channelParam = activeChannelParam as IntegrationChannelId | undefined;
   const activeChannel: MessagingChannel =
-    activeChannelParam && isIntegrationChannelId(activeChannelParam)
-      ? activeChannelParam
+    channelParam && isMessagingIntegrationChannel(channelParam)
+      ? channelParam
       : "whatsapp";
 
   const businessId = await getOwnedBusinessId();

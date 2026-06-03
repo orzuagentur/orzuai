@@ -24,6 +24,7 @@ import { getInstagramConnection } from "@/services/instagram.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
+import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { getWhatsAppConnection } from "@/services/whatsapp.service";
 import type {
   ChannelAiSettingsData,
@@ -220,18 +221,21 @@ export async function syncChannelAnalytics(
 }
 
 export async function getChannelConnectionStatuses(businessId: string) {
-  const [whatsapp, instagram, telegram, websiteForms] = await Promise.all([
-    getWhatsAppConnection(businessId),
-    getInstagramConnection(businessId),
-    getTelegramConnection(businessId),
-    getWebsiteFormConnection(businessId),
-  ]);
+  const [whatsapp, instagram, telegram, websiteForms, websiteKnowledge] =
+    await Promise.all([
+      getWhatsAppConnection(businessId),
+      getInstagramConnection(businessId),
+      getTelegramConnection(businessId),
+      getWebsiteFormConnection(businessId),
+      getWebsiteKnowledgeSync(businessId),
+    ]);
 
   return buildIntegrationChannelStatuses({
     whatsappConnection: whatsapp,
     instagramConnection: instagram,
     telegramConnection: telegram,
     websiteFormConnection: websiteForms,
+    websiteKnowledgeSync: websiteKnowledge,
   });
 }
 

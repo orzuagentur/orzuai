@@ -5,6 +5,8 @@ export {
   DEFAULT_INTEGRATION_SECTION,
   INTEGRATION_CHANNEL_LIST,
   INTEGRATION_CHANNELS,
+  isMessagingIntegrationChannel,
+  MESSAGING_INTEGRATION_CHANNELS,
   INTEGRATION_SECTION_LIST,
   INTEGRATION_SECTIONS,
   INTEGRATIONS_MESSAGES,
@@ -14,6 +16,7 @@ export {
 export type {
   IntegrationChannelId,
   IntegrationSectionId,
+  MessagingIntegrationChannelId,
 } from "./constants";
 export {
   buildIntegrationChannelStatuses,
