@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
 import { MessageSquareIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
   getChannelBadgeLabel,
   getChannelBadgeVariant,
 } from "@/features/chats/channel-ui";
+import type { ChatChannelId } from "@/features/chats";
 import type { ConversationListItem } from "@/types/chat.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
@@ -18,6 +19,8 @@ import { formatRelativeTime } from "@/utils/dashboard";
 type ChatListProps = {
   conversations: ConversationListItem[];
   activeConversationId: string | null;
+  channelId: ChatChannelId;
+  hideChannelBadge?: boolean;
   className?: string;
 };
 
@@ -35,20 +38,20 @@ function getStatusVariant(
   return "outline";
 }
 
+function buildConversationHref(
+  channelId: ChatChannelId,
+  conversationId: string,
+): string {
+  return `${DASHBOARD_ROUTES.chats}/${channelId}?conversation=${conversationId}`;
+}
+
 export function ChatList({
   conversations,
   activeConversationId,
+  channelId,
+  hideChannelBadge = false,
   className,
 }: ChatListProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function buildConversationHref(conversationId: string): string {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("conversation", conversationId);
-    return `${pathname}?${params.toString()}`;
-  }
-
   if (conversations.length === 0) {
     return (
       <div
@@ -74,10 +77,10 @@ export function ChatList({
         return (
           <Link
             key={conversation.id}
-            href={buildConversationHref(conversation.id)}
+            href={buildConversationHref(channelId, conversation.id)}
             className={cn(
               "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-              isActive && "bg-muted",
+              isActive && "bg-primary/5",
             )}
           >
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
@@ -87,12 +90,14 @@ export function ChatList({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="truncate font-medium">{conversation.contactName}</p>
-                  <Badge
-                    variant={getChannelBadgeVariant(conversation.channel)}
-                    className="shrink-0 px-1.5 py-0 text-[10px]"
-                  >
-                    {getChannelBadgeLabel(conversation.channel)}
-                  </Badge>
+                  {!hideChannelBadge ? (
+                    <Badge
+                      variant={getChannelBadgeVariant(conversation.channel)}
+                      className="shrink-0 px-1.5 py-0 text-[10px]"
+                    >
+                      {getChannelBadgeLabel(conversation.channel)}
+                    </Badge>
+                  ) : null}
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatRelativeTime(
@@ -104,14 +109,14 @@ export function ChatList({
                 {formatContactIdentifier(conversation.contactPhone)}
               </p>
               {conversation.lastMessagePreview ? (
-                <p className="truncate text-sm text-muted-foreground">
+                <p className="line-clamp-2 text-sm text-muted-foreground">
                   {conversation.lastMessagePreview}
                 </p>
               ) : null}
             </div>
             <Badge
               variant={getStatusVariant(conversation.status)}
-              className="shrink-0 self-start"
+              className="hidden shrink-0 self-start sm:inline-flex"
             >
               {conversation.status}
             </Badge>

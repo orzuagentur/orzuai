@@ -16,35 +16,40 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useSendChatMessage } from "@/hooks/use-send-chat-message";
 import type { ConversationDetail } from "@/types/chat.types";
+import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 
 type ChatWindowProps = {
   conversation: ConversationDetail | null;
   aiEnabled: boolean | null;
-  whatsappConnected: boolean;
-  instagramConnected: boolean;
-  telegramConnected: boolean;
+  channelConnected: boolean;
+  channel: MessagingChannel;
 };
+
+function getChannelNotConnectedMessage(channel: MessagingChannel): string {
+  if (channel === "instagram") {
+    return CHAT_MESSAGES.instagramNotConnected;
+  }
+
+  if (channel === "telegram") {
+    return CHAT_MESSAGES.telegramNotConnected;
+  }
+
+  if (channel === "website_forms") {
+    return CHAT_MESSAGES.websiteFormsNotConnected;
+  }
+
+  return CHAT_MESSAGES.whatsappNotConnected;
+}
 
 export function ChatWindow({
   conversation,
   aiEnabled,
-  whatsappConnected,
-  instagramConnected,
-  telegramConnected,
+  channelConnected,
+  channel,
 }: ChatWindowProps) {
-  const channelConnected =
-    conversation?.channel === "instagram"
-      ? instagramConnected
-      : conversation?.channel === "telegram"
-        ? telegramConnected
-        : whatsappConnected;
-  const channelNotConnectedMessage =
-    conversation?.channel === "instagram"
-      ? CHAT_MESSAGES.instagramNotConnected
-      : conversation?.channel === "telegram"
-        ? CHAT_MESSAGES.telegramNotConnected
-        : CHAT_MESSAGES.whatsappNotConnected;
+  const canSend = channelConnected;
+  const channelNotConnectedMessage = getChannelNotConnectedMessage(channel);
   const router = useRouter();
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -65,7 +70,7 @@ export function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MessageSquareIcon className="size-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           {CHAT_MESSAGES.selectConversation}
@@ -89,7 +94,7 @@ export function ChatWindow({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <div className="border-b px-4 py-3">
+      <div className="shrink-0 border-b px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">{conversation.contactName}</p>
           <Badge variant={getChannelBadgeVariant(conversation.channel)}>
@@ -115,11 +120,15 @@ export function ChatWindow({
         onSubmit={(event) => {
           void handleSubmit(event);
         }}
-        className="border-t p-4"
+        className="shrink-0 border-t p-3 sm:p-4"
       >
-        {!channelConnected ? (
+        {!canSend ? (
           <p className="mb-3 text-xs text-muted-foreground">
             {channelNotConnectedMessage}
+          </p>
+        ) : conversation.channel === "website_forms" ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            {CHAT_MESSAGES.websiteFormsReplyHint}
           </p>
         ) : null}
         <div className="flex gap-2">
@@ -128,14 +137,14 @@ export function ChatWindow({
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Type a reply..."
             rows={2}
-            disabled={isLoading || !channelConnected}
-            className="min-h-[72px] resize-none"
+            disabled={isLoading || !canSend}
+            className="min-h-[72px] flex-1 resize-none"
           />
           <Button
             type="submit"
             size="icon"
             className="shrink-0 self-end"
-            disabled={isLoading || !channelConnected || !draft.trim()}
+            disabled={isLoading || !canSend || !draft.trim()}
           >
             {isLoading ? (
               <Loader2Icon className="size-4 animate-spin" />

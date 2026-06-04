@@ -61,6 +61,33 @@ export type ConversationDetail = {
   messages: ChatMessageData[];
 };
 
+export type ChatChannelConnectionMap = Record<MessagingChannel, boolean>;
+
+export type ChatMonitorChannelStats = {
+  channel: MessagingChannel;
+  connected: boolean;
+  conversationsCount: number;
+  totalMessages: number;
+  aiReplies: number;
+  lastActivityAt: string | null;
+};
+
+export type ChatsMonitorData = {
+  hasBusiness: boolean;
+  channels: ChatMonitorChannelStats[];
+  totalConversations: number;
+  totalMessages: number;
+};
+
+export type ChatsChannelPageData = {
+  hasBusiness: boolean;
+  channel: MessagingChannel;
+  channelConnected: boolean;
+  aiEnabled: boolean | null;
+  conversations: ConversationListItem[];
+  activeConversation: ConversationDetail | null;
+};
+
 export type ChatsPageData = {
   hasBusiness: boolean;
   whatsappConnected: boolean;

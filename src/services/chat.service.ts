@@ -14,10 +14,14 @@ import {
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
+  ChatMonitorChannelStats,
+  ChatsChannelPageData,
+  ChatsMonitorData,
   ChatsPageData,
   ConversationDetail,
   ConversationListItem,
@@ -48,8 +52,14 @@ function missingConfigError(): {
   };
 }
 
-function revalidateChatPaths(): void {
+function revalidateChatPaths(channel?: DbMessagingChannel): void {
   revalidatePath(DASHBOARD_ROUTES.chats);
+  if (channel) {
+    revalidatePath(`${DASHBOARD_ROUTES.chats}/${channel}`);
+  }
+  for (const ch of MESSAGING_INTEGRATION_CHANNELS) {
+    revalidatePath(`${DASHBOARD_ROUTES.chats}/${ch}`);
+  }
   revalidatePath(APP_ROUTES.dashboard);
 }
 
@@ -62,19 +72,26 @@ async function getOwnedBusinessId(): Promise<string | null> {
 
 export async function listConversations(
   businessId: string,
+  channel?: DbMessagingChannel,
 ): Promise<ConversationListItem[]> {
   if (!hasSupabaseEnv()) {
     return [];
   }
 
   const supabase = await createClient();
-  const { data: conversations } = await supabase
+  let query = supabase
     .from("conversations")
     .select(
       "id, channel, status, updated_at, contact:contacts(name, phone_number)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
+
+  if (channel) {
+    query = query.eq("channel", channel);
+  }
+
+  const { data: conversations } = await query;
 
   if (!conversations?.length) {
     return [];
@@ -185,9 +202,39 @@ async function isTelegramConnected(businessId: string): Promise<boolean> {
   return data?.telegram_status === "connected";
 }
 
+async function isWebsiteFormsConnected(businessId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("website_form_connections")
+    .select("connection_status")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data?.connection_status === "connected";
+}
+
+export async function isChatChannelConnected(
+  businessId: string,
+  channel: DbMessagingChannel,
+): Promise<boolean> {
+  if (channel === "whatsapp") {
+    return isWhatsAppConnected(businessId);
+  }
+
+  if (channel === "instagram") {
+    return isInstagramConnected(businessId);
+  }
+
+  if (channel === "telegram") {
+    return isTelegramConnected(businessId);
+  }
+
+  return isWebsiteFormsConnected(businessId);
+}
+
 async function getAiEnabledForChannel(
   businessId: string,
-  channel: MessagingChannel,
+  channel: DbMessagingChannel,
 ): Promise<boolean | null> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -202,6 +249,129 @@ async function getAiEnabledForChannel(
   }
 
   return data.ai_enabled;
+}
+
+export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
+  if (!hasSupabaseEnv()) {
+    return { hasBusiness: false, channels: [], totalConversations: 0, totalMessages: 0 };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return { hasBusiness: false, channels: [], totalConversations: 0, totalMessages: 0 };
+  }
+
+  const supabase = await createClient();
+  const channels: ChatMonitorChannelStats[] = [];
+
+  for (const channel of MESSAGING_INTEGRATION_CHANNELS) {
+    const [connected, analyticsResult, conversationsResult, lastConversation] =
+      await Promise.all([
+        isChatChannelConnected(business.id, channel),
+        supabase
+          .from("channel_analytics")
+          .select("total_messages, ai_replies")
+          .eq("business_id", business.id)
+          .eq("channel", channel)
+          .maybeSingle(),
+        supabase
+          .from("conversations")
+          .select("id", { count: "exact", head: true })
+          .eq("business_id", business.id)
+          .eq("channel", channel),
+        supabase
+          .from("conversations")
+          .select("updated_at")
+          .eq("business_id", business.id)
+          .eq("channel", channel)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+    channels.push({
+      channel,
+      connected,
+      conversationsCount: conversationsResult.count ?? 0,
+      totalMessages: analyticsResult.data?.total_messages ?? 0,
+      aiReplies: analyticsResult.data?.ai_replies ?? 0,
+      lastActivityAt: lastConversation.data?.updated_at ?? null,
+    });
+  }
+
+  const totalConversations = channels.reduce(
+    (sum, item) => sum + item.conversationsCount,
+    0,
+  );
+  const totalMessages = channels.reduce(
+    (sum, item) => sum + item.totalMessages,
+    0,
+  );
+
+  return {
+    hasBusiness: true,
+    channels,
+    totalConversations,
+    totalMessages,
+  };
+}
+
+export async function getChatsChannelPageData(
+  channel: DbMessagingChannel,
+  activeConversationId?: string,
+): Promise<ChatsChannelPageData> {
+  if (!hasSupabaseEnv()) {
+    return {
+      hasBusiness: false,
+      channel,
+      channelConnected: false,
+      aiEnabled: null,
+      conversations: [],
+      activeConversation: null,
+    };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return {
+      hasBusiness: false,
+      channel,
+      channelConnected: false,
+      aiEnabled: null,
+      conversations: [],
+      activeConversation: null,
+    };
+  }
+
+  const [conversations, channelConnected] = await Promise.all([
+    listConversations(business.id, channel),
+    isChatChannelConnected(business.id, channel),
+  ]);
+
+  const selectedId =
+    activeConversationId &&
+    conversations.some((conversation) => conversation.id === activeConversationId)
+      ? activeConversationId
+      : null;
+
+  const activeConversation = selectedId
+    ? await getConversationDetail(selectedId, business.id)
+    : null;
+
+  const aiEnabled = await getAiEnabledForChannel(business.id, channel);
+
+  return {
+    hasBusiness: true,
+    channel,
+    channelConnected,
+    aiEnabled,
+    conversations,
+    activeConversation,
+  };
 }
 
 export async function getChatsPageData(
@@ -348,6 +518,18 @@ export async function sendChatMessage(
         },
       };
     }
+  } else if (conversation.channel === "website_forms") {
+    const connected = await isWebsiteFormsConnected(businessId);
+
+    if (!connected) {
+      return {
+        success: false,
+        error: {
+          code: "WHATSAPP_NOT_CONNECTED",
+          message: CHAT_MESSAGES.websiteFormsNotConnected,
+        },
+      };
+    }
   } else {
     const connected = await isWhatsAppConnected(businessId);
 
@@ -442,7 +624,7 @@ export async function sendChatMessage(
       .update({ updated_at: now })
       .eq("id", parsed.data.conversationId);
 
-    revalidateChatPaths();
+    revalidateChatPaths(conversation.channel);
 
     return {
       success: true,
@@ -501,7 +683,7 @@ export async function sendChatMessage(
     }),
   ]);
 
-  revalidateChatPaths();
+  revalidateChatPaths(conversation.channel);
 
   return {
     success: true,
@@ -557,7 +739,7 @@ export async function toggleChatAi(input: unknown): Promise<ToggleChatAiResult> 
     };
   }
 
-  revalidateChatPaths();
+  revalidateChatPaths(parsed.data.channel);
 
   return {
     success: true,

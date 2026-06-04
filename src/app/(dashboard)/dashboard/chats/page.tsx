@@ -1,39 +1,51 @@
+import Link from "next/link";
 import { Suspense } from "react";
 
-import { ChatsPanel } from "@/components/chats/ChatsPanel";
+import { ChatsHub } from "@/components/chats/ChatsHub";
+import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CHAT_MESSAGES } from "@/features/chats/constants";
-import { getChatsPageData } from "@/services/chat.service";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { CHAT_MESSAGES } from "@/features/chats";
+import { getChatsMonitorData } from "@/services/chat.service";
 
-type ChatsPageProps = {
-  searchParams: Promise<{
-    conversation?: string;
-  }>;
-};
-
-function ChatsPanelFallback() {
-  return <Skeleton className="min-h-[calc(100vh-12rem)] w-full rounded-xl" />;
+function ChatsMonitorFallback() {
+  return <Skeleton className="min-h-[24rem] w-full rounded-xl" />;
 }
 
-export default async function ChatsPage({ searchParams }: ChatsPageProps) {
-  const params = await searchParams;
-  const conversationId = params.conversation?.trim();
-  const data = await getChatsPageData(conversationId);
+export default async function ChatsPage() {
+  const data = await getChatsMonitorData();
+
+  if (!data.hasBusiness) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <Card className="mx-auto max-w-2xl shadow-none">
+          <CardHeader>
+            <CardTitle>{CHAT_MESSAGES.noBusinessTitle}</CardTitle>
+            <CardDescription>{CHAT_MESSAGES.noBusinessDescription}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {CHAT_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {CHAT_MESSAGES.pageDescription}
-        </p>
-      </div>
-
-      <Suspense fallback={<ChatsPanelFallback />}>
-        <ChatsPanel {...data} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<ChatsMonitorFallback />}>
+      <ChatsHub activeChannel={null} monitorChannels={data.channels}>
+        <ChatsMonitorPanel {...data} />
+      </ChatsHub>
+    </Suspense>
   );
 }

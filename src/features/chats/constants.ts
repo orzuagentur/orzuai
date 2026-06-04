@@ -1,7 +1,19 @@
 export const CHAT_MESSAGES = {
   pageTitle: "Chats",
   pageDescription:
-    "Unified inbox for WhatsApp, Instagram, and Telegram — send replies and control AI per channel.",
+    "Monitor all channels, then open WhatsApp, Instagram, Telegram, or Website Forms inboxes.",
+  monitorTitle: "Monitoring",
+  monitorDescription:
+    "Overview of conversations and activity across every connected channel.",
+  channelsTitle: "Channels",
+  openChannel: "Open inbox",
+  viewMonitor: "Overview",
+  channelInbox: "Inbox",
+  conversationsCount: "conversations",
+  messagesToday: "messages",
+  notConnectedHint: "Connect this channel in Integrations to receive messages.",
+  websiteFormsReplyHint:
+    "Website form leads are saved in OrzuAI. Replies here are stored in the conversation (no external send).",
   noBusinessTitle: "Create your business profile first",
   noBusinessDescription:
     "Set up your business profile before viewing customer conversations.",
@@ -15,6 +27,8 @@ export const CHAT_MESSAGES = {
     "Instagram is not connected. Connect it in Integrations to send replies.",
   telegramNotConnected:
     "Telegram is not connected. Connect it in Integrations to send replies.",
+  websiteFormsNotConnected:
+    "Enable Website Forms in Integrations to receive leads here.",
   sendSuccess: "Message sent successfully.",
   sendFailed: "Unable to send message. Please try again.",
   aiEnabledSuccess: "AI auto-replies enabled.",
