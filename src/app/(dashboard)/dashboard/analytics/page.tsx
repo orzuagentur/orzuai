@@ -1,4 +1,12 @@
-import { ChannelWorkspacePage } from "@/components/dashboard/ChannelWorkspacePage";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+import { AnalyticsHub } from "@/components/analytics/AnalyticsHub";
+import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { isMessagingIntegrationChannel } from "@/features/integrations";
+import type { IntegrationChannelId } from "@/features/integrations";
+import { getAnalyticsPageData } from "@/services/analytics.service";
 
 type AnalyticsPageProps = {
   searchParams: Promise<{ channel?: string }>;
@@ -9,11 +17,35 @@ export default async function AnalyticsPage({
 }: AnalyticsPageProps) {
   const { channel } = await searchParams;
 
+  if (
+    channel &&
+    !isMessagingIntegrationChannel(channel as IntegrationChannelId)
+  ) {
+    redirect(`${DASHBOARD_ROUTES.analytics}?channel=whatsapp`);
+  }
+
+  const data = await getAnalyticsPageData(channel ?? "whatsapp");
+
+  if (!data.hasBusiness) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <DashboardComingSoon title="Analytics" />
+      </div>
+    );
+  }
+
   return (
-    <ChannelWorkspacePage
-      title="Analytics"
-      channelParam={channel}
-      section="analytics"
-    />
+    <Suspense fallback={<AnalyticsFallback />}>
+      <AnalyticsHub data={data} />
+    </Suspense>
+  );
+}
+
+function AnalyticsFallback() {
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
+      <div className="min-h-[32rem] animate-pulse rounded-xl border bg-muted/30" />
+    </div>
   );
 }

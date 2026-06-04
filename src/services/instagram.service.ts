@@ -3,6 +3,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
+import { ENV_KEYS } from "@/constants/env-keys";
 import { INSTAGRAM_MESSAGES } from "@/features/instagram/constants";
 import {
   getInstagramEmbeddedSignupConfigId,
@@ -31,11 +32,17 @@ import type { InstagramConnection } from "@/types/database.types";
 import type {
   CompleteInstagramEmbeddedSignupInput,
   CompleteInstagramEmbeddedSignupResult,
+  ConnectManualInstagramInput,
+  ConnectManualInstagramResult,
+  InstagramConnectConfig,
   InstagramConnectionData,
   InstagramEmbeddedSignupConfig,
   InstagramWebhookPayload,
 } from "@/types/instagram.types";
-import { completeInstagramEmbeddedSignupSchema } from "@/types/instagram.types";
+import {
+  completeInstagramEmbeddedSignupSchema,
+  connectManualInstagramSchema,
+} from "@/types/instagram.types";
 import { mapInstagramConnection } from "@/utils/instagram";
 import { parseInstagramWebhookPayload } from "@/utils/instagram-webhook";
 
@@ -77,6 +84,25 @@ export async function getInstagramConnection(
     .maybeSingle();
 
   return data ? mapInstagramConnection(data) : null;
+}
+
+export function getInstagramWebhookUrl(): string {
+  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
+
+  if (!appUrl) {
+    return "";
+  }
+
+  return `${appUrl.replace(/\/$/, "")}/api/webhooks/instagram`;
+}
+
+export function getInstagramConnectConfig(): InstagramConnectConfig {
+  const webhookUrl = getInstagramWebhookUrl();
+
+  return {
+    isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
+    webhookUrl,
+  };
 }
 
 export async function getInstagramEmbeddedSignupConfig(): Promise<InstagramEmbeddedSignupConfig> {
@@ -201,6 +227,142 @@ export async function completeInstagramEmbeddedSignup(
     meta_page_id: pageDetails.details.pageId,
     meta_ig_user_id: pageDetails.details.igUserId,
     meta_access_token: tokenResult.accessToken,
+    meta_business_account_id: parsed.data.businessAccountId ?? null,
+    connected_at: connectedAt,
+    last_synced_at: connectedAt,
+  };
+
+  const { data: existingPending } = await supabase
+    .from("instagram_connections")
+    .select("id")
+    .eq("business_id", businessId)
+    .neq("instagram_status", "connected")
+    .maybeSingle();
+
+  const { data, error } = existingPending
+    ? await supabase
+        .from("instagram_connections")
+        .update(connectionPayload)
+        .eq("id", existingPending.id)
+        .select("*")
+        .single()
+    : await supabase
+        .from("instagram_connections")
+        .insert(connectionPayload)
+        .select("*")
+        .single();
+
+  if (error || !data) {
+    return {
+      success: false,
+      error: {
+        code: "CONNECT_FAILED",
+        message: error?.message || INSTAGRAM_MESSAGES.genericError,
+      },
+    };
+  }
+
+  revalidateInstagramPaths();
+
+  return {
+    success: true,
+    data: {
+      connection: mapInstagramConnection(data),
+    },
+  };
+}
+
+export async function connectManualInstagram(
+  input: ConnectManualInstagramInput,
+): Promise<ConnectManualInstagramResult> {
+  if (!hasSupabaseEnv()) {
+    return missingConfigError();
+  }
+
+  const parsed = connectManualInstagramSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: INSTAGRAM_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: existingConnection } = await supabase
+    .from("instagram_connections")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("instagram_status", "connected")
+    .maybeSingle();
+
+  if (existingConnection) {
+    return {
+      success: false,
+      error: {
+        code: "ALREADY_CONNECTED",
+        message: INSTAGRAM_MESSAGES.alreadyConnected,
+      },
+    };
+  }
+
+  const accessToken = parsed.data.accessToken;
+
+  const pageDetails = await resolveInstagramPageDetails(
+    parsed.data.pageId,
+    accessToken,
+    parsed.data.igUserId,
+  );
+
+  if (!pageDetails.success) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: pageDetails.message,
+      },
+    };
+  }
+
+  const subscribeResult = await subscribeInstagramPage(
+    pageDetails.details.pageId,
+    accessToken,
+  );
+
+  if (!subscribeResult.success) {
+    return {
+      success: false,
+      error: {
+        code: "SUBSCRIBE_FAILED",
+        message: subscribeResult.message,
+      },
+    };
+  }
+
+  const connectedAt = new Date().toISOString();
+  const connectionPayload = {
+    business_id: businessId,
+    instagram_username:
+      pageDetails.details.username || pageDetails.details.pageName,
+    instagram_status: "connected" as const,
+    meta_page_id: pageDetails.details.pageId,
+    meta_ig_user_id: pageDetails.details.igUserId,
+    meta_access_token: accessToken,
     meta_business_account_id: parsed.data.businessAccountId ?? null,
     connected_at: connectedAt,
     last_synced_at: connectedAt,

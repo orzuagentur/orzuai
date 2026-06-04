@@ -74,9 +74,7 @@ export function ChannelAnalyticsPanel({ data }: ChannelAnalyticsPanelProps) {
               </div>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link
-                href={`${DASHBOARD_ROUTES.chats}?channel=${data.channel}`}
-              >
+              <Link href={`${DASHBOARD_ROUTES.chats}/${data.channel}`}>
                 {CHANNEL_WORKSPACE_MESSAGES.openChats}
               </Link>
             </Button>

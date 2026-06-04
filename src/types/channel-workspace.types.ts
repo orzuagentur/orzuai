@@ -117,6 +117,27 @@ export type ChannelAnalyticsData = {
   recentMessages: ChannelRecentMessage[];
 };
 
+export type AnalyticsChannelEntry = {
+  channel: MessagingChannel;
+  analytics: ChannelAnalyticsData;
+  isChannelConnected: boolean;
+};
+
+export type AnalyticsTotals = {
+  totalMessages: number;
+  totalContacts: number;
+  aiReplies: number;
+  activeConversations: number;
+};
+
+export type AnalyticsPageData = {
+  hasBusiness: boolean;
+  activeChannel: MessagingChannel;
+  channelStatuses: IntegrationChannelStatusMap;
+  channels: AnalyticsChannelEntry[];
+  totals: AnalyticsTotals;
+};
+
 export type ChannelWorkspaceSummary = {
   contactsCount: number;
   aiEnabled: boolean;

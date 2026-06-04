@@ -1,9 +1,24 @@
 import "server-only";
 
+import {
+  MESSAGING_INTEGRATION_CHANNELS,
+  isMessagingIntegrationChannel,
+} from "@/features/integrations";
+import type { IntegrationChannelId } from "@/features/integrations";
+import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
+import {
+  getChannelAnalytics,
+  getChannelConnectionStatuses,
+} from "@/services/channel-workspace.service";
+import type {
+  AnalyticsPageData,
+  AnalyticsTotals,
+  MessagingChannel,
+} from "@/types/channel-workspace.types";
 import type {
   ActivityDataPoint,
   DashboardMetrics,
@@ -14,6 +29,8 @@ import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
 } from "@/utils/dashboard";
+
+const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
 
 const EMPTY_METRICS: DashboardMetrics = {
   totalMessages: 0,
@@ -150,4 +167,83 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const overview = await getDashboardOverview();
   return overview.metrics;
+}
+
+async function getOwnedBusinessId(): Promise<string | null> {
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+  return business?.id ?? null;
+}
+
+function buildTotals(
+  channels: AnalyticsPageData["channels"],
+): AnalyticsTotals {
+  return channels.reduce<AnalyticsTotals>(
+    (acc, entry) => ({
+      totalMessages: acc.totalMessages + entry.analytics.totalMessages,
+      totalContacts: acc.totalContacts + entry.analytics.totalContacts,
+      aiReplies: acc.aiReplies + entry.analytics.aiReplies,
+      activeConversations:
+        acc.activeConversations + entry.analytics.activeConversations,
+    }),
+    {
+      totalMessages: 0,
+      totalContacts: 0,
+      aiReplies: 0,
+      activeConversations: 0,
+    },
+  );
+}
+
+export async function getAnalyticsPageData(
+  activeChannelParam?: string | null,
+): Promise<AnalyticsPageData> {
+  const channelParam = activeChannelParam as IntegrationChannelId | undefined;
+  const activeChannel: MessagingChannel =
+    channelParam && isMessagingIntegrationChannel(channelParam)
+      ? channelParam
+      : "whatsapp";
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      hasBusiness: false,
+      activeChannel,
+      channelStatuses: {},
+      channels: [],
+      totals: {
+        totalMessages: 0,
+        totalContacts: 0,
+        aiReplies: 0,
+        activeConversations: 0,
+      },
+    };
+  }
+
+  const channelStatuses = await getChannelConnectionStatuses(businessId);
+
+  const channels = await Promise.all(
+    MESSAGING_CHANNELS.map(async (channel) => {
+      const isChannelConnected = isChannelConnectedForWorkspace(
+        channel,
+        channelStatuses,
+      );
+      const analytics = await getChannelAnalytics(channel);
+
+      return {
+        channel,
+        analytics,
+        isChannelConnected,
+      };
+    }),
+  );
+
+  return {
+    hasBusiness: true,
+    activeChannel,
+    channelStatuses,
+    channels,
+    totals: buildTotals(channels),
+  };
 }

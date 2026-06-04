@@ -139,10 +139,14 @@ export {
 export type {
   InstagramActionError,
   InstagramActionResult,
+  ConnectManualInstagramInput,
+  ConnectManualInstagramResult,
+  InstagramConnectConfig,
   InstagramConnectionData,
   InstagramEmbeddedSignupConfig,
   InstagramErrorCode,
 } from "./instagram.types";
+export { connectManualInstagramSchema } from "./instagram.types";
 
 export type {
   TelegramActionError,

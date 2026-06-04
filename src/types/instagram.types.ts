@@ -19,6 +19,25 @@ export type InstagramEmbeddedSignupConfig = {
   isConfigured: boolean;
 };
 
+export const connectManualInstagramSchema = z.object({
+  pageId: z.string().trim().min(1, "Facebook Page ID is required."),
+  accessToken: z
+    .string()
+    .trim()
+    .min(1, "Page access token is required."),
+  igUserId: z.string().trim().min(1).optional(),
+  businessAccountId: z.string().trim().min(1).optional(),
+});
+
+export type ConnectManualInstagramInput = z.infer<
+  typeof connectManualInstagramSchema
+>;
+
+export type InstagramConnectConfig = {
+  isConfigured: boolean;
+  webhookUrl: string;
+};
+
 export const completeInstagramEmbeddedSignupSchema = z.object({
   code: z.string().trim().min(1, "Meta authorization code is required."),
   pageId: z.string().trim().min(1, "Facebook Page ID is required."),
@@ -56,6 +75,10 @@ export type InstagramActionResult<T> =
   | { success: false; error: InstagramActionError };
 
 export type CompleteInstagramEmbeddedSignupResult = InstagramActionResult<{
+  connection: InstagramConnectionData;
+}>;
+
+export type ConnectManualInstagramResult = InstagramActionResult<{
   connection: InstagramConnectionData;
 }>;
 

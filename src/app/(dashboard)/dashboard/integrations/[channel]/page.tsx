@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
   getInstagramConnection,
-  getInstagramEmbeddedSignupConfig,
+  getInstagramConnectConfig,
 } from "@/services/instagram.service";
 import {
   getTelegramConnection,
@@ -67,7 +67,7 @@ export default async function IntegrationsChannelPage({
     whatsappConnection,
     whatsappConnectConfig,
     instagramConnection,
-    instagramConfig,
+    instagramConnectConfig,
     telegramConnection,
     telegramConfig,
     websiteFormConnection,
@@ -77,7 +77,7 @@ export default async function IntegrationsChannelPage({
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWhatsAppConnectConfig()),
     business ? getInstagramConnection(business.id) : Promise.resolve(null),
-    getInstagramEmbeddedSignupConfig(),
+    Promise.resolve(getInstagramConnectConfig()),
     business ? getTelegramConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getTelegramConnectConfig()),
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
@@ -130,7 +130,7 @@ export default async function IntegrationsChannelPage({
           }}
           instagram={{
             connection: instagramConnection,
-            embeddedSignupConfig: instagramConfig,
+            connectConfig: instagramConnectConfig,
           }}
           telegram={{
             connection: telegramConnection,
