@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 
-import { InstagramManualConnect } from "@/components/instagram/InstagramManualConnect";
+import { InstagramEmbeddedSignup } from "@/components/instagram/InstagramEmbeddedSignup";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,14 +17,14 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { INSTAGRAM_MESSAGES } from "@/features/instagram/constants";
 import type {
-  InstagramConnectConfig,
   InstagramConnectionData,
+  InstagramEmbeddedSignupConfig,
 } from "@/types/instagram.types";
 
 type InstagramActivatePanelProps = {
   connection: InstagramConnectionData | null;
   hasBusiness: boolean;
-  connectConfig: InstagramConnectConfig;
+  embeddedSignupConfig: InstagramEmbeddedSignupConfig;
   embeddedInHub?: boolean;
 };
 
@@ -46,11 +45,9 @@ function getStatusVariant(
 export function InstagramActivatePanel({
   connection,
   hasBusiness,
-  connectConfig,
+  embeddedSignupConfig,
   embeddedInHub = false,
 }: InstagramActivatePanelProps) {
-  const router = useRouter();
-
   if (!hasBusiness) {
     return (
       <Card className="max-w-2xl shadow-none">
@@ -69,13 +66,15 @@ export function InstagramActivatePanel({
     );
   }
 
-  const cardClassName = embeddedInHub
-    ? "w-full max-w-none border-0 bg-transparent shadow-none"
-    : "max-w-2xl shadow-none";
-
   if (connection?.status === "connected") {
     return (
-      <Card className={cardClassName}>
+      <Card
+        className={
+          embeddedInHub
+            ? "w-full max-w-none border-0 bg-transparent shadow-none"
+            : "max-w-2xl shadow-none"
+        }
+      >
         <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{INSTAGRAM_MESSAGES.connectTitle}</CardTitle>
@@ -104,23 +103,47 @@ export function InstagramActivatePanel({
     );
   }
 
+  const cardClassName = embeddedInHub
+    ? "w-full max-w-none border-0 bg-transparent shadow-none"
+    : "max-w-2xl shadow-none";
+
   return (
     <Card className={cardClassName}>
       <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
         <div className="flex items-start gap-3">
           <Camera className="mt-1 size-5 text-primary" />
           <div className="space-y-1">
-            <CardTitle>{INSTAGRAM_MESSAGES.connectTitle}</CardTitle>
+            <CardTitle>
+              {embeddedInHub
+                ? INSTAGRAM_MESSAGES.connectWithFacebook
+                : INSTAGRAM_MESSAGES.connectTitle}
+            </CardTitle>
             <CardDescription>{INSTAGRAM_MESSAGES.connectDescription}</CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className={embeddedInHub ? "px-0 pb-0" : undefined}>
-        <InstagramManualConnect
-          config={connectConfig}
-          onConnected={() => router.refresh()}
-        />
+      <CardContent
+        className={embeddedInHub ? "space-y-5 px-0 pb-0" : "space-y-5"}
+      >
+        <RequirementsList />
+        <p className="text-xs text-muted-foreground">
+          {INSTAGRAM_MESSAGES.connectLoginHint}
+        </p>
+        <InstagramEmbeddedSignup config={embeddedSignupConfig} />
       </CardContent>
     </Card>
+  );
+}
+
+function RequirementsList() {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-4 text-sm">
+      <p className="font-medium">{INSTAGRAM_MESSAGES.requirementsTitle}</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>{INSTAGRAM_MESSAGES.requirementProfessional}</li>
+        <li>{INSTAGRAM_MESSAGES.requirementFacebookPage}</li>
+        <li>{INSTAGRAM_MESSAGES.requirementMetaApp}</li>
+      </ul>
+    </div>
   );
 }

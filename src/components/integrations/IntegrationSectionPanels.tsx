@@ -35,7 +35,7 @@ import type {
 } from "@/types/channel-workspace.types";
 import type {
   InstagramConnectionData,
-  InstagramConnectConfig,
+  InstagramEmbeddedSignupConfig,
 } from "@/types/instagram.types";
 import type {
   TelegramConnectConfig,
@@ -65,7 +65,7 @@ type IntegrationSectionPanelsProps = {
   };
   instagram?: {
     connection: InstagramConnectionData | null;
-    connectConfig: InstagramConnectConfig;
+    embeddedSignupConfig: InstagramEmbeddedSignupConfig;
   };
   telegram?: {
     connection: TelegramConnectionData | null;
@@ -215,7 +215,7 @@ function ActivateSection({
       <InstagramActivatePanel
         connection={instagram.connection}
         hasBusiness={hasBusiness}
-        connectConfig={instagram.connectConfig}
+        embeddedSignupConfig={instagram.embeddedSignupConfig}
         embeddedInHub
       />
     );
