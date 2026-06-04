@@ -62,7 +62,7 @@ export function ChatsChannelPanel({
           <Button variant="ghost" size="sm" asChild>
             <Link href={DASHBOARD_ROUTES.chats}>
               <ArrowLeftIcon className="size-4" />
-              {CHAT_MESSAGES.viewMonitor}
+              {CHAT_MESSAGES.monitorTitle}
             </Link>
           </Button>
         </div>

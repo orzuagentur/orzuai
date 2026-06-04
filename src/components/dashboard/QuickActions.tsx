@@ -33,7 +33,7 @@ const QUICK_ACTIONS = [
     icon: BotIcon,
   },
   {
-    label: "Open Chats",
+    label: "Open Monitoring",
     href: DASHBOARD_ROUTES.chats,
     icon: MessageSquareIcon,
   },

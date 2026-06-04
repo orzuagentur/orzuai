@@ -23,7 +23,7 @@ export const DASHBOARD_NAV_ITEMS = [
   },
   {
     id: "chats",
-    label: "Chats",
+    label: "Monitoring",
     href: DASHBOARD_ROUTES.chats,
     icon: MessageSquare,
   },

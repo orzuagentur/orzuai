@@ -21,7 +21,7 @@ import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { hasGeminiEnv } from "@/lib/env";
 import {
   getWhatsAppConnection,
-  getWhatsAppEmbeddedSignupConfig,
+  getWhatsAppConnectConfig,
 } from "@/services/whatsapp.service";
 import {
   buildIntegrationChannelStatuses,
@@ -65,7 +65,7 @@ export default async function IntegrationsChannelPage({
 
   const [
     whatsappConnection,
-    whatsappConfig,
+    whatsappConnectConfig,
     instagramConnection,
     instagramConfig,
     telegramConnection,
@@ -75,7 +75,7 @@ export default async function IntegrationsChannelPage({
     websiteKnowledgeSync,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
-    getWhatsAppEmbeddedSignupConfig(),
+    Promise.resolve(getWhatsAppConnectConfig()),
     business ? getInstagramConnection(business.id) : Promise.resolve(null),
     getInstagramEmbeddedSignupConfig(),
     business ? getTelegramConnection(business.id) : Promise.resolve(null),
@@ -126,7 +126,7 @@ export default async function IntegrationsChannelPage({
           analytics={analytics}
           whatsapp={{
             connection: whatsappConnection,
-            embeddedSignupConfig: whatsappConfig,
+            connectConfig: whatsappConnectConfig,
           }}
           instagram={{
             connection: instagramConnection,

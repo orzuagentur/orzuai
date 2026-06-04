@@ -33,7 +33,7 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   analyticsDescription: "Performance metrics for this channel.",
   notConnectedHint:
     "Connect this channel in Integrations → Activate to start collecting data.",
-  openChats: "Open Chats",
+  openChats: "Open Monitoring",
   totalMessages: "Total Messages",
   uniqueContacts: "Contacts",
   aiReplies: "AI Replies",
@@ -43,7 +43,7 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   activityTitle: "Messages — last 7 days",
   recentTitle: "Recent messages",
   recentEmpty: "No messages on this channel yet.",
-  openChatsHint: "Reply manually or review AI messages in Chats.",
+  openChatsHint: "Reply manually or review AI messages in Monitoring.",
 } as const;
 
 export function getChannelLabel(channel: string): string {

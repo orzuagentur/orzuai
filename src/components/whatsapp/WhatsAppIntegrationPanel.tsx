@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 
-import { WhatsAppEmbeddedSignup } from "@/components/whatsapp/WhatsAppEmbeddedSignup";
+import { WhatsAppManualConnect } from "@/components/whatsapp/WhatsAppManualConnect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,14 +19,14 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import { useSyncWhatsApp } from "@/hooks/use-sync-whatsapp";
 import type {
+  WhatsAppConnectConfig,
   WhatsAppConnectionData,
-  WhatsAppEmbeddedSignupConfig,
 } from "@/types/whatsapp.types";
 
 type WhatsAppIntegrationPanelProps = {
   connection: WhatsAppConnectionData | null;
   hasBusiness: boolean;
-  embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
+  connectConfig: WhatsAppConnectConfig;
   /** When true, panel is shown inside the integrations hub (no outer page title). */
   embeddedInHub?: boolean;
 };
@@ -48,7 +48,7 @@ function getStatusVariant(
 export function WhatsAppIntegrationPanel({
   connection,
   hasBusiness,
-  embeddedSignupConfig,
+  connectConfig,
   embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
   const router = useRouter();
@@ -83,11 +83,7 @@ export function WhatsAppIntegrationPanel({
       <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle>
-              {embeddedInHub
-                ? WHATSAPP_MESSAGES.connectWithFacebook
-                : WHATSAPP_MESSAGES.connectTitle}
-            </CardTitle>
+            <CardTitle>{WHATSAPP_MESSAGES.connectTitle}</CardTitle>
             <CardDescription>
               {WHATSAPP_MESSAGES.connectDescription}
             </CardDescription>
@@ -147,7 +143,10 @@ export function WhatsAppIntegrationPanel({
             ) : null}
           </div>
         ) : (
-          <WhatsAppEmbeddedSignup config={embeddedSignupConfig} />
+          <WhatsAppManualConnect
+            config={connectConfig}
+            onConnected={() => router.refresh()}
+          />
         )}
       </CardContent>
     </Card>

@@ -2,6 +2,26 @@ import { z } from "zod";
 
 import type { WhatsappStatus } from "./database.types";
 
+export const connectManualWhatsAppSchema = z.object({
+  phoneNumberId: z
+    .string()
+    .trim()
+    .min(1, "WhatsApp Phone Number ID is required."),
+  wabaId: z
+    .string()
+    .trim()
+    .min(1, "WhatsApp Business Account ID is required."),
+  accessToken: z
+    .string()
+    .trim()
+    .min(1, "Permanent access token is required."),
+  businessAccountId: z.string().trim().min(1).optional(),
+});
+
+export type ConnectManualWhatsAppInput = z.infer<
+  typeof connectManualWhatsAppSchema
+>;
+
 export const completeEmbeddedSignupSchema = z.object({
   code: z.string().trim().min(1, "Meta authorization code is required."),
   phoneNumberId: z.string().trim().min(1, "WhatsApp phone number ID is missing."),
@@ -51,6 +71,15 @@ export type WhatsAppActionResult<T> =
 export type CompleteEmbeddedSignupResult = WhatsAppActionResult<{
   connection: WhatsAppConnectionData;
 }>;
+
+export type ConnectManualWhatsAppResult = WhatsAppActionResult<{
+  connection: WhatsAppConnectionData;
+}>;
+
+export type WhatsAppConnectConfig = {
+  isConfigured: boolean;
+  webhookUrl: string;
+};
 
 export type SyncWhatsAppResult = WhatsAppActionResult<{
   syncedAt: string;

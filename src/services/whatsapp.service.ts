@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
-import { getMetaAppId, getWhatsAppEmbeddedSignupConfigId, hasEmbeddedSignupEnv, hasSupabaseEnv } from "@/lib/env";
+import { ENV_KEYS } from "@/constants/env-keys";
+import {
+  getMetaAppId,
+  getWhatsAppEmbeddedSignupConfigId,
+  hasEmbeddedSignupEnv,
+  hasSupabaseEnv,
+} from "@/lib/env";
 import {
   exchangeEmbeddedSignupCode,
   getWhatsAppApiVersion,
@@ -26,13 +32,17 @@ import type { WhatsappConnection } from "@/types/database.types";
 import type {
   CompleteEmbeddedSignupInput,
   CompleteEmbeddedSignupResult,
+  ConnectManualWhatsAppInput,
+  ConnectManualWhatsAppResult,
   SyncWhatsAppResult,
+  WhatsAppConnectConfig,
   WhatsAppConnectionData,
   WhatsAppEmbeddedSignupConfig,
   WhatsAppWebhookPayload,
 } from "@/types/whatsapp.types";
 import {
   completeEmbeddedSignupSchema,
+  connectManualWhatsAppSchema,
 } from "@/types/whatsapp.types";
 import {
   mapWhatsAppConnection,
@@ -81,6 +91,25 @@ export async function getWhatsAppConnection(
     .maybeSingle();
 
   return data ? mapWhatsAppConnection(data) : null;
+}
+
+export function getWhatsAppWebhookUrl(): string {
+  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
+
+  if (!appUrl) {
+    return "";
+  }
+
+  return `${appUrl.replace(/\/$/, "")}/api/webhooks/whatsapp`;
+}
+
+export function getWhatsAppConnectConfig(): WhatsAppConnectConfig {
+  const webhookUrl = getWhatsAppWebhookUrl();
+
+  return {
+    isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
+    webhookUrl,
+  };
 }
 
 export async function getWhatsAppEmbeddedSignupConfig(): Promise<WhatsAppEmbeddedSignupConfig> {
@@ -217,6 +246,146 @@ export async function completeEmbeddedSignup(
     whatsapp_status: "connected" as const,
     meta_phone_number_id: parsed.data.phoneNumberId,
     meta_access_token: tokenResult.accessToken,
+    meta_waba_id: parsed.data.wabaId,
+    meta_business_account_id: parsed.data.businessAccountId ?? null,
+    verification_code_hash: null,
+    verification_expires_at: null,
+    connected_at: connectedAt,
+    last_synced_at: connectedAt,
+  };
+
+  const { data: existingPending } = await supabase
+    .from("whatsapp_connections")
+    .select("id")
+    .eq("business_id", businessId)
+    .neq("whatsapp_status", "connected")
+    .maybeSingle();
+
+  const { data, error } = existingPending
+    ? await supabase
+        .from("whatsapp_connections")
+        .update(connectionPayload)
+        .eq("id", existingPending.id)
+        .select("*")
+        .single()
+    : await supabase
+        .from("whatsapp_connections")
+        .insert(connectionPayload)
+        .select("*")
+        .single();
+
+  if (error || !data) {
+    return {
+      success: false,
+      error: {
+        code: "CONNECT_FAILED",
+        message: error?.message || WHATSAPP_MESSAGES.genericError,
+      },
+    };
+  }
+
+  revalidateWhatsAppPaths();
+
+  return {
+    success: true,
+    data: {
+      connection: mapWhatsAppConnection(data),
+    },
+  };
+}
+
+export async function connectManualWhatsApp(
+  input: ConnectManualWhatsAppInput,
+): Promise<ConnectManualWhatsAppResult> {
+  if (!hasSupabaseEnv()) {
+    return missingConfigError();
+  }
+
+  const parsed = connectManualWhatsAppSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: WHATSAPP_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: existingConnection } = await supabase
+    .from("whatsapp_connections")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("whatsapp_status", "connected")
+    .maybeSingle();
+
+  if (existingConnection) {
+    return {
+      success: false,
+      error: {
+        code: "ALREADY_CONNECTED",
+        message: WHATSAPP_MESSAGES.alreadyConnected,
+      },
+    };
+  }
+
+  const accessToken = parsed.data.accessToken;
+
+  const credentialCheck = await verifyWhatsAppCredentials(
+    parsed.data.phoneNumberId,
+    accessToken,
+  );
+
+  if (!credentialCheck.success) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
+      },
+    };
+  }
+
+  const subscribeResult = await subscribeAppToWaba(
+    parsed.data.wabaId,
+    accessToken,
+  );
+
+  if (!subscribeResult.success) {
+    return {
+      success: false,
+      error: {
+        code: "SUBSCRIBE_FAILED",
+        message: subscribeResult.message,
+      },
+    };
+  }
+
+  const connectedAt = new Date().toISOString();
+  const phoneNumber =
+    credentialCheck.displayPhoneNumber ??
+    normalizePhoneNumber(parsed.data.phoneNumberId);
+
+  const connectionPayload = {
+    business_id: businessId,
+    phone_number: phoneNumber,
+    whatsapp_status: "connected" as const,
+    meta_phone_number_id: parsed.data.phoneNumberId,
+    meta_access_token: accessToken,
     meta_waba_id: parsed.data.wabaId,
     meta_business_account_id: parsed.data.businessAccountId ?? null,
     verification_code_hash: null,

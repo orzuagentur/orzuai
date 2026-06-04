@@ -122,13 +122,19 @@ export type {
   SyncWhatsAppResult,
   WhatsAppActionError,
   WhatsAppActionResult,
+  WhatsAppConnectConfig,
   WhatsAppConnectionData,
+  ConnectManualWhatsAppInput,
+  ConnectManualWhatsAppResult,
   WhatsAppEmbeddedSignupConfig,
   WhatsAppErrorCode,
   WhatsAppWebhookMessage,
   WhatsAppWebhookPayload,
 } from "./whatsapp.types";
-export { completeEmbeddedSignupSchema } from "./whatsapp.types";
+export {
+  completeEmbeddedSignupSchema,
+  connectManualWhatsAppSchema,
+} from "./whatsapp.types";
 
 export type {
   InstagramActionError,

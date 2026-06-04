@@ -48,7 +48,7 @@ import type {
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type {
   WhatsAppConnectionData,
-  WhatsAppEmbeddedSignupConfig,
+  WhatsAppConnectConfig,
 } from "@/types/whatsapp.types";
 
 type IntegrationSectionPanelsProps = {
@@ -61,7 +61,7 @@ type IntegrationSectionPanelsProps = {
   analytics?: ChannelAnalyticsData | null;
   whatsapp?: {
     connection: WhatsAppConnectionData | null;
-    embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
+    connectConfig: WhatsAppConnectConfig;
   };
   instagram?: {
     connection: InstagramConnectionData | null;
@@ -204,7 +204,7 @@ function ActivateSection({
       <WhatsAppIntegrationPanel
         connection={whatsapp.connection}
         hasBusiness={hasBusiness}
-        embeddedSignupConfig={whatsapp.embeddedSignupConfig}
+        connectConfig={whatsapp.connectConfig}
         embeddedInHub
       />
     );
