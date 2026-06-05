@@ -19,6 +19,7 @@ import {
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from "@/services/email.service";
+import { triggerOnboardingDripDay0 } from "@/services/onboarding-drip.service";
 import type {
   DeleteAccountInput,
   DeleteAccountResult,
@@ -198,6 +199,14 @@ export async function registerWithEmail(
         message: emailResult.error.message,
       },
     };
+  }
+
+  if (data.user?.id) {
+    void triggerOnboardingDripDay0({
+      userId: data.user.id,
+      email: parsed.data.email,
+      businessName: businessName ?? null,
+    });
   }
 
   return {

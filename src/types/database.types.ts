@@ -442,6 +442,30 @@ export type Database = {
           },
         ];
       };
+      onboarding_drip_emails: {
+        Row: {
+          id: string;
+          user_id: string;
+          email: string;
+          drip_day: number;
+          sent_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          email: string;
+          drip_day: number;
+          sent_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          email?: string;
+          drip_day?: number;
+          sent_at?: string;
+        };
+        Relationships: [];
+      };
       contacts: {
         Row: {
           id: string;

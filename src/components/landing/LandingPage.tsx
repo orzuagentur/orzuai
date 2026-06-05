@@ -5,6 +5,10 @@ import { ArrowRightIcon, BotIcon, MessageSquareIcon, SparklesIcon } from "lucide
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { AuthModal } from "@/components/landing/AuthModal";
+import { LandingFaq } from "@/components/landing/LandingFaq";
+import { LandingHeader } from "@/components/landing/LandingHeader";
+import { LandingPricing } from "@/components/landing/LandingPricing";
+import { LandingSocialProof } from "@/components/landing/LandingSocialProof";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
@@ -20,8 +24,12 @@ const FEATURE_ICONS = [MessageSquareIcon, BotIcon, SparklesIcon] as const;
 export function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
 
+  function openAuth() {
+    setAuthOpen(true);
+  }
+
   return (
-    <div className="landing relative flex min-h-full flex-1 flex-col overflow-hidden bg-background text-foreground">
+    <div className="landing relative flex min-h-full flex-1 flex-col overflow-x-hidden bg-background text-foreground">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
@@ -32,71 +40,79 @@ export function LandingPage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(0,0,0,0.35))]" />
       </div>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16">
-        <div className="flex w-full max-w-3xl flex-col items-center text-center">
-          <OrzuLogo size="lg" align="center" className="mb-10" />
+      <LandingHeader onStartFree={openAuth} />
 
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-sm">
-            <SparklesIcon className="size-3.5 text-primary" />
-            AI inbox for WhatsApp, Instagram & Telegram
-          </div>
+      <main className="relative z-10 flex flex-1 flex-col items-center">
+        <section className="flex w-full flex-col items-center px-6 py-12 sm:py-16">
+          <div className="flex w-full max-w-3xl flex-col items-center text-center">
+            <OrzuLogo size="lg" align="center" className="mb-10 sm:hidden" />
 
-          <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl sm:leading-tight">
-            {LANDING_COPY.tagline}
-          </h1>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-sm">
+              <SparklesIcon className="size-3.5 text-primary" />
+              AI inbox for WhatsApp, Instagram & Telegram
+            </div>
 
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-            {LANDING_COPY.subtitle}
-          </p>
+            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl sm:leading-tight">
+              {LANDING_COPY.tagline}
+            </h1>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            {LANDING_CHANNELS.map((channel) => (
-              <div
-                key={channel.id}
-                className="flex flex-col items-center gap-1.5"
-              >
-                <div className="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
-                  <ChannelBrandIcon channel={channel.id} className="size-7" />
-                </div>
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {channel.label}
-                </span>
-              </div>
-            ))}
-          </div>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+              {LANDING_COPY.subtitle}
+            </p>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            {LANDING_FEATURES.map((feature, index) => {
-              const Icon = FEATURE_ICONS[index] ?? SparklesIcon;
-
-              return (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+              {LANDING_CHANNELS.map((channel) => (
                 <div
-                  key={feature}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm"
+                  key={channel.id}
+                  className="flex flex-col items-center gap-1.5"
                 >
-                  <Icon className="size-3.5 text-primary" />
-                  {feature}
+                  <div className="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+                    <ChannelBrandIcon channel={channel.id} className="size-7" />
+                  </div>
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {channel.label}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          <Button
-            type="button"
-            size="lg"
-            className={cn(
-              "mt-12 h-14 min-w-[220px] rounded-full px-10 text-base font-semibold tracking-[0.2em]",
-              "shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40",
-            )}
-            onClick={() => setAuthOpen(true)}
-          >
-            {LANDING_COPY.startButton}
-            <ArrowRightIcon className="size-4" />
-          </Button>
-        </div>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              {LANDING_FEATURES.map((feature, index) => {
+                const Icon = FEATURE_ICONS[index] ?? SparklesIcon;
+
+                return (
+                  <div
+                    key={feature}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm"
+                  >
+                    <Icon className="size-3.5 text-primary" />
+                    {feature}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              type="button"
+              size="lg"
+              className={cn(
+                "mt-12 h-14 min-w-[220px] rounded-full px-10 text-base font-semibold tracking-[0.2em]",
+                "shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40",
+              )}
+              onClick={openAuth}
+            >
+              {LANDING_COPY.startButton}
+              <ArrowRightIcon className="size-4" />
+            </Button>
+          </div>
+        </section>
+
+        <LandingSocialProof />
+        <LandingPricing onStartFree={openAuth} />
+        <LandingFaq />
       </main>
 
-      <footer className="relative z-10 space-y-3 px-6 pb-8 text-center text-xs text-muted-foreground">
+      <footer className="relative z-10 space-y-3 px-6 pb-8 pt-4 text-center text-xs text-muted-foreground">
         <LegalFooterLinks />
         <p>© {new Date().getFullYear()} OrzuAI. Built for modern small businesses.</p>
       </footer>

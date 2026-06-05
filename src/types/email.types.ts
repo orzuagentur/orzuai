@@ -29,6 +29,12 @@ export const sendLeadFollowUpEmailSchema = z.object({
   message: z.string().trim().min(1).max(8000),
 });
 
+export const sendOnboardingDripEmailSchema = z.object({
+  to: emailAddressSchema,
+  subject: z.string().trim().min(1).max(200),
+  html: z.string().trim().min(1).max(100_000),
+});
+
 export type SendVerificationEmailInput = z.infer<
   typeof sendVerificationEmailSchema
 >;
@@ -39,6 +45,10 @@ export type SendPasswordResetEmailInput = z.infer<
 
 export type SendLeadFollowUpEmailInput = z.infer<
   typeof sendLeadFollowUpEmailSchema
+>;
+
+export type SendOnboardingDripEmailInput = z.infer<
+  typeof sendOnboardingDripEmailSchema
 >;
 
 export type EmailSendSuccess = {

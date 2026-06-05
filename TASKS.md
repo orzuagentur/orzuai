@@ -311,7 +311,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** Test AI reply встроен в onboarding (шаг 4)
 * [x] **P2** Magic link login (без пароля)
 * [x] **P2** Resume setup: deep link для users с account но без business
-* [ ] **P2** Email drip: Day 0/1/3 onboarding tips (Resend)
+* [x] **P2** Email drip: Day 0/1/3 onboarding tips (Resend)
 
 ---
 
@@ -334,11 +334,11 @@ Progress: **100%** (core hub + channels)
 ## Категория: UI — Landing Page и конверсия
 
 * [x] **P0** Hero: multi-channel value proposition
-* [ ] **P1** Header: Log in + Start free CTA
-* [ ] **P1** Social proof block (logos, testimonials)
+* [x] **P1** Header: Log in + Start free CTA
+* [x] **P1** Social proof block (logos, testimonials)
 * [ ] **P1** Product screenshot / demo video (60s)
-* [ ] **P1** Pricing teaser section
-* [ ] **P1** FAQ section
+* [x] **P1** Pricing teaser section
+* [x] **P1** FAQ section
 * [ ] **P2** Feature comparison vs ManyChat / Intercom
 * [ ] **P2** Secondary CTA: «Book a demo»
 * [ ] **P2** Localized landing (EN / RU / UZ)

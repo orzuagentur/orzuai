@@ -20,3 +20,96 @@ export const LANDING_CHANNELS = [
   { id: "telegram", label: "Telegram" },
   { id: "website_forms", label: "Website Forms" },
 ] as const;
+
+export const LANDING_HEADER = {
+  login: "Log in",
+  startFree: "Start free",
+} as const;
+
+export const LANDING_SOCIAL_PROOF = {
+  title: "Trusted by growing teams",
+  subtitle: "Small businesses use OrzuAI to reply faster across every channel.",
+  logos: ["Retail", "Clinics", "Agencies", "E-commerce", "Education"],
+  testimonials: [
+    {
+      quote:
+        "We connected WhatsApp in minutes and AI handles 70% of first replies.",
+      author: "Sofia K.",
+      role: "Boutique owner",
+    },
+    {
+      quote:
+        "One inbox for Instagram DMs and Telegram — our team finally stopped switching apps.",
+      author: "Marco R.",
+      role: "Agency founder",
+    },
+  ],
+} as const;
+
+export const LANDING_PRICING = {
+  title: "Simple pricing to get started",
+  subtitle: "Start free. Upgrade when your team and channels grow.",
+  plans: [
+    {
+      id: "starter",
+      name: "Starter",
+      price: "Free",
+      period: "forever",
+      description: "Perfect for solo founders testing AI replies.",
+      features: [
+        "1 business profile",
+        "WhatsApp or Instagram",
+        "AI auto-replies",
+        "Knowledge base",
+      ],
+      highlighted: true,
+      cta: "Start free",
+    },
+    {
+      id: "growth",
+      name: "Growth",
+      price: "$29",
+      period: "/ month",
+      description: "For teams managing multiple channels daily.",
+      features: [
+        "All Starter features",
+        "Telegram + Website Forms",
+        "Unified inbox",
+        "Priority support",
+      ],
+      highlighted: false,
+      cta: "Coming soon",
+    },
+  ],
+} as const;
+
+export const LANDING_FAQ = {
+  title: "Frequently asked questions",
+  items: [
+    {
+      question: "Which channels does OrzuAI support?",
+      answer:
+        "WhatsApp Business Cloud API, Instagram Direct, Telegram Bot API, and Website Forms leads — all in one inbox.",
+    },
+    {
+      question: "Do I need a developer to connect WhatsApp?",
+      answer:
+        "No. Use the guided Integrations wizard to connect your Meta WhatsApp number and verify webhooks in a few steps.",
+    },
+    {
+      question: "How does the AI learn about my business?",
+      answer:
+        "Add entries to Knowledge (FAQs, pricing, policies) or sync your website. Every reply uses that context per channel.",
+    },
+    {
+      question: "Can humans take over a conversation?",
+      answer:
+        "Yes. Reply manually in the Inbox, toggle AI per channel, and use internal notes for your team.",
+    },
+    {
+      question: "Is there a free plan?",
+      answer:
+        "Yes — the Starter plan is free so you can connect a channel and test AI replies before upgrading.",
+    },
+  ],
+} as const;

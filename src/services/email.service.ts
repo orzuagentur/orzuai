@@ -8,11 +8,13 @@ import { getResendClient } from "@/lib/resend/client";
 import type {
   EmailServiceResult,
   SendLeadFollowUpEmailInput,
+  SendOnboardingDripEmailInput,
   SendPasswordResetEmailInput,
   SendVerificationEmailInput,
 } from "@/types/email.types";
 import {
   sendLeadFollowUpEmailSchema,
+  sendOnboardingDripEmailSchema,
   sendPasswordResetEmailSchema,
   sendVerificationEmailSchema,
 } from "@/types/email.types";
@@ -124,6 +126,22 @@ export async function sendLeadFollowUpEmail(
     to: parsed.data.to,
     subject,
     html,
+  });
+}
+
+export async function sendOnboardingDripEmail(
+  input: SendOnboardingDripEmailInput,
+): Promise<EmailServiceResult> {
+  const parsed = sendOnboardingDripEmailSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  return sendTransactionalEmail({
+    to: parsed.data.to,
+    subject: parsed.data.subject,
+    html: parsed.data.html,
   });
 }
 

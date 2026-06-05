@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-website-knowledge",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/onboarding-drip",
+      "schedule": "0 9 * * *"
     }
   ]
 }
