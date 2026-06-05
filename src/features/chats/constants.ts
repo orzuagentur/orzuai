@@ -36,4 +36,24 @@ export const CHAT_MESSAGES = {
   aiToggleFailed: "Unable to update AI status. Please try again.",
   missingConfig: "Chat services are not configured.",
   genericError: "Something went wrong. Please try again.",
+  searchPlaceholder: "Search by name, phone, or message…",
+  filterAll: "All",
+  filterAiHandled: "AI handled",
+  filterNeedsHuman: "Needs human",
+  filterActive: "Active",
+  emptySearchTitle: "No matching conversations",
+  emptySearchDescription: "Try a different search term or filter.",
+  unifiedInboxTitle: "All channels",
+  unifiedInboxDescription:
+    "Every conversation across WhatsApp, Instagram, Telegram, and Website Forms.",
+  internalNotesTitle: "Internal note",
+  internalNotesDescription:
+    "Visible only to your team. Customers never see this note.",
+  internalNotesPlaceholder: "Add context for your team…",
+  internalNotesSave: "Save note",
+  internalNoteSaved: "Internal note saved.",
+  statusLabel: "Conversation status",
+  statusUpdated: "Conversation status updated.",
 } as const;
+
+export type ChatInboxFilter = "all" | "ai_handled" | "needs_human" | "active";

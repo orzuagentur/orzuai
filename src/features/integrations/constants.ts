@@ -28,6 +28,16 @@ export function isMessagingIntegrationChannel(
 
 export const INTEGRATION_SECTIONS = ["activate", "contacts"] as const;
 
+export const INTEGRATION_WIZARD_STEPS = [
+  { id: "connect", label: "Connect" },
+  { id: "configure-ai", label: "Configure AI" },
+  { id: "test", label: "Test" },
+  { id: "go-live", label: "Go live" },
+] as const;
+
+export type IntegrationWizardStepId =
+  (typeof INTEGRATION_WIZARD_STEPS)[number]["id"];
+
 export const LEGACY_INTEGRATION_WORKSPACE_SECTIONS = [
   "ai-assistant",
   "analytics",
@@ -131,6 +141,12 @@ export const INTEGRATIONS_MESSAGES = {
   statusDisconnected: "Not connected",
   statusComingSoon: "Coming soon",
   channelContextPrefix: "Viewing workspace for",
+  webhookReceiving: "Receiving messages",
+  webhookWaiting: "Waiting for first message",
+  webhookDisconnected: "Not connected",
+  wizardTitle: "Setup flow",
+  wizardDescription:
+    "Connect your channel, configure AI, test a reply, then open the inbox.",
 } as const;
 
 export function buildChannelWorkspaceHref(

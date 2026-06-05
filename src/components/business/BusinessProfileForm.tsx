@@ -22,6 +22,7 @@ import type { BusinessProfileData } from "@/types/business.types";
 
 type BusinessProfileFormProps = {
   business?: BusinessProfileData | null;
+  defaultBusinessName?: string;
   className?: string;
   onSuccess?: () => void;
 };
@@ -40,6 +41,7 @@ type FormErrors = Partial<
 
 export function BusinessProfileForm({
   business,
+  defaultBusinessName,
   className,
   onSuccess,
 }: BusinessProfileFormProps) {
@@ -117,7 +119,7 @@ export function BusinessProfileForm({
             <Input
               id="business-name"
               name="businessName"
-              defaultValue={business?.businessName ?? ""}
+              defaultValue={business?.businessName ?? defaultBusinessName ?? ""}
               placeholder="Acme Coffee Shop"
               required
               aria-invalid={Boolean(errors.businessName)}

@@ -2,12 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { AUTH_ROUTES } from "@/constants/routes";
 import { createClient } from "@/lib/supabase/server";
+import { getPrimaryBusiness } from "@/services/business.service";
 import { authCallbackQuerySchema } from "@/types/auth.types";
 import {
-  getPostAuthRedirectPath,
   getSafeRedirectPath,
   shouldUseVerifySuccessRedirect,
 } from "@/utils/auth";
+import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
 
 export async function GET(request: NextRequest) {
   const query = authCallbackQuerySchema.safeParse(
@@ -50,7 +51,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl);
   }
 
-  const redirectPath = getPostAuthRedirectPath(next);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const business = user ? await getPrimaryBusiness(user.id) : null;
+  const redirectPath = resolveAuthenticatedLandingPath(Boolean(business), next);
 
   if (!shouldUseVerifySuccessRedirect(redirectPath)) {
     return NextResponse.redirect(new URL(redirectPath, request.url));

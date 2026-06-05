@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { ChatsChannelPanel } from "@/components/chats/ChatsChannelPanel";
 import { ChatsHub } from "@/components/chats/ChatsHub";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { isChatChannelId, type ChatChannelId } from "@/features/chats";
 import { getChatsChannelPageData, getChatsMonitorData } from "@/services/chat.service";
 
@@ -13,7 +13,11 @@ type ChatsChannelPageProps = {
 };
 
 function ChatsChannelFallback() {
-  return <Skeleton className="min-h-[24rem] w-full" />;
+  return (
+    <div className="min-h-[24rem] rounded-xl border p-4">
+      <ConversationListSkeleton rows={8} />
+    </div>
+  );
 }
 
 export default async function ChatsChannelPage({

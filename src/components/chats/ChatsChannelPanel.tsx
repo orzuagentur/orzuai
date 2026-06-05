@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { usePollingRefresh } from "@/hooks/use-polling-refresh";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { ChatInboxToolbar } from "@/components/chats/ChatInboxToolbar";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,8 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES, type ChatChannelId } from "@/features/chats";
+import type { ChatInboxFilter } from "@/features/chats/constants";
+import { filterConversations } from "@/utils/chat-inbox-filters";
 import type { ChatsChannelPageData } from "@/types/chat.types";
 
 type ChatsChannelPanelProps = ChatsChannelPageData & {
@@ -33,6 +37,17 @@ export function ChatsChannelPanel({
   activeConversation,
 }: ChatsChannelPanelProps) {
   usePollingRefresh(5000);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
+
+  const filteredConversations = useMemo(
+    () =>
+      filterConversations(conversations, {
+        searchQuery,
+        filter: activeFilter,
+      }),
+    [activeFilter, conversations, searchQuery],
+  );
 
   if (!hasBusiness) {
     return (
@@ -73,15 +88,27 @@ export function ChatsChannelPanel({
         <div className="border-b px-4 py-3">
           <p className="text-sm font-medium">{CHAT_MESSAGES.channelInbox}</p>
           <p className="text-xs text-muted-foreground">
-            {conversations.length} {CHAT_MESSAGES.conversationsCount}
+            {filteredConversations.length} / {conversations.length}{" "}
+            {CHAT_MESSAGES.conversationsCount}
           </p>
         </div>
+        <ChatInboxToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ChatList
-            conversations={conversations}
+            conversations={filteredConversations}
             activeConversationId={activeConversationId}
             channelId={channelId}
             hideChannelBadge
+            emptyVariant={
+              conversations.length > 0 && filteredConversations.length === 0
+                ? "search"
+                : "default"
+            }
           />
         </div>
       </aside>

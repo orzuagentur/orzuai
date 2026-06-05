@@ -47,6 +47,7 @@ type OnboardingWizardProps = {
   step: number;
   progress: OnboardingProgress;
   business: BusinessProfileData | null;
+  defaultBusinessName?: string;
   whatsappConfig: WhatsAppConnectConfig;
   aiSettings: ChannelAiSettingsData | null;
 };
@@ -59,6 +60,7 @@ export function OnboardingWizard({
   step,
   progress,
   business,
+  defaultBusinessName,
   whatsappConfig,
   aiSettings,
 }: OnboardingWizardProps) {
@@ -177,6 +179,7 @@ export function OnboardingWizard({
           <CardContent>
             <BusinessProfileForm
               business={business}
+              defaultBusinessName={defaultBusinessName}
               onSuccess={() => {
                 router.refresh();
                 goToStep(router, 2);

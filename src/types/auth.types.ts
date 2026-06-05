@@ -64,6 +64,11 @@ export const registerWithEmailInputSchema = z.object({
     .email("Enter a valid email address")
     .max(320, "Email address is too long"),
   password: passwordSchema,
+  businessName: z
+    .string()
+    .trim()
+    .max(120, "Business name is too long")
+    .optional(),
 });
 
 export const resetPasswordSchema = z

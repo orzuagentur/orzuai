@@ -262,7 +262,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
       </Card>
 
       <Card className="shadow-none">
-        <CardHeader>
+        <CardHeader id="ai-test" className="scroll-mt-6">
           <div className="flex items-center gap-2">
             <SparklesIcon className="size-5 text-primary" />
             <CardTitle>{CHANNEL_WORKSPACE_MESSAGES.aiTestTitle}</CardTitle>

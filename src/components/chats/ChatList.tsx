@@ -8,9 +8,13 @@ import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
+  getChannelBadgeClassName,
   getChannelBadgeLabel,
-  getChannelBadgeVariant,
 } from "@/features/chats/channel-ui";
+import {
+  getConversationStatusLabel,
+  getConversationStatusVariant,
+} from "@/utils/conversation-status";
 import type { ChatChannelId } from "@/features/chats";
 import type { ConversationListItem } from "@/types/chat.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
@@ -21,28 +25,19 @@ type ChatListProps = {
   activeConversationId: string | null;
   channelId: ChatChannelId;
   hideChannelBadge?: boolean;
+  linkToConversationChannel?: boolean;
+  emptyVariant?: "default" | "search";
   className?: string;
 };
-
-function getStatusVariant(
-  status: ConversationListItem["status"],
-): "default" | "secondary" | "outline" {
-  if (status === "active") {
-    return "default";
-  }
-
-  if (status === "archived") {
-    return "secondary";
-  }
-
-  return "outline";
-}
 
 function buildConversationHref(
   channelId: ChatChannelId,
   conversationId: string,
+  conversationChannel: ConversationListItem["channel"],
+  linkToConversationChannel: boolean,
 ): string {
-  return `${DASHBOARD_ROUTES.chats}/${channelId}?conversation=${conversationId}`;
+  const channel = linkToConversationChannel ? conversationChannel : channelId;
+  return `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`;
 }
 
 export function ChatList({
@@ -50,9 +45,13 @@ export function ChatList({
   activeConversationId,
   channelId,
   hideChannelBadge = false,
+  linkToConversationChannel = false,
+  emptyVariant = "default",
   className,
 }: ChatListProps) {
   if (conversations.length === 0) {
+    const isSearchEmpty = emptyVariant === "search";
+
     return (
       <div
         className={cn(
@@ -61,9 +60,15 @@ export function ChatList({
         )}
       >
         <MessageSquareIcon className="size-8 text-muted-foreground" />
-        <p className="font-medium">{CHAT_MESSAGES.emptyListTitle}</p>
+        <p className="font-medium">
+          {isSearchEmpty
+            ? CHAT_MESSAGES.emptySearchTitle
+            : CHAT_MESSAGES.emptyListTitle}
+        </p>
         <p className="text-sm text-muted-foreground">
-          {CHAT_MESSAGES.emptyListDescription}
+          {isSearchEmpty
+            ? CHAT_MESSAGES.emptySearchDescription
+            : CHAT_MESSAGES.emptyListDescription}
         </p>
       </div>
     );
@@ -77,7 +82,12 @@ export function ChatList({
         return (
           <Link
             key={conversation.id}
-            href={buildConversationHref(channelId, conversation.id)}
+            href={buildConversationHref(
+              channelId,
+              conversation.id,
+              conversation.channel,
+              linkToConversationChannel,
+            )}
             className={cn(
               "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
               isActive && "bg-primary/5",
@@ -92,8 +102,8 @@ export function ChatList({
                   <p className="truncate font-medium">{conversation.contactName}</p>
                   {!hideChannelBadge ? (
                     <Badge
-                      variant={getChannelBadgeVariant(conversation.channel)}
-                      className="shrink-0 px-1.5 py-0 text-[10px]"
+                      variant="outline"
+                      className={`shrink-0 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
                     >
                       {getChannelBadgeLabel(conversation.channel)}
                     </Badge>
@@ -115,10 +125,10 @@ export function ChatList({
               ) : null}
             </div>
             <Badge
-              variant={getStatusVariant(conversation.status)}
+              variant={getConversationStatusVariant(conversation.status)}
               className="hidden shrink-0 self-start sm:inline-flex"
             >
-              {conversation.status}
+              {getConversationStatusLabel(conversation.status)}
             </Badge>
           </Link>
         );

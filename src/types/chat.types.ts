@@ -27,8 +27,34 @@ export const toggleChatAiSchema = z.object({
   channel: messagingChannelSchema,
 });
 
+const conversationStatusSchema = z.enum([
+  "open",
+  "pending",
+  "resolved",
+  "snoozed",
+  "active",
+  "archived",
+  "closed",
+]);
+
+export const updateConversationStatusSchema = z.object({
+  conversationId: z.string().uuid("Invalid conversation identifier."),
+  status: conversationStatusSchema,
+});
+
+export const updateConversationInternalNoteSchema = z.object({
+  conversationId: z.string().uuid("Invalid conversation identifier."),
+  internalNote: z.string().max(4000, "Note is too long."),
+});
+
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
 export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
+export type UpdateConversationStatusInput = z.infer<
+  typeof updateConversationStatusSchema
+>;
+export type UpdateConversationInternalNoteInput = z.infer<
+  typeof updateConversationInternalNoteSchema
+>;
 
 export type ChatMessageData = {
   id: string;
@@ -49,6 +75,8 @@ export type ConversationListItem = {
   updatedAt: string;
   lastMessagePreview: string | null;
   lastMessageAt: string | null;
+  lastMessageSenderType: MessageSenderType | null;
+  lastMessageAiGenerated: boolean;
 };
 
 export type ConversationDetail = {
@@ -57,6 +85,7 @@ export type ConversationDetail = {
   contactPhone: string;
   channel: MessagingChannel;
   status: ConversationStatus;
+  internalNote: string | null;
   updatedAt: string;
   messages: ChatMessageData[];
 };
@@ -77,6 +106,7 @@ export type ChatsMonitorData = {
   channels: ChatMonitorChannelStats[];
   totalConversations: number;
   totalMessages: number;
+  unifiedConversations: ConversationListItem[];
 };
 
 export type ChatsChannelPageData = {

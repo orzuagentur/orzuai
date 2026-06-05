@@ -9,6 +9,7 @@ export {
   MESSAGING_INTEGRATION_CHANNELS,
   INTEGRATION_SECTION_LIST,
   INTEGRATION_SECTIONS,
+  INTEGRATION_WIZARD_STEPS,
   INTEGRATIONS_MESSAGES,
   isIntegrationChannelId,
   isIntegrationSectionId,
@@ -18,6 +19,7 @@ export {
 export type {
   IntegrationChannelId,
   IntegrationSectionId,
+  IntegrationWizardStepId,
   LegacyIntegrationWorkspaceSectionId,
   MessagingIntegrationChannelId,
 } from "./constants";

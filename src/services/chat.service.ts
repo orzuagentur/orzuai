@@ -31,6 +31,12 @@ import type {
 import {
   sendChatMessageSchema,
   toggleChatAiSchema,
+  updateConversationInternalNoteSchema,
+  updateConversationStatusSchema,
+} from "@/types/chat.types";
+import type {
+  UpdateConversationInternalNoteInput,
+  UpdateConversationStatusInput,
 } from "@/types/chat.types";
 import {
   buildLastMessagePreviewMap,
@@ -100,7 +106,7 @@ export async function listConversations(
   const conversationIds = conversations.map((conversation) => conversation.id);
   const { data: messages } = await supabase
     .from("messages")
-    .select("conversation_id, content, created_at")
+    .select("conversation_id, content, created_at, sender_type, ai_generated")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
@@ -128,7 +134,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, contact:contacts(name, phone_number)",
+      "id, channel, status, internal_note, updated_at, contact:contacts(name, phone_number)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -158,6 +164,7 @@ export async function getConversationDetail(
     contactPhone: contact.phone_number,
     channel: conversation.channel,
     status: conversation.status,
+    internalNote: conversation.internal_note,
     updatedAt: conversation.updated_at,
     messages: (messages ?? []).map(mapChatMessage),
   };
@@ -253,14 +260,26 @@ async function getAiEnabledForChannel(
 
 export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   if (!hasSupabaseEnv()) {
-    return { hasBusiness: false, channels: [], totalConversations: 0, totalMessages: 0 };
+    return {
+      hasBusiness: false,
+      channels: [],
+      totalConversations: 0,
+      totalMessages: 0,
+      unifiedConversations: [],
+    };
   }
 
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
 
   if (!business) {
-    return { hasBusiness: false, channels: [], totalConversations: 0, totalMessages: 0 };
+    return {
+      hasBusiness: false,
+      channels: [],
+      totalConversations: 0,
+      totalMessages: 0,
+      unifiedConversations: [],
+    };
   }
 
   const supabase = await createClient();
@@ -310,12 +329,90 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
     0,
   );
 
+  const unifiedConversations = await listConversations(business.id);
+
   return {
     hasBusiness: true,
     channels,
     totalConversations,
     totalMessages,
+    unifiedConversations,
   };
+}
+
+export async function updateConversationStatus(
+  input: UpdateConversationStatusInput,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: CHAT_MESSAGES.missingConfig };
+  }
+
+  const parsed = updateConversationStatusSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? CHAT_MESSAGES.genericError,
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: CHAT_MESSAGES.noBusinessDescription };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("conversations")
+    .update({ status: parsed.data.status })
+    .eq("id", parsed.data.conversationId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: CHAT_MESSAGES.genericError };
+  }
+
+  revalidateChatPaths();
+  return { success: true };
+}
+
+export async function updateConversationInternalNote(
+  input: UpdateConversationInternalNoteInput,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: CHAT_MESSAGES.missingConfig };
+  }
+
+  const parsed = updateConversationInternalNoteSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? CHAT_MESSAGES.genericError,
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: CHAT_MESSAGES.noBusinessDescription };
+  }
+
+  const supabase = await createClient();
+  const trimmedNote = parsed.data.internalNote.trim();
+  const { error } = await supabase
+    .from("conversations")
+    .update({ internal_note: trimmedNote.length > 0 ? trimmedNote : null })
+    .eq("id", parsed.data.conversationId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: CHAT_MESSAGES.genericError };
+  }
+
+  revalidateChatPaths();
+  return { success: true };
 }
 
 export async function getChatsChannelPageData(

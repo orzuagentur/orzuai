@@ -36,7 +36,14 @@ export type MessagingChannel =
   | "telegram"
   | "website_forms";
 
-export type ConversationStatus = "active" | "archived" | "closed";
+export type ConversationStatus =
+  | "open"
+  | "pending"
+  | "resolved"
+  | "snoozed"
+  | "active"
+  | "archived"
+  | "closed";
 
 export type MessageSenderType = "user" | "client" | "ai";
 
@@ -480,6 +487,7 @@ export type Database = {
           contact_id: string;
           channel: MessagingChannel;
           status: ConversationStatus;
+          internal_note: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -489,6 +497,7 @@ export type Database = {
           contact_id: string;
           channel?: MessagingChannel;
           status?: ConversationStatus;
+          internal_note?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -498,6 +507,7 @@ export type Database = {
           contact_id?: string;
           channel?: MessagingChannel;
           status?: ConversationStatus;
+          internal_note?: string | null;
           created_at?: string;
           updated_at?: string;
         };

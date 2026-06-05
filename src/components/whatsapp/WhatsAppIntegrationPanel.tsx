@@ -14,6 +14,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
+import {
+  IntegrationWebhookHealth,
+  resolveWebhookHealthStatus,
+} from "@/components/integrations/IntegrationWebhookHealth";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import type {
@@ -83,11 +87,21 @@ export function WhatsAppIntegrationPanel({
               {WHATSAPP_MESSAGES.connectDescription}
             </CardDescription>
           </div>
-          {connection ? (
-            <Badge variant={getStatusVariant(connection.status)}>
-              {connection.status}
-            </Badge>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {connection ? (
+              <Badge variant={getStatusVariant(connection.status)}>
+                {connection.status}
+              </Badge>
+            ) : null}
+            {connection?.status === "connected" ? (
+              <IntegrationWebhookHealth
+                status={resolveWebhookHealthStatus({
+                  connected: true,
+                  lastActivityAt: connection.lastSyncedAt,
+                })}
+              />
+            ) : null}
+          </div>
         </div>
       </CardHeader>
       <CardContent className={embeddedInHub ? "space-y-6 px-0 pb-0" : "space-y-6"}>

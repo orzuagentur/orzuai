@@ -11,13 +11,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { getChatsMonitorData } from "@/services/chat.service";
 
 function ChatsMonitorFallback() {
-  return <Skeleton className="min-h-[24rem] w-full rounded-xl" />;
+  return (
+    <div className="rounded-xl border p-4">
+      <ConversationListSkeleton rows={8} />
+    </div>
+  );
 }
 
 export default async function ChatsPage() {

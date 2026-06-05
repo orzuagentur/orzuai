@@ -25,5 +25,6 @@ export async function registerWithEmailAction(
   return registerWithEmail({
     email: parsed.data.email,
     password: parsed.data.password,
+    businessName: parsed.data.businessName,
   });
 }

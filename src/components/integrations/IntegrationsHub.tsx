@@ -7,15 +7,18 @@ import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { IntegrationWizardNav } from "@/components/integrations/IntegrationWizardNav";
 import {
   INTEGRATION_CHANNEL_LIST,
   INTEGRATION_SECTION_LIST,
   INTEGRATIONS_MESSAGES,
   isIntegrationSectionId,
+  isMessagingIntegrationChannel,
   type IntegrationChannelId,
   type IntegrationChannelStatusEntry,
   type IntegrationChannelStatusMap,
   type IntegrationSectionId,
+  type IntegrationWizardStepId,
 } from "@/features/integrations";
 
 type IntegrationsHubProps = {
@@ -39,6 +42,9 @@ export function IntegrationsHub({
   const activeChannelConfig = INTEGRATION_CHANNEL_LIST.find(
     (c) => c.id === activeChannel,
   );
+  const isMessagingChannel = isMessagingIntegrationChannel(activeChannel);
+  const wizardStep: IntegrationWizardStepId =
+    activeSection === "contacts" ? "go-live" : "connect";
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -111,23 +117,39 @@ export function IntegrationsHub({
                 </p>
               </div>
             </div>
-            <nav className="mt-4 flex flex-wrap gap-1">
-              {INTEGRATION_SECTION_LIST.map((section) => {
-                const href = section.href(activeChannel);
-                const isSectionActive = activeSection === section.id;
+            {isMessagingChannel ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {INTEGRATIONS_MESSAGES.wizardTitle}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {INTEGRATIONS_MESSAGES.wizardDescription}
+                </p>
+                <IntegrationWizardNav
+                  channel={activeChannel}
+                  activeStep={wizardStep}
+                  channelStatuses={channelStatuses}
+                />
+              </div>
+            ) : (
+              <nav className="mt-4 flex flex-wrap gap-1">
+                {INTEGRATION_SECTION_LIST.map((section) => {
+                  const href = section.href(activeChannel);
+                  const isSectionActive = activeSection === section.id;
 
-                return (
-                  <Button
-                    key={section.id}
-                    variant={isSectionActive ? "secondary" : "ghost"}
-                    size="sm"
-                    asChild
-                  >
-                    <Link href={href}>{section.label}</Link>
-                  </Button>
-                );
-              })}
-            </nav>
+                  return (
+                    <Button
+                      key={section.id}
+                      variant={isSectionActive ? "secondary" : "ghost"}
+                      size="sm"
+                      asChild
+                    >
+                      <Link href={href}>{section.label}</Link>
+                    </Button>
+                  );
+                })}
+              </nav>
+            )}
           </header>
 
           <div className="flex-1 overflow-y-auto p-4 md:p-6">{children}</div>

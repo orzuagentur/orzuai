@@ -141,12 +141,15 @@ export async function registerWithEmail(
   const admin = createAdminClient();
   const redirectTo = buildAuthCallbackUrl(APP_ROUTES.dashboard);
 
+  const businessName = parsed.data.businessName?.trim();
+
   const { data, error } = await admin.auth.admin.generateLink({
     type: "signup",
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       redirectTo,
+      data: businessName ? { business_name: businessName } : undefined,
     },
   });
 

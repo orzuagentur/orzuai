@@ -5,13 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2Icon, MessageSquareIcon, SendIcon } from "lucide-react";
 
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
+import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
+import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
 import { MessageHistory } from "@/components/chats/MessageHistory";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
+  getChannelBadgeClassName,
   getChannelBadgeLabel,
-  getChannelBadgeVariant,
 } from "@/features/chats/channel-ui";
 import { Badge } from "@/components/ui/badge";
 import { useSendChatMessage } from "@/hooks/use-send-chat-message";
@@ -95,11 +97,20 @@ export function ChatWindow({
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <div className="shrink-0 border-b px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium">{conversation.contactName}</p>
-          <Badge variant={getChannelBadgeVariant(conversation.channel)}>
-            {getChannelBadgeLabel(conversation.channel)}
-          </Badge>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{conversation.contactName}</p>
+            <Badge
+              variant="outline"
+              className={getChannelBadgeClassName(conversation.channel)}
+            >
+              {getChannelBadgeLabel(conversation.channel)}
+            </Badge>
+          </div>
+          <ConversationStatusSelect
+            conversationId={conversation.id}
+            status={conversation.status}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           {formatContactIdentifier(conversation.contactPhone)}
@@ -110,6 +121,11 @@ export function ChatWindow({
         channel={conversation.channel}
         aiEnabled={aiEnabled}
         onToggle={handleRefresh}
+      />
+
+      <ConversationInternalNotes
+        conversationId={conversation.id}
+        initialNote={conversation.internalNote}
       />
 
       <MessageHistory messages={conversation.messages} />

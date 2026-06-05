@@ -59,11 +59,14 @@ export function EmailRegistrationForm({
       return;
     }
 
+    const businessName = String(formData.get("businessName") ?? "").trim();
+
     const result = await register({
       email,
       password,
       confirmPassword,
       acceptedTerms: true,
+      businessName: businessName || undefined,
     });
 
     if (!result.success && result.error.code === "VALIDATION_ERROR") {
@@ -112,6 +115,20 @@ export function EmailRegistrationForm({
         {errors.email ? (
           <p className="text-sm text-destructive">{errors.email}</p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="businessName">
+          Business name <span className="text-muted-foreground">(optional)</span>
+        </Label>
+        <Input
+          id="businessName"
+          name="businessName"
+          type="text"
+          autoComplete="organization"
+          placeholder="Acme Coffee Shop"
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-2">

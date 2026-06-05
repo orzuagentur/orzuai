@@ -53,9 +53,27 @@ export function buildLastMessagePreviewMap(
     conversation_id: string;
     content: string;
     created_at: string;
+    sender_type: MessageSenderType;
+    ai_generated: boolean;
   }>,
-): Map<string, { preview: string; createdAt: string }> {
-  const map = new Map<string, { preview: string; createdAt: string }>();
+): Map<
+  string,
+  {
+    preview: string;
+    createdAt: string;
+    senderType: MessageSenderType;
+    aiGenerated: boolean;
+  }
+> {
+  const map = new Map<
+    string,
+    {
+      preview: string;
+      createdAt: string;
+      senderType: MessageSenderType;
+      aiGenerated: boolean;
+    }
+  >();
 
   for (const message of messages) {
     if (map.has(message.conversation_id)) {
@@ -65,6 +83,8 @@ export function buildLastMessagePreviewMap(
     map.set(message.conversation_id, {
       preview: truncatePreview(message.content),
       createdAt: message.created_at,
+      senderType: message.sender_type,
+      aiGenerated: message.ai_generated,
     });
   }
 
@@ -83,7 +103,14 @@ function truncatePreview(content: string, maxLength = 80): string {
 
 export function mapConversationListItem(
   row: RawConversationRow,
-  lastMessage: { preview: string; createdAt: string } | undefined,
+  lastMessage:
+    | {
+        preview: string;
+        createdAt: string;
+        senderType: MessageSenderType;
+        aiGenerated: boolean;
+      }
+    | undefined,
 ): ConversationListItem | null {
   const contact = resolveContactFromRow(row.contact);
 
@@ -100,5 +127,7 @@ export function mapConversationListItem(
     updatedAt: row.updated_at,
     lastMessagePreview: lastMessage?.preview ?? null,
     lastMessageAt: lastMessage?.createdAt ?? null,
+    lastMessageSenderType: lastMessage?.senderType ?? null,
+    lastMessageAiGenerated: lastMessage?.aiGenerated ?? false,
   };
 }

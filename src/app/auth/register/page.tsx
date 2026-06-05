@@ -8,14 +8,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { APP_ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
+import { getPrimaryBusiness } from "@/services/business.service";
+import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
 
 export default async function RegisterPage() {
   const user = await getCurrentUser();
 
   if (user) {
-    redirect(APP_ROUTES.dashboard);
+    const business = await getPrimaryBusiness(user.id);
+    redirect(resolveAuthenticatedLandingPath(Boolean(business)));
   }
 
   return (

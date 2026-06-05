@@ -1,12 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRightIcon,
-  BotIcon,
-  MessageSquareIcon,
-  UsersIcon,
-} from "lucide-react";
+import { ArrowRightIcon, BotIcon, MessageSquareIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +13,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { ChatList } from "@/components/chats/ChatList";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
+import { getChannelIconClassName } from "@/features/chats/channel-ui";
 import type { ChatsMonitorData } from "@/types/chat.types";
 import { formatRelativeTime } from "@/utils/dashboard";
 
@@ -29,6 +26,7 @@ export function ChatsMonitorPanel({
   channels,
   totalConversations,
   totalMessages,
+  unifiedConversations,
 }: ChatsMonitorPanelProps) {
   if (!hasBusiness) {
     return null;
@@ -69,8 +67,10 @@ export function ChatsMonitorPanel({
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                      <channel.icon className="size-5 text-primary" />
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted/60">
+                      <channel.icon
+                        className={`size-5 ${getChannelIconClassName(channel.id)}`}
+                      />
                     </div>
                     <div>
                       <CardTitle className="text-base">{channel.label}</CardTitle>
@@ -134,13 +134,18 @@ export function ChatsMonitorPanel({
         })}
       </div>
 
-      <Card className="border-dashed shadow-none">
-        <CardContent className="flex flex-wrap items-center gap-3 py-6">
-          <UsersIcon className="size-5 text-muted-foreground" />
-          <p className="flex-1 text-sm text-muted-foreground">
-            Select a channel in the sidebar or open an inbox above to view contacts
-            and reply.
-          </p>
+      <Card className="shadow-none">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{CHAT_MESSAGES.unifiedInboxTitle}</CardTitle>
+          <CardDescription>{CHAT_MESSAGES.unifiedInboxDescription}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ChatList
+            conversations={unifiedConversations}
+            activeConversationId={null}
+            channelId="whatsapp"
+            linkToConversationChannel
+          />
         </CardContent>
       </Card>
     </div>

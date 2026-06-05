@@ -277,7 +277,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P0** Объединить дубли: AI Assistant (sidebar + integrations) → один вход
 * [x] **P0** Объединить дубли: Analytics (sidebar + integrations) → один вход
 * [x] **P0** Объединить Knowledge Base + Website Knowledge в один раздел **Knowledge**
-* [ ] **P1** Integrations: wizard Connect → Configure AI → Test → Go live (вместо 4 табов)
+* [x] **P1** Integrations: wizard Connect → Configure AI → Test → Go live (вместо 4 табов)
 * [x] **P1** Breadcrumbs в dashboard header
 * [x] **P1** Quick Actions: disable до business + channel connect
 * [x] **P2** Упростить sidebar: Home | Inbox | CRM | AI Agents | Analytics | Integrations | Knowledge | Settings
@@ -289,14 +289,14 @@ Progress: **100%** (core hub + channels)
 ## Категория: UX — Inbox (чаты / мониторинг)
 
 * [x] **P0** Realtime обновления (Supabase Realtime или polling 5s)
-* [ ] **P1** Search conversations (по имени, телефону, тексту)
-* [ ] **P1** Filters: unread, AI-handled, needs human, by channel
-* [ ] **P1** Internal notes на conversation
+* [x] **P1** Search conversations (по имени, телефону, тексту)
+* [x] **P1** Filters: unread, AI-handled, needs human, by channel
+* [x] **P1** Internal notes на conversation
 * [ ] **P1** Assign conversation to team member (после Team module)
-* [ ] **P2** Unified inbox view (все каналы в одном списке)
+* [x] **P2** Unified inbox view (все каналы в одном списке)
 * [ ] **P2** AI suggest reply sidebar в chat window
 * [ ] **P2** Typing indicators / read receipts (где API позволяет)
-* [ ] **P2** Conversation status: open / pending / resolved / snoozed
+* [x] **P2** Conversation status: open / pending / resolved / snoozed
 * [ ] **P3** Canned responses / quick replies library
 
 ---
@@ -304,13 +304,13 @@ Progress: **100%** (core hub + channels)
 ## Категория: UX — Onboarding и активация
 
 * [x] **P0** Guided onboarding wizard с progress ring (0–100%)
-* [ ] **P0** Inline business name при регистрации (опционально)
+* [x] **P0** Inline business name при регистрации (опционально)
 * [x] **P0** AI enabled by default после connect channel
 * [x] **P1** Setup checklist на Overview до завершения onboarding
-* [ ] **P1** Webhook health check: статус «Receiving messages» в Integrations
-* [ ] **P1** Test AI reply встроен в onboarding (шаг 4)
+* [x] **P1** Webhook health check: статус «Receiving messages» в Integrations
+* [x] **P1** Test AI reply встроен в onboarding (шаг 4)
 * [ ] **P2** Magic link login (без пароля)
-* [ ] **P2** Resume setup: deep link для users с account но без business
+* [x] **P2** Resume setup: deep link для users с account но без business
 * [ ] **P2** Email drip: Day 0/1/3 onboarding tips (Resend)
 
 ---
@@ -318,10 +318,10 @@ Progress: **100%** (core hub + channels)
 ## Категория: UI — Design System V2
 
 * [ ] **P1** Единая система кнопок (landing + dashboard)
-* [ ] **P1** Channel color coding (WhatsApp green, Instagram gradient, Telegram blue)
+* [x] **P1** Channel color coding (WhatsApp green, Instagram gradient, Telegram blue)
 * [ ] **P1** Semantic colors: success / warning / error / info
 * [ ] **P1** Typography scale (H1/H2/H3/body/caption)
-* [ ] **P1** Skeleton loaders вместо пустых нулей
+* [x] **P1** Skeleton loaders вместо пустых нулей
 * [ ] **P1** Empty state illustrations + primary CTA
 * [ ] **P2** shadcn Form + Select + Checkbox primitives везде
 * [ ] **P2** Channel brand icons в nav и badges

@@ -8,9 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { APP_ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
+import { getPrimaryBusiness } from "@/services/business.service";
 import { getSafeRedirectPath } from "@/utils/auth";
+import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -19,13 +20,14 @@ type LoginPageProps = {
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
   const user = await getCurrentUser();
 
   if (user) {
-    redirect(APP_ROUTES.dashboard);
+    const business = await getPrimaryBusiness(user.id);
+    redirect(resolveAuthenticatedLandingPath(Boolean(business), params.next));
   }
 
-  const params = await searchParams;
   const nextPath = getSafeRedirectPath(params.next);
 
   return (

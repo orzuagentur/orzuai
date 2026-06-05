@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
+import { APP_ROUTES, AUTH_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { getSupabaseAnonKey, getSupabaseUrl, hasSupabaseEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 import { isAuthEntryRoute, isProtectedRoute } from "@/utils/auth";
@@ -51,8 +51,17 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthEntryRoute(pathname)) {
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = APP_ROUTES.dashboard;
+    redirectUrl.pathname = business
+      ? APP_ROUTES.dashboard
+      : DASHBOARD_ROUTES.onboarding;
     redirectUrl.search = "";
 
     return NextResponse.redirect(redirectUrl);

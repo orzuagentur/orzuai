@@ -25,6 +25,10 @@ function OnboardingWizardFallback() {
 export default async function OnboardingPage({ searchParams }: OnboardingPageProps) {
   const user = await getCurrentUser();
   const business = user ? await getPrimaryBusiness(user.id) : null;
+  const defaultBusinessName =
+    typeof user?.user_metadata?.business_name === "string"
+      ? user.user_metadata.business_name
+      : undefined;
   const params = await searchParams;
   const requestedStep = Number(params.step);
   const progress = business
@@ -62,6 +66,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
           step={step}
           progress={progress}
           business={business ? mapBusinessToProfile(business) : null}
+          defaultBusinessName={defaultBusinessName}
           whatsappConfig={whatsappConfig}
           aiSettings={aiSettings}
         />
