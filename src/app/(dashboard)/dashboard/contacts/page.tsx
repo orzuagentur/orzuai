@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
+
 import { ChannelWorkspacePage } from "@/components/dashboard/ChannelWorkspacePage";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 type ContactsPageProps = {
   searchParams: Promise<{ channel?: string }>;
@@ -6,6 +9,10 @@ type ContactsPageProps = {
 
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
   const { channel } = await searchParams;
+
+  if (!channel) {
+    redirect(`${DASHBOARD_ROUTES.contacts}?channel=whatsapp`);
+  }
 
   return (
     <ChannelWorkspacePage

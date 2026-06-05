@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
+import { AUTH_ROUTES } from "@/constants/routes";
 import { REGISTRATION_MESSAGES } from "@/features/auth/constants";
 import { MailCheckIcon } from "lucide-react";
 
@@ -39,8 +39,17 @@ export function RegistrationConfirmation({
           </p>
         ) : null}
         {email ? <ResendVerificationForm email={email} /> : null}
-        <Button asChild className="w-full">
-          <Link href={APP_ROUTES.home}>Back to home</Link>
+        {email ? (
+          <Button asChild className="w-full">
+            <a href={`mailto:${email}`}>Open email app</a>
+          </Button>
+        ) : null}
+        <Button
+          asChild
+          className="w-full"
+          variant={email ? "outline" : "default"}
+        >
+          <Link href={AUTH_ROUTES.login}>Sign in</Link>
         </Button>
         <Button asChild variant="ghost" className="w-full">
           <Link href={AUTH_ROUTES.register}>Use a different email</Link>

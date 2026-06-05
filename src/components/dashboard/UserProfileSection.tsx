@@ -1,16 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ChevronsUpDownIcon,
-  CreditCardIcon,
-  Loader2Icon,
-  LogOutIcon,
-} from "lucide-react";
+import { ChevronsUpDownIcon, Loader2Icon, LogOutIcon } from "lucide-react";
 import { useTransition } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { signOutAction } from "@/features/auth/actions/sign-out";
 import {
   SidebarMenu,
@@ -96,12 +88,6 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
             <DropdownMenuItem disabled className="text-muted-foreground">
               Current plan: {userProfile.plan}
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={DASHBOARD_ROUTES.subscription}>
-                <CreditCardIcon />
-                Manage Subscription
-              </Link>
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={isSigningOut}
@@ -121,12 +107,6 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-        <Button asChild variant="outline" size="sm" className="w-full">
-          <Link href={DASHBOARD_ROUTES.subscription}>Manage Subscription</Link>
-        </Button>
       </SidebarMenuItem>
     </SidebarMenu>
   );

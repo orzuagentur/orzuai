@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BotIcon } from "lucide-react";
 
 type AiStatusCardProps = {
@@ -24,7 +28,7 @@ export function AiStatusCard({ aiEnabled }: AiStatusCardProps) {
           AI Status
         </CardTitle>
         <CardDescription>
-          Current state of your AI WhatsApp assistant.
+          Automated replies across WhatsApp, Instagram, Telegram, and more.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -38,6 +42,11 @@ export function AiStatusCard({ aiEnabled }: AiStatusCardProps) {
               : "AI auto-replies are turned off. Enable them in AI Assistant settings."
             : "Configure your AI assistant to start automating responses."}
         </p>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`${DASHBOARD_ROUTES.aiAssistant}?channel=whatsapp`}>
+            Configure AI
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );

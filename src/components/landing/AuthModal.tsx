@@ -5,6 +5,7 @@ import { useState } from "react";
 import { EmailLoginForm } from "@/components/auth/EmailLoginForm";
 import { EmailRegistrationForm } from "@/components/auth/EmailRegistrationForm";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { TermsAcceptanceField } from "@/components/auth/TermsAcceptanceField";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { LEGAL_ROUTES } from "@/constants/routes";
 import { LANDING_COPY } from "@/features/landing/constants";
 import { cn } from "@/lib/utils";
 
@@ -25,13 +25,15 @@ type AuthModalProps = {
 };
 
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
-  const [view, setView] = useState<AuthView>("login");
+  const [view, setView] = useState<AuthView>("register");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
 
     if (!nextOpen) {
-      setView("login");
+      setView("register");
+      setAcceptedTerms(false);
     }
   }
 
@@ -62,31 +64,16 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             ))}
           </div>
 
-          <GoogleSignInButton />
-
           {view === "register" ? (
-            <p className="text-center text-xs leading-5 text-muted-foreground">
-              By continuing, you agree to our{" "}
-              <a
-                href={LEGAL_ROUTES.terms}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Terms of Service
-              </a>{" "}
-              and{" "}
-              <a
-                href={LEGAL_ROUTES.privacy}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Privacy Policy
-              </a>
-              .
-            </p>
+            <TermsAcceptanceField
+              checked={acceptedTerms}
+              onChange={setAcceptedTerms}
+            />
           ) : null}
+
+          <GoogleSignInButton
+            disabled={view === "register" && !acceptedTerms}
+          />
 
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />

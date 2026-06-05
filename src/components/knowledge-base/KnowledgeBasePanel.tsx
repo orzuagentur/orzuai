@@ -73,7 +73,11 @@ export function KnowledgeBasePanel({
         </Button>
       </div>
 
-      <KnowledgeEntryList entries={entries} hasActiveFilters={hasActiveFilters} />
+      <KnowledgeEntryList
+        entries={entries}
+        hasActiveFilters={hasActiveFilters}
+        onAddFirstEntry={() => setCreateOpen(true)}
+      />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">

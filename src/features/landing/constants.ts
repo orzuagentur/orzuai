@@ -1,15 +1,15 @@
 export const LANDING_COPY = {
-  tagline: "The easiest AI WhatsApp Assistant for small businesses.",
+  tagline: "The AI inbox for WhatsApp, Instagram, Telegram, and your website.",
   subtitle:
-    "Automate customer conversations, train your AI on your business knowledge, and grow faster — all from one simple dashboard.",
+    "Unify customer conversations, automate replies with AI trained on your business knowledge, and grow faster — all from one dashboard.",
   startButton: "START",
   modalTitle: "Welcome to OrzuAI",
   modalDescription:
-    "Sign in or create an account to launch your AI WhatsApp assistant.",
+    "Sign in or create an account to launch your multi-channel AI assistant.",
 } as const;
 
 export const LANDING_FEATURES = [
-  "WhatsApp automation",
+  "WhatsApp & Instagram",
+  "Telegram & Web forms",
   "AI-powered replies",
-  "Business analytics",
 ] as const;

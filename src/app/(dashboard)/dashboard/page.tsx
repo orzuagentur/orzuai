@@ -53,31 +53,33 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-              <Link href={DASHBOARD_ROUTES.settings}>Create business profile</Link>
+              <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
             </Button>
           </CardContent>
         </Card>
-      ) : null}
+      ) : (
+        <>
+          <AnalyticsCardsGrid metrics={overview.metrics} />
 
-      <AnalyticsCardsGrid metrics={overview.metrics} />
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <ActivityChart data={overview.activity} />
+            </div>
+            <QuickActions />
+          </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <ActivityChart data={overview.activity} />
-        </div>
-        <QuickActions />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RecentConversations conversations={overview.recentConversations} />
-        <div className="grid gap-4">
-          <WhatsAppStatusCard
-            status={overview.whatsappStatus}
-            phoneNumber={overview.whatsappPhoneNumber}
-          />
-          <AiStatusCard aiEnabled={overview.aiEnabled} />
-        </div>
-      </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <RecentConversations conversations={overview.recentConversations} />
+            <div className="grid gap-4">
+              <WhatsAppStatusCard
+                status={overview.whatsappStatus}
+                phoneNumber={overview.whatsappPhoneNumber}
+              />
+              <AiStatusCard aiEnabled={overview.aiEnabled} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

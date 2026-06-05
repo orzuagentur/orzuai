@@ -1,9 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { EmailLoginForm } from "@/components/auth/EmailLoginForm";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { Button } from "@/components/ui/button";
+import { LoginAuthSection } from "@/components/auth/LoginAuthSection";
 import {
   Card,
   CardContent,
@@ -11,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { APP_ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
 import { getSafeRedirectPath } from "@/utils/auth";
@@ -38,22 +34,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <CardHeader className="text-center">
           <CardTitle>Welcome back to OrzuAI</CardTitle>
           <CardDescription>
-            Sign in to manage your AI WhatsApp assistant.
+            Sign in to manage your multi-channel AI inbox.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <EmailLoginForm nextPath={nextPath} />
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              or
-            </span>
-            <Separator className="flex-1" />
-          </div>
-          <GoogleSignInButton nextPath={nextPath} />
-          <Button asChild variant="ghost" className="w-full">
-            <Link href={APP_ROUTES.home}>Back to home</Link>
-          </Button>
+        <CardContent>
+          <LoginAuthSection nextPath={nextPath} />
         </CardContent>
       </Card>
     </div>

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 
 import { WhatsAppManualConnect } from "@/components/whatsapp/WhatsAppManualConnect";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,6 @@ import {
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
-import { useSyncWhatsApp } from "@/hooks/use-sync-whatsapp";
 import type {
   WhatsAppConnectConfig,
   WhatsAppConnectionData,
@@ -52,9 +50,6 @@ export function WhatsAppIntegrationPanel({
   embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
   const router = useRouter();
-  const { sync, isLoading: isSyncing } = useSyncWhatsApp({
-    onSuccess: () => router.refresh(),
-  });
 
   if (!hasBusiness) {
     return (
@@ -112,31 +107,14 @@ export function WhatsAppIntegrationPanel({
                 ) : null}
                 {connection.lastSyncedAt ? (
                   <p>
-                    <span className="font-medium">Last synced:</span>{" "}
+                    <span className="font-medium">Last activity:</span>{" "}
                     {new Date(connection.lastSyncedAt).toLocaleString("en-US")}
                   </p>
                 ) : null}
+                <p className="text-muted-foreground">
+                  New messages arrive automatically via Meta webhooks.
+                </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSyncing}
-                onClick={() => {
-                  void sync();
-                }}
-              >
-                {isSyncing ? (
-                  <>
-                    <Loader2Icon className="size-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCwIcon className="size-4" />
-                    Sync messages
-                  </>
-                )}
-              </Button>
             </div>
             {embeddedInHub ? (
               <IntegrationQuickLinks channel="whatsapp" showHubSections />

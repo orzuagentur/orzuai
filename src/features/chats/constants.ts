@@ -1,10 +1,10 @@
 export const CHAT_MESSAGES = {
-  pageTitle: "Monitoring",
+  pageTitle: "Inbox",
   pageDescription:
-    "Dashboard for all channels, then open WhatsApp, Instagram, Telegram, or Website Forms inboxes.",
-  monitorTitle: "Dashboard",
+    "All channels in one place — open WhatsApp, Instagram, Telegram, or Website Forms inboxes.",
+  monitorTitle: "Overview",
   monitorDescription:
-    "Overview of conversations and activity across every connected channel.",
+    "Summary of conversations and activity across every connected channel.",
   channelsTitle: "Channels",
   openChannel: "Open inbox",
   viewMonitor: "All channels",

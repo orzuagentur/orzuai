@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { AiAssistantHub } from "@/components/ai-assistant/AiAssistantHub";
-import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
@@ -27,11 +27,7 @@ export default async function AiAssistantPage({
   const data = await getAiAssistantPageData(channel ?? "whatsapp");
 
   if (!data.hasBusiness) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <DashboardComingSoon title="AI Assistant" />
-      </div>
-    );
+    return <DashboardSetupPrompt title="AI Assistant" />;
   }
 
   return (

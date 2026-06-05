@@ -66,17 +66,16 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
   const supabase = await createClient();
 
   const [
-    analyticsResult,
+    channelAnalyticsResult,
     whatsappResult,
     aiSettingsResult,
     conversationsResult,
     allConversationsResult,
   ] = await Promise.all([
     supabase
-      .from("analytics")
+      .from("channel_analytics")
       .select("total_messages, total_contacts, ai_replies")
-      .eq("business_id", business.id)
-      .maybeSingle(),
+      .eq("business_id", business.id),
     supabase
       .from("whatsapp_connections")
       .select("whatsapp_status, phone_number")
@@ -86,9 +85,8 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .maybeSingle(),
     supabase
       .from("ai_settings")
-      .select("ai_enabled")
-      .eq("business_id", business.id)
-      .maybeSingle(),
+      .select("ai_enabled, channel")
+      .eq("business_id", business.id),
     supabase
       .from("conversations")
       .select(
@@ -100,9 +98,19 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
     supabase.from("conversations").select("id").eq("business_id", business.id),
   ]);
 
-  const totalMessages = analyticsResult.data?.total_messages ?? 0;
-  const uniqueContacts = analyticsResult.data?.total_contacts ?? 0;
-  const aiResponses = analyticsResult.data?.ai_replies ?? 0;
+  const channelRows = channelAnalyticsResult.data ?? [];
+  const totalMessages = channelRows.reduce(
+    (sum, row) => sum + (row.total_messages ?? 0),
+    0,
+  );
+  const uniqueContacts = channelRows.reduce(
+    (sum, row) => sum + (row.total_contacts ?? 0),
+    0,
+  );
+  const aiResponses = channelRows.reduce(
+    (sum, row) => sum + (row.ai_replies ?? 0),
+    0,
+  );
 
   const metrics: DashboardMetrics = {
     totalMessages,
@@ -160,7 +168,10 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
     recentConversations,
     whatsappStatus: whatsappResult.data?.whatsapp_status ?? null,
     whatsappPhoneNumber: whatsappResult.data?.phone_number ?? null,
-    aiEnabled: aiSettingsResult.data?.ai_enabled ?? null,
+    aiEnabled:
+      aiSettingsResult.data && aiSettingsResult.data.length > 0
+        ? aiSettingsResult.data.some((row) => row.ai_enabled)
+        : null,
   };
 }
 

@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buildIntegrationActivateHref } from "@/features/integrations";
 import type { WhatsappStatus } from "@/types/database.types";
 import { PhoneIcon } from "lucide-react";
 
@@ -40,6 +44,8 @@ export function WhatsAppStatusCard({
   status,
   phoneNumber,
 }: WhatsAppStatusCardProps) {
+  const isConnected = status === "connected";
+
   return (
     <Card className="shadow-none">
       <CardHeader>
@@ -58,6 +64,11 @@ export function WhatsAppStatusCard({
             ? `Connected number: ${phoneNumber}`
             : "No WhatsApp number connected yet."}
         </p>
+        <Button asChild variant={isConnected ? "outline" : "default"} size="sm">
+          <Link href={buildIntegrationActivateHref("whatsapp")}>
+            {isConnected ? "Manage connection" : "Connect WhatsApp"}
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );

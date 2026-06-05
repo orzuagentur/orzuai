@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { AnalyticsHub } from "@/components/analytics/AnalyticsHub";
-import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
@@ -27,11 +27,7 @@ export default async function AnalyticsPage({
   const data = await getAnalyticsPageData(channel ?? "whatsapp");
 
   if (!data.hasBusiness) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <DashboardComingSoon title="Analytics" />
-      </div>
-    );
+    return <DashboardSetupPrompt title="Analytics" />;
   }
 
   return (

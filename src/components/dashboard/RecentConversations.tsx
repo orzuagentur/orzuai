@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { buildIntegrationActivateHref } from "@/features/integrations";
 import type { RecentConversationItem } from "@/types/dashboard.types";
 import { formatRelativeTime } from "@/utils/dashboard";
 
@@ -40,19 +41,28 @@ export function RecentConversations({
         <div className="space-y-1">
           <CardTitle>Recent Conversations</CardTitle>
           <CardDescription>
-            Latest WhatsApp chats with your customers.
+            Latest customer conversations across all connected channels.
           </CardDescription>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href={DASHBOARD_ROUTES.chats}>View all</Link>
-        </Button>
+        {conversations.length > 0 ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={DASHBOARD_ROUTES.chats}>View all</Link>
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         {conversations.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No conversations yet. Connect WhatsApp to start receiving
-            messages.
-          </p>
+          <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No conversations yet. Connect a channel in Integrations to start
+              receiving messages.
+            </p>
+            <Button asChild size="sm">
+              <Link href={buildIntegrationActivateHref("whatsapp")}>
+                Connect a channel
+              </Link>
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {conversations.map((conversation) => (

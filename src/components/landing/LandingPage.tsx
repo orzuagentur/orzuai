@@ -36,7 +36,7 @@ export function LandingPage() {
 
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-sm">
             <SparklesIcon className="size-3.5 text-primary" />
-            AI WhatsApp platform for small business
+            AI inbox for WhatsApp, Instagram & Telegram
           </div>
 
           <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl sm:leading-tight">

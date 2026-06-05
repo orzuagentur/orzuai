@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChannelAnalyticsPanel } from "@/components/channel-workspace/ChannelAnalyticsPanel";
 import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
 import { ChannelWorkspaceBanner } from "@/components/integrations/ChannelWorkspaceBanner";
-import { DashboardComingSoon } from "@/components/dashboard/DashboardComingSoon";
+import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,7 +41,12 @@ export async function ChannelWorkspacePage({
   section,
 }: ChannelWorkspacePageProps) {
   if (!channelParam || !isIntegrationChannelId(channelParam)) {
-    return <DashboardComingSoon title={title} />;
+    return (
+      <DashboardSetupPrompt
+        title={title}
+        description="Select a channel to view contacts for WhatsApp, Instagram, Telegram, or Website Forms."
+      />
+    );
   }
 
   if (!isMessagingIntegrationChannel(channelParam)) {
@@ -77,11 +82,7 @@ export async function ChannelWorkspacePage({
   const business = user ? await getPrimaryBusiness(user.id) : null;
 
   if (!business) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <DashboardComingSoon title={pageTitle} />
-      </div>
-    );
+    return <DashboardSetupPrompt title={pageTitle} />;
   }
 
   const isReady = await isChannelWorkspaceReady(business.id, channel);

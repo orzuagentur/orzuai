@@ -23,7 +23,7 @@ export const DASHBOARD_NAV_ITEMS = [
   },
   {
     id: "chats",
-    label: "Monitoring",
+    label: "Inbox",
     href: DASHBOARD_ROUTES.chats,
     icon: MessageSquare,
   },
@@ -72,7 +72,7 @@ export const DASHBOARD_NAV_ITEMS = [
 
 export const OVERVIEW_MESSAGES = {
   title: "Overview",
-  description: "Monitor your WhatsApp assistant performance at a glance.",
+  description: "Monitor messages, AI performance, and activity across all channels.",
   emptyBusinessTitle: "Set up your business",
   emptyBusinessDescription:
     "Create your business profile to start tracking messages, contacts, and AI performance.",

@@ -22,7 +22,7 @@ const CARD_CONFIG = [
   {
     key: "totalMessages" as const,
     label: ANALYTICS_CARD_LABELS.totalMessages,
-    description: "All messages across your WhatsApp conversations.",
+    description: "All messages across your connected channels.",
     icon: MessageSquareIcon,
     format: formatMetricValue,
   },

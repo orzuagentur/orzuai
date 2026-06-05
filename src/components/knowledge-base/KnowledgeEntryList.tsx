@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 
 import { KnowledgeEntryCard } from "@/components/knowledge-base/KnowledgeEntryCard";
+import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -15,11 +17,13 @@ import type { KnowledgeEntryData } from "@/types/knowledge.types";
 type KnowledgeEntryListProps = {
   entries: KnowledgeEntryData[];
   hasActiveFilters: boolean;
+  onAddFirstEntry?: () => void;
 };
 
 export function KnowledgeEntryList({
   entries,
   hasActiveFilters,
+  onAddFirstEntry,
 }: KnowledgeEntryListProps) {
   const router = useRouter();
 
@@ -38,6 +42,13 @@ export function KnowledgeEntryList({
               : KNOWLEDGE_MESSAGES.emptyDescription}
           </CardDescription>
         </CardHeader>
+        {!hasActiveFilters && onAddFirstEntry ? (
+          <CardContent className="flex justify-center pb-6">
+            <Button type="button" onClick={onAddFirstEntry}>
+              Add first entry
+            </Button>
+          </CardContent>
+        ) : null}
       </Card>
     );
   }
