@@ -81,9 +81,14 @@ export type ContactProfileData = {
   timeline: ContactTimelineEntry[];
 };
 
+export const CONTACT_SEGMENTS = ["all", "hot_leads", "no_reply_48h"] as const;
+
+export type ContactSegment = (typeof CONTACT_SEGMENTS)[number];
+
 export type UnifiedContactsPageData = {
   hasBusiness: boolean;
   contacts: UnifiedContactItem[];
   total: number;
   activeChannelFilter: MessagingChannel | null;
+  activeSegment: ContactSegment;
 };

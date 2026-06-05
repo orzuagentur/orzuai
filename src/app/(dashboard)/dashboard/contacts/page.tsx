@@ -4,12 +4,12 @@ import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { getUnifiedContacts } from "@/services/contacts.service";
 
 type ContactsPageProps = {
-  searchParams: Promise<{ channel?: string }>;
+  searchParams: Promise<{ channel?: string; segment?: string }>;
 };
 
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
-  const { channel } = await searchParams;
-  const data = await getUnifiedContacts(channel);
+  const { channel, segment } = await searchParams;
+  const data = await getUnifiedContacts(channel, segment);
 
   if (!data.hasBusiness) {
     return (

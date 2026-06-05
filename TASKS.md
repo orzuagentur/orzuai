@@ -172,7 +172,7 @@ Status: DONE (3/3)
 
 * [x] Website Forms webhook ingest
 * [x] Lead → contact + conversation + AI follow-up (WhatsApp / Email)
-* [ ] Website Forms → Telegram follow-up
+* [x] Website Forms → Telegram follow-up
 
 Status: IN PROGRESS (2/3)
 
@@ -327,7 +327,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P2** Channel brand icons в nav и badges
 * [x] **P2** Dark mode toggle для dashboard
 * [ ] **P2** 8px spacing grid audit
-* [ ] **P3** Design tokens: удалить или синхронизировать `constants/design.ts` с `globals.css`
+* [x] **P3** Design tokens: удалить или синхронизировать `constants/design.ts` с `globals.css`
 
 ---
 
@@ -358,7 +358,7 @@ Progress: **100%** (core hub + channels)
 * [ ] **P2** Pipeline (kanban): New → Qualified → Proposal → Won / Lost
 * [ ] **P2** Deals: value, expected close date, stage
 * [ ] **P2** Tasks: create, assign, due date, reminders
-* [ ] **P2** Segments: hot leads, no reply 48h, by channel/source
+* [x] **P2** Segments: hot leads, no reply 48h, by channel/source
 * [ ] **P2** Auto-create task при high-intent message (AI rule)
 * [ ] **P3** Contact import (CSV)
 * [ ] **P3** Contact export (CSV / GDPR)
@@ -367,8 +367,8 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: AI Agents
 
-* [ ] **P0** AI CRM Assistant: lead score + summary + suggested action per message
-* [ ] **P0** AI Follow-Up Agent: cron 24h/48h auto follow-up messages
+* [x] **P0** AI CRM Assistant: lead score + summary + suggested action per message
+* [x] **P0** AI Follow-Up Agent: cron 24h/48h auto follow-up messages
 * [x] **P1** AI suggest reply в Inbox sidebar
 * [ ] **P1** Agent builder UI: prompt + channels + triggers
 * [ ] **P1** Multi-model support: Gemini + OpenAI + Claude (selector)
@@ -401,7 +401,7 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Integrations — каналы связи
 
-* [ ] **P0** Website Forms → Telegram follow-up (завершить stub)
+* [x] **P0** Website Forms → Telegram follow-up (завершить stub)
 * [ ] **P1** Facebook Messenger channel
 * [ ] **P1** Gmail / Google Workspace (send + receive email inbox)
 * [ ] **P1** Outlook / Microsoft 365 email

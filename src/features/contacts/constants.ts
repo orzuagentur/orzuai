@@ -50,7 +50,16 @@ export const CONTACTS_MESSAGES = {
   hotLead: "Hot lead",
   warmLead: "Warm lead",
   coldLead: "Cold lead",
+  segmentAll: "All contacts",
+  segmentHotLeads: "Hot leads",
+  segmentNoReply48h: "No reply 48h+",
 } as const;
+
+export const CONTACT_SEGMENT_FILTERS = [
+  { id: "all" as const, label: CONTACTS_MESSAGES.segmentAll },
+  { id: "hot_leads" as const, label: CONTACTS_MESSAGES.segmentHotLeads },
+  { id: "no_reply_48h" as const, label: CONTACTS_MESSAGES.segmentNoReply48h },
+] as const;
 
 export const CONTACT_CHANNEL_FILTERS = [
   { id: null, label: CONTACTS_MESSAGES.filterAll },

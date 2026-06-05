@@ -466,6 +466,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      conversation_follow_ups: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          business_id: string;
+          follow_up_day: number;
+          sent_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          business_id: string;
+          follow_up_day: number;
+          sent_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          business_id?: string;
+          follow_up_day?: number;
+          sent_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversation_follow_ups_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversation_follow_ups_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       canned_responses: {
         Row: {
           id: string;

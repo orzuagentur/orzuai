@@ -14,8 +14,10 @@ import {
 } from "@/features/chats/channel-ui";
 import {
   CONTACT_CHANNEL_FILTERS,
+  CONTACT_SEGMENT_FILTERS,
   CONTACTS_MESSAGES,
 } from "@/features/contacts/constants";
+import type { ContactSegment } from "@/types/contact.types";
 import { cn } from "@/lib/utils";
 import type { UnifiedContactsPageData } from "@/types/contact.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
@@ -24,12 +26,25 @@ import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 
 type UnifiedContactsPanelProps = UnifiedContactsPageData;
 
-function buildContactsHref(channel: string | null): string {
-  if (!channel) {
-    return DASHBOARD_ROUTES.contacts;
+function buildContactsHref(
+  channel: string | null,
+  segment: ContactSegment,
+): string {
+  const params = new URLSearchParams();
+
+  if (channel) {
+    params.set("channel", channel);
   }
 
-  return `${DASHBOARD_ROUTES.contacts}?channel=${channel}`;
+  if (segment !== "all") {
+    params.set("segment", segment);
+  }
+
+  const query = params.toString();
+
+  return query
+    ? `${DASHBOARD_ROUTES.contacts}?${query}`
+    : DASHBOARD_ROUTES.contacts;
 }
 
 export function UnifiedContactsPanel({
@@ -37,6 +52,7 @@ export function UnifiedContactsPanel({
   contacts,
   total,
   activeChannelFilter,
+  activeSegment,
 }: UnifiedContactsPanelProps) {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
@@ -65,6 +81,27 @@ export function UnifiedContactsPanel({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {CONTACT_SEGMENT_FILTERS.map((filter) => {
+          const isActive = filter.id === activeSegment;
+
+          return (
+            <Link
+              key={filter.id}
+              href={buildContactsHref(activeChannelFilter, filter.id)}
+              className={cn(
+                "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                isActive
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+              )}
+            >
+              {filter.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {CONTACT_CHANNEL_FILTERS.map((filter) => {
           const isActive =
             filter.id === activeChannelFilter ||
@@ -73,7 +110,7 @@ export function UnifiedContactsPanel({
           return (
             <Link
               key={filter.id ?? "all"}
-              href={buildContactsHref(filter.id)}
+              href={buildContactsHref(filter.id, activeSegment)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                 isActive

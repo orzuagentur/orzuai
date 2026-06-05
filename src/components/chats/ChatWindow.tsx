@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2Icon, MessageSquareIcon, SendIcon, SparklesIcon } from "lucide-react";
 
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
+import { ChatCrmAssistantBar } from "@/components/chats/ChatCrmAssistantBar";
 import { QuickRepliesPicker } from "@/components/chats/QuickRepliesPicker";
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
@@ -128,6 +129,8 @@ export function ChatWindow({
           {formatContactIdentifier(conversation.contactPhone)}
         </p>
       </div>
+
+      <ChatCrmAssistantBar conversationId={conversation.id} />
 
       <ChatAiStatus
         channel={conversation.channel}

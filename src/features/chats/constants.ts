@@ -63,6 +63,9 @@ export const CHAT_MESSAGES = {
   suggestReplyFailed: "Unable to generate a suggestion. Please try again.",
   suggestReplyNoMessages:
     "No customer messages yet. Wait for the customer to write first.",
+  crmAssistantTitle: "CRM assistant",
+  crmAssistantLoading: "Loading CRM insights…",
+  crmSuggestedAction: "Suggested action",
 } as const;
 
 export type ChatInboxFilter = "all" | "ai_handled" | "needs_human" | "active";

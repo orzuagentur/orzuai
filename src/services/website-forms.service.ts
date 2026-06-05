@@ -10,6 +10,7 @@ import {
   formatWebsiteFormSubmissionBody,
   resolveWebsiteFormContactIdentifier,
 } from "@/lib/website-forms/format-submission";
+import { sendWebsiteFormTelegramFollowUp } from "@/lib/website-forms/telegram-follow-up";
 import {
   generateWebsiteFormApiKey,
   generateWebhookToken,
@@ -462,7 +463,12 @@ async function processWebsiteFormFollowUp(input: {
   }
 
   if (channel === "telegram") {
-    outboundSent = false;
+    outboundSent = await sendWebsiteFormTelegramFollowUp({
+      admin,
+      businessId,
+      submission,
+      message: followUpText,
+    });
   }
 
   await insertChannelMessage(admin, {

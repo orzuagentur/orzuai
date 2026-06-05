@@ -17,6 +17,7 @@ import type {
   DeleteContactInput,
   GenerateContactInsightsInput,
   GenerateContactInsightsResult,
+  ContactSegment,
   UnifiedContactItem,
   UnifiedContactsPageData,
   UpdateContactInput,
@@ -89,6 +90,87 @@ function revalidateContactPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.contacts);
 }
 
+function isContactSegment(value: string | null | undefined): value is ContactSegment {
+  return value === "all" || value === "hot_leads" || value === "no_reply_48h";
+}
+
+async function filterContactsBySegment(
+  contacts: UnifiedContactItem[],
+  segment: ContactSegment,
+  businessId: string,
+): Promise<UnifiedContactItem[]> {
+  if (segment === "all") {
+    return contacts;
+  }
+
+  if (segment === "hot_leads") {
+    return contacts.filter(
+      (contact) => contact.leadScore !== null && contact.leadScore >= 70,
+    );
+  }
+
+  const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+  const supabase = await createClient();
+  const contactIds = contacts.map((contact) => contact.id);
+
+  if (contactIds.length === 0) {
+    return [];
+  }
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id, contact_id")
+    .eq("business_id", businessId)
+    .in("contact_id", contactIds);
+
+  const conversationIds = (conversations ?? []).map(
+    (conversation) => conversation.id,
+  );
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("conversation_id, sender_type, created_at")
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false });
+
+  const conversationToContact = new Map(
+    (conversations ?? []).map((conversation) => [
+      conversation.id,
+      conversation.contact_id,
+    ]),
+  );
+
+  const latestByContactId = new Map<
+    string,
+    { senderType: string; createdAt: string }
+  >();
+
+  for (const message of messages ?? []) {
+    const contactId = conversationToContact.get(message.conversation_id);
+
+    if (contactId && !latestByContactId.has(contactId)) {
+      latestByContactId.set(contactId, {
+        senderType: message.sender_type,
+        createdAt: message.created_at,
+      });
+    }
+  }
+
+  return contacts.filter((contact) => {
+    const latest = latestByContactId.get(contact.id);
+
+    if (!latest || latest.senderType !== "client") {
+      return false;
+    }
+
+    return new Date(latest.createdAt).getTime() <= cutoff;
+  });
+}
+
 function isMessagingChannel(value: string): value is MessagingChannel {
   return (
     value === "whatsapp" ||
@@ -149,9 +231,11 @@ async function attachLastMessagePreviews(
 
 export async function getUnifiedContacts(
   channelFilter?: string | null,
+  segmentFilter?: string | null,
 ): Promise<UnifiedContactsPageData> {
   const activeChannelFilter =
     channelFilter && isMessagingChannel(channelFilter) ? channelFilter : null;
+  const activeSegment = isContactSegment(segmentFilter) ? segmentFilter : "all";
 
   const businessId = await getOwnedBusinessId();
 
@@ -161,6 +245,7 @@ export async function getUnifiedContacts(
       contacts: [],
       total: 0,
       activeChannelFilter,
+      activeSegment,
     };
   }
 
@@ -181,13 +266,19 @@ export async function getUnifiedContacts(
   }
 
   const { data, count } = await query;
-  const contacts = await attachLastMessagePreviews(data ?? []);
+  const allContacts = await attachLastMessagePreviews(data ?? []);
+  const contacts = await filterContactsBySegment(
+    allContacts,
+    activeSegment,
+    businessId,
+  );
 
   return {
     hasBusiness: true,
     contacts,
-    total: count ?? contacts.length,
+    total: activeSegment === "all" ? (count ?? allContacts.length) : contacts.length,
     activeChannelFilter,
+    activeSegment,
   };
 }
 

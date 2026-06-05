@@ -1,28 +1,31 @@
-/** @deprecated Prefer CSS variables in globals.css and Button variants (`cta`, `ctaOutline`). */
+/** Mirrors CSS variables in globals.css for non-CSS consumers (charts, emails). */
 export const COLORS = {
-  primary: "hsl(262 83% 58%)",
-  primaryForeground: "hsl(0 0% 100%)",
-  background: "hsl(0 0% 100%)",
-  foreground: "hsl(240 10% 3.9%)",
-  muted: "hsl(240 4.8% 95.9%)",
-  mutedForeground: "hsl(240 3.8% 46.1%)",
-  border: "hsl(240 5.9% 90%)",
-  destructive: "hsl(0 84.2% 60.2%)",
-  landing: "hsl(240 10% 4%)",
-  landingForeground: "hsl(0 0% 98%)",
+  primary: "var(--primary)",
+  primaryForeground: "var(--primary-foreground)",
+  background: "var(--background)",
+  foreground: "var(--foreground)",
+  muted: "var(--muted)",
+  mutedForeground: "var(--muted-foreground)",
+  border: "var(--border)",
+  destructive: "var(--destructive)",
+  success: "var(--success)",
+  warning: "var(--warning)",
+  info: "var(--info)",
+  landing: "var(--landing)",
+  landingForeground: "var(--landing-foreground)",
 } as const;
 
 export const RADIUS = {
-  sm: "calc(0.625rem - 4px)",
-  md: "calc(0.625rem - 2px)",
-  lg: "0.625rem",
-  xl: "calc(0.625rem + 4px)",
-  "2xl": "calc(0.625rem + 8px)",
+  sm: "var(--radius-sm)",
+  md: "var(--radius-md)",
+  lg: "var(--radius-lg)",
+  xl: "var(--radius-xl)",
+  "2xl": "var(--radius-2xl)",
 } as const;
 
 export const SPACING = {
-  section: "2rem",
-  container: "1.5rem",
+  section: "var(--spacing-section)",
+  container: "var(--spacing-container)",
   card: "1.25rem",
   stack: "1rem",
   inline: "0.5rem",

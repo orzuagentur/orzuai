@@ -25,7 +25,8 @@ export const WEBSITE_FORMS_MESSAGES = {
     "After a form is submitted, OrzuAI can reply using AI on WhatsApp, Email, or in-app (Website Forms inbox).",
   followUpWhatsapp: "WhatsApp (needs phone in form + WhatsApp connected)",
   followUpEmail: "Email (needs email in form + Resend configured)",
-  followUpTelegram: "Telegram (coming soon — customer must message your bot first)",
+  followUpTelegram:
+    "Telegram (needs chat_id in form or matching email on an existing Telegram contact)",
   followUpNone: "Inbox only (no outbound message)",
   autoFollowUpLabel: "Enable AI follow-up after new submissions",
   saveSettings: "Save settings",
