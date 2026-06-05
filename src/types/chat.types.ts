@@ -47,6 +47,10 @@ export const updateConversationInternalNoteSchema = z.object({
   internalNote: z.string().max(4000, "Note is too long."),
 });
 
+export const suggestConversationReplySchema = z.object({
+  conversationId: z.string().uuid("Invalid conversation identifier."),
+});
+
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
 export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
 export type UpdateConversationStatusInput = z.infer<
@@ -54,6 +58,9 @@ export type UpdateConversationStatusInput = z.infer<
 >;
 export type UpdateConversationInternalNoteInput = z.infer<
   typeof updateConversationInternalNoteSchema
+>;
+export type SuggestConversationReplyInput = z.infer<
+  typeof suggestConversationReplySchema
 >;
 
 export type ChatMessageData = {
@@ -149,3 +156,4 @@ export type ChatActionResult<T> =
 
 export type SendChatMessageResult = ChatActionResult<{ message: ChatMessageData }>;
 export type ToggleChatAiResult = ChatActionResult<{ aiEnabled: boolean }>;
+export type SuggestConversationReplyResult = ChatActionResult<{ suggestion: string }>;

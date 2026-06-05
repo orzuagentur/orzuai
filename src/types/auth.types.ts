@@ -41,6 +41,14 @@ export const signInWithEmailSchema = z.object({
     .max(PASSWORD_MAX_LENGTH, "Password is too long"),
 });
 
+export const signInWithMagicLinkSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Enter a valid email address")
+    .max(320, "Email address is too long"),
+});
+
 export const passwordSchema = z
   .string()
   .trim()
@@ -106,6 +114,7 @@ export const deleteAccountSchema = z.object({
 export type AuthCallbackQuery = z.infer<typeof authCallbackQuerySchema>;
 export type AuthConfirmQuery = z.infer<typeof authConfirmQuerySchema>;
 export type SignInWithEmailInput = z.infer<typeof signInWithEmailSchema>;
+export type SignInWithMagicLinkInput = z.infer<typeof signInWithMagicLinkSchema>;
 export type ResendVerificationEmailInput = z.infer<
   typeof resendVerificationEmailSchema
 >;
@@ -156,6 +165,21 @@ export type LoginResult =
       success: false;
       error: {
         code: LoginErrorCode;
+        message: string;
+      };
+    };
+
+export type MagicLinkErrorCode =
+  | "VALIDATION_ERROR"
+  | "MAGIC_LINK_FAILED"
+  | "MISSING_CONFIG";
+
+export type MagicLinkResult =
+  | { success: true; data: { email: string } }
+  | {
+      success: false;
+      error: {
+        code: MagicLinkErrorCode;
         message: string;
       };
     };

@@ -13,3 +13,10 @@ export const LANDING_FEATURES = [
   "Telegram & Web forms",
   "AI-powered replies",
 ] as const;
+
+export const LANDING_CHANNELS = [
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "instagram", label: "Instagram" },
+  { id: "telegram", label: "Telegram" },
+  { id: "website_forms", label: "Website Forms" },
+] as const;

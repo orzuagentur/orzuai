@@ -1,4 +1,23 @@
+import type { IntegrationChannelId } from "@/features/integrations/constants";
 import type { MessagingChannel } from "@/types/database.types";
+
+export function getChannelIconContainerClassName(
+  channel: MessagingChannel | IntegrationChannelId,
+): string {
+  if (channel === "whatsapp") {
+    return "bg-emerald-50 dark:bg-emerald-950/50";
+  }
+
+  if (channel === "instagram") {
+    return "bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-orange-950/40 dark:via-pink-950/40 dark:to-purple-950/40";
+  }
+
+  if (channel === "telegram") {
+    return "bg-sky-50 dark:bg-sky-950/50";
+  }
+
+  return "bg-amber-50 dark:bg-amber-950/50";
+}
 
 export function getChannelBadgeLabel(channel: MessagingChannel): string {
   if (channel === "whatsapp") {

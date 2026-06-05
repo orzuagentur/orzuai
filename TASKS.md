@@ -294,7 +294,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** Internal notes на conversation
 * [ ] **P1** Assign conversation to team member (после Team module)
 * [x] **P2** Unified inbox view (все каналы в одном списке)
-* [ ] **P2** AI suggest reply sidebar в chat window
+* [x] **P2** AI suggest reply sidebar в chat window
 * [ ] **P2** Typing indicators / read receipts (где API позволяет)
 * [x] **P2** Conversation status: open / pending / resolved / snoozed
 * [ ] **P3** Canned responses / quick replies library
@@ -309,7 +309,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** Setup checklist на Overview до завершения onboarding
 * [x] **P1** Webhook health check: статус «Receiving messages» в Integrations
 * [x] **P1** Test AI reply встроен в onboarding (шаг 4)
-* [ ] **P2** Magic link login (без пароля)
+* [x] **P2** Magic link login (без пароля)
 * [x] **P2** Resume setup: deep link для users с account но без business
 * [ ] **P2** Email drip: Day 0/1/3 onboarding tips (Resend)
 
@@ -319,12 +319,12 @@ Progress: **100%** (core hub + channels)
 
 * [ ] **P1** Единая система кнопок (landing + dashboard)
 * [x] **P1** Channel color coding (WhatsApp green, Instagram gradient, Telegram blue)
-* [ ] **P1** Semantic colors: success / warning / error / info
+* [x] **P1** Semantic colors: success / warning / error / info
 * [ ] **P1** Typography scale (H1/H2/H3/body/caption)
 * [x] **P1** Skeleton loaders вместо пустых нулей
 * [ ] **P1** Empty state illustrations + primary CTA
 * [ ] **P2** shadcn Form + Select + Checkbox primitives везде
-* [ ] **P2** Channel brand icons в nav и badges
+* [x] **P2** Channel brand icons в nav и badges
 * [ ] **P2** Dark mode toggle для dashboard
 * [ ] **P2** 8px spacing grid audit
 * [ ] **P3** Design tokens: удалить или синхронизировать `constants/design.ts` с `globals.css`
@@ -333,7 +333,7 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: UI — Landing Page и конверсия
 
-* [ ] **P0** Hero: multi-channel value proposition
+* [x] **P0** Hero: multi-channel value proposition
 * [ ] **P1** Header: Log in + Start free CTA
 * [ ] **P1** Social proof block (logos, testimonials)
 * [ ] **P1** Product screenshot / demo video (60s)

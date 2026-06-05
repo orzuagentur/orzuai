@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
 
 import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge";
+import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import {
   buildIntegrationActivateHref,
   INTEGRATION_CHANNEL_LIST,
@@ -42,7 +43,9 @@ export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <div
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${getChannelIconContainerClassName(channel.id)}`}
+                  >
                     <channel.icon className="size-5" />
                   </div>
                   <div className="space-y-1">

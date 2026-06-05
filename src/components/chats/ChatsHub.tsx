@@ -120,7 +120,7 @@ export function ChatsHub({
           {activeChannelConfig ? (
             <header className="shrink-0 border-b px-4 py-4 md:px-6">
               <div className="flex items-center gap-3">
-                <activeChannelConfig.icon className="size-5 text-primary" />
+                <activeChannelConfig.icon className="size-5" />
                 <div>
                   <h2 className="text-lg font-semibold tracking-tight">
                     {activeChannelConfig.label} — {CHAT_MESSAGES.channelInbox}

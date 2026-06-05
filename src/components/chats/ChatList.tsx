@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MessageSquareIcon } from "lucide-react";
 
+import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -12,8 +13,8 @@ import {
   getChannelBadgeLabel,
 } from "@/features/chats/channel-ui";
 import {
+  getConversationStatusClassName,
   getConversationStatusLabel,
-  getConversationStatusVariant,
 } from "@/utils/conversation-status";
 import type { ChatChannelId } from "@/features/chats";
 import type { ConversationListItem } from "@/types/chat.types";
@@ -103,8 +104,12 @@ export function ChatList({
                   {!hideChannelBadge ? (
                     <Badge
                       variant="outline"
-                      className={`shrink-0 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
+                      className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
                     >
+                      <ChannelBrandIcon
+                        channel={conversation.channel}
+                        className="size-3"
+                      />
                       {getChannelBadgeLabel(conversation.channel)}
                     </Badge>
                   ) : null}
@@ -125,8 +130,8 @@ export function ChatList({
               ) : null}
             </div>
             <Badge
-              variant={getConversationStatusVariant(conversation.status)}
-              className="hidden shrink-0 self-start sm:inline-flex"
+              variant="outline"
+              className={`hidden shrink-0 self-start sm:inline-flex ${getConversationStatusClassName(conversation.status)}`}
             >
               {getConversationStatusLabel(conversation.status)}
             </Badge>

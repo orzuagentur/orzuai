@@ -20,6 +20,7 @@ export const AUTH_ROUTES = {
   verifySuccess: "/auth/verify/success",
   forgotPassword: "/auth/forgot-password",
   forgotPasswordConfirmation: "/auth/forgot-password/confirmation",
+  magicLinkConfirmation: "/auth/magic-link/confirmation",
   resetPassword: "/auth/reset-password",
   resetPasswordSuccess: "/auth/reset-password/success",
 } as const;

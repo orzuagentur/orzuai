@@ -6,6 +6,7 @@ import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
 import {
   ACCOUNT_DELETION_MESSAGES,
   LOGIN_MESSAGES,
+  MAGIC_LINK_MESSAGES,
   PASSWORD_RESET_MESSAGES,
   REGISTRATION_MESSAGES,
   VERIFICATION_MESSAGES,
@@ -29,7 +30,9 @@ import type {
   RequestPasswordResetInput,
   ResendVerificationEmailInput,
   ResetPasswordPayload,
+  MagicLinkResult,
   SignInWithEmailInput,
+  SignInWithMagicLinkInput,
   VerificationResult,
 } from "@/types/auth.types";
 import {
@@ -39,6 +42,7 @@ import {
   resendVerificationEmailSchema,
   resetPasswordInputSchema,
   signInWithEmailSchema,
+  signInWithMagicLinkSchema,
 } from "@/types/auth.types";
 import type { AuthActionResult } from "@/types/auth.types";
 import { buildAuthCallbackUrl } from "@/utils/auth";
@@ -385,6 +389,61 @@ export async function signInWithEmail(
     success: true,
     data: {
       email: data.user.email,
+    },
+  };
+}
+
+export async function signInWithMagicLink(
+  input: SignInWithMagicLinkInput,
+  nextPath?: string,
+): Promise<MagicLinkResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message:
+          "Authentication services are not configured. Missing required environment variables.",
+      },
+    };
+  }
+
+  const parsed = signInWithMagicLinkSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const redirectTo = buildAuthCallbackUrl(nextPath ?? APP_ROUTES.dashboard);
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: {
+      emailRedirectTo: redirectTo,
+      shouldCreateUser: false,
+    },
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: "MAGIC_LINK_FAILED",
+        message: error.message || MAGIC_LINK_MESSAGES.genericError,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    data: {
+      email: parsed.data.email,
     },
   };
 }

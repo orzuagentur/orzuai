@@ -4,13 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
-import { hasSupabaseEnv } from "@/lib/env";
+import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sendInstagramChatMessage } from "@/services/instagram.service";
+import { generateAssistantReply } from "@/services/gemini.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
+  listKnowledgeEntriesForBusiness,
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
@@ -26,15 +28,18 @@ import type {
   ConversationDetail,
   ConversationListItem,
   SendChatMessageResult,
+  SuggestConversationReplyResult,
   ToggleChatAiResult,
 } from "@/types/chat.types";
 import {
   sendChatMessageSchema,
+  suggestConversationReplySchema,
   toggleChatAiSchema,
   updateConversationInternalNoteSchema,
   updateConversationStatusSchema,
 } from "@/types/chat.types";
 import type {
+  SuggestConversationReplyInput,
   UpdateConversationInternalNoteInput,
   UpdateConversationStatusInput,
 } from "@/types/chat.types";
@@ -842,6 +847,134 @@ export async function toggleChatAi(input: unknown): Promise<ToggleChatAiResult> 
     success: true,
     data: {
       aiEnabled: parsed.data.enabled,
+    },
+  };
+}
+
+export async function suggestConversationReply(
+  input: SuggestConversationReplyInput,
+): Promise<SuggestConversationReplyResult> {
+  if (!hasSupabaseEnv()) {
+    return missingConfigError();
+  }
+
+  if (!hasGeminiEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message: CHAT_MESSAGES.suggestReplyFailed,
+      },
+    };
+  }
+
+  const parsed = suggestConversationReplySchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? CHAT_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: CHAT_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const conversation = await getConversationDetail(
+    parsed.data.conversationId,
+    businessId,
+  );
+
+  if (!conversation) {
+    return {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: CHAT_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const lastClientMessage = [...conversation.messages]
+    .reverse()
+    .find((message) => message.senderType === "client");
+
+  if (!lastClientMessage) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: CHAT_MESSAGES.suggestReplyNoMessages,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: settings } = await supabase
+    .from("ai_settings")
+    .select("model, language, system_prompt")
+    .eq("business_id", businessId)
+    .eq("channel", conversation.channel)
+    .maybeSingle();
+
+  if (!settings) {
+    return {
+      success: false,
+      error: {
+        code: "UPDATE_FAILED",
+        message: CHAT_MESSAGES.suggestReplyFailed,
+      },
+    };
+  }
+
+  const admin = createAdminClient();
+  const knowledgeEntries = await listKnowledgeEntriesForBusiness(
+    admin,
+    businessId,
+  );
+
+  const reply = await generateAssistantReply({
+    model: settings.model,
+    systemPrompt: settings.system_prompt,
+    language: settings.language,
+    userMessage: lastClientMessage.content,
+    knowledgeContext: knowledgeEntries.map((entry) => ({
+      title: entry.title,
+      content: entry.content,
+      category: entry.category,
+    })),
+    conversationHistory: conversation.messages.map((message) => ({
+      role: message.senderType === "client" ? "user" : "assistant",
+      content: message.content,
+    })),
+  });
+
+  if (!reply.success) {
+    return {
+      success: false,
+      error: {
+        code: "UPDATE_FAILED",
+        message: reply.error.message || CHAT_MESSAGES.suggestReplyFailed,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    data: {
+      suggestion: reply.data.text,
     },
   };
 }

@@ -11,7 +11,10 @@ type ChannelStatusBadgeProps = {
 export function ChannelStatusBadge({ entry }: ChannelStatusBadgeProps) {
   if (entry.status === "connected") {
     return (
-      <Badge variant="default" className="shrink-0 text-[10px]">
+      <Badge
+        variant="outline"
+        className="shrink-0 border-success/30 bg-success/10 text-[10px] text-success"
+      >
         {INTEGRATIONS_MESSAGES.statusConnected}
       </Badge>
     );
@@ -19,7 +22,10 @@ export function ChannelStatusBadge({ entry }: ChannelStatusBadgeProps) {
 
   if (entry.status === "pending") {
     return (
-      <Badge variant="secondary" className="shrink-0 text-[10px]">
+      <Badge
+        variant="outline"
+        className="shrink-0 border-warning/30 bg-warning/10 text-[10px] text-warning"
+      >
         {INTEGRATIONS_MESSAGES.statusPending}
       </Badge>
     );

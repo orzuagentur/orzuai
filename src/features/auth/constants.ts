@@ -19,6 +19,20 @@ export const LOGIN_MESSAGES = {
   genericError: "Unable to sign in. Please try again.",
 } as const;
 
+export const MAGIC_LINK_MESSAGES = {
+  requestTitle: "Sign in with email link",
+  requestDescription:
+    "We will email you a secure one-time link — no password needed.",
+  confirmationTitle: "Check your email",
+  confirmationDescription:
+    "If an account exists for this email, you will receive a sign-in link shortly.",
+  sendButton: "Email me a sign-in link",
+  sending: "Sending link…",
+  genericError: "Unable to send sign-in link. Please try again.",
+  usePassword: "Sign in with password",
+  useMagicLink: "Sign in with email link",
+} as const;
+
 export const VERIFICATION_MESSAGES = {
   successTitle: "Email verified",
   successDescription:

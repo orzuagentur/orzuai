@@ -15,7 +15,7 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ChatList } from "@/components/chats/ChatList";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
-import { getChannelIconClassName } from "@/features/chats/channel-ui";
+import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import type { ChatsMonitorData } from "@/types/chat.types";
 import { formatRelativeTime } from "@/utils/dashboard";
 
@@ -67,10 +67,10 @@ export function ChatsMonitorPanel({
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted/60">
-                      <channel.icon
-                        className={`size-5 ${getChannelIconClassName(channel.id)}`}
-                      />
+                    <div
+                      className={`flex size-10 items-center justify-center rounded-lg ${getChannelIconContainerClassName(channel.id)}`}
+                    >
+                      <channel.icon className="size-5" />
                     </div>
                     <div>
                       <CardTitle className="text-base">{channel.label}</CardTitle>

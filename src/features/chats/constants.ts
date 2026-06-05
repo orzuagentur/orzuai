@@ -54,6 +54,15 @@ export const CHAT_MESSAGES = {
   internalNoteSaved: "Internal note saved.",
   statusLabel: "Conversation status",
   statusUpdated: "Conversation status updated.",
+  suggestReplyTitle: "AI suggest reply",
+  suggestReplyDescription:
+    "Generate a draft reply based on conversation history and your knowledge base.",
+  suggestReplyButton: "Generate suggestion",
+  suggestReplyUse: "Use in reply",
+  suggestReplyEmpty: "Click generate to get an AI draft for this conversation.",
+  suggestReplyFailed: "Unable to generate a suggestion. Please try again.",
+  suggestReplyNoMessages:
+    "No customer messages yet. Wait for the customer to write first.",
 } as const;
 
 export type ChatInboxFilter = "all" | "ai_handled" | "needs_human" | "active";

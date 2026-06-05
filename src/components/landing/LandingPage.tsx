@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { ArrowRightIcon, BotIcon, MessageSquareIcon, SparklesIcon } from "lucide-react";
 
+import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { AuthModal } from "@/components/landing/AuthModal";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
 import {
+  LANDING_CHANNELS,
   LANDING_COPY,
   LANDING_FEATURES,
 } from "@/features/landing/constants";
@@ -46,6 +48,22 @@ export function LandingPage() {
           <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
             {LANDING_COPY.subtitle}
           </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            {LANDING_CHANNELS.map((channel) => (
+              <div
+                key={channel.id}
+                className="flex flex-col items-center gap-1.5"
+              >
+                <div className="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+                  <ChannelBrandIcon channel={channel.id} className="size-7" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {channel.label}
+                </span>
+              </div>
+            ))}
+          </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             {LANDING_FEATURES.map((feature, index) => {

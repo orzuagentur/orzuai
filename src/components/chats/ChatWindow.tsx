@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Loader2Icon, MessageSquareIcon, SendIcon } from "lucide-react";
+import { Loader2Icon, MessageSquareIcon, SendIcon, SparklesIcon } from "lucide-react";
 
+import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
+import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
 import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
 import { MessageHistory } from "@/components/chats/MessageHistory";
@@ -54,6 +56,7 @@ export function ChatWindow({
   const channelNotConnectedMessage = getChannelNotConnectedMessage(channel);
   const router = useRouter();
   const [draft, setDraft] = useState("");
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { sendMessage, isLoading } = useSendChatMessage({
     onSuccess: () => {
@@ -95,15 +98,20 @@ export function ChatWindow({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="shrink-0 border-b px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium">{conversation.contactName}</p>
             <Badge
               variant="outline"
-              className={getChannelBadgeClassName(conversation.channel)}
+              className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
             >
+              <ChannelBrandIcon
+                channel={conversation.channel}
+                className="size-3.5"
+              />
               {getChannelBadgeLabel(conversation.channel)}
             </Badge>
           </div>
@@ -147,6 +155,19 @@ export function ChatWindow({
             {CHAT_MESSAGES.websiteFormsReplyHint}
           </p>
         ) : null}
+        <div className="mb-2 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setSuggestOpen(true)}
+            disabled={!canSend}
+          >
+            <SparklesIcon className="size-3.5" />
+            AI suggest
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Textarea
             value={draft}
@@ -170,6 +191,14 @@ export function ChatWindow({
           </Button>
         </div>
       </form>
+      </div>
+
+      <AiSuggestReplyPanel
+        conversationId={conversation.id}
+        open={suggestOpen}
+        onOpenChange={setSuggestOpen}
+        onUseSuggestion={setDraft}
+      />
     </div>
   );
 }

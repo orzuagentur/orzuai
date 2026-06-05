@@ -71,6 +71,7 @@ export function isPublicAuthFlowRoute(pathname: string): boolean {
     pathname === AUTH_ROUTES.authCodeError ||
     pathname === AUTH_ROUTES.registerConfirmation ||
     pathname === AUTH_ROUTES.forgotPasswordConfirmation ||
+    pathname === AUTH_ROUTES.magicLinkConfirmation ||
     pathname === AUTH_ROUTES.resetPasswordSuccess ||
     pathname.startsWith("/auth/register/") ||
     pathname.startsWith("/auth/forgot-password/")

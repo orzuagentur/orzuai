@@ -1,7 +1,14 @@
-import type { LucideIcon } from "lucide-react";
-import { Camera, Globe, MessageCircle, Send } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 
+import {
+  InstagramIcon,
+  TelegramIcon,
+  WebsiteFormsIcon,
+  WhatsAppIcon,
+} from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+
+export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
@@ -55,7 +62,7 @@ export type IntegrationChannelConfig = {
   id: IntegrationChannelId;
   label: string;
   description: string;
-  icon: LucideIcon;
+  icon: ChannelIconComponent;
   available: boolean;
 };
 
@@ -64,28 +71,28 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     id: "whatsapp",
     label: "WhatsApp",
     description: "WhatsApp Business Cloud API",
-    icon: MessageCircle,
+    icon: WhatsAppIcon,
     available: true,
   },
   {
     id: "instagram",
     label: "Instagram",
     description: "Instagram Direct via Meta",
-    icon: Camera,
+    icon: InstagramIcon,
     available: true,
   },
   {
     id: "telegram",
     label: "Telegram",
     description: "Telegram Bot API",
-    icon: Send,
+    icon: TelegramIcon,
     available: true,
   },
   {
     id: "website_forms",
     label: "Website Forms",
     description: "Leads from any website or CMS",
-    icon: Globe,
+    icon: WebsiteFormsIcon,
     available: true,
   },
 ];
