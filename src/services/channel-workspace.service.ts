@@ -44,9 +44,27 @@ import {
   calculateConversionRate,
 } from "@/utils/dashboard";
 
+export async function enableAiForChannelOnConnect(
+  businessId: string,
+  channel: MessagingChannel,
+): Promise<void> {
+  if (!hasSupabaseEnv()) {
+    return;
+  }
+
+  const supabase = await createClient();
+
+  await supabase
+    .from("ai_settings")
+    .update({ ai_enabled: true })
+    .eq("business_id", businessId)
+    .eq("channel", channel);
+}
+
 function revalidateChannelWorkspacePaths(channel: MessagingChannel): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
   revalidatePath(DASHBOARD_ROUTES.analytics);
+  revalidatePath(DASHBOARD_ROUTES.onboarding);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/${channel}`);
   revalidatePath(DASHBOARD_ROUTES.integrations);
   revalidatePath(DASHBOARD_ROUTES.chats);

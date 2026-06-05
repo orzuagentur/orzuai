@@ -17,7 +17,7 @@ export const DEFAULT_SUBSCRIPTION_PLAN = "Free Plan";
 export const DASHBOARD_NAV_ITEMS = [
   {
     id: "overview",
-    label: "Overview",
+    label: "Home",
     href: DASHBOARD_ROUTES.overview,
     icon: LayoutDashboard,
   },
@@ -29,25 +29,13 @@ export const DASHBOARD_NAV_ITEMS = [
   },
   {
     id: "contacts",
-    label: "Contacts",
+    label: "CRM",
     href: DASHBOARD_ROUTES.contacts,
     icon: Users,
   },
   {
-    id: "knowledge-base",
-    label: "Knowledge Base",
-    href: DASHBOARD_ROUTES.knowledgeBase,
-    icon: BookOpen,
-  },
-  {
-    id: "integrations",
-    label: "Integrations",
-    href: DASHBOARD_ROUTES.integrations,
-    icon: Plug,
-  },
-  {
     id: "ai-assistant",
-    label: "AI Assistant",
+    label: "AI Agents",
     href: DASHBOARD_ROUTES.aiAssistant,
     icon: Bot,
   },
@@ -56,6 +44,18 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "Analytics",
     href: DASHBOARD_ROUTES.analytics,
     icon: BarChart3,
+  },
+  {
+    id: "integrations",
+    label: "Integrations",
+    href: DASHBOARD_ROUTES.integrations,
+    icon: Plug,
+  },
+  {
+    id: "knowledge-base",
+    label: "Knowledge",
+    href: DASHBOARD_ROUTES.knowledgeBase,
+    icon: BookOpen,
   },
   {
     id: "settings",
@@ -71,7 +71,7 @@ export const DASHBOARD_NAV_ITEMS = [
 }>;
 
 export const OVERVIEW_MESSAGES = {
-  title: "Overview",
+  title: "Home",
   description: "Monitor messages, AI performance, and activity across all channels.",
   emptyBusinessTitle: "Set up your business",
   emptyBusinessDescription:

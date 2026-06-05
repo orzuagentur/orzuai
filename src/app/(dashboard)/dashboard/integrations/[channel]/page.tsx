@@ -1,4 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { Suspense } from "react";
 
 import { IntegrationSectionPanels } from "@/components/integrations/IntegrationSectionPanels";
@@ -18,26 +20,20 @@ import {
   getWebsiteFormConnectConfig,
 } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
-import { hasGeminiEnv } from "@/lib/env";
 import {
   getWhatsAppConnection,
   getWhatsAppConnectConfig,
 } from "@/services/whatsapp.service";
 import {
+  buildChannelWorkspaceHref,
   buildIntegrationChannelStatuses,
   DEFAULT_INTEGRATION_SECTION,
-  isChannelConnectedForWorkspace,
   isIntegrationChannelId,
   isIntegrationSectionId,
-  isMessagingIntegrationChannel,
+  isLegacyIntegrationWorkspaceSection,
   type IntegrationChannelId,
   type IntegrationSectionId,
 } from "@/features/integrations";
-import {
-  getChannelAiSettings,
-  getChannelAnalytics,
-  getChannelWorkspaceSummary,
-} from "@/services/channel-workspace.service";
 
 type IntegrationsChannelPageProps = {
   params: Promise<{ channel: string }>;
@@ -51,11 +47,20 @@ export default async function IntegrationsChannelPage({
   const { channel: channelParam } = await params;
   const { section: sectionParam } = await searchParams;
 
+  if (channelParam === "website_knowledge") {
+    redirect(`${DASHBOARD_ROUTES.knowledgeBase}#website-sync`);
+  }
+
   if (!isIntegrationChannelId(channelParam)) {
     notFound();
   }
 
   const channel: IntegrationChannelId = channelParam;
+
+  if (isLegacyIntegrationWorkspaceSection(sectionParam)) {
+    redirect(buildChannelWorkspaceHref(channel, sectionParam));
+  }
+
   const section: IntegrationSectionId = isIntegrationSectionId(sectionParam)
     ? sectionParam
     : DEFAULT_INTEGRATION_SECTION;
@@ -93,26 +98,6 @@ export default async function IntegrationsChannelPage({
     websiteKnowledgeSync,
   });
 
-  const isMessagingChannel = isMessagingIntegrationChannel(channel);
-  const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
-
-  const workspaceSummary =
-    business && isConnected && isMessagingChannel
-      ? await getChannelWorkspaceSummary(business.id, channel)
-      : undefined;
-
-  const [aiSettings, analytics] =
-    business && isConnected && isMessagingChannel
-      ? await Promise.all([
-          section === "ai-assistant"
-            ? getChannelAiSettings(channel)
-            : Promise.resolve(null),
-          section === "analytics"
-            ? getChannelAnalytics(channel)
-            : Promise.resolve(null),
-        ])
-      : [null, null];
-
   return (
     <Suspense fallback={<IntegrationsHubFallback channel={channel} />}>
       <IntegrationsHub activeChannel={channel} channelStatuses={channelStatuses}>
@@ -121,9 +106,6 @@ export default async function IntegrationsChannelPage({
           section={section}
           hasBusiness={Boolean(business)}
           channelStatuses={channelStatuses}
-          workspaceSummary={workspaceSummary}
-          aiSettings={aiSettings}
-          analytics={analytics}
           whatsapp={{
             connection: whatsappConnection,
             connectConfig: whatsappConnectConfig,
@@ -139,10 +121,6 @@ export default async function IntegrationsChannelPage({
           websiteForms={{
             connection: websiteFormConnection,
             connectConfig: websiteFormConfig,
-          }}
-          websiteKnowledge={{
-            sync: websiteKnowledgeSync,
-            geminiConfigured: hasGeminiEnv(),
           }}
         />
       </IntegrationsHub>

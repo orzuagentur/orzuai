@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { buildChannelWorkspaceHref } from "@/features/integrations";
 import {
   disconnectWebsiteFormsAction,
   regenerateWebsiteFormApiKeyAction,
@@ -441,7 +442,7 @@ export function WebsiteFormsActivatePanel({
 
           <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link
-              href={`${DASHBOARD_ROUTES.integrations}/website_forms?section=ai-assistant`}
+              href={buildChannelWorkspaceHref("website_forms", "ai-assistant")}
             >
               Configure AI for Website Forms
             </Link>

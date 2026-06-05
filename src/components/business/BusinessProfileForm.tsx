@@ -23,6 +23,7 @@ import type { BusinessProfileData } from "@/types/business.types";
 type BusinessProfileFormProps = {
   business?: BusinessProfileData | null;
   className?: string;
+  onSuccess?: () => void;
 };
 
 type FormErrors = Partial<
@@ -40,6 +41,7 @@ type FormErrors = Partial<
 export function BusinessProfileForm({
   business,
   className,
+  onSuccess,
 }: BusinessProfileFormProps) {
   const router = useRouter();
   const [errors, setErrors] = useState<FormErrors>({});
@@ -47,9 +49,11 @@ export function BusinessProfileForm({
     businessId: business?.id,
     onCreateSuccess: () => {
       router.refresh();
+      onSuccess?.();
     },
     onUpdateSuccess: () => {
       router.refresh();
+      onSuccess?.();
     },
   });
 

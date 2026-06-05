@@ -12,10 +12,13 @@ export {
   INTEGRATIONS_MESSAGES,
   isIntegrationChannelId,
   isIntegrationSectionId,
+  isLegacyIntegrationWorkspaceSection,
+  LEGACY_INTEGRATION_WORKSPACE_SECTIONS,
 } from "./constants";
 export type {
   IntegrationChannelId,
   IntegrationSectionId,
+  LegacyIntegrationWorkspaceSectionId,
   MessagingIntegrationChannelId,
 } from "./constants";
 export {

@@ -1,7 +1,11 @@
 export const KNOWLEDGE_MESSAGES = {
-  pageTitle: "Knowledge Base",
+  pageTitle: "Knowledge",
   pageDescription:
-    "Train your AI assistant with services, pricing, FAQs, and business hours.",
+    "Manage manual entries and sync content from your website for AI replies.",
+  websiteSyncTitle: "Website sync",
+  websiteSyncDescription:
+    "Scan your public website and automatically add pages to your AI knowledge.",
+  manualEntriesTitle: "Manual entries",
   createTitle: "Add knowledge entry",
   editTitle: "Edit knowledge entry",
   createDescription:

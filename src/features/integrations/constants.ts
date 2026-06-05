@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Camera, Globe, MessageCircle, Send } from "lucide-react";
+import { Camera, Globe, MessageCircle, Send } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 
@@ -26,12 +26,15 @@ export function isMessagingIntegrationChannel(
   return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
 }
 
-export const INTEGRATION_SECTIONS = [
-  "activate",
-  "contacts",
+export const INTEGRATION_SECTIONS = ["activate", "contacts"] as const;
+
+export const LEGACY_INTEGRATION_WORKSPACE_SECTIONS = [
   "ai-assistant",
   "analytics",
 ] as const;
+
+export type LegacyIntegrationWorkspaceSectionId =
+  (typeof LEGACY_INTEGRATION_WORKSPACE_SECTIONS)[number];
 
 export type IntegrationSectionId = (typeof INTEGRATION_SECTIONS)[number];
 
@@ -75,13 +78,6 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     icon: Globe,
     available: true,
   },
-  {
-    id: "website_knowledge",
-    label: "Website Knowledge",
-    description: "Sync site content into AI knowledge",
-    icon: BookOpen,
-    available: true,
-  },
 ];
 
 export const INTEGRATION_SECTION_LIST: Array<{
@@ -101,24 +97,15 @@ export const INTEGRATION_SECTION_LIST: Array<{
     href: (channel) =>
       `${DASHBOARD_ROUTES.integrations}/${channel}?section=contacts`,
   },
-  {
-    id: "ai-assistant",
-    label: "AI Assistant",
-    href: (channel) =>
-      `${DASHBOARD_ROUTES.integrations}/${channel}?section=ai-assistant`,
-  },
-  {
-    id: "analytics",
-    label: "Analytics",
-    href: (channel) =>
-      `${DASHBOARD_ROUTES.integrations}/${channel}?section=analytics`,
-  },
 ];
 
 export const INTEGRATIONS_MESSAGES = {
   pageTitle: "Integrations",
   pageDescription:
     "Connect messaging channels and manage activation, contacts, AI, and analytics per product.",
+  indexDescription:
+    "Choose a channel to connect or configure. AI Assistant and Analytics live in the sidebar.",
+  configureChannel: "Configure",
   channelsTitle: "Channels",
   selectChannel: "Select a channel to configure.",
   comingSoonTitle: "Coming in Version 2",
@@ -179,5 +166,17 @@ export function isIntegrationSectionId(
     value !== null &&
     value !== undefined &&
     INTEGRATION_SECTIONS.includes(value as IntegrationSectionId)
+  );
+}
+
+export function isLegacyIntegrationWorkspaceSection(
+  value: string | null | undefined,
+): value is LegacyIntegrationWorkspaceSectionId {
+  return (
+    value !== null &&
+    value !== undefined &&
+    LEGACY_INTEGRATION_WORKSPACE_SECTIONS.includes(
+      value as LegacyIntegrationWorkspaceSectionId,
+    )
   );
 }

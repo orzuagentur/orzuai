@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { usePollingRefresh } from "@/hooks/use-polling-refresh";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { ChatList } from "@/components/chats/ChatList";
@@ -30,6 +32,8 @@ export function ChatsChannelPanel({
   conversations,
   activeConversation,
 }: ChatsChannelPanelProps) {
+  usePollingRefresh(5000);
+
   if (!hasBusiness) {
     return (
       <Card className="m-4 max-w-2xl shadow-none md:m-6">
@@ -39,7 +43,7 @@ export function ChatsChannelPanel({
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
+            <Link href={DASHBOARD_ROUTES.onboarding}>Start setup wizard</Link>
           </Button>
         </CardContent>
       </Card>

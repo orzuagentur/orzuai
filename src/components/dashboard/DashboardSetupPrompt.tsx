@@ -34,7 +34,7 @@ export function DashboardSetupPrompt({
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
+            <Link href={DASHBOARD_ROUTES.onboarding}>Start setup wizard</Link>
           </Button>
         </CardContent>
       </Card>

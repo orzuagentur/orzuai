@@ -250,7 +250,7 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Quick Wins (1–7 дней)
 
-* [ ] **P0** Onboarding wizard (5 шагов: business → channel → knowledge → AI → test)
+* [x] **P0** Onboarding wizard (5 шагов: business → channel → knowledge → AI → test)
 * [x] **P0** Auth modal: default tab = Register (не Login)
 * [x] **P0** Fix Contacts nav: redirect `/dashboard/contacts` → `?channel=whatsapp`
 * [x] **P0** Hide Subscription menu item до реализации billing
@@ -266,29 +266,29 @@ Progress: **100%** (core hub + channels)
 * [x] **P2** Auth: унифицировать порядок Google / Email (modal = pages)
 * [x] **P2** Auth: Terms checkbox перед Google OAuth на register page
 * [x] **P2** Registration confirmation: primary CTA «Open email» вместо «Back to home»
-* [ ] **P2** Dashboard header: показывать title текущей страницы (mobile)
-* [ ] **P2** Integrations index page (все каналы) вместо redirect только на WhatsApp
+* [x] **P2** Dashboard header: показывать title текущей страницы (mobile)
+* [x] **P2** Integrations index page (все каналы) вместо redirect только на WhatsApp
 
 ---
 
 ## Категория: UX — навигация и информационная архитектура
 
-* [ ] **P0** Переименовать Monitoring → **Inbox** в sidebar
-* [ ] **P0** Объединить дубли: AI Assistant (sidebar + integrations) → один вход
-* [ ] **P0** Объединить дубли: Analytics (sidebar + integrations) → один вход
-* [ ] **P0** Объединить Knowledge Base + Website Knowledge в один раздел **Knowledge**
+* [x] **P0** Переименовать Monitoring → **Inbox** в sidebar
+* [x] **P0** Объединить дубли: AI Assistant (sidebar + integrations) → один вход
+* [x] **P0** Объединить дубли: Analytics (sidebar + integrations) → один вход
+* [x] **P0** Объединить Knowledge Base + Website Knowledge в один раздел **Knowledge**
 * [ ] **P1** Integrations: wizard Connect → Configure AI → Test → Go live (вместо 4 табов)
-* [ ] **P1** Breadcrumbs в dashboard header
-* [ ] **P1** Quick Actions: disable до business + channel connect
-* [ ] **P2** Упростить sidebar: Home | Inbox | CRM | AI Agents | Analytics | Integrations | Knowledge | Settings
-* [ ] **P2** Channel workspace previews: убрать дубли, оставить deep links
-* [ ] **P2** Post-login redirect: users без business → onboarding wizard (не пустой dashboard)
+* [x] **P1** Breadcrumbs в dashboard header
+* [x] **P1** Quick Actions: disable до business + channel connect
+* [x] **P2** Упростить sidebar: Home | Inbox | CRM | AI Agents | Analytics | Integrations | Knowledge | Settings
+* [x] **P2** Channel workspace previews: убрать дубли, оставить deep links
+* [x] **P2** Post-login redirect: users без business → onboarding wizard (не пустой dashboard)
 
 ---
 
 ## Категория: UX — Inbox (чаты / мониторинг)
 
-* [ ] **P0** Realtime обновления (Supabase Realtime или polling 5s)
+* [x] **P0** Realtime обновления (Supabase Realtime или polling 5s)
 * [ ] **P1** Search conversations (по имени, телефону, тексту)
 * [ ] **P1** Filters: unread, AI-handled, needs human, by channel
 * [ ] **P1** Internal notes на conversation
@@ -303,10 +303,10 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: UX — Onboarding и активация
 
-* [ ] **P0** Guided onboarding wizard с progress ring (0–100%)
+* [x] **P0** Guided onboarding wizard с progress ring (0–100%)
 * [ ] **P0** Inline business name при регистрации (опционально)
-* [ ] **P0** AI enabled by default после connect channel
-* [ ] **P1** Setup checklist на Overview до завершения onboarding
+* [x] **P0** AI enabled by default после connect channel
+* [x] **P1** Setup checklist на Overview до завершения onboarding
 * [ ] **P1** Webhook health check: статус «Receiving messages» в Integrations
 * [ ] **P1** Test AI reply встроен в onboarding (шаг 4)
 * [ ] **P2** Magic link login (без пароля)

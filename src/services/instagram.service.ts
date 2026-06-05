@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -262,6 +263,8 @@ export async function completeInstagramEmbeddedSignup(
     };
   }
 
+  await enableAiForChannelOnConnect(businessId, "instagram");
+
   revalidateInstagramPaths();
 
   return {
@@ -397,6 +400,8 @@ export async function connectManualInstagram(
       },
     };
   }
+
+  await enableAiForChannelOnConnect(businessId, "instagram");
 
   revalidateInstagramPaths();
 

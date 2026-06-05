@@ -33,6 +33,7 @@ type WebsiteKnowledgeActivatePanelProps = {
   hasBusiness: boolean;
   geminiConfigured: boolean;
   embeddedInHub?: boolean;
+  showKnowledgeBaseLink?: boolean;
 };
 
 function statusBadge(sync: WebsiteKnowledgeSyncData | null) {
@@ -60,6 +61,7 @@ export function WebsiteKnowledgeActivatePanel({
   hasBusiness,
   geminiConfigured,
   embeddedInHub = false,
+  showKnowledgeBaseLink = true,
 }: WebsiteKnowledgeActivatePanelProps) {
   const router = useRouter();
   const [siteUrl, setSiteUrl] = useState(sync?.siteUrl ?? "");
@@ -304,11 +306,13 @@ export function WebsiteKnowledgeActivatePanel({
             </div>
           ) : null}
 
-          <Button asChild variant="outline">
-            <Link href={DASHBOARD_ROUTES.knowledgeBase}>
-              {WEBSITE_KNOWLEDGE_MESSAGES.openKnowledgeBase}
-            </Link>
-          </Button>
+          {showKnowledgeBaseLink ? (
+            <Button asChild variant="outline">
+              <Link href={DASHBOARD_ROUTES.knowledgeBase}>
+                {WEBSITE_KNOWLEDGE_MESSAGES.openKnowledgeBase}
+              </Link>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </div>

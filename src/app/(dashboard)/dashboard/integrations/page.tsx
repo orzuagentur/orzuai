@@ -1,10 +1,14 @@
-import { redirect } from "next/navigation";
+import { IntegrationsIndex } from "@/components/integrations/IntegrationsIndex";
+import { getCurrentUser } from "@/services/auth.service";
+import { getPrimaryBusiness } from "@/services/business.service";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 
-import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { DEFAULT_INTEGRATION_CHANNEL } from "@/features/integrations";
+export default async function IntegrationsIndexPage() {
+  const user = await getCurrentUser();
+  const business = user ? await getPrimaryBusiness(user.id) : null;
+  const channelStatuses = business
+    ? await getChannelConnectionStatuses(business.id)
+    : {};
 
-export default function IntegrationsIndexPage() {
-  redirect(
-    `${DASHBOARD_ROUTES.integrations}/${DEFAULT_INTEGRATION_CHANNEL}?section=activate`,
-  );
+  return <IntegrationsIndex channelStatuses={channelStatuses} />;
 }

@@ -117,7 +117,7 @@ export function WhatsAppIntegrationPanel({
               </div>
             </div>
             {embeddedInHub ? (
-              <IntegrationQuickLinks channel="whatsapp" showHubSections />
+              <IntegrationQuickLinks channel="whatsapp" />
             ) : null}
           </div>
         ) : (

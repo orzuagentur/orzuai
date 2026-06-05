@@ -26,6 +26,7 @@ export const AUTH_ROUTES = {
 
 export const DASHBOARD_ROUTES = {
   overview: "/dashboard",
+  onboarding: "/dashboard/onboarding",
   chats: "/dashboard/chats",
   chatsMonitor: "/dashboard/chats",
   contacts: "/dashboard/contacts",

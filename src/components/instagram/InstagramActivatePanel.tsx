@@ -96,7 +96,7 @@ export function InstagramActivatePanel({
             ) : null}
           </div>
           {embeddedInHub ? (
-            <IntegrationQuickLinks channel="instagram" showHubSections />
+            <IntegrationQuickLinks channel="instagram" />
           ) : null}
         </CardContent>
       </Card>

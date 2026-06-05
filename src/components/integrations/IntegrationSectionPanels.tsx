@@ -1,16 +1,10 @@
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
-import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
-import { ChannelAnalyticsPanel } from "@/components/channel-workspace/ChannelAnalyticsPanel";
-import { ChannelWorkspacePreview } from "@/components/channel-workspace/ChannelWorkspacePreview";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
-import { WebsiteKnowledgeActivatePanel } from "@/components/website-knowledge/WebsiteKnowledgeActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
-import Link from "next/link";
 
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   Card,
   CardContent,
@@ -18,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   INTEGRATIONS_MESSAGES,
   isChannelConnectedForWorkspace,
@@ -27,12 +20,6 @@ import {
   type IntegrationChannelStatusMap,
   type IntegrationSectionId,
 } from "@/features/integrations";
-import { WEBSITE_KNOWLEDGE_MESSAGES } from "@/features/website-knowledge";
-import type {
-  ChannelAiSettingsData,
-  ChannelAnalyticsData,
-  ChannelWorkspaceSummary,
-} from "@/types/channel-workspace.types";
 import type {
   InstagramConnectionData,
   InstagramEmbeddedSignupConfig,
@@ -45,7 +32,6 @@ import type {
   WebsiteFormConnectConfig,
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
-import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type {
   WhatsAppConnectionData,
   WhatsAppConnectConfig,
@@ -56,9 +42,6 @@ type IntegrationSectionPanelsProps = {
   section: IntegrationSectionId;
   hasBusiness: boolean;
   channelStatuses: IntegrationChannelStatusMap;
-  workspaceSummary?: ChannelWorkspaceSummary;
-  aiSettings?: ChannelAiSettingsData | null;
-  analytics?: ChannelAnalyticsData | null;
   whatsapp?: {
     connection: WhatsAppConnectionData | null;
     connectConfig: WhatsAppConnectConfig;
@@ -75,10 +58,6 @@ type IntegrationSectionPanelsProps = {
     connection: WebsiteFormConnectionData | null;
     connectConfig: WebsiteFormConnectConfig;
   };
-  websiteKnowledge?: {
-    sync: WebsiteKnowledgeSyncData | null;
-    geminiConfigured: boolean;
-  };
 };
 
 export function IntegrationSectionPanels({
@@ -86,14 +65,10 @@ export function IntegrationSectionPanels({
   section,
   hasBusiness,
   channelStatuses,
-  workspaceSummary,
-  aiSettings,
-  analytics,
   whatsapp,
   instagram,
   telegram,
   websiteForms,
-  websiteKnowledge,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
   const isMessagingChannel = isMessagingIntegrationChannel(channel);
@@ -107,79 +82,19 @@ export function IntegrationSectionPanels({
         instagram={instagram}
         telegram={telegram}
         websiteForms={websiteForms}
-        websiteKnowledge={websiteKnowledge}
       />
     );
   }
 
   if (!isMessagingChannel) {
-    return (
-      <Card className="max-w-2xl shadow-none">
-        <CardHeader>
-          <CardTitle>{WEBSITE_KNOWLEDGE_MESSAGES.connectTitle}</CardTitle>
-          <CardDescription>{WEBSITE_KNOWLEDGE_MESSAGES.aiUsageNote}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href={`${DASHBOARD_ROUTES.integrations}/website_knowledge?section=activate`}>
-              Open setup
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={DASHBOARD_ROUTES.knowledgeBase}>Knowledge base</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   if (!isConnected) {
     return <ActivateFirstPrompt channel={channel} />;
   }
 
-  const summary = workspaceSummary ?? {
-    contactsCount: 0,
-    aiEnabled: false,
-    totalMessages: 0,
-  };
-
-  if (section === "contacts") {
-    return (
-      <WorkspaceLinkSection channel={channel} kind="contacts" summary={summary} />
-    );
-  }
-
-  if (section === "ai-assistant") {
-    if (aiSettings) {
-      return (
-        <div className="space-y-4">
-          <ChannelAiPanel data={aiSettings} />
-          <IntegrationQuickLinks channel={channel} showHubSections={false} />
-        </div>
-      );
-    }
-
-    return (
-      <WorkspaceLinkSection
-        channel={channel}
-        kind="ai-assistant"
-        summary={summary}
-      />
-    );
-  }
-
-  if (analytics) {
-    return (
-      <div className="space-y-4">
-        <ChannelAnalyticsPanel data={analytics} />
-        <IntegrationQuickLinks channel={channel} showHubSections={false} />
-      </div>
-    );
-  }
-
-  return (
-    <WorkspaceLinkSection channel={channel} kind="analytics" summary={summary} />
-  );
+  return <IntegrationQuickLinks channel={channel} />;
 }
 
 function ActivateSection({
@@ -189,7 +104,6 @@ function ActivateSection({
   instagram,
   telegram,
   websiteForms,
-  websiteKnowledge,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
@@ -197,7 +111,6 @@ function ActivateSection({
   instagram?: IntegrationSectionPanelsProps["instagram"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
-  websiteKnowledge?: IntegrationSectionPanelsProps["websiteKnowledge"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -243,17 +156,6 @@ function ActivateSection({
     );
   }
 
-  if (channel === "website_knowledge" && websiteKnowledge) {
-    return (
-      <WebsiteKnowledgeActivatePanel
-        sync={websiteKnowledge.sync}
-        hasBusiness={hasBusiness}
-        geminiConfigured={websiteKnowledge.geminiConfigured}
-        embeddedInHub
-      />
-    );
-  }
-
   return <ComingSoonChannelPanel channel={channel} />;
 }
 
@@ -283,27 +185,9 @@ function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) 
         <ul className="list-disc space-y-1 pl-5">
           <li>Activate — connect account</li>
           <li>Contacts — channel contacts</li>
-          <li>AI Assistant — automated replies</li>
-          <li>Analytics — channel metrics</li>
+          <li>AI Assistant and Analytics — sidebar workspace pages</li>
         </ul>
       </CardContent>
     </Card>
-  );
-}
-
-function WorkspaceLinkSection({
-  channel,
-  kind,
-  summary,
-}: {
-  channel: IntegrationChannelId;
-  kind: "contacts" | "ai-assistant" | "analytics";
-  summary: ChannelWorkspaceSummary;
-}) {
-  return (
-    <div className="space-y-4">
-      <ChannelWorkspacePreview channel={channel} kind={kind} summary={summary} />
-      <IntegrationQuickLinks channel={channel} showHubSections={false} />
-    </div>
   );
 }

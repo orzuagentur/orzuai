@@ -62,7 +62,7 @@ export async function ChannelWorkspacePage({
           <CardContent>
             <Button asChild>
               <Link
-                href={`${DASHBOARD_ROUTES.integrations}/website_knowledge?section=activate`}
+                href={`${DASHBOARD_ROUTES.knowledgeBase}#website-sync`}
               >
                 Open Website Knowledge
               </Link>

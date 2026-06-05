@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { Badge } from "@/components/ui/badge";
+import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -137,38 +137,3 @@ export function IntegrationsHub({
   );
 }
 
-function ChannelStatusBadge({
-  entry,
-}: {
-  entry: IntegrationChannelStatusEntry;
-}) {
-  if (entry.status === "connected") {
-    return (
-      <Badge variant="default" className="shrink-0 text-[10px]">
-        {INTEGRATIONS_MESSAGES.statusConnected}
-      </Badge>
-    );
-  }
-
-  if (entry.status === "pending") {
-    return (
-      <Badge variant="secondary" className="shrink-0 text-[10px]">
-        {INTEGRATIONS_MESSAGES.statusPending}
-      </Badge>
-    );
-  }
-
-  if (entry.status === "coming_soon") {
-    return (
-      <Badge variant="outline" className="shrink-0 text-[10px]">
-        {INTEGRATIONS_MESSAGES.statusComingSoon}
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="outline" className="shrink-0 text-[10px]">
-      {INTEGRATIONS_MESSAGES.statusDisconnected}
-    </Badge>
-  );
-}

@@ -5,19 +5,14 @@ import { Button } from "@/components/ui/button";
 import {
   buildChannelWorkspaceHref,
   INTEGRATIONS_MESSAGES,
-  INTEGRATION_SECTION_LIST,
   type IntegrationChannelId,
 } from "@/features/integrations";
 
 type IntegrationQuickLinksProps = {
   channel: IntegrationChannelId;
-  showHubSections?: boolean;
 };
 
-export function IntegrationQuickLinks({
-  channel,
-  showHubSections = true,
-}: IntegrationQuickLinksProps) {
+export function IntegrationQuickLinks({ channel }: IntegrationQuickLinksProps) {
   const workspaceLinks = [
     {
       label: INTEGRATIONS_MESSAGES.sectionContacts,
@@ -40,15 +35,6 @@ export function IntegrationQuickLinks({
     <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
       <p className="text-sm font-medium">{INTEGRATIONS_MESSAGES.connectedQuickLinks}</p>
       <div className="flex flex-wrap gap-2">
-        {showHubSections
-          ? INTEGRATION_SECTION_LIST.filter((s) => s.id !== "activate").map(
-              (section) => (
-                <Button key={section.id} variant="outline" size="sm" asChild>
-                  <Link href={section.href(channel)}>{section.label}</Link>
-                </Button>
-              ),
-            )
-          : null}
         {workspaceLinks.map((link) => (
           <Button key={link.href} variant="secondary" size="sm" asChild>
             <Link href={link.href}>

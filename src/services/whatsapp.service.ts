@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -284,6 +285,8 @@ export async function completeEmbeddedSignup(
     };
   }
 
+  await enableAiForChannelOnConnect(businessId, "whatsapp");
+
   revalidateWhatsAppPaths();
 
   return {
@@ -423,6 +426,8 @@ export async function connectManualWhatsApp(
       },
     };
   }
+
+  await enableAiForChannelOnConnect(businessId, "whatsapp");
 
   revalidateWhatsAppPaths();
 
