@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquareIcon } from "lucide-react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
@@ -54,24 +54,26 @@ export function ChatList({
     const isSearchEmpty = emptyVariant === "search";
 
     return (
-      <div
-        className={cn(
-          "flex flex-col items-center justify-center gap-2 px-4 py-12 text-center",
-          className,
-        )}
-      >
-        <MessageSquareIcon className="size-8 text-muted-foreground" />
-        <p className="font-medium">
-          {isSearchEmpty
+      <EmptyState
+        variant="inbox"
+        className={className}
+        title={
+          isSearchEmpty
             ? CHAT_MESSAGES.emptySearchTitle
-            : CHAT_MESSAGES.emptyListTitle}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {isSearchEmpty
+            : CHAT_MESSAGES.emptyListTitle
+        }
+        description={
+          isSearchEmpty
             ? CHAT_MESSAGES.emptySearchDescription
-            : CHAT_MESSAGES.emptyListDescription}
-        </p>
-      </div>
+            : CHAT_MESSAGES.emptyListDescription
+        }
+        actionLabel={
+          isSearchEmpty ? undefined : "Open Integrations"
+        }
+        actionHref={
+          isSearchEmpty ? undefined : DASHBOARD_ROUTES.integrations
+        }
+      />
     );
   }
 

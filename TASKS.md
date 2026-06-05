@@ -297,7 +297,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P2** AI suggest reply sidebar в chat window
 * [ ] **P2** Typing indicators / read receipts (где API позволяет)
 * [x] **P2** Conversation status: open / pending / resolved / snoozed
-* [ ] **P3** Canned responses / quick replies library
+* [x] **P3** Canned responses / quick replies library
 
 ---
 
@@ -317,15 +317,15 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: UI — Design System V2
 
-* [ ] **P1** Единая система кнопок (landing + dashboard)
+* [x] **P1** Единая система кнопок (landing + dashboard)
 * [x] **P1** Channel color coding (WhatsApp green, Instagram gradient, Telegram blue)
 * [x] **P1** Semantic colors: success / warning / error / info
-* [ ] **P1** Typography scale (H1/H2/H3/body/caption)
+* [x] **P1** Typography scale (H1/H2/H3/body/caption)
 * [x] **P1** Skeleton loaders вместо пустых нулей
-* [ ] **P1** Empty state illustrations + primary CTA
+* [x] **P1** Empty state illustrations + primary CTA
 * [ ] **P2** shadcn Form + Select + Checkbox primitives везде
 * [x] **P2** Channel brand icons в nav и badges
-* [ ] **P2** Dark mode toggle для dashboard
+* [x] **P2** Dark mode toggle для dashboard
 * [ ] **P2** 8px spacing grid audit
 * [ ] **P3** Design tokens: удалить или синхронизировать `constants/design.ts` с `globals.css`
 
@@ -336,11 +336,11 @@ Progress: **100%** (core hub + channels)
 * [x] **P0** Hero: multi-channel value proposition
 * [x] **P1** Header: Log in + Start free CTA
 * [x] **P1** Social proof block (logos, testimonials)
-* [ ] **P1** Product screenshot / demo video (60s)
+* [x] **P1** Product screenshot / demo video (60s)
 * [x] **P1** Pricing teaser section
 * [x] **P1** FAQ section
-* [ ] **P2** Feature comparison vs ManyChat / Intercom
-* [ ] **P2** Secondary CTA: «Book a demo»
+* [x] **P2** Feature comparison vs ManyChat / Intercom
+* [x] **P2** Secondary CTA: «Book a demo»
 * [ ] **P2** Localized landing (EN / RU / UZ)
 * [ ] **P3** A/B test framework для CTA
 
@@ -348,13 +348,13 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: CRM
 
-* [ ] **P0** Unified contacts view (все каналы, не только `?channel=`)
-* [ ] **P0** Contact profile drawer: timeline, channel badges, last message
-* [ ] **P1** Contact fields: email, tags, custom fields
-* [ ] **P1** AI Lead Score (0–100) на contact
-* [ ] **P1** AI Summary на contact (auto-generated)
-* [ ] **P1** Activity timeline (messages, tasks, AI actions, notes)
-* [ ] **P1** Edit / merge / delete contacts
+* [x] **P0** Unified contacts view (все каналы, не только `?channel=`)
+* [x] **P0** Contact profile drawer: timeline, channel badges, last message
+* [x] **P1** Contact fields: email, tags, custom fields
+* [x] **P1** AI Lead Score (0–100) на contact
+* [x] **P1** AI Summary на contact (auto-generated)
+* [x] **P1** Activity timeline (messages, tasks, AI actions, notes)
+* [x] **P1** Edit / merge / delete contacts
 * [ ] **P2** Pipeline (kanban): New → Qualified → Proposal → Won / Lost
 * [ ] **P2** Deals: value, expected close date, stage
 * [ ] **P2** Tasks: create, assign, due date, reminders
@@ -369,7 +369,7 @@ Progress: **100%** (core hub + channels)
 
 * [ ] **P0** AI CRM Assistant: lead score + summary + suggested action per message
 * [ ] **P0** AI Follow-Up Agent: cron 24h/48h auto follow-up messages
-* [ ] **P1** AI suggest reply в Inbox sidebar
+* [x] **P1** AI suggest reply в Inbox sidebar
 * [ ] **P1** Agent builder UI: prompt + channels + triggers
 * [ ] **P1** Multi-model support: Gemini + OpenAI + Claude (selector)
 * [ ] **P1** AI usage limits per subscription plan

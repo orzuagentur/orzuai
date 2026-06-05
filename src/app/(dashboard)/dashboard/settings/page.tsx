@@ -1,11 +1,14 @@
 import { BusinessSettingsPanel } from "@/components/business/BusinessSettingsPanel";
+import { CannedResponsesPanel } from "@/components/settings/CannedResponsesPanel";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { listCannedResponses } from "@/services/canned-responses.service";
 import { mapBusinessToProfile } from "@/utils/business";
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
   const business = user ? await getPrimaryBusiness(user.id) : null;
+  const cannedResponses = business ? await listCannedResponses() : [];
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -19,6 +22,12 @@ export default async function SettingsPage() {
       <BusinessSettingsPanel
         business={business ? mapBusinessToProfile(business) : null}
       />
+
+      {business ? (
+        <div className="mx-auto w-full max-w-3xl">
+          <CannedResponsesPanel initialResponses={cannedResponses} />
+        </div>
+      ) : null}
     </div>
   );
 }

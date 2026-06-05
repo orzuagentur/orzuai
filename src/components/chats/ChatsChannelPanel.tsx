@@ -35,6 +35,7 @@ export function ChatsChannelPanel({
   aiEnabled,
   conversations,
   activeConversation,
+  cannedResponses,
 }: ChatsChannelPanelProps) {
   usePollingRefresh(5000);
   const [searchQuery, setSearchQuery] = useState("");
@@ -136,6 +137,7 @@ export function ChatsChannelPanel({
           aiEnabled={aiEnabled}
           channelConnected={channelConnected}
           channel={channel}
+          cannedResponses={cannedResponses}
         />
       </section>
     </div>

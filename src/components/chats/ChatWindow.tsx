@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2Icon, MessageSquareIcon, SendIcon, SparklesIcon } from "lucide-react";
 
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
+import { QuickRepliesPicker } from "@/components/chats/QuickRepliesPicker";
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
@@ -19,6 +20,7 @@ import {
 } from "@/features/chats/channel-ui";
 import { Badge } from "@/components/ui/badge";
 import { useSendChatMessage } from "@/hooks/use-send-chat-message";
+import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
@@ -28,6 +30,7 @@ type ChatWindowProps = {
   aiEnabled: boolean | null;
   channelConnected: boolean;
   channel: MessagingChannel;
+  cannedResponses: CannedResponseItem[];
 };
 
 function getChannelNotConnectedMessage(channel: MessagingChannel): string {
@@ -51,6 +54,7 @@ export function ChatWindow({
   aiEnabled,
   channelConnected,
   channel,
+  cannedResponses,
 }: ChatWindowProps) {
   const canSend = channelConnected;
   const channelNotConnectedMessage = getChannelNotConnectedMessage(channel);
@@ -155,7 +159,12 @@ export function ChatWindow({
             {CHAT_MESSAGES.websiteFormsReplyHint}
           </p>
         ) : null}
-        <div className="mb-2 flex justify-end">
+        <div className="mb-2 flex flex-wrap justify-end gap-2">
+          <QuickRepliesPicker
+            responses={cannedResponses}
+            disabled={!canSend}
+            onSelect={(content) => setDraft(content)}
+          />
           <Button
             type="button"
             variant="outline"

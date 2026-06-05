@@ -1,0 +1,20 @@
+export const CANNED_RESPONSES_MESSAGES = {
+  sectionTitle: "Quick replies",
+  sectionDescription:
+    "Save canned responses your team can insert in the Inbox composer.",
+  emptyTitle: "No quick replies yet",
+  emptyDescription: "Add templates for greetings, pricing, hours, and FAQs.",
+  addButton: "Add quick reply",
+  titleLabel: "Title",
+  contentLabel: "Message",
+  channelLabel: "Channel (optional)",
+  channelAll: "All channels",
+  saveButton: "Save",
+  deleteButton: "Delete",
+  pickerLabel: "Quick replies",
+  pickerEmpty: "No quick replies saved. Add them in Settings.",
+  saveFailed: "Unable to save quick reply. Please try again.",
+  deleteFailed: "Unable to delete quick reply. Please try again.",
+  saved: "Quick reply saved.",
+  deleted: "Quick reply deleted.",
+} as const;

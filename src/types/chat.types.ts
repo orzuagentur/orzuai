@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { CannedResponseItem } from "./canned-response.types";
 import type {
   ConversationStatus,
   MessageSenderType,
@@ -123,6 +124,7 @@ export type ChatsChannelPageData = {
   aiEnabled: boolean | null;
   conversations: ConversationListItem[];
   activeConversation: ConversationDetail | null;
+  cannedResponses: CannedResponseItem[];
 };
 
 export type ChatsPageData = {

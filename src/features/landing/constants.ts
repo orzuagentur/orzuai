@@ -24,6 +24,23 @@ export const LANDING_CHANNELS = [
 export const LANDING_HEADER = {
   login: "Log in",
   startFree: "Start free",
+  bookDemo: "Book a demo",
+} as const;
+
+export const LANDING_BOOK_DEMO = {
+  label: "Book a demo",
+  href: "mailto:hello@orzuai.com?subject=OrzuAI%20demo%20request",
+} as const;
+
+export const LANDING_PRODUCT = {
+  title: "One dashboard for every conversation",
+  subtitle:
+    "Inbox, CRM, AI replies, and channel analytics — without switching between apps.",
+  features: [
+    "Unified multi-channel inbox",
+    "AI trained on your knowledge",
+    "Per-channel integrations wizard",
+  ],
 } as const;
 
 export const LANDING_SOCIAL_PROOF = {
@@ -79,6 +96,51 @@ export const LANDING_PRICING = {
       ],
       highlighted: false,
       cta: "Coming soon",
+    },
+  ],
+} as const;
+
+export const LANDING_FEATURE_COMPARISON = {
+  title: "Why teams switch to OrzuAI",
+  subtitle:
+    "ManyChat and Intercom are great at one channel or one use case. OrzuAI unifies messaging + CRM + AI in one place.",
+  columns: ["OrzuAI", "ManyChat", "Intercom"] as const,
+  rows: [
+    {
+      feature: "WhatsApp + Instagram + Telegram",
+      orzuai: true,
+      manychat: "partial",
+      intercom: false,
+    },
+    {
+      feature: "Unified inbox (all channels)",
+      orzuai: true,
+      manychat: false,
+      intercom: "partial",
+    },
+    {
+      feature: "AI replies trained on your knowledge",
+      orzuai: true,
+      manychat: "partial",
+      intercom: true,
+    },
+    {
+      feature: "Built-in CRM + lead score",
+      orzuai: true,
+      manychat: false,
+      intercom: "partial",
+    },
+    {
+      feature: "Website form leads in same inbox",
+      orzuai: true,
+      manychat: false,
+      intercom: true,
+    },
+    {
+      feature: "Free starter plan",
+      orzuai: true,
+      manychat: false,
+      intercom: false,
     },
   ],
 } as const;

@@ -466,12 +466,55 @@ export type Database = {
         };
         Relationships: [];
       };
+      canned_responses: {
+        Row: {
+          id: string;
+          business_id: string;
+          title: string;
+          content: string;
+          channel: MessagingChannel | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          title: string;
+          content: string;
+          channel?: MessagingChannel | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          title?: string;
+          content?: string;
+          channel?: MessagingChannel | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canned_responses_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contacts: {
         Row: {
           id: string;
           business_id: string;
           name: string;
           phone_number: string;
+          email: string | null;
+          tags: string[];
+          custom_fields: Record<string, string>;
+          lead_score: number | null;
+          ai_summary: string | null;
           channel: MessagingChannel;
           last_message_at: string | null;
           created_at: string;
@@ -481,6 +524,11 @@ export type Database = {
           business_id: string;
           name: string;
           phone_number: string;
+          email?: string | null;
+          tags?: string[];
+          custom_fields?: Record<string, string>;
+          lead_score?: number | null;
+          ai_summary?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
@@ -490,6 +538,11 @@ export type Database = {
           business_id?: string;
           name?: string;
           phone_number?: string;
+          email?: string | null;
+          tags?: string[];
+          custom_fields?: Record<string, string>;
+          lead_score?: number | null;
+          ai_summary?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;

@@ -54,8 +54,9 @@ export function LandingPricing({ onStartFree }: LandingPricingProps) {
             </ul>
             <Button
               type="button"
-              className="mt-8 w-full rounded-full"
-              variant={plan.highlighted ? "default" : "secondary"}
+              className="mt-8 w-full"
+              variant={plan.highlighted ? "cta" : "secondary"}
+              size="cta"
               disabled={!plan.highlighted}
               onClick={plan.highlighted ? onStartFree : undefined}
             >

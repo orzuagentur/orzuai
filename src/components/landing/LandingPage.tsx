@@ -6,18 +6,20 @@ import { ArrowRightIcon, BotIcon, MessageSquareIcon, SparklesIcon } from "lucide
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { AuthModal } from "@/components/landing/AuthModal";
 import { LandingFaq } from "@/components/landing/LandingFaq";
+import { LandingFeatureComparison } from "@/components/landing/LandingFeatureComparison";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingPricing } from "@/components/landing/LandingPricing";
+import { LandingProductPreview } from "@/components/landing/LandingProductPreview";
 import { LandingSocialProof } from "@/components/landing/LandingSocialProof";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
 import {
+  LANDING_BOOK_DEMO,
   LANDING_CHANNELS,
   LANDING_COPY,
   LANDING_FEATURES,
 } from "@/features/landing/constants";
-import { cn } from "@/lib/utils";
 
 const FEATURE_ICONS = [MessageSquareIcon, BotIcon, SparklesIcon] as const;
 
@@ -92,23 +94,28 @@ export function LandingPage() {
               })}
             </div>
 
-            <Button
-              type="button"
-              size="lg"
-              className={cn(
-                "mt-12 h-14 min-w-[220px] rounded-full px-10 text-base font-semibold tracking-[0.2em]",
-                "shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/40",
-              )}
-              onClick={openAuth}
-            >
-              {LANDING_COPY.startButton}
-              <ArrowRightIcon className="size-4" />
-            </Button>
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                type="button"
+                variant="cta"
+                size="cta-lg"
+                className="transition-all hover:scale-[1.02]"
+                onClick={openAuth}
+              >
+                {LANDING_COPY.startButton}
+                <ArrowRightIcon className="size-4" />
+              </Button>
+              <Button variant="ctaOutline" size="cta-lg" asChild>
+                <a href={LANDING_BOOK_DEMO.href}>{LANDING_BOOK_DEMO.label}</a>
+              </Button>
+            </div>
           </div>
         </section>
 
+        <LandingProductPreview />
         <LandingSocialProof />
         <LandingPricing onStartFree={openAuth} />
+        <LandingFeatureComparison />
         <LandingFaq />
       </main>
 

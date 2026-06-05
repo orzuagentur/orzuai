@@ -3,7 +3,7 @@ import Link from "next/link";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/constants/routes";
-import { LANDING_HEADER } from "@/features/landing/constants";
+import { LANDING_BOOK_DEMO, LANDING_HEADER } from "@/features/landing/constants";
 
 type LandingHeaderProps = {
   onStartFree: () => void;
@@ -21,11 +21,10 @@ export function LandingHeader({ onStartFree }: LandingHeaderProps) {
         >
           <Link href={AUTH_ROUTES.login}>{LANDING_HEADER.login}</Link>
         </Button>
-        <Button
-          type="button"
-          className="rounded-full px-5 shadow-lg shadow-primary/25"
-          onClick={onStartFree}
-        >
+        <Button variant="ctaOutline" size="cta" asChild>
+          <a href={LANDING_BOOK_DEMO.href}>{LANDING_HEADER.bookDemo}</a>
+        </Button>
+        <Button type="button" variant="cta" size="cta" onClick={onStartFree}>
           {LANDING_HEADER.startFree}
         </Button>
       </div>

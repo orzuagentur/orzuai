@@ -143,6 +143,44 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  h1 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-lg font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-display {
+    @apply text-4xl font-semibold tracking-tight sm:text-5xl;
+  }
+
+  .text-h1 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  .text-h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  .text-h3 {
+    @apply text-lg font-semibold tracking-tight;
+  }
+
+  .text-body {
+    @apply text-sm leading-relaxed;
+  }
+
+  .text-caption {
+    @apply text-xs text-muted-foreground;
+  }
 }
 
 .dark {

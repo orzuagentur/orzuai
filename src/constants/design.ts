@@ -1,3 +1,4 @@
+/** @deprecated Prefer CSS variables in globals.css and Button variants (`cta`, `ctaOutline`). */
 export const COLORS = {
   primary: "hsl(262 83% 58%)",
   primaryForeground: "hsl(0 0% 100%)",

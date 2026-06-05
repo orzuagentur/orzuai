@@ -18,6 +18,7 @@ import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
+import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
@@ -432,6 +433,7 @@ export async function getChatsChannelPageData(
       aiEnabled: null,
       conversations: [],
       activeConversation: null,
+      cannedResponses: [],
     };
   }
 
@@ -446,12 +448,14 @@ export async function getChatsChannelPageData(
       aiEnabled: null,
       conversations: [],
       activeConversation: null,
+      cannedResponses: [],
     };
   }
 
-  const [conversations, channelConnected] = await Promise.all([
+  const [conversations, channelConnected, cannedResponses] = await Promise.all([
     listConversations(business.id, channel),
     isChatChannelConnected(business.id, channel),
+    listCannedResponses(channel),
   ]);
 
   const selectedId =
@@ -473,6 +477,7 @@ export async function getChatsChannelPageData(
     aiEnabled,
     conversations,
     activeConversation,
+    cannedResponses,
   };
 }
 

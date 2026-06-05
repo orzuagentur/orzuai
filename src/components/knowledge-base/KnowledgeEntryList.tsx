@@ -3,14 +3,7 @@
 import { useRouter } from "next/navigation";
 
 import { KnowledgeEntryCard } from "@/components/knowledge-base/KnowledgeEntryCard";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
 import type { KnowledgeEntryData } from "@/types/knowledge.types";
 
@@ -29,27 +22,21 @@ export function KnowledgeEntryList({
 
   if (entries.length === 0) {
     return (
-      <Card className="shadow-none">
-        <CardHeader className="text-center">
-          <CardTitle>
-            {hasActiveFilters
-              ? KNOWLEDGE_MESSAGES.emptySearchTitle
-              : KNOWLEDGE_MESSAGES.emptyTitle}
-          </CardTitle>
-          <CardDescription>
-            {hasActiveFilters
-              ? KNOWLEDGE_MESSAGES.emptySearchDescription
-              : KNOWLEDGE_MESSAGES.emptyDescription}
-          </CardDescription>
-        </CardHeader>
-        {!hasActiveFilters && onAddFirstEntry ? (
-          <CardContent className="flex justify-center pb-6">
-            <Button type="button" onClick={onAddFirstEntry}>
-              Add first entry
-            </Button>
-          </CardContent>
-        ) : null}
-      </Card>
+      <EmptyState
+        variant="knowledge"
+        title={
+          hasActiveFilters
+            ? KNOWLEDGE_MESSAGES.emptySearchTitle
+            : KNOWLEDGE_MESSAGES.emptyTitle
+        }
+        description={
+          hasActiveFilters
+            ? KNOWLEDGE_MESSAGES.emptySearchDescription
+            : KNOWLEDGE_MESSAGES.emptyDescription
+        }
+        actionLabel={!hasActiveFilters ? "Add first entry" : undefined}
+        onAction={!hasActiveFilters ? onAddFirstEntry : undefined}
+      />
     );
   }
 
