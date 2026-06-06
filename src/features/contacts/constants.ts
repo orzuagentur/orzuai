@@ -72,6 +72,7 @@ export const CONTACTS_MESSAGES = {
   taskDeleteFailed: "Unable to delete task.",
   taskDone: "Done",
   taskOpen: "Open",
+  sentimentLabel: "Sentiment",
 } as const;
 
 export const CONTACT_SEGMENT_FILTERS = [

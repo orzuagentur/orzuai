@@ -7,6 +7,9 @@ import type {
   CrmFunnelMetrics,
   LeadSourceEntry,
   ResponseTimeMetrics,
+  RevenueMetrics,
+  SentimentBreakdown,
+  TeamAnalyticsMetrics,
 } from "./dashboard.types";
 import type { AiAgentItem } from "./ai-agent.types";
 import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
@@ -159,6 +162,9 @@ export type AnalyticsPageData = {
   responseTime: ResponseTimeMetrics;
   crmFunnel: CrmFunnelMetrics;
   aiCost: AiCostMetrics;
+  teamAnalytics: TeamAnalyticsMetrics;
+  revenue: RevenueMetrics;
+  sentiment: SentimentBreakdown;
 };
 
 export type ChannelWorkspaceSummary = {

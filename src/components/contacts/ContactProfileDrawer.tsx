@@ -320,6 +320,14 @@ export function ContactProfileDrawer({
                   {getChannelBadgeLabel(profile.contact.channel)}
                 </Badge>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {profile.contact.sentiment ? (
+                    <p>
+                      <span className="text-caption font-medium">
+                        {CONTACTS_MESSAGES.sentimentLabel}:{" "}
+                      </span>
+                      <span className="capitalize">{profile.contact.sentiment}</span>
+                    </p>
+                  ) : null}
                   {profile.contact.leadScore !== null ? (
                     <Badge
                       variant="outline"

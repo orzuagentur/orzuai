@@ -5,7 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReply } from "@/services/llm.service";
+import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
+import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -105,7 +107,21 @@ export async function processChannelAutoReply(input: {
     .maybeSingle();
 
   if (conversation?.contact_id) {
+    await analyzeAndStoreSentiment({
+      admin,
+      businessId,
+      contactId: conversation.contact_id,
+      message: clientMessage,
+    });
+
     await processSalesAgentRules({
+      admin,
+      businessId,
+      contactId: conversation.contact_id,
+      message: clientMessage,
+    });
+
+    await processHighIntentTaskRule({
       admin,
       businessId,
       contactId: conversation.contact_id,

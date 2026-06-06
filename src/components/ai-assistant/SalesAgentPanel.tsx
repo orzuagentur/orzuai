@@ -30,6 +30,13 @@ export function SalesAgentPanel({ settings }: SalesAgentPanelProps) {
   const [autoQualifyPipeline, setAutoQualifyPipeline] = useState(
     settings.autoQualifyPipeline,
   );
+  const [autoTaskEnabled, setAutoTaskEnabled] = useState(settings.autoTaskEnabled);
+  const [autoTaskThreshold, setAutoTaskThreshold] = useState(
+    String(settings.autoTaskThreshold),
+  );
+  const [sentimentAnalysisEnabled, setSentimentAnalysisEnabled] = useState(
+    settings.sentimentAnalysisEnabled,
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   async function handleSave() {
@@ -40,6 +47,9 @@ export function SalesAgentPanel({ settings }: SalesAgentPanelProps) {
         salesAgentEnabled,
         bantThreshold: Number(bantThreshold),
         autoQualifyPipeline,
+        autoTaskEnabled,
+        autoTaskThreshold: Number(autoTaskThreshold),
+        sentimentAnalysisEnabled,
       });
 
       if (!result.success) {
@@ -97,6 +107,44 @@ export function SalesAgentPanel({ settings }: SalesAgentPanelProps) {
             className="size-4 rounded border"
           />
           {AI_ASSISTANT_MESSAGES.autoQualifyLabel}
+        </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={autoTaskEnabled}
+            onChange={(event) => setAutoTaskEnabled(event.target.checked)}
+            className="size-4 rounded border"
+          />
+          {AI_ASSISTANT_MESSAGES.autoTaskEnabled}
+        </label>
+
+        {autoTaskEnabled ? (
+          <div className="space-y-2">
+            <Label htmlFor="auto-task-threshold">
+              {AI_ASSISTANT_MESSAGES.autoTaskThresholdLabel}
+            </Label>
+            <Input
+              id="auto-task-threshold"
+              type="number"
+              min={0}
+              max={100}
+              value={autoTaskThreshold}
+              onChange={(event) => setAutoTaskThreshold(event.target.value)}
+            />
+          </div>
+        ) : null}
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={sentimentAnalysisEnabled}
+            onChange={(event) =>
+              setSentimentAnalysisEnabled(event.target.checked)
+            }
+            className="size-4 rounded border"
+          />
+          {AI_ASSISTANT_MESSAGES.sentimentEnabled}
         </label>
 
         <Button

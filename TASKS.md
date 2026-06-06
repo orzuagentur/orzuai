@@ -359,7 +359,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P2** Deals: value, expected close date, stage
 * [x] **P2** Tasks: create, assign, due date, reminders
 * [x] **P2** Segments: hot leads, no reply 48h, by channel/source
-* [ ] **P2** Auto-create task при high-intent message (AI rule)
+* [x] **P2** Auto-create task при high-intent message (AI rule)
 * [ ] **P3** Contact import (CSV)
 * [ ] **P3** Contact export (CSV / GDPR)
 
@@ -376,7 +376,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** AI cost tracking ($ per conversation)
 * [x] **P2** AI Sales Agent: BANT qualification + routing rules
 * [x] **P2** AI Analytics Assistant: natural language insights («Why did conversions drop?»)
-* [ ] **P2** Sentiment analysis на входящих сообщениях
+* [x] **P2** Sentiment analysis на входящих сообщениях
 * [x] **P2** AI Agent templates library (sales, support, booking)
 * [ ] **P3** AI Call Agent (voice): Retell AI / Vapi / Twilio integration
 * [ ] **P3** AI Instagram comment replies (не только DM)
@@ -390,9 +390,9 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** Response time metrics: first response, avg resolution per channel
 * [x] **P1** CRM funnel: lead → qualified → won conversion
 * [x] **P1** Lead source attribution (channel, website form, campaign)
-* [ ] **P2** Team analytics: messages per agent, SLA compliance
-* [ ] **P2** Revenue metrics (после Stripe + CRM deals)
-* [ ] **P2** AI cost dashboard ($ Gemini spend per business)
+* [x] **P2** Team analytics: messages per agent, SLA compliance
+* [x] **P2** Revenue metrics (после Stripe + CRM deals)
+* [x] **P2** AI cost dashboard ($ Gemini spend per business)
 * [ ] **P2** Export reports (PDF / CSV)
 * [ ] **P3** Custom date range + comparison (week vs week)
 * [ ] **P3** Scheduled email reports (weekly digest)

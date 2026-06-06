@@ -74,6 +74,9 @@ export async function getAiAssistantPageData(
         salesAgentEnabled: false,
         bantThreshold: 70,
         autoQualifyPipeline: true,
+        autoTaskEnabled: false,
+        autoTaskThreshold: 75,
+        sentimentAnalysisEnabled: true,
       },
     };
   }

@@ -560,6 +560,7 @@ export type Database = {
           pipeline_stage: string;
           deal_value: number | null;
           expected_close_date: string | null;
+          sentiment: string | null;
           channel: MessagingChannel;
           last_message_at: string | null;
           created_at: string;
@@ -577,6 +578,7 @@ export type Database = {
           pipeline_stage?: string;
           deal_value?: number | null;
           expected_close_date?: string | null;
+          sentiment?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
@@ -594,6 +596,7 @@ export type Database = {
           pipeline_stage?: string;
           deal_value?: number | null;
           expected_close_date?: string | null;
+          sentiment?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
@@ -890,6 +893,9 @@ export type Database = {
           sales_agent_enabled: boolean;
           bant_threshold: number;
           auto_qualify_pipeline: boolean;
+          auto_task_enabled: boolean;
+          auto_task_threshold: number;
+          sentiment_analysis_enabled: boolean;
           updated_at: string;
         };
         Insert: {
@@ -897,6 +903,9 @@ export type Database = {
           sales_agent_enabled?: boolean;
           bant_threshold?: number;
           auto_qualify_pipeline?: boolean;
+          auto_task_enabled?: boolean;
+          auto_task_threshold?: number;
+          sentiment_analysis_enabled?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -904,6 +913,9 @@ export type Database = {
           sales_agent_enabled?: boolean;
           bant_threshold?: number;
           auto_qualify_pipeline?: boolean;
+          auto_task_enabled?: boolean;
+          auto_task_threshold?: number;
+          sentiment_analysis_enabled?: boolean;
           updated_at?: string;
         };
         Relationships: [

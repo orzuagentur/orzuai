@@ -30,6 +30,7 @@ export type UnifiedContactItem = {
   pipelineStage: PipelineStage;
   dealValue: number | null;
   expectedCloseDate: string | null;
+  sentiment: "positive" | "neutral" | "negative" | null;
   channel: MessagingChannel;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;

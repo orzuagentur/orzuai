@@ -31,6 +31,9 @@ import type {
   LeadSourceEntry,
   RecentConversationItem,
   ResponseTimeMetrics,
+  RevenueMetrics,
+  SentimentBreakdown,
+  TeamAnalyticsMetrics,
 } from "@/types/dashboard.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
@@ -74,6 +77,32 @@ const EMPTY_AI_COST: AiCostMetrics = {
   monthReplies: 0,
   avgCostPerReplyUsd: 0,
   byProvider: [],
+};
+
+const SLA_TARGET_MINUTES = 60;
+
+const EMPTY_TEAM_ANALYTICS: TeamAnalyticsMetrics = {
+  teamReplies: 0,
+  aiReplies: 0,
+  clientMessages: 0,
+  slaCompliancePercent: 0,
+  slaTargetMinutes: SLA_TARGET_MINUTES,
+  sampledConversations: 0,
+};
+
+const EMPTY_REVENUE: RevenueMetrics = {
+  totalPipelineValue: 0,
+  wonRevenue: 0,
+  qualifiedPipelineValue: 0,
+  openDealsCount: 0,
+  avgDealSize: 0,
+};
+
+const EMPTY_SENTIMENT: SentimentBreakdown = {
+  positive: 0,
+  neutral: 0,
+  negative: 0,
+  unknown: 0,
 };
 
 function createEmptyOverview(): DashboardOverview {
@@ -321,6 +350,189 @@ export async function getCrmFunnelMetrics(
   };
 }
 
+export async function getTeamAnalyticsMetrics(
+  businessId: string,
+): Promise<TeamAnalyticsMetrics> {
+  const supabase = await createClient();
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId);
+
+  const conversationIds = conversations?.map((row) => row.id) ?? [];
+
+  if (conversationIds.length === 0) {
+    return EMPTY_TEAM_ANALYTICS;
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("sender_type, ai_generated")
+    .in("conversation_id", conversationIds);
+
+  let teamReplies = 0;
+  let aiReplies = 0;
+  let clientMessages = 0;
+
+  for (const message of messages ?? []) {
+    if (message.sender_type === "client") {
+      clientMessages += 1;
+      continue;
+    }
+
+    if (message.ai_generated || message.sender_type === "ai") {
+      aiReplies += 1;
+    } else if (message.sender_type === "user") {
+      teamReplies += 1;
+    }
+  }
+
+  const { data: conversationRows } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId)
+    .limit(50);
+
+  let compliant = 0;
+  let measured = 0;
+
+  for (const conversation of conversationRows ?? []) {
+    const { data: thread } = await supabase
+      .from("messages")
+      .select("sender_type, created_at")
+      .eq("conversation_id", conversation.id)
+      .order("created_at", { ascending: true });
+
+    if (!thread?.length) {
+      continue;
+    }
+
+    const firstClient = thread.find((row) => row.sender_type === "client");
+
+    if (!firstClient) {
+      continue;
+    }
+
+    const firstClientAt = new Date(firstClient.created_at).getTime();
+    const firstReply = thread.find(
+      (row) =>
+        row.sender_type !== "client" &&
+        new Date(row.created_at).getTime() > firstClientAt,
+    );
+
+    if (!firstReply) {
+      continue;
+    }
+
+    measured += 1;
+    const minutes =
+      (new Date(firstReply.created_at).getTime() - firstClientAt) / 60000;
+
+    if (minutes <= SLA_TARGET_MINUTES) {
+      compliant += 1;
+    }
+  }
+
+  const slaCompliancePercent =
+    measured > 0 ? Math.round((compliant / measured) * 100) : 0;
+
+  return {
+    teamReplies,
+    aiReplies,
+    clientMessages,
+    slaCompliancePercent,
+    slaTargetMinutes: SLA_TARGET_MINUTES,
+    sampledConversations: measured,
+  };
+}
+
+export async function getRevenueMetrics(
+  businessId: string,
+): Promise<RevenueMetrics> {
+  const supabase = await createClient();
+
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("pipeline_stage, deal_value")
+    .eq("business_id", businessId);
+
+  let totalPipelineValue = 0;
+  let wonRevenue = 0;
+  let qualifiedPipelineValue = 0;
+  let openDealsCount = 0;
+  let dealValuesSum = 0;
+  let dealsWithValue = 0;
+
+  for (const contact of contacts ?? []) {
+    const value =
+      typeof contact.deal_value === "number" ? contact.deal_value : 0;
+    const stage = contact.pipeline_stage ?? "new";
+
+    if (value > 0) {
+      dealsWithValue += 1;
+      dealValuesSum += value;
+    }
+
+    if (stage === "won") {
+      wonRevenue += value;
+      continue;
+    }
+
+    if (stage === "lost") {
+      continue;
+    }
+
+    openDealsCount += value > 0 ? 1 : 0;
+    totalPipelineValue += value;
+
+    if (stage === "qualified" || stage === "proposal") {
+      qualifiedPipelineValue += value;
+    }
+  }
+
+  return {
+    totalPipelineValue,
+    wonRevenue,
+    qualifiedPipelineValue,
+    openDealsCount,
+    avgDealSize:
+      dealsWithValue > 0 ? Math.round(dealValuesSum / dealsWithValue) : 0,
+  };
+}
+
+export async function getSentimentBreakdown(
+  businessId: string,
+): Promise<SentimentBreakdown> {
+  const supabase = await createClient();
+
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("sentiment")
+    .eq("business_id", businessId);
+
+  const breakdown: SentimentBreakdown = {
+    positive: 0,
+    neutral: 0,
+    negative: 0,
+    unknown: 0,
+  };
+
+  for (const contact of contacts ?? []) {
+    if (contact.sentiment === "positive") {
+      breakdown.positive += 1;
+    } else if (contact.sentiment === "neutral") {
+      breakdown.neutral += 1;
+    } else if (contact.sentiment === "negative") {
+      breakdown.negative += 1;
+    } else {
+      breakdown.unknown += 1;
+    }
+  }
+
+  return breakdown;
+}
+
 export async function getDashboardOverview(): Promise<DashboardOverview> {
   if (!hasSupabaseEnv()) {
     return createEmptyOverview();
@@ -507,18 +719,33 @@ export async function getAnalyticsPageData(
       responseTime: EMPTY_RESPONSE_TIME,
       crmFunnel: EMPTY_CRM_FUNNEL,
       aiCost: EMPTY_AI_COST,
+      teamAnalytics: EMPTY_TEAM_ANALYTICS,
+      revenue: EMPTY_REVENUE,
+      sentiment: EMPTY_SENTIMENT,
     };
   }
 
-  const [channelStatuses, aiPerformance, leadSources, responseTime, crmFunnel, aiCost] =
-    await Promise.all([
-      getChannelConnectionStatuses(businessId),
-      getAiPerformanceMetrics(businessId),
-      getLeadSourceAttribution(businessId),
-      getResponseTimeMetrics(businessId),
-      getCrmFunnelMetrics(businessId),
-      getAiCostMetrics(businessId),
-    ]);
+  const [
+    channelStatuses,
+    aiPerformance,
+    leadSources,
+    responseTime,
+    crmFunnel,
+    aiCost,
+    teamAnalytics,
+    revenue,
+    sentiment,
+  ] = await Promise.all([
+    getChannelConnectionStatuses(businessId),
+    getAiPerformanceMetrics(businessId),
+    getLeadSourceAttribution(businessId),
+    getResponseTimeMetrics(businessId),
+    getCrmFunnelMetrics(businessId),
+    getAiCostMetrics(businessId),
+    getTeamAnalyticsMetrics(businessId),
+    getRevenueMetrics(businessId),
+    getSentimentBreakdown(businessId),
+  ]);
 
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => {
@@ -547,5 +774,8 @@ export async function getAnalyticsPageData(
     responseTime,
     crmFunnel,
     aiCost,
+    teamAnalytics,
+    revenue,
+    sentiment,
   };
 }

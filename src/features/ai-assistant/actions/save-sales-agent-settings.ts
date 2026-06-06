@@ -10,6 +10,9 @@ const saveSalesAgentSettingsSchema = z.object({
   salesAgentEnabled: z.boolean(),
   bantThreshold: z.number().int().min(0).max(100),
   autoQualifyPipeline: z.boolean(),
+  autoTaskEnabled: z.boolean(),
+  autoTaskThreshold: z.number().int().min(0).max(100),
+  sentimentAnalysisEnabled: z.boolean(),
 });
 
 export async function saveSalesAgentSettingsAction(

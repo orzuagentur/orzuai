@@ -34,4 +34,7 @@ export const AI_ASSISTANT_MESSAGES = {
   autoQualifyLabel: "Auto-move to Qualified pipeline when score exceeds threshold",
   salesAgentSave: "Save sales agent rules",
   salesAgentSaved: "Sales agent rules saved.",
+  autoTaskEnabled: "Auto-create CRM task on high-intent messages",
+  autoTaskThresholdLabel: "Intent threshold (0–100)",
+  sentimentEnabled: "Analyze sentiment on incoming messages",
 } as const;

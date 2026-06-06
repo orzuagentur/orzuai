@@ -18,6 +18,9 @@ export async function getSalesAgentSettings(
     salesAgentEnabled: false,
     bantThreshold: 70,
     autoQualifyPipeline: true,
+    autoTaskEnabled: false,
+    autoTaskThreshold: 75,
+    sentimentAnalysisEnabled: true,
   };
 
   if (!hasSupabaseEnv()) {
@@ -27,7 +30,9 @@ export async function getSalesAgentSettings(
   const admin = createAdminClient();
   const { data } = await admin
     .from("business_ai_config")
-    .select("sales_agent_enabled, bant_threshold, auto_qualify_pipeline")
+    .select(
+      "sales_agent_enabled, bant_threshold, auto_qualify_pipeline, auto_task_enabled, auto_task_threshold, sentiment_analysis_enabled",
+    )
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -39,6 +44,9 @@ export async function getSalesAgentSettings(
     salesAgentEnabled: data.sales_agent_enabled,
     bantThreshold: data.bant_threshold,
     autoQualifyPipeline: data.auto_qualify_pipeline,
+    autoTaskEnabled: data.auto_task_enabled,
+    autoTaskThreshold: data.auto_task_threshold,
+    sentimentAnalysisEnabled: data.sentiment_analysis_enabled,
   };
 }
 
@@ -57,6 +65,9 @@ export async function saveSalesAgentSettings(
       sales_agent_enabled: settings.salesAgentEnabled,
       bant_threshold: settings.bantThreshold,
       auto_qualify_pipeline: settings.autoQualifyPipeline,
+      auto_task_enabled: settings.autoTaskEnabled,
+      auto_task_threshold: settings.autoTaskThreshold,
+      sentiment_analysis_enabled: settings.sentimentAnalysisEnabled,
     },
     { onConflict: "business_id" },
   );

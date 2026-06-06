@@ -6,6 +6,9 @@ import { BarChart3Icon } from "lucide-react";
 
 import { AiAnalyticsAssistantPanel } from "@/components/analytics/AiAnalyticsAssistantPanel";
 import { AiCostPanel } from "@/components/analytics/AiCostPanel";
+import { RevenueMetricsPanel } from "@/components/analytics/RevenueMetricsPanel";
+import { SentimentPanel } from "@/components/analytics/SentimentPanel";
+import { TeamAnalyticsPanel } from "@/components/analytics/TeamAnalyticsPanel";
 import { AiPerformancePanel } from "@/components/analytics/AiPerformancePanel";
 import { CrmFunnelPanel } from "@/components/analytics/CrmFunnelPanel";
 import { LeadSourcePanel } from "@/components/analytics/LeadSourcePanel";
@@ -174,6 +177,9 @@ export function AnalyticsHub({ data }: AnalyticsHubProps) {
             <ResponseTimePanel metrics={data.responseTime} />
             <CrmFunnelPanel funnel={data.crmFunnel} />
             <AiCostPanel metrics={data.aiCost} />
+            <TeamAnalyticsPanel metrics={data.teamAnalytics} />
+            <RevenueMetricsPanel metrics={data.revenue} />
+            <SentimentPanel breakdown={data.sentiment} />
           </div>
 
           <AiAnalyticsAssistantPanel />

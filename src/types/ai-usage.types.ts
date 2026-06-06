@@ -28,4 +28,7 @@ export type SalesAgentSettings = {
   salesAgentEnabled: boolean;
   bantThreshold: number;
   autoQualifyPipeline: boolean;
+  autoTaskEnabled: boolean;
+  autoTaskThreshold: number;
+  sentimentAnalysisEnabled: boolean;
 };

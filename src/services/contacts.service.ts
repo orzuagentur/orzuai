@@ -53,6 +53,7 @@ type ContactRow = {
   pipeline_stage?: string | null;
   deal_value?: number | null;
   expected_close_date?: string | null;
+  sentiment?: string | null;
   channel: MessagingChannel;
   last_message_at: string | null;
 };
@@ -107,6 +108,12 @@ function mapContactRow(
     dealValue:
       typeof contact.deal_value === "number" ? contact.deal_value : null,
     expectedCloseDate: contact.expected_close_date ?? null,
+    sentiment:
+      contact.sentiment === "positive" ||
+      contact.sentiment === "neutral" ||
+      contact.sentiment === "negative"
+        ? contact.sentiment
+        : null,
     channel: contact.channel,
     lastMessageAt: contact.last_message_at,
     lastMessagePreview,
@@ -287,7 +294,7 @@ export async function getUnifiedContacts(
   let query = supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
       {
       count: "exact",
     })
@@ -398,7 +405,7 @@ export async function getContactProfile(
   const { data: contactRow } = await supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
     )
     .eq("id", contactId)
     .eq("business_id", businessId)

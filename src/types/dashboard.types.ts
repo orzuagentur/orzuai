@@ -79,6 +79,30 @@ export type CrmFunnelMetrics = {
   qualifiedToWonRate: number;
 };
 
+export type TeamAnalyticsMetrics = {
+  teamReplies: number;
+  aiReplies: number;
+  clientMessages: number;
+  slaCompliancePercent: number;
+  slaTargetMinutes: number;
+  sampledConversations: number;
+};
+
+export type RevenueMetrics = {
+  totalPipelineValue: number;
+  wonRevenue: number;
+  qualifiedPipelineValue: number;
+  openDealsCount: number;
+  avgDealSize: number;
+};
+
+export type SentimentBreakdown = {
+  positive: number;
+  neutral: number;
+  negative: number;
+  unknown: number;
+};
+
 export type AnalyticsCardConfig = {
   id: keyof DashboardMetrics;
   label: string;
