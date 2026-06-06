@@ -1,3 +1,4 @@
+import type { VoiceConnectionData } from "@/types/voice-agent.types";
 import type { InstagramConnectionData } from "@/types/instagram.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
@@ -27,6 +28,7 @@ type BuildChannelStatusesInput = {
   telegramConnection: TelegramConnectionData | null;
   websiteFormConnection: WebsiteFormConnectionData | null;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
+  voiceConnection?: VoiceConnectionData | null;
 };
 
 export function buildIntegrationChannelStatuses({
@@ -35,6 +37,7 @@ export function buildIntegrationChannelStatuses({
   telegramConnection,
   websiteFormConnection,
   websiteKnowledgeSync,
+  voiceConnection,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
   let whatsappStatus: IntegrationChannelStatus = "disconnected";
   let whatsappDetail: string | undefined;
@@ -97,6 +100,17 @@ export function buildIntegrationChannelStatuses({
     websiteKnowledgeStatus = "pending";
   }
 
+  let voiceStatus: IntegrationChannelStatus = "disconnected";
+  let voiceDetail: string | undefined;
+
+  if (voiceConnection?.status === "connected") {
+    voiceStatus = "connected";
+    voiceDetail = voiceConnection.phoneNumber ?? undefined;
+  } else if (voiceConnection?.status === "pending") {
+    voiceStatus = "pending";
+    voiceDetail = voiceConnection.phoneNumber ?? undefined;
+  }
+
   return {
     whatsapp: {
       status: whatsappStatus,
@@ -117,6 +131,10 @@ export function buildIntegrationChannelStatuses({
     website_knowledge: {
       status: websiteKnowledgeStatus,
       detail: websiteKnowledgeDetail,
+    },
+    voice: {
+      status: voiceStatus,
+      detail: voiceDetail,
     },
   };
 }

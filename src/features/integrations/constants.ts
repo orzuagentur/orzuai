@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from "react";
 import {
   InstagramIcon,
   TelegramIcon,
+  VoiceIcon,
   WebsiteFormsIcon,
   WhatsAppIcon,
 } from "@/components/icons/channel-brand-icons";
@@ -19,6 +20,7 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
 
 export const INTEGRATION_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
+  "voice",
   "website_knowledge",
 ] as const;
 
@@ -93,6 +95,13 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     label: "Website Forms",
     description: "Leads from any website or CMS",
     icon: WebsiteFormsIcon,
+    available: true,
+  },
+  {
+    id: "voice",
+    label: "AI Voice",
+    description: "AI calls leads after website forms",
+    icon: VoiceIcon,
     available: true,
   },
 ];

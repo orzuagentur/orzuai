@@ -12,7 +12,6 @@ import type {
   TeamAnalyticsMetrics,
 } from "./dashboard.types";
 import type { AiAgentItem } from "./ai-agent.types";
-import type { VoiceAgentSettings, VoiceCallLogItem } from "./voice-agent.types";
 import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
@@ -111,8 +110,6 @@ export type AiAssistantPageData = {
   agents: AiAgentItem[];
   usage: AiUsageSummary | null;
   salesAgent: SalesAgentSettings;
-  voiceAgent: VoiceAgentSettings;
-  voiceCalls: VoiceCallLogItem[];
 };
 
 export type ChannelAnalyticsActivityPoint = {

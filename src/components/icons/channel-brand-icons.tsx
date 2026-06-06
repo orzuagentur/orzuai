@@ -71,6 +71,31 @@ export function TelegramIcon({ className, ...props }: IconProps) {
   );
 }
 
+export function VoiceIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path
+        fill="#6366F1"
+        stroke="none"
+        d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"
+      />
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <path d="M12 18v4" />
+      <path d="M8 22h8" />
+    </svg>
+  );
+}
+
 export function WebsiteFormsIcon({ className, ...props }: IconProps) {
   return (
     <svg
@@ -92,6 +117,7 @@ const CHANNEL_ICON_MAP = {
   instagram: InstagramIcon,
   telegram: TelegramIcon,
   website_forms: WebsiteFormsIcon,
+  voice: VoiceIcon,
 } as const;
 
 export type ChannelBrandId = keyof typeof CHANNEL_ICON_MAP;

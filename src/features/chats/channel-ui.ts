@@ -16,6 +16,10 @@ export function getChannelIconContainerClassName(
     return "bg-sky-50 dark:bg-sky-950/50";
   }
 
+  if (channel === "voice") {
+    return "bg-indigo-50 dark:bg-indigo-950/50";
+  }
+
   return "bg-amber-50 dark:bg-amber-950/50";
 }
 

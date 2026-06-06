@@ -14,10 +14,6 @@ import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { getAiUsageSummary } from "@/services/ai-usage.service";
 import { getProviderAvailability } from "@/services/llm.service";
 import { getSalesAgentSettings } from "@/services/sales-agent.service";
-import {
-  getVoiceAgentSettings,
-  listRecentVoiceCalls,
-} from "@/services/voice-agent.service";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -82,36 +78,15 @@ export async function getAiAssistantPageData(
         autoTaskThreshold: 75,
         sentimentAnalysisEnabled: true,
       },
-      voiceAgent: {
-        enabled: false,
-        provider: "twilio",
-        phoneNumber: "",
-        outboundEnabled: true,
-        inboundEnabled: true,
-        callbackAfterOrder: true,
-        callbackDelayMinutes: 5,
-        outboundScript: "",
-        inboundGreeting: "",
-        retellAgentId: "",
-        vapiAssistantId: "",
-        twilioPhoneSid: "",
-        providerConfigured: false,
-        inboundWebhookUrl: "",
-        outboundWebhookUrl: "",
-      },
-      voiceCalls: [],
     };
   }
 
-  const [channelStatuses, agents, usage, salesAgent, voiceAgent, voiceCalls] =
-    await Promise.all([
-      getChannelConnectionStatuses(businessId),
-      listAiAgents(),
-      getAiUsageSummary(),
-      getSalesAgentSettings(businessId),
-      getVoiceAgentSettings(businessId),
-      listRecentVoiceCalls(businessId),
-    ]);
+  const [channelStatuses, agents, usage, salesAgent] = await Promise.all([
+    getChannelConnectionStatuses(businessId),
+    listAiAgents(),
+    getAiUsageSummary(),
+    getSalesAgentSettings(businessId),
+  ]);
 
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => ({
@@ -135,8 +110,6 @@ export async function getAiAssistantPageData(
     agents,
     usage,
     salesAgent,
-    voiceAgent,
-    voiceCalls,
   };
 }
 

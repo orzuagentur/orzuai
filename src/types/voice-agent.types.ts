@@ -4,6 +4,30 @@ export const VOICE_PROVIDERS = ["twilio", "retell", "vapi"] as const;
 
 export type VoiceProvider = (typeof VOICE_PROVIDERS)[number];
 
+export const connectVoiceAgentSchema = z.object({
+  phoneNumber: z
+    .string()
+    .trim()
+    .min(8, "Enter a valid phone number.")
+    .max(32)
+    .regex(/^\+[1-9]\d{6,14}$/, "Use international format, e.g. +380501234567"),
+});
+
+export type ConnectVoiceAgentInput = z.infer<typeof connectVoiceAgentSchema>;
+
+export type VoiceConnectionStatus = "connected" | "pending" | "disconnected";
+
+export type VoiceConnectionData = {
+  status: VoiceConnectionStatus;
+  phoneNumber: string | null;
+  enabled: boolean;
+  callbackAfterOrder: boolean;
+};
+
+export type VoiceConnectConfig = {
+  isConfigured: boolean;
+};
+
 export const saveVoiceAgentSettingsSchema = z.object({
   enabled: z.boolean(),
   provider: z.enum(VOICE_PROVIDERS),

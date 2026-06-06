@@ -2,17 +2,26 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { PhoneCallIcon } from "lucide-react";
 
 import { AiAgentBuilderPanel } from "@/components/ai-assistant/AiAgentBuilderPanel";
 import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaultsCard";
 import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
 import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
-import { VoiceAgentPanel } from "@/components/ai-assistant/VoiceAgentPanel";
 import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   INTEGRATION_CHANNEL_LIST,
   type IntegrationChannelStatusEntry,
@@ -114,10 +123,22 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
 
           <SalesAgentPanel settings={data.salesAgent} />
 
-          <VoiceAgentPanel
-            settings={data.voiceAgent}
-            recentCalls={data.voiceCalls}
-          />
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <PhoneCallIcon className="size-4 text-indigo-600" />
+                {VOICE_MESSAGES.channelLabel}
+              </CardTitle>
+              <CardDescription>{VOICE_MESSAGES.aiAssistantHint}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild>
+                <Link href={`${DASHBOARD_ROUTES.integrations}/voice?section=activate`}>
+                  {VOICE_MESSAGES.openIntegrations}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <AiAgentBuilderPanel
             agents={data.agents}

@@ -1,18 +1,27 @@
 import "server-only";
 
+import { revalidatePath } from "next/cache";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ENV_KEYS } from "@/constants/env-keys";
-import { VOICE_AGENT_MESSAGES } from "@/features/subscription/constants";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { getAppUrl, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
+  ConnectVoiceAgentInput,
   SaveVoiceAgentSettingsInput,
   VoiceAgentSettings,
   VoiceCallLogItem,
+  VoiceConnectConfig,
+  VoiceConnectionData,
   VoiceProvider,
 } from "@/types/voice-agent.types";
-import { saveVoiceAgentSettingsSchema } from "@/types/voice-agent.types";
+import {
+  connectVoiceAgentSchema,
+  saveVoiceAgentSettingsSchema,
+} from "@/types/voice-agent.types";
 
 type MessagingDbClient = ReturnType<typeof createAdminClient>;
 
@@ -52,6 +61,113 @@ function isVoiceProviderConfigured(provider: VoiceProvider): boolean {
   }
 
   return false;
+}
+
+function revalidateVoicePaths(): void {
+  revalidatePath(DASHBOARD_ROUTES.integrations);
+  revalidatePath(`${DASHBOARD_ROUTES.integrations}/voice`);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+}
+
+export function getVoiceConnectConfig(): VoiceConnectConfig {
+  return {
+    isConfigured: isVoiceProviderConfigured("twilio"),
+  };
+}
+
+export async function getVoiceConnection(
+  businessId: string,
+): Promise<VoiceConnectionData> {
+  const settings = await getVoiceAgentSettings(businessId);
+
+  if (!settings.phoneNumber) {
+    return {
+      status: "disconnected",
+      phoneNumber: null,
+      enabled: false,
+      callbackAfterOrder: settings.callbackAfterOrder,
+    };
+  }
+
+  if (
+    settings.enabled &&
+    settings.phoneNumber &&
+    settings.providerConfigured
+  ) {
+    return {
+      status: "connected",
+      phoneNumber: settings.phoneNumber,
+      enabled: true,
+      callbackAfterOrder: settings.callbackAfterOrder,
+    };
+  }
+
+  return {
+    status: "pending",
+    phoneNumber: settings.phoneNumber,
+    enabled: settings.enabled,
+    callbackAfterOrder: settings.callbackAfterOrder,
+  };
+}
+
+export async function connectVoiceAgent(
+  businessId: string,
+  input: ConnectVoiceAgentInput,
+): Promise<{ success: boolean; message?: string }> {
+  const parsed = connectVoiceAgentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? VOICE_MESSAGES.saveFailed,
+    };
+  }
+
+  if (!getVoiceConnectConfig().isConfigured) {
+    return { success: false, message: VOICE_MESSAGES.platformMissing };
+  }
+
+  const existing = await getVoiceAgentSettings(businessId);
+
+  return saveVoiceAgentSettings(businessId, {
+    enabled: true,
+    provider: "twilio",
+    phoneNumber: parsed.data.phoneNumber,
+    outboundEnabled: true,
+    inboundEnabled: true,
+    callbackAfterOrder: true,
+    callbackDelayMinutes: existing.callbackDelayMinutes,
+    outboundScript: existing.outboundScript,
+    inboundGreeting: existing.inboundGreeting,
+    retellAgentId: "",
+    vapiAssistantId: "",
+    twilioPhoneSid: "",
+  });
+}
+
+export async function disconnectVoiceAgent(
+  businessId: string,
+): Promise<{ success: boolean; message?: string }> {
+  const existing = await getVoiceAgentSettings(businessId);
+
+  if (!existing.phoneNumber) {
+    return { success: true };
+  }
+
+  return saveVoiceAgentSettings(businessId, {
+    enabled: false,
+    provider: existing.provider,
+    phoneNumber: existing.phoneNumber,
+    outboundEnabled: existing.outboundEnabled,
+    inboundEnabled: existing.inboundEnabled,
+    callbackAfterOrder: existing.callbackAfterOrder,
+    callbackDelayMinutes: existing.callbackDelayMinutes,
+    outboundScript: existing.outboundScript,
+    inboundGreeting: existing.inboundGreeting,
+    retellAgentId: existing.retellAgentId,
+    vapiAssistantId: existing.vapiAssistantId,
+    twilioPhoneSid: existing.twilioPhoneSid,
+  });
 }
 
 function buildWebhookUrls(businessId: string) {
@@ -119,7 +235,7 @@ export async function saveVoiceAgentSettings(
   if (!parsed.success) {
     return {
       success: false,
-      message: parsed.error.issues[0]?.message ?? VOICE_AGENT_MESSAGES.saveFailed,
+      message: parsed.error.issues[0]?.message ?? VOICE_MESSAGES.saveFailed,
     };
   }
 
@@ -150,6 +266,8 @@ export async function saveVoiceAgentSettings(
   if (error) {
     return { success: false, message: error.message };
   }
+
+  revalidateVoicePaths();
 
   return { success: true };
 }
@@ -338,7 +456,7 @@ export async function placeOutboundVoiceCall(input: {
   }
 
   if (!isVoiceProviderConfigured(settings.provider)) {
-    return { success: false, message: VOICE_AGENT_MESSAGES.providerMissing };
+    return { success: false, message: VOICE_MESSAGES.platformMissing };
   }
 
   const webhooks = buildWebhookUrls(input.businessId);

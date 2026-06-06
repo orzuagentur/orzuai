@@ -21,6 +21,12 @@ import {
 } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import {
+  getVoiceAgentSettings,
+  getVoiceConnectConfig,
+  getVoiceConnection,
+  listRecentVoiceCalls,
+} from "@/services/voice-agent.service";
+import {
   getWhatsAppConnection,
   getWhatsAppConnectConfig,
 } from "@/services/whatsapp.service";
@@ -78,6 +84,10 @@ export default async function IntegrationsChannelPage({
     websiteFormConnection,
     websiteFormConfig,
     websiteKnowledgeSync,
+    voiceConnection,
+    voiceSettings,
+    voiceRecentCalls,
+    voiceConnectConfig,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWhatsAppConnectConfig()),
@@ -88,6 +98,12 @@ export default async function IntegrationsChannelPage({
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWebsiteFormConnectConfig()),
     business ? getWebsiteKnowledgeSync(business.id) : Promise.resolve(null),
+    business ? getVoiceConnection(business.id) : Promise.resolve(null),
+    business
+      ? getVoiceAgentSettings(business.id)
+      : Promise.resolve(null),
+    business ? listRecentVoiceCalls(business.id) : Promise.resolve([]),
+    Promise.resolve(getVoiceConnectConfig()),
   ]);
 
   const channelStatuses = buildIntegrationChannelStatuses({
@@ -96,6 +112,7 @@ export default async function IntegrationsChannelPage({
     telegramConnection,
     websiteFormConnection,
     websiteKnowledgeSync,
+    voiceConnection,
   });
 
   return (
@@ -122,6 +139,16 @@ export default async function IntegrationsChannelPage({
             connection: websiteFormConnection,
             connectConfig: websiteFormConfig,
           }}
+          voice={
+            voiceConnection && voiceSettings
+              ? {
+                  connection: voiceConnection,
+                  settings: voiceSettings,
+                  recentCalls: voiceRecentCalls,
+                  connectConfig: voiceConnectConfig,
+                }
+              : undefined
+          }
         />
       </IntegrationsHub>
     </Suspense>

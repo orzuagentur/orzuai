@@ -2,6 +2,8 @@ import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstProm
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
+import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
 
@@ -33,6 +35,12 @@ import type {
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
 import type {
+  VoiceAgentSettings,
+  VoiceCallLogItem,
+  VoiceConnectConfig,
+  VoiceConnectionData,
+} from "@/types/voice-agent.types";
+import type {
   WhatsAppConnectionData,
   WhatsAppConnectConfig,
 } from "@/types/whatsapp.types";
@@ -58,6 +66,12 @@ type IntegrationSectionPanelsProps = {
     connection: WebsiteFormConnectionData | null;
     connectConfig: WebsiteFormConnectConfig;
   };
+  voice?: {
+    connection: VoiceConnectionData;
+    settings: VoiceAgentSettings;
+    recentCalls: VoiceCallLogItem[];
+    connectConfig: VoiceConnectConfig;
+  };
 };
 
 export function IntegrationSectionPanels({
@@ -69,6 +83,7 @@ export function IntegrationSectionPanels({
   instagram,
   telegram,
   websiteForms,
+  voice,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
   const isMessagingChannel = isMessagingIntegrationChannel(channel);
@@ -82,8 +97,17 @@ export function IntegrationSectionPanels({
         instagram={instagram}
         telegram={telegram}
         websiteForms={websiteForms}
+        voice={voice}
       />
     );
+  }
+
+  if (channel === "voice" && voice) {
+    if (!isConnected) {
+      return <ActivateFirstPrompt channel={channel} />;
+    }
+
+    return <VoiceCallsSection calls={voice.recentCalls} />;
   }
 
   if (!isMessagingChannel) {
@@ -104,6 +128,7 @@ function ActivateSection({
   instagram,
   telegram,
   websiteForms,
+  voice,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
@@ -111,6 +136,7 @@ function ActivateSection({
   instagram?: IntegrationSectionPanelsProps["instagram"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
+  voice?: IntegrationSectionPanelsProps["voice"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -156,7 +182,52 @@ function ActivateSection({
     );
   }
 
+  if (channel === "voice" && voice) {
+    return (
+      <VoiceActivatePanel
+        connection={voice.connection}
+        settings={voice.settings}
+        recentCalls={voice.recentCalls}
+        config={voice.connectConfig}
+        hasBusiness={hasBusiness}
+        embeddedInHub
+      />
+    );
+  }
+
   return <ComingSoonChannelPanel channel={channel} />;
+}
+
+function VoiceCallsSection({ calls }: { calls: VoiceCallLogItem[] }) {
+  return (
+    <Card className="max-w-2xl shadow-none">
+      <CardHeader>
+        <CardTitle>{VOICE_MESSAGES.recentCallsTitle}</CardTitle>
+        <CardDescription>{INTEGRATIONS_MESSAGES.contactsHint}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {calls.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.noCalls}</p>
+        ) : (
+          <ul className="divide-y rounded-lg border text-sm">
+            {calls.map((call) => (
+              <li
+                key={call.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+              >
+                <span>
+                  {call.direction === "outbound" ? "→" : "←"} {call.phoneNumber}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {call.status} · {new Date(call.createdAt).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) {
