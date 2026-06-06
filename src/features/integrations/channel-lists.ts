@@ -20,10 +20,6 @@ export function getActivatedIntegrationChannels(
   );
 }
 
-export function getMarketplaceIntegrationChannels(
-  statuses: IntegrationChannelStatusMap,
-): IntegrationChannelConfig[] {
-  return INTEGRATION_CHANNEL_LIST.filter(
-    (channel) => channel.available && !isChannelActivated(channel.id, statuses),
-  );
+export function getMarketplaceIntegrationChannels(): IntegrationChannelConfig[] {
+  return INTEGRATION_CHANNEL_LIST.filter((channel) => channel.available);
 }

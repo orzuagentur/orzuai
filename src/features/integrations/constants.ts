@@ -136,7 +136,7 @@ export const INTEGRATIONS_MESSAGES = {
     "Browse the Marketplace to connect WhatsApp, Telegram, Website Forms, AI Voice, and more.",
   marketplaceTitle: "Integrations Marketplace",
   marketplaceDescription:
-    "Discover and connect new channels. Already connected apps appear on Integrations.",
+    "Browse all channels. Activated ones are marked with a green badge.",
   backToIntegrations: "My integrations",
   backToMarketplace: "Marketplace",
   configureChannel: "Open settings",
@@ -163,6 +163,7 @@ export const INTEGRATIONS_MESSAGES = {
   goToActivate: "Go to Activate",
   connectedQuickLinks: "Workspace",
   statusConnected: "Connected",
+  statusActivated: "Activated",
   statusPending: "Pending",
   statusDisconnected: "Not connected",
   statusComingSoon: "Coming soon",
