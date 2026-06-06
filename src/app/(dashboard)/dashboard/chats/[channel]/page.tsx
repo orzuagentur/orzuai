@@ -14,8 +14,11 @@ type ChatsChannelPageProps = {
 
 function ChatsChannelFallback() {
   return (
-    <div className="min-h-[24rem] rounded-xl border p-4">
-      <ConversationListSkeleton rows={8} />
+    <div className="flex h-full min-h-0 flex-1">
+      <div className="hidden h-full w-80 shrink-0 border-r bg-muted/10 lg:block" />
+      <div className="min-h-0 flex-1 overflow-hidden p-4">
+        <ConversationListSkeleton rows={8} />
+      </div>
     </div>
   );
 }

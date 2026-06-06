@@ -19,7 +19,7 @@ import { getChatsMonitorData } from "@/services/chat.service";
 
 function ChatsMonitorFallback() {
   return (
-    <div className="rounded-xl border p-4">
+    <div className="h-full overflow-y-auto p-4 md:p-6">
       <ConversationListSkeleton rows={8} />
     </div>
   );

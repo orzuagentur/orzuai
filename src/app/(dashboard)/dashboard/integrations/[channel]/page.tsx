@@ -177,9 +177,10 @@ function IntegrationChannelFallback({
   channel: IntegrationChannelId;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
-      <div className="min-h-[32rem] animate-pulse rounded-xl border bg-muted/30" />
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="h-14 shrink-0 animate-pulse border-b bg-muted/20" />
+      <div className="h-28 shrink-0 animate-pulse border-b bg-muted/10" />
+      <div className="min-h-0 flex-1 animate-pulse bg-muted/5" />
       <span className="sr-only">Loading {channel} integration</span>
     </div>
   );

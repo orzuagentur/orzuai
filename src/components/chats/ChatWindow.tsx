@@ -104,7 +104,7 @@ export function ChatWindow({
 
   return (
     <div className="flex h-full min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div className="shrink-0 border-b px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -130,20 +130,26 @@ export function ChatWindow({
         </p>
       </div>
 
-      <ChatCrmAssistantBar conversationId={conversation.id} />
+      <div className="shrink-0">
+        <ChatCrmAssistantBar conversationId={conversation.id} />
+      </div>
 
-      <ChatAiStatus
-        channel={conversation.channel}
-        aiEnabled={aiEnabled}
-        onToggle={handleRefresh}
-      />
+      <div className="shrink-0">
+        <ChatAiStatus
+          channel={conversation.channel}
+          aiEnabled={aiEnabled}
+          onToggle={handleRefresh}
+        />
+      </div>
 
-      <ConversationInternalNotes
-        conversationId={conversation.id}
-        initialNote={conversation.internalNote}
-      />
+      <div className="shrink-0">
+        <ConversationInternalNotes
+          conversationId={conversation.id}
+          initialNote={conversation.internalNote}
+        />
+      </div>
 
-      <MessageHistory messages={conversation.messages} />
+      <MessageHistory messages={conversation.messages} className="min-h-0" />
 
       <div ref={bottomRef} />
 

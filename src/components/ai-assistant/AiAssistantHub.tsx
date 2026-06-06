@@ -10,6 +10,12 @@ import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaults
 import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
 import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
 import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
+import {
+  DashboardFill,
+  DashboardPaneBody,
+  DashboardPaneHeader,
+  DashboardSplitView,
+} from "@/components/layout/DashboardWorkspaceLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,102 +67,118 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
     data.channels.find((entry) => entry.channel === "whatsapp") ??
     activeEntry;
 
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {AI_ASSISTANT_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {AI_ASSISTANT_MESSAGES.pageDescription}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Server default model:{" "}
-          <code className="rounded bg-muted px-1">{data.defaultModel}</code>
-        </p>
-      </div>
+  const activeChannelLabel =
+    INTEGRATION_CHANNEL_LIST.find((c) => c.id === activeChannel)?.label ??
+    activeChannel;
 
-      <div className="flex min-h-[32rem] flex-1 flex-col overflow-hidden rounded-xl border bg-card lg:flex-row">
-        <aside className="w-full shrink-0 border-b lg:w-56 lg:border-b-0 lg:border-r">
-          <div className="border-b px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {AI_ASSISTANT_MESSAGES.channelsTitle}
+  const navigation = (
+    <nav className="flex flex-row gap-1 p-2 lg:flex-col lg:overflow-x-visible">
+      {INTEGRATION_CHANNEL_LIST.map((channel) => {
+        const href = `${DASHBOARD_ROUTES.aiAssistant}?channel=${channel.id}`;
+        const isActive = activeChannel === channel.id;
+        const entry = data.channels.find((c) => c.channel === channel.id);
+        const status =
+          data.channelStatuses[channel.id]?.status ?? "disconnected";
+
+        return (
+          <Link
+            key={channel.id}
+            href={href}
+            className={cn(
+              "flex min-w-[9rem] items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors lg:min-w-0",
+              isActive
+                ? "bg-primary/10 font-medium text-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            )}
+          >
+            <span>{channel.label}</span>
+            <Badge
+              variant={statusBadgeVariant(status)}
+              className="shrink-0 text-[10px]"
+            >
+              {entry?.settings.aiEnabled ? "AI on" : status}
+            </Badge>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  return (
+    <DashboardFill>
+      <DashboardPaneHeader className="hidden lg:block">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {AI_ASSISTANT_MESSAGES.pageTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {AI_ASSISTANT_MESSAGES.pageDescription}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Server default model:{" "}
+            <code className="rounded bg-muted px-1">{data.defaultModel}</code>
+          </p>
+        </div>
+      </DashboardPaneHeader>
+
+      <DashboardSplitView
+        navigationTitle={AI_ASSISTANT_MESSAGES.channelsTitle}
+        navigation={navigation}
+        header={
+          <div className="space-y-1 lg:hidden">
+            <h1 className="text-xl font-semibold tracking-tight">
+              {AI_ASSISTANT_MESSAGES.pageTitle}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {activeChannelLabel} settings
             </p>
           </div>
-          <nav className="flex flex-row gap-1 overflow-x-auto p-2 lg:flex-col">
-            {INTEGRATION_CHANNEL_LIST.map((channel) => {
-              const href = `${DASHBOARD_ROUTES.aiAssistant}?channel=${channel.id}`;
-              const isActive = activeChannel === channel.id;
-              const entry = data.channels.find((c) => c.channel === channel.id);
-              const status =
-                data.channelStatuses[channel.id]?.status ?? "disconnected";
+        }
+      >
+        <DashboardPaneBody className="bg-muted/10">
+          <div className="mx-auto w-full max-w-4xl space-y-6">
+            <AiUsageLimitsPanel usage={data.usage} />
 
-              return (
-                <Link
-                  key={channel.id}
-                  href={href}
-                  className={cn(
-                    "flex min-w-[9rem] items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors lg:min-w-0",
-                    isActive
-                      ? "bg-primary/10 font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  )}
-                >
-                  <span>{channel.label}</span>
-                  <Badge
-                    variant={statusBadgeVariant(status)}
-                    className="shrink-0 text-[10px]"
-                  >
-                    {entry?.settings.aiEnabled ? "AI on" : status}
-                  </Badge>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+            {templateEntry ? (
+              <AiGlobalDefaultsCard template={templateEntry.settings} />
+            ) : null}
 
-        <div className="min-w-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
-          <AiUsageLimitsPanel usage={data.usage} />
+            <SalesAgentPanel settings={data.salesAgent} />
 
-          {templateEntry ? (
-            <AiGlobalDefaultsCard template={templateEntry.settings} />
-          ) : null}
+            <FollowUpAgentPanel settings={data.followUpAgent} />
 
-          <SalesAgentPanel settings={data.salesAgent} />
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <PhoneCallIcon className="size-4 text-indigo-600" />
+                  {VOICE_MESSAGES.channelLabel}
+                </CardTitle>
+                <CardDescription>{VOICE_MESSAGES.aiAssistantHint}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" asChild>
+                  <Link href={`${DASHBOARD_ROUTES.integrations}/voice?section=activate`}>
+                    {VOICE_MESSAGES.openIntegrations}
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
 
-          <FollowUpAgentPanel settings={data.followUpAgent} />
+            <AiAgentBuilderPanel
+              agents={data.agents}
+              activeChannel={activeChannel}
+            />
 
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <PhoneCallIcon className="size-4 text-indigo-600" />
-                {VOICE_MESSAGES.channelLabel}
-              </CardTitle>
-              <CardDescription>{VOICE_MESSAGES.aiAssistantHint}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" asChild>
-                <Link href={`${DASHBOARD_ROUTES.integrations}/voice?section=activate`}>
-                  {VOICE_MESSAGES.openIntegrations}
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <AiAgentBuilderPanel
-            agents={data.agents}
-            activeChannel={activeChannel}
-          />
-
-          {activeEntry ? (
-            <ChannelAiPanel data={activeEntry.settings} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Select a channel to configure AI settings.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+            {activeEntry ? (
+              <ChannelAiPanel data={activeEntry.settings} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Select a channel to configure AI settings.
+              </p>
+            )}
+          </div>
+        </DashboardPaneBody>
+      </DashboardSplitView>
+    </DashboardFill>
   );
 }
