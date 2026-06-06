@@ -11,39 +11,8 @@ export type MarketplaceApp = {
   href?: string;
 };
 
-export const MARKETPLACE_APPS: MarketplaceApp[] = [
-  {
-    id: "whatsapp",
-    name: "WhatsApp Business",
-    category: "Messaging",
-    description: "Cloud API inbox and AI auto-replies.",
-    status: "available",
-    href: `${DASHBOARD_ROUTES.integrations}/whatsapp?section=activate`,
-  },
-  {
-    id: "telegram",
-    name: "Telegram Bot",
-    category: "Messaging",
-    description: "Connect a bot for customer chats.",
-    status: "available",
-    href: `${DASHBOARD_ROUTES.integrations}/telegram?section=activate`,
-  },
-  {
-    id: "website-forms",
-    name: "Website Forms",
-    category: "Leads",
-    description: "Capture leads from any website.",
-    status: "available",
-    href: `${DASHBOARD_ROUTES.integrations}/website_forms?section=activate`,
-  },
-  {
-    id: "voice",
-    name: "AI Voice",
-    category: "Voice",
-    description: "AI calls leads after form submissions.",
-    status: "available",
-    href: `${DASHBOARD_ROUTES.integrations}/voice?section=activate`,
-  },
+/** Third-party apps only — connectable channels live in INTEGRATION_CHANNEL_LIST. */
+export const THIRD_PARTY_MARKETPLACE_APPS: MarketplaceApp[] = [
   {
     id: "stripe",
     name: "Stripe Billing",

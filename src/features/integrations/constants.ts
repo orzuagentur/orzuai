@@ -130,8 +130,18 @@ export const INTEGRATIONS_MESSAGES = {
   pageDescription:
     "Connect messaging channels and manage activation, contacts, AI, and analytics per product.",
   indexDescription:
-    "Choose a channel to connect or configure. AI Assistant and Analytics live in the sidebar.",
-  configureChannel: "Configure",
+    "Your connected channels. Add more from the Marketplace.",
+  indexEmptyTitle: "No active integrations yet",
+  indexEmptyDescription:
+    "Browse the Marketplace to connect WhatsApp, Telegram, Website Forms, AI Voice, and more.",
+  marketplaceTitle: "Integrations Marketplace",
+  marketplaceDescription:
+    "Discover and connect new channels. Already connected apps appear on Integrations.",
+  backToIntegrations: "My integrations",
+  backToMarketplace: "Marketplace",
+  configureChannel: "Open settings",
+  connectChannel: "Connect",
+  sectionSettings: "Settings",
   channelsTitle: "Channels",
   selectChannel: "Select a channel to configure.",
   comingSoonTitle: "Coming in Version 2",

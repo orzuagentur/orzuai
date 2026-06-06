@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { Suspense } from "react";
 
+import { IntegrationChannelShell } from "@/components/integrations/IntegrationChannelShell";
 import { IntegrationSectionPanels } from "@/components/integrations/IntegrationSectionPanels";
-import { IntegrationsHub } from "@/components/integrations/IntegrationsHub";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
@@ -34,6 +34,8 @@ import {
   buildChannelWorkspaceHref,
   buildIntegrationChannelStatuses,
   DEFAULT_INTEGRATION_SECTION,
+  INTEGRATIONS_MESSAGES,
+  isChannelActivated,
   isIntegrationChannelId,
   isIntegrationSectionId,
   isLegacyIntegrationWorkspaceSection,
@@ -115,9 +117,23 @@ export default async function IntegrationsChannelPage({
     voiceConnection,
   });
 
+  const isActivated = isChannelActivated(channel, channelStatuses);
+
   return (
-    <Suspense fallback={<IntegrationsHubFallback channel={channel} />}>
-      <IntegrationsHub activeChannel={channel} channelStatuses={channelStatuses}>
+    <Suspense fallback={<IntegrationChannelFallback channel={channel} />}>
+      <IntegrationChannelShell
+        activeChannel={channel}
+        channelStatuses={channelStatuses}
+        isActivated={isActivated}
+        backHref={
+          isActivated ? DASHBOARD_ROUTES.integrations : DASHBOARD_ROUTES.marketplace
+        }
+        backLabel={
+          isActivated
+            ? INTEGRATIONS_MESSAGES.backToIntegrations
+            : INTEGRATIONS_MESSAGES.backToMarketplace
+        }
+      >
         <IntegrationSectionPanels
           channel={channel}
           section={section}
@@ -150,12 +166,12 @@ export default async function IntegrationsChannelPage({
               : undefined
           }
         />
-      </IntegrationsHub>
+      </IntegrationChannelShell>
     </Suspense>
   );
 }
 
-function IntegrationsHubFallback({
+function IntegrationChannelFallback({
   channel,
 }: {
   channel: IntegrationChannelId;

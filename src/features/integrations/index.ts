@@ -24,6 +24,11 @@ export type {
   MessagingIntegrationChannelId,
 } from "./constants";
 export {
+  getActivatedIntegrationChannels,
+  getMarketplaceIntegrationChannels,
+  isChannelActivated,
+} from "./channel-lists";
+export {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
 } from "./channel-status";
