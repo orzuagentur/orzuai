@@ -2,6 +2,13 @@ import { z } from "zod";
 
 import { GEMINI_MODEL_IDS } from "@/lib/gemini/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
+import type {
+  AiPerformanceMetrics,
+  CrmFunnelMetrics,
+  LeadSourceEntry,
+  ResponseTimeMetrics,
+} from "./dashboard.types";
+import type { AiAgentItem } from "./ai-agent.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
 export type { MessagingChannel };
@@ -89,6 +96,7 @@ export type AiAssistantPageData = {
   activeChannel: MessagingChannel;
   channelStatuses: IntegrationChannelStatusMap;
   channels: AiAssistantChannelEntry[];
+  agents: AiAgentItem[];
 };
 
 export type ChannelAnalyticsActivityPoint = {
@@ -136,6 +144,10 @@ export type AnalyticsPageData = {
   channelStatuses: IntegrationChannelStatusMap;
   channels: AnalyticsChannelEntry[];
   totals: AnalyticsTotals;
+  aiPerformance: AiPerformanceMetrics;
+  leadSources: LeadSourceEntry[];
+  responseTime: ResponseTimeMetrics;
+  crmFunnel: CrmFunnelMetrics;
 };
 
 export type ChannelWorkspaceSummary = {

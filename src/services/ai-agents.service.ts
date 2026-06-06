@@ -1,0 +1,209 @@
+import "server-only";
+
+import { revalidatePath } from "next/cache";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
+import { hasSupabaseEnv } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/services/auth.service";
+import { getPrimaryBusiness } from "@/services/business.service";
+import type {
+  AiAgentActionResult,
+  AiAgentItem,
+  CreateAiAgentInput,
+  DeleteAiAgentInput,
+  UpdateAiAgentInput,
+} from "@/types/ai-agent.types";
+import {
+  createAiAgentSchema,
+  deleteAiAgentSchema,
+  updateAiAgentSchema,
+} from "@/types/ai-agent.types";
+import type { MessagingChannel } from "@/types/database.types";
+
+async function getOwnedBusinessId(): Promise<string | null> {
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+  return business?.id ?? null;
+}
+
+function revalidateAgentPaths(): void {
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+}
+
+function mapAiAgent(row: {
+  id: string;
+  name: string;
+  system_prompt: string;
+  channels: MessagingChannel[] | null;
+  trigger_keywords: string[] | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}): AiAgentItem {
+  return {
+    id: row.id,
+    name: row.name,
+    systemPrompt: row.system_prompt,
+    channels: row.channels ?? [],
+    triggerKeywords: row.trigger_keywords ?? [],
+    enabled: row.enabled,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function listAiAgents(): Promise<AiAgentItem[]> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ai_agents")
+    .select(
+      "id, name, system_prompt, channels, trigger_keywords, enabled, created_at, updated_at",
+    )
+    .eq("business_id", businessId)
+    .order("updated_at", { ascending: false });
+
+  return (data ?? []).map(mapAiAgent);
+}
+
+export async function createAiAgent(
+  input: CreateAiAgentInput,
+): Promise<AiAgentActionResult> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  const parsed = createAiAgentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? AI_ASSISTANT_MESSAGES.saveFailed,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("ai_agents").insert({
+    business_id: businessId,
+    name: parsed.data.name,
+    system_prompt: parsed.data.systemPrompt,
+    channels: parsed.data.channels,
+    trigger_keywords: parsed.data.triggerKeywords,
+    enabled: parsed.data.enabled,
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "CREATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  revalidateAgentPaths();
+  return { success: true };
+}
+
+export async function updateAiAgent(
+  input: UpdateAiAgentInput,
+): Promise<AiAgentActionResult> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  const parsed = updateAiAgentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? AI_ASSISTANT_MESSAGES.saveFailed,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ai_agents")
+    .update({
+      name: parsed.data.name,
+      system_prompt: parsed.data.systemPrompt,
+      channels: parsed.data.channels,
+      trigger_keywords: parsed.data.triggerKeywords,
+      enabled: parsed.data.enabled,
+    })
+    .eq("id", parsed.data.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "UPDATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  revalidateAgentPaths();
+  return { success: true };
+}
+
+export async function deleteAiAgent(
+  input: DeleteAiAgentInput,
+): Promise<AiAgentActionResult> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: AI_ASSISTANT_MESSAGES.deleteFailed },
+    };
+  }
+
+  const parsed = deleteAiAgentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? AI_ASSISTANT_MESSAGES.deleteFailed,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ai_agents")
+    .delete()
+    .eq("id", parsed.data.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "DELETE_FAILED", message: AI_ASSISTANT_MESSAGES.deleteFailed },
+    };
+  }
+
+  revalidateAgentPaths();
+  return { success: true };
+}

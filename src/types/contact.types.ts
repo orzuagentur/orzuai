@@ -1,11 +1,22 @@
 import { z } from "zod";
 
+import type { CrmTaskItem } from "./crm-task.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
 export type ContactCustomFields = {
   company?: string;
   notes?: string;
 };
+
+export const PIPELINE_STAGES = [
+  "new",
+  "qualified",
+  "proposal",
+  "won",
+  "lost",
+] as const;
+
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 export type UnifiedContactItem = {
   id: string;
@@ -16,6 +27,9 @@ export type UnifiedContactItem = {
   customFields: ContactCustomFields;
   leadScore: number | null;
   aiSummary: string | null;
+  pipelineStage: PipelineStage;
+  dealValue: number | null;
+  expectedCloseDate: string | null;
   channel: MessagingChannel;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
@@ -42,6 +56,8 @@ export const updateContactSchema = z.object({
     company: z.string().trim().max(200).optional(),
     notes: z.string().trim().max(2000).optional(),
   }),
+  dealValue: z.number().min(0).max(999999999).optional().nullable(),
+  expectedCloseDate: z.string().trim().max(32).optional().nullable(),
 });
 
 export const deleteContactSchema = z.object({
@@ -79,11 +95,26 @@ export type ContactProfileData = {
   contact: UnifiedContactItem;
   conversationId: string | null;
   timeline: ContactTimelineEntry[];
+  tasks: CrmTaskItem[];
 };
 
 export const CONTACT_SEGMENTS = ["all", "hot_leads", "no_reply_48h"] as const;
 
 export type ContactSegment = (typeof CONTACT_SEGMENTS)[number];
+
+export const updateContactPipelineStageSchema = z.object({
+  contactId: z.string().uuid("Invalid contact identifier."),
+  pipelineStage: z.enum(PIPELINE_STAGES),
+});
+
+export type UpdateContactPipelineStageInput = z.infer<
+  typeof updateContactPipelineStageSchema
+>;
+
+export type ContactPipelinePageData = {
+  hasBusiness: boolean;
+  columns: Record<PipelineStage, UnifiedContactItem[]>;
+};
 
 export type UnifiedContactsPageData = {
   hasBusiness: boolean;
@@ -91,4 +122,5 @@ export type UnifiedContactsPageData = {
   total: number;
   activeChannelFilter: MessagingChannel | null;
   activeSegment: ContactSegment;
+  activeView: "list" | "pipeline";
 };

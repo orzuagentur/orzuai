@@ -1,15 +1,20 @@
+"use client";
+
 import { BotIcon, MessageSquareIcon, UsersIcon } from "lucide-react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
+import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
 import { LANDING_PRODUCT } from "@/features/landing/constants";
 
 export function LandingProductPreview() {
+  const { copy } = useLandingLocale();
+
   return (
     <section className="relative z-10 w-full max-w-5xl px-6 py-16">
       <div className="text-center">
-        <h2 className="text-h2">{LANDING_PRODUCT.title}</h2>
+        <h2 className="text-h2">{copy.product.title}</h2>
         <p className="text-body mt-3 text-muted-foreground">
-          {LANDING_PRODUCT.subtitle}
+          {copy.product.subtitle}
         </p>
       </div>
 

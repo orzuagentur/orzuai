@@ -8,6 +8,7 @@ import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { listCrmTasksForContact } from "@/services/crm-tasks.service";
 import { generateText } from "@/services/gemini.service";
 import type {
   ContactActionResult,
@@ -16,15 +17,20 @@ import type {
   ContactTimelineEntry,
   DeleteContactInput,
   GenerateContactInsightsInput,
+  ContactPipelinePageData,
   GenerateContactInsightsResult,
   ContactSegment,
+  PipelineStage,
   UnifiedContactItem,
   UnifiedContactsPageData,
   UpdateContactInput,
+  UpdateContactPipelineStageInput,
 } from "@/types/contact.types";
 import {
   deleteContactSchema,
   generateContactInsightsSchema,
+  PIPELINE_STAGES,
+  updateContactPipelineStageSchema,
   updateContactSchema,
 } from "@/types/contact.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -44,6 +50,9 @@ type ContactRow = {
   custom_fields?: ContactCustomFields | Record<string, string> | null;
   lead_score?: number | null;
   ai_summary?: string | null;
+  pipeline_stage?: string | null;
+  deal_value?: number | null;
+  expected_close_date?: string | null;
   channel: MessagingChannel;
   last_message_at: string | null;
 };
@@ -67,6 +76,20 @@ function parseCustomFields(
   };
 }
 
+function parsePipelineStage(value: string | null | undefined): PipelineStage {
+  if (
+    value === "new" ||
+    value === "qualified" ||
+    value === "proposal" ||
+    value === "won" ||
+    value === "lost"
+  ) {
+    return value;
+  }
+
+  return "new";
+}
+
 function mapContactRow(
   contact: ContactRow,
   lastMessagePreview: string | null = null,
@@ -80,6 +103,10 @@ function mapContactRow(
     customFields: parseCustomFields(contact.custom_fields),
     leadScore: contact.lead_score ?? null,
     aiSummary: contact.ai_summary ?? null,
+    pipelineStage: parsePipelineStage(contact.pipeline_stage),
+    dealValue:
+      typeof contact.deal_value === "number" ? contact.deal_value : null,
+    expectedCloseDate: contact.expected_close_date ?? null,
     channel: contact.channel,
     lastMessageAt: contact.last_message_at,
     lastMessagePreview,
@@ -229,13 +256,19 @@ async function attachLastMessagePreviews(
   );
 }
 
+function isContactsView(value: string | null | undefined): value is "list" | "pipeline" {
+  return value === "list" || value === "pipeline";
+}
+
 export async function getUnifiedContacts(
   channelFilter?: string | null,
   segmentFilter?: string | null,
+  viewFilter?: string | null,
 ): Promise<UnifiedContactsPageData> {
   const activeChannelFilter =
     channelFilter && isMessagingChannel(channelFilter) ? channelFilter : null;
   const activeSegment = isContactSegment(segmentFilter) ? segmentFilter : "all";
+  const activeView = isContactsView(viewFilter) ? viewFilter : "list";
 
   const businessId = await getOwnedBusinessId();
 
@@ -246,6 +279,7 @@ export async function getUnifiedContacts(
       total: 0,
       activeChannelFilter,
       activeSegment,
+      activeView,
     };
   }
 
@@ -253,7 +287,7 @@ export async function getUnifiedContacts(
   let query = supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, channel, last_message_at",
       {
       count: "exact",
     })
@@ -266,7 +300,7 @@ export async function getUnifiedContacts(
   }
 
   const { data, count } = await query;
-  const allContacts = await attachLastMessagePreviews(data ?? []);
+  const allContacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
   const contacts = await filterContactsBySegment(
     allContacts,
     activeSegment,
@@ -279,7 +313,76 @@ export async function getUnifiedContacts(
     total: activeSegment === "all" ? (count ?? allContacts.length) : contacts.length,
     activeChannelFilter,
     activeSegment,
+    activeView,
   };
+}
+
+export async function getContactPipeline(
+  channelFilter?: string | null,
+): Promise<ContactPipelinePageData> {
+  const data = await getUnifiedContacts(channelFilter, "all", "pipeline");
+
+  const columns = PIPELINE_STAGES.reduce(
+    (acc, stage) => {
+      acc[stage] = data.contacts.filter((contact) => contact.pipelineStage === stage);
+      return acc;
+    },
+    {} as Record<PipelineStage, UnifiedContactItem[]>,
+  );
+
+  return {
+    hasBusiness: data.hasBusiness,
+    columns,
+  };
+}
+
+export async function updateContactPipelineStage(
+  input: UpdateContactPipelineStageInput,
+): Promise<ContactActionResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const parsed = updateContactPipelineStageSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? CONTACTS_MESSAGES.contactSaveFailed,
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: { code: "NO_BUSINESS", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("contacts")
+    .update({ pipeline_stage: parsed.data.pipelineStage })
+    .eq("id", parsed.data.contactId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "UPDATE_FAILED", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  revalidateContactPaths();
+  return { success: true };
 }
 
 export async function getContactProfile(
@@ -295,7 +398,7 @@ export async function getContactProfile(
   const { data: contactRow } = await supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, channel, last_message_at",
     )
     .eq("id", contactId)
     .eq("business_id", businessId)
@@ -360,10 +463,13 @@ export async function getContactProfile(
     );
   }
 
+  const tasks = await listCrmTasksForContact(contactId);
+
   return {
     contact,
     conversationId: conversation?.id ?? null,
     timeline,
+    tasks,
   };
 }
 
@@ -428,6 +534,9 @@ export async function updateContact(
       email: email && email.length > 0 ? email : null,
       tags: parsed.data.tags,
       custom_fields: customFields,
+      deal_value: parsed.data.dealValue ?? null,
+      expected_close_date:
+        parsed.data.expectedCloseDate?.trim() || null,
     })
     .eq("id", parsed.data.contactId)
     .eq("business_id", businessId);

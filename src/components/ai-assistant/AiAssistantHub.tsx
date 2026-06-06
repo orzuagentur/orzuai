@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
+import { AiAgentBuilderPanel } from "@/components/ai-assistant/AiAgentBuilderPanel";
 import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaultsCard";
 import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,11 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
               geminiConfigured={data.geminiConfigured}
             />
           ) : null}
+
+          <AiAgentBuilderPanel
+            agents={data.agents}
+            activeChannel={activeChannel}
+          />
 
           {activeEntry ? (
             <ChannelAiPanel data={activeEntry.settings} />

@@ -73,6 +73,9 @@ export const DASHBOARD_NAV_ITEMS = [
 export const OVERVIEW_MESSAGES = {
   title: "Home",
   description: "Monitor messages, AI performance, and activity across all channels.",
+  channelMetricsTitle: "Multi-channel metrics",
+  channelMetricsDescription:
+    "Per-channel message, contact, and AI volume from channel_analytics.",
   emptyBusinessTitle: "Set up your business",
   emptyBusinessDescription:
     "Create your business profile to start tracking messages, contacts, and AI performance.",

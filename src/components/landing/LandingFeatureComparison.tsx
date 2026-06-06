@@ -1,5 +1,8 @@
+"use client";
+
 import { CheckIcon, MinusIcon } from "lucide-react";
 
+import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
 import { LANDING_FEATURE_COMPARISON } from "@/features/landing/constants";
 import { cn } from "@/lib/utils";
 
@@ -33,14 +36,16 @@ function ComparisonCell({ value }: { value: CellValue }) {
 }
 
 export function LandingFeatureComparison() {
+  const { copy } = useLandingLocale();
+
   return (
     <section className="relative z-10 w-full max-w-4xl px-6 py-16">
       <div className="text-center">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {LANDING_FEATURE_COMPARISON.title}
+          {copy.comparison.title}
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          {LANDING_FEATURE_COMPARISON.subtitle}
+          {copy.comparison.subtitle}
         </p>
       </div>
 

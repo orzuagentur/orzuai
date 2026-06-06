@@ -341,7 +341,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** FAQ section
 * [x] **P2** Feature comparison vs ManyChat / Intercom
 * [x] **P2** Secondary CTA: «Book a demo»
-* [ ] **P2** Localized landing (EN / RU / UZ)
+* [x] **P2** Localized landing (EN / RU / UZ)
 * [ ] **P3** A/B test framework для CTA
 
 ---
@@ -355,9 +355,9 @@ Progress: **100%** (core hub + channels)
 * [x] **P1** AI Summary на contact (auto-generated)
 * [x] **P1** Activity timeline (messages, tasks, AI actions, notes)
 * [x] **P1** Edit / merge / delete contacts
-* [ ] **P2** Pipeline (kanban): New → Qualified → Proposal → Won / Lost
-* [ ] **P2** Deals: value, expected close date, stage
-* [ ] **P2** Tasks: create, assign, due date, reminders
+* [x] **P2** Pipeline (kanban): New → Qualified → Proposal → Won / Lost
+* [x] **P2** Deals: value, expected close date, stage
+* [x] **P2** Tasks: create, assign, due date, reminders
 * [x] **P2** Segments: hot leads, no reply 48h, by channel/source
 * [ ] **P2** Auto-create task при high-intent message (AI rule)
 * [ ] **P3** Contact import (CSV)
@@ -370,14 +370,14 @@ Progress: **100%** (core hub + channels)
 * [x] **P0** AI CRM Assistant: lead score + summary + suggested action per message
 * [x] **P0** AI Follow-Up Agent: cron 24h/48h auto follow-up messages
 * [x] **P1** AI suggest reply в Inbox sidebar
-* [ ] **P1** Agent builder UI: prompt + channels + triggers
+* [x] **P1** Agent builder UI: prompt + channels + triggers
 * [ ] **P1** Multi-model support: Gemini + OpenAI + Claude (selector)
 * [ ] **P1** AI usage limits per subscription plan
 * [ ] **P1** AI cost tracking ($ per conversation)
 * [ ] **P2** AI Sales Agent: BANT qualification + routing rules
 * [ ] **P2** AI Analytics Assistant: natural language insights («Why did conversions drop?»)
 * [ ] **P2** Sentiment analysis на входящих сообщениях
-* [ ] **P2** AI Agent templates library (sales, support, booking)
+* [x] **P2** AI Agent templates library (sales, support, booking)
 * [ ] **P3** AI Call Agent (voice): Retell AI / Vapi / Twilio integration
 * [ ] **P3** AI Instagram comment replies (не только DM)
 
@@ -385,11 +385,11 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Analytics
 
-* [ ] **P0** Overview dashboard: multi-channel metrics (не legacy `analytics` table)
-* [ ] **P1** AI Performance panel: AI resolution %, handoff rate, time saved
-* [ ] **P1** Response time metrics: first response, avg resolution per channel
-* [ ] **P1** CRM funnel: lead → qualified → won conversion
-* [ ] **P1** Lead source attribution (channel, website form, campaign)
+* [x] **P0** Overview dashboard: multi-channel metrics (не legacy `analytics` table)
+* [x] **P1** AI Performance panel: AI resolution %, handoff rate, time saved
+* [x] **P1** Response time metrics: first response, avg resolution per channel
+* [x] **P1** CRM funnel: lead → qualified → won conversion
+* [x] **P1** Lead source attribution (channel, website form, campaign)
 * [ ] **P2** Team analytics: messages per agent, SLA compliance
 * [ ] **P2** Revenue metrics (после Stripe + CRM deals)
 * [ ] **P2** AI cost dashboard ($ Gemini spend per business)

@@ -554,6 +554,9 @@ export type Database = {
           custom_fields: Record<string, string>;
           lead_score: number | null;
           ai_summary: string | null;
+          pipeline_stage: string;
+          deal_value: number | null;
+          expected_close_date: string | null;
           channel: MessagingChannel;
           last_message_at: string | null;
           created_at: string;
@@ -568,6 +571,9 @@ export type Database = {
           custom_fields?: Record<string, string>;
           lead_score?: number | null;
           ai_summary?: string | null;
+          pipeline_stage?: string;
+          deal_value?: number | null;
+          expected_close_date?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
@@ -582,6 +588,9 @@ export type Database = {
           custom_fields?: Record<string, string>;
           lead_score?: number | null;
           ai_summary?: string | null;
+          pipeline_stage?: string;
+          deal_value?: number | null;
+          expected_close_date?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
           created_at?: string;
@@ -644,6 +653,54 @@ export type Database = {
           },
         ];
       };
+      crm_tasks: {
+        Row: {
+          id: string;
+          business_id: string;
+          contact_id: string;
+          title: string;
+          due_at: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          contact_id: string;
+          title: string;
+          due_at?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          contact_id?: string;
+          title?: string;
+          due_at?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "crm_tasks_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "crm_tasks_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       messages: {
         Row: {
           id: string;
@@ -678,6 +735,50 @@ export type Database = {
             columns: ["conversation_id"];
             isOneToOne: false;
             referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_agents: {
+        Row: {
+          id: string;
+          business_id: string;
+          name: string;
+          system_prompt: string;
+          channels: MessagingChannel[];
+          trigger_keywords: string[];
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          name: string;
+          system_prompt: string;
+          channels?: MessagingChannel[];
+          trigger_keywords?: string[];
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          name?: string;
+          system_prompt?: string;
+          channels?: MessagingChannel[];
+          trigger_keywords?: string[];
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
             referencedColumns: ["id"];
           },
         ];

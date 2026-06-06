@@ -24,11 +24,14 @@ import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 
-type UnifiedContactsPanelProps = UnifiedContactsPageData;
+type UnifiedContactsPanelProps = UnifiedContactsPageData & {
+  headerOnly?: boolean;
+};
 
 function buildContactsHref(
   channel: string | null,
   segment: ContactSegment,
+  view: "list" | "pipeline" = "list",
 ): string {
   const params = new URLSearchParams();
 
@@ -38,6 +41,10 @@ function buildContactsHref(
 
   if (segment !== "all") {
     params.set("segment", segment);
+  }
+
+  if (view === "pipeline") {
+    params.set("view", "pipeline");
   }
 
   const query = params.toString();
@@ -53,6 +60,8 @@ export function UnifiedContactsPanel({
   total,
   activeChannelFilter,
   activeSegment,
+  activeView,
+  headerOnly = false,
 }: UnifiedContactsPanelProps) {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
@@ -81,13 +90,38 @@ export function UnifiedContactsPanel({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Link
+          href={buildContactsHref(activeChannelFilter, activeSegment, "list")}
+          className={cn(
+            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+            activeView === "list"
+              ? "border-primary/40 bg-primary/10 text-foreground"
+              : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+          )}
+        >
+          {CONTACTS_MESSAGES.viewList}
+        </Link>
+        <Link
+          href={buildContactsHref(activeChannelFilter, activeSegment, "pipeline")}
+          className={cn(
+            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+            activeView === "pipeline"
+              ? "border-primary/40 bg-primary/10 text-foreground"
+              : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+          )}
+        >
+          {CONTACTS_MESSAGES.viewPipeline}
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {CONTACT_SEGMENT_FILTERS.map((filter) => {
           const isActive = filter.id === activeSegment;
 
           return (
             <Link
               key={filter.id}
-              href={buildContactsHref(activeChannelFilter, filter.id)}
+              href={buildContactsHref(activeChannelFilter, filter.id, activeView)}
               className={cn(
                 "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                 isActive
@@ -110,7 +144,7 @@ export function UnifiedContactsPanel({
           return (
             <Link
               key={filter.id ?? "all"}
-              href={buildContactsHref(filter.id, activeSegment)}
+              href={buildContactsHref(filter.id, activeSegment, activeView)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                 isActive
@@ -129,7 +163,7 @@ export function UnifiedContactsPanel({
         })}
       </div>
 
-      {contacts.length === 0 ? (
+      {headerOnly ? null : contacts.length === 0 ? (
         <EmptyState
           variant="contacts"
           title={CONTACTS_MESSAGES.emptyTitle}
@@ -202,11 +236,13 @@ export function UnifiedContactsPanel({
         </ul>
       )}
 
-      <ContactProfileDrawer
-        contactId={selectedContactId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
+      {headerOnly ? null : (
+        <ContactProfileDrawer
+          contactId={selectedContactId}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+        />
+      )}
     </div>
   );
 }

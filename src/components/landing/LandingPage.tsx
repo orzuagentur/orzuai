@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { ArrowRightIcon, BotIcon, MessageSquareIcon, SparklesIcon } from "lucide-react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
@@ -8,6 +8,10 @@ import { AuthModal } from "@/components/landing/AuthModal";
 import { LandingFaq } from "@/components/landing/LandingFaq";
 import { LandingFeatureComparison } from "@/components/landing/LandingFeatureComparison";
 import { LandingHeader } from "@/components/landing/LandingHeader";
+import {
+  LandingLocaleProvider,
+  useLandingLocale,
+} from "@/components/landing/LandingLocaleProvider";
 import { LandingPricing } from "@/components/landing/LandingPricing";
 import { LandingProductPreview } from "@/components/landing/LandingProductPreview";
 import { LandingSocialProof } from "@/components/landing/LandingSocialProof";
@@ -17,13 +21,13 @@ import { Button } from "@/components/ui/button";
 import {
   LANDING_BOOK_DEMO,
   LANDING_CHANNELS,
-  LANDING_COPY,
   LANDING_FEATURES,
 } from "@/features/landing/constants";
 
 const FEATURE_ICONS = [MessageSquareIcon, BotIcon, SparklesIcon] as const;
 
-export function LandingPage() {
+function LandingPageContent() {
+  const { copy } = useLandingLocale();
   const [authOpen, setAuthOpen] = useState(false);
 
   function openAuth() {
@@ -51,15 +55,15 @@ export function LandingPage() {
 
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-sm">
               <SparklesIcon className="size-3.5 text-primary" />
-              AI inbox for WhatsApp, Instagram & Telegram
+              {copy.heroBadge}
             </div>
 
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl sm:leading-tight">
-              {LANDING_COPY.tagline}
+              {copy.tagline}
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-              {LANDING_COPY.subtitle}
+              {copy.subtitle}
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -102,11 +106,11 @@ export function LandingPage() {
                 className="transition-all hover:scale-[1.02]"
                 onClick={openAuth}
               >
-                {LANDING_COPY.startButton}
+                {copy.startButton}
                 <ArrowRightIcon className="size-4" />
               </Button>
               <Button variant="ctaOutline" size="cta-lg" asChild>
-                <a href={LANDING_BOOK_DEMO.href}>{LANDING_BOOK_DEMO.label}</a>
+                <a href={LANDING_BOOK_DEMO.href}>{copy.header.bookDemo}</a>
               </Button>
             </div>
           </div>
@@ -126,5 +130,15 @@ export function LandingPage() {
 
       <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
     </div>
+  );
+}
+
+export function LandingPage() {
+  return (
+    <Suspense fallback={null}>
+      <LandingLocaleProvider>
+        <LandingPageContent />
+      </LandingLocaleProvider>
+    </Suspense>
   );
 }

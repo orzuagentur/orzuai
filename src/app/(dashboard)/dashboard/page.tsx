@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { AiStatusCard } from "@/components/dashboard/AiStatusCard";
 import { AnalyticsCardsGrid } from "@/components/dashboard/AnalyticsCardsGrid";
+import { MultiChannelMetricsPanel } from "@/components/dashboard/MultiChannelMetricsPanel";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentConversations } from "@/components/dashboard/RecentConversations";
@@ -57,6 +58,8 @@ export default async function DashboardPage() {
       ) : null}
 
       <AnalyticsCardsGrid metrics={overview.metrics} />
+
+      <MultiChannelMetricsPanel channels={overview.channelMetrics} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">

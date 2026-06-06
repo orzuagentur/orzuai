@@ -28,10 +28,12 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { createCrmTaskAction } from "@/features/contacts/actions/create-crm-task";
 import { deleteContactAction } from "@/features/contacts/actions/delete-contact";
 import { generateContactInsightsAction } from "@/features/contacts/actions/generate-contact-insights";
 import { getContactProfileAction } from "@/features/contacts/actions/get-contact-profile";
 import { updateContactAction } from "@/features/contacts/actions/update-contact";
+import { updateCrmTaskStatusAction } from "@/features/contacts/actions/update-crm-task-status";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import {
   getChannelBadgeClassName,
@@ -97,6 +99,11 @@ export function ContactProfileDrawer({
   const [tagsInput, setTagsInput] = useState("");
   const [company, setCompany] = useState("");
   const [notes, setNotes] = useState("");
+  const [dealValue, setDealValue] = useState("");
+  const [expectedCloseDate, setExpectedCloseDate] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueAt, setTaskDueAt] = useState("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   async function loadProfile(id: string) {
@@ -111,6 +118,10 @@ export function ContactProfileDrawer({
       setTagsInput(tagsToInput(data.contact.tags));
       setCompany(data.contact.customFields.company ?? "");
       setNotes(data.contact.customFields.notes ?? "");
+      setDealValue(
+        data.contact.dealValue !== null ? String(data.contact.dealValue) : "",
+      );
+      setExpectedCloseDate(data.contact.expectedCloseDate ?? "");
     }
   }
 
@@ -144,6 +155,8 @@ export function ContactProfileDrawer({
         email,
         tags: parseTagsInput(tagsInput),
         customFields: { company, notes },
+        dealValue: dealValue.trim() ? Number(dealValue) : null,
+        expectedCloseDate: expectedCloseDate || null,
       });
 
       if (!result.success) {
@@ -180,6 +193,50 @@ export function ContactProfileDrawer({
       router.refresh();
     } finally {
       setIsGeneratingInsights(false);
+    }
+  }
+
+  async function handleCreateTask() {
+    if (!contactId || !taskTitle.trim()) {
+      return;
+    }
+
+    setIsCreatingTask(true);
+
+    try {
+      const result = await createCrmTaskAction({
+        contactId,
+        title: taskTitle,
+        dueAt: taskDueAt ? new Date(taskDueAt).toISOString() : null,
+      });
+
+      if (!result.success) {
+        toast.error(result.error.message);
+        return;
+      }
+
+      toast.success(CONTACTS_MESSAGES.taskSaved);
+      setTaskTitle("");
+      setTaskDueAt("");
+      await loadProfile(contactId);
+    } finally {
+      setIsCreatingTask(false);
+    }
+  }
+
+  async function handleToggleTask(
+    taskId: string,
+    status: "open" | "done",
+  ) {
+    const result = await updateCrmTaskStatusAction({ taskId, status });
+
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
+
+    if (contactId) {
+      await loadProfile(contactId);
     }
   }
 
@@ -337,6 +394,33 @@ export function ContactProfileDrawer({
                         rows={3}
                       />
                     </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-deal-value">
+                          {CONTACTS_MESSAGES.dealValueLabel}
+                        </Label>
+                        <Input
+                          id="contact-deal-value"
+                          type="number"
+                          min="0"
+                          value={dealValue}
+                          onChange={(event) => setDealValue(event.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contact-close-date">
+                          {CONTACTS_MESSAGES.expectedCloseLabel}
+                        </Label>
+                        <Input
+                          id="contact-close-date"
+                          type="date"
+                          value={expectedCloseDate}
+                          onChange={(event) =>
+                            setExpectedCloseDate(event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         type="button"
@@ -414,8 +498,94 @@ export function ContactProfileDrawer({
                         {profile.contact.customFields.notes}
                       </p>
                     ) : null}
+                    {profile.contact.dealValue !== null ? (
+                      <p>
+                        <span className="text-caption font-medium">
+                          {CONTACTS_MESSAGES.dealValueLabel}:{" "}
+                        </span>
+                        ${profile.contact.dealValue.toLocaleString()}
+                      </p>
+                    ) : null}
+                    {profile.contact.expectedCloseDate ? (
+                      <p>
+                        <span className="text-caption font-medium">
+                          {CONTACTS_MESSAGES.expectedCloseLabel}:{" "}
+                        </span>
+                        {profile.contact.expectedCloseDate}
+                      </p>
+                    ) : null}
                   </div>
                 )}
+
+                <div className="mb-6 space-y-3">
+                  <p className="text-h3">{CONTACTS_MESSAGES.tasksTitle}</p>
+                  <ul className="space-y-2">
+                    {profile.tasks.map((task) => (
+                      <li
+                        key={task.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p
+                            className={
+                              task.status === "done"
+                                ? "line-through text-muted-foreground"
+                                : ""
+                            }
+                          >
+                            {task.title}
+                          </p>
+                          {task.dueAt ? (
+                            <p className="text-caption">
+                              {formatRelativeTime(task.dueAt)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void handleToggleTask(
+                              task.id,
+                              task.status === "done" ? "open" : "done",
+                            );
+                          }}
+                        >
+                          {task.status === "done"
+                            ? CONTACTS_MESSAGES.taskOpen
+                            : CONTACTS_MESSAGES.taskDone}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <Input
+                      value={taskTitle}
+                      onChange={(event) => setTaskTitle(event.target.value)}
+                      placeholder={CONTACTS_MESSAGES.taskTitleLabel}
+                    />
+                    <Input
+                      type="datetime-local"
+                      value={taskDueAt}
+                      onChange={(event) => setTaskDueAt(event.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isCreatingTask || !taskTitle.trim()}
+                      onClick={() => {
+                        void handleCreateTask();
+                      }}
+                    >
+                      {isCreatingTask ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        CONTACTS_MESSAGES.addTask
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
                 {profile.contact.lastMessagePreview ? (
                   <div className="mb-6 rounded-lg border bg-muted/30 p-4">

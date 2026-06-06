@@ -21,10 +21,16 @@ import type {
 } from "@/types/channel-workspace.types";
 import type {
   ActivityDataPoint,
+  AiPerformanceMetrics,
+  ChannelMetricSummary,
+  CrmFunnelMetrics,
   DashboardMetrics,
   DashboardOverview,
+  LeadSourceEntry,
   RecentConversationItem,
+  ResponseTimeMetrics,
 } from "@/types/dashboard.types";
+import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
@@ -39,15 +45,268 @@ const EMPTY_METRICS: DashboardMetrics = {
   conversionRate: 0,
 };
 
+const EMPTY_RESPONSE_TIME: ResponseTimeMetrics = {
+  avgFirstResponseMinutes: null,
+  avgResolutionHours: null,
+  sampledConversations: 0,
+};
+
+const EMPTY_CRM_FUNNEL: CrmFunnelMetrics = {
+  stages: [],
+  newToQualifiedRate: 0,
+  qualifiedToWonRate: 0,
+};
+
+const EMPTY_AI_PERFORMANCE: AiPerformanceMetrics = {
+  aiResolutionRate: 0,
+  handoffRate: 0,
+  estimatedMinutesSaved: 0,
+  aiReplies: 0,
+  humanReplies: 0,
+};
+
 function createEmptyOverview(): DashboardOverview {
   return {
     hasBusiness: false,
     metrics: EMPTY_METRICS,
+    channelMetrics: [],
     activity: buildLastSevenDaysActivity([]),
     recentConversations: [],
     whatsappStatus: null,
     whatsappPhoneNumber: null,
     aiEnabled: null,
+  };
+}
+
+async function buildChannelMetrics(
+  businessId: string,
+): Promise<ChannelMetricSummary[]> {
+  const supabase = await createClient();
+  const channelStatuses = await getChannelConnectionStatuses(businessId);
+
+  const { data: rows } = await supabase
+    .from("channel_analytics")
+    .select("channel, total_messages, total_contacts, ai_replies")
+    .eq("business_id", businessId);
+
+  const rowByChannel = new Map(
+    (rows ?? []).map((row) => [row.channel as DbMessagingChannel, row]),
+  );
+
+  return MESSAGING_CHANNELS.map((channel) => {
+    const row = rowByChannel.get(channel);
+    const status = channelStatuses[channel]?.status ?? "disconnected";
+
+    return {
+      channel,
+      totalMessages: row?.total_messages ?? 0,
+      totalContacts: row?.total_contacts ?? 0,
+      aiReplies: row?.ai_replies ?? 0,
+      connected: status === "connected",
+    };
+  });
+}
+
+export async function getAiPerformanceMetrics(
+  businessId: string,
+): Promise<AiPerformanceMetrics> {
+  const supabase = await createClient();
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId);
+
+  const conversationIds = conversations?.map((row) => row.id) ?? [];
+
+  if (conversationIds.length === 0) {
+    return EMPTY_AI_PERFORMANCE;
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("sender_type, ai_generated")
+    .in("conversation_id", conversationIds);
+
+  let aiReplies = 0;
+  let humanReplies = 0;
+
+  for (const message of messages ?? []) {
+    if (message.sender_type === "client") {
+      continue;
+    }
+
+    if (message.ai_generated || message.sender_type === "ai") {
+      aiReplies += 1;
+    } else if (message.sender_type === "user") {
+      humanReplies += 1;
+    }
+  }
+
+  const outboundTotal = aiReplies + humanReplies;
+  const aiResolutionRate =
+    outboundTotal > 0 ? Math.round((aiReplies / outboundTotal) * 100) : 0;
+  const handoffRate =
+    outboundTotal > 0 ? Math.round((humanReplies / outboundTotal) * 100) : 0;
+
+  return {
+    aiResolutionRate,
+    handoffRate,
+    estimatedMinutesSaved: aiReplies * 2,
+    aiReplies,
+    humanReplies,
+  };
+}
+
+export async function getLeadSourceAttribution(
+  businessId: string,
+): Promise<LeadSourceEntry[]> {
+  const supabase = await createClient();
+
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("channel")
+    .eq("business_id", businessId);
+
+  const counts = new Map<DbMessagingChannel, number>();
+
+  for (const channel of MESSAGING_CHANNELS) {
+    counts.set(channel, 0);
+  }
+
+  for (const contact of contacts ?? []) {
+    const channel = contact.channel as DbMessagingChannel;
+    counts.set(channel, (counts.get(channel) ?? 0) + 1);
+  }
+
+  const total = contacts?.length ?? 0;
+
+  return MESSAGING_CHANNELS.map((channel) => {
+    const contactCount = counts.get(channel) ?? 0;
+
+    return {
+      channel,
+      contacts: contactCount,
+      percentage: total > 0 ? Math.round((contactCount / total) * 100) : 0,
+    };
+  }).filter((entry) => entry.contacts > 0);
+}
+
+export async function getResponseTimeMetrics(
+  businessId: string,
+): Promise<ResponseTimeMetrics> {
+  const supabase = await createClient();
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id, status, created_at, updated_at")
+    .eq("business_id", businessId)
+    .limit(100);
+
+  if (!conversations?.length) {
+    return EMPTY_RESPONSE_TIME;
+  }
+
+  const firstResponseMinutes: number[] = [];
+  const resolutionHours: number[] = [];
+
+  for (const conversation of conversations) {
+    const { data: messages } = await supabase
+      .from("messages")
+      .select("sender_type, created_at")
+      .eq("conversation_id", conversation.id)
+      .order("created_at", { ascending: true });
+
+    if (!messages?.length) {
+      continue;
+    }
+
+    const firstClientIndex = messages.findIndex(
+      (message) => message.sender_type === "client",
+    );
+
+    const firstClient = messages.at(firstClientIndex);
+
+    if (!firstClient) {
+      continue;
+    }
+
+    const firstClientAt = new Date(firstClient.created_at).getTime();
+    const firstReply = messages
+      .slice(firstClientIndex + 1)
+      .find((message) => message.sender_type !== "client");
+
+    if (firstReply) {
+      const minutes =
+        (new Date(firstReply.created_at).getTime() - firstClientAt) / 60000;
+      firstResponseMinutes.push(minutes);
+    }
+
+    if (conversation.status === "resolved" || conversation.status === "closed") {
+      const hours =
+        (new Date(conversation.updated_at).getTime() -
+          new Date(conversation.created_at).getTime()) /
+        3600000;
+      resolutionHours.push(hours);
+    }
+  }
+
+  const avg = (values: number[]) =>
+    values.length > 0
+      ? Math.round(
+          values.reduce((sum, value) => sum + value, 0) / values.length,
+        )
+      : null;
+
+  return {
+    avgFirstResponseMinutes: avg(firstResponseMinutes),
+    avgResolutionHours: avg(resolutionHours),
+    sampledConversations: conversations.length,
+  };
+}
+
+export async function getCrmFunnelMetrics(
+  businessId: string,
+): Promise<CrmFunnelMetrics> {
+  const supabase = await createClient();
+
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("pipeline_stage")
+    .eq("business_id", businessId);
+
+  const stageOrder = ["new", "qualified", "proposal", "won", "lost"] as const;
+  const counts = new Map<string, number>();
+
+  for (const stage of stageOrder) {
+    counts.set(stage, 0);
+  }
+
+  for (const contact of contacts ?? []) {
+    const stage = contact.pipeline_stage ?? "new";
+    counts.set(stage, (counts.get(stage) ?? 0) + 1);
+  }
+
+  const total = contacts?.length ?? 0;
+  const stages = stageOrder.map((stage) => ({
+    stage,
+    count: counts.get(stage) ?? 0,
+    percentage:
+      total > 0
+        ? Math.round(((counts.get(stage) ?? 0) / total) * 100)
+        : 0,
+  }));
+
+  const newCount = counts.get("new") ?? 0;
+  const qualifiedCount = counts.get("qualified") ?? 0;
+  const wonCount = counts.get("won") ?? 0;
+
+  return {
+    stages,
+    newToQualifiedRate:
+      newCount > 0 ? Math.round((qualifiedCount / newCount) * 100) : 0,
+    qualifiedToWonRate:
+      qualifiedCount > 0 ? Math.round((wonCount / qualifiedCount) * 100) : 0,
   };
 }
 
@@ -67,6 +326,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
 
   const [
     channelAnalyticsResult,
+    channelMetrics,
     whatsappResult,
     aiSettingsResult,
     conversationsResult,
@@ -76,6 +336,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .from("channel_analytics")
       .select("total_messages, total_contacts, ai_replies")
       .eq("business_id", business.id),
+    buildChannelMetrics(business.id),
     supabase
       .from("whatsapp_connections")
       .select("whatsapp_status, phone_number")
@@ -164,6 +425,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
   return {
     hasBusiness: true,
     metrics,
+    channelMetrics,
     activity,
     recentConversations,
     whatsappStatus: whatsappResult.data?.whatsapp_status ?? null,
@@ -229,10 +491,21 @@ export async function getAnalyticsPageData(
         aiReplies: 0,
         activeConversations: 0,
       },
+      aiPerformance: EMPTY_AI_PERFORMANCE,
+      leadSources: [],
+      responseTime: EMPTY_RESPONSE_TIME,
+      crmFunnel: EMPTY_CRM_FUNNEL,
     };
   }
 
-  const channelStatuses = await getChannelConnectionStatuses(businessId);
+  const [channelStatuses, aiPerformance, leadSources, responseTime, crmFunnel] =
+    await Promise.all([
+      getChannelConnectionStatuses(businessId),
+      getAiPerformanceMetrics(businessId),
+      getLeadSourceAttribution(businessId),
+      getResponseTimeMetrics(businessId),
+      getCrmFunnelMetrics(businessId),
+    ]);
 
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => {
@@ -256,5 +529,9 @@ export async function getAnalyticsPageData(
     channelStatuses,
     channels,
     totals: buildTotals(channels),
+    aiPerformance,
+    leadSources,
+    responseTime,
+    crmFunnel,
   };
 }

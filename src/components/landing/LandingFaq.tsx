@@ -1,11 +1,16 @@
+"use client";
+
+import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
 import { LANDING_FAQ } from "@/features/landing/constants";
 
 export function LandingFaq() {
+  const { copy } = useLandingLocale();
+
   return (
     <section className="relative z-10 w-full max-w-3xl px-6 py-16">
       <div className="text-center">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {LANDING_FAQ.title}
+          {copy.faqTitle}
         </h2>
       </div>
 

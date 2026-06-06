@@ -11,4 +11,16 @@ export const AI_ASSISTANT_MESSAGES = {
   channelNotConnected:
     "This channel is not connected yet. AI settings are saved, but auto-replies start after you connect the channel in Integrations.",
   goToIntegrations: "Connect channel",
+  agentBuilderTitle: "Custom AI agents",
+  agentBuilderDescription:
+    "Build agents with prompts, channel targets, and keyword triggers. Use templates to get started fast.",
+  agentName: "Agent name",
+  agentPrompt: "System prompt",
+  agentChannels: "Active channels",
+  agentTriggers: "Trigger keywords (comma-separated)",
+  agentCreate: "Create agent",
+  agentSaved: "AI agent saved.",
+  agentDeleted: "AI agent deleted.",
+  saveFailed: "Unable to save agent. Please try again.",
+  deleteFailed: "Unable to delete agent. Please try again.",
 } as const;
