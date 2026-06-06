@@ -37,6 +37,8 @@ export const DASHBOARD_ROUTES = {
   analytics: "/dashboard/analytics",
   settings: "/dashboard/settings",
   subscription: "/dashboard/subscription",
+  automations: "/dashboard/automations",
+  marketplace: "/dashboard/integrations/marketplace",
 } as const;
 
 export const PROTECTED_ROUTE_PREFIXES = ["/dashboard"] as const;

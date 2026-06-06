@@ -17,10 +17,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "OrzuAI",
   description: "The easiest AI WhatsApp Assistant platform for small businesses",
-  icons: {
-    icon: [{ url: "/orzuai-icon.png", type: "image/png" }],
-    apple: [{ url: "/orzuai-icon.png", type: "image/png" }],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "OrzuAI",
+    statusBarStyle: "default",
   },
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/icon.png", type: "image/png" }],
+  },
+};
+
+export const viewport = {
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({

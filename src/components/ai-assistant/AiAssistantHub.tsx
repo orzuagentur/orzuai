@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PhoneCallIcon } from "lucide-react";
 
 import { AiAgentBuilderPanel } from "@/components/ai-assistant/AiAgentBuilderPanel";
+import { FollowUpAgentPanel } from "@/components/ai-assistant/FollowUpAgentPanel";
 import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaultsCard";
 import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
 import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
@@ -122,6 +123,8 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
           ) : null}
 
           <SalesAgentPanel settings={data.salesAgent} />
+
+          <FollowUpAgentPanel settings={data.followUpAgent} />
 
           <Card className="shadow-none">
             <CardHeader>

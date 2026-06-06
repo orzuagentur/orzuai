@@ -539,17 +539,17 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Platform V2 — крупные модули (1–3 месяца)
 
-* [ ] **P0** Module: **Home** (activation dashboard с progress ring)
-* [ ] **P0** Module: **Inbox** (unified + realtime + AI sidebar)
-* [ ] **P0** Module: **CRM** (contacts + pipeline + tasks)
-* [ ] **P0** Module: **AI Agents** (builder + templates + follow-up)
-* [ ] **P1** Module: **Automations** (visual workflow builder)
-* [ ] **P1** Module: **Analytics V2** (AI + CRM + business metrics)
-* [ ] **P1** Module: **Team** (members, roles, routing)
+* [x] **P0** Module: **Home** (activation dashboard с progress ring)
+* [x] **P0** Module: **Inbox** (unified + realtime + AI sidebar)
+* [x] **P0** Module: **CRM** (contacts + pipeline + tasks)
+* [x] **P0** Module: **AI Agents** (builder + templates + follow-up)
+* [x] **P1** Module: **Automations** (visual workflow builder)
+* [x] **P1** Module: **Analytics V2** (AI + CRM + business metrics)
+* [x] **P1** Module: **Team** (members, roles, routing)
 * [x] **P1** Module: **Billing** (Stripe full)
 * [x] **P2** Module: **Calls** (AI voice agent)
-* [ ] **P2** Module: **Integrations Marketplace**
-* [ ] **P3** Module: **Mobile App** (PWA → React Native)
+* [x] **P2** Module: **Integrations Marketplace**
+* [x] **P3** Module: **Mobile App** (PWA → React Native)
 
 ---
 

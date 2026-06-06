@@ -13,6 +13,7 @@ import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { getAiUsageSummary } from "@/services/ai-usage.service";
 import { getProviderAvailability } from "@/services/llm.service";
+import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import { getSalesAgentSettings } from "@/services/sales-agent.service";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -78,15 +79,18 @@ export async function getAiAssistantPageData(
         autoTaskThreshold: 75,
         sentimentAnalysisEnabled: true,
       },
+      followUpAgent: { enabled: true, sentCount: 0 },
     };
   }
 
-  const [channelStatuses, agents, usage, salesAgent] = await Promise.all([
-    getChannelConnectionStatuses(businessId),
-    listAiAgents(),
-    getAiUsageSummary(),
-    getSalesAgentSettings(businessId),
-  ]);
+  const [channelStatuses, agents, usage, salesAgent, followUpAgent] =
+    await Promise.all([
+      getChannelConnectionStatuses(businessId),
+      listAiAgents(),
+      getAiUsageSummary(),
+      getSalesAgentSettings(businessId),
+      getFollowUpAgentSettings(businessId),
+    ]);
 
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => ({
@@ -110,6 +114,7 @@ export async function getAiAssistantPageData(
     agents,
     usage,
     salesAgent,
+    followUpAgent,
   };
 }
 

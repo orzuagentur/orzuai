@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { OnboardingProgressRing } from "@/components/onboarding/OnboardingProgressRing";
 import { ONBOARDING_MESSAGES } from "@/features/onboarding/constants";
 import type { OnboardingProgress } from "@/services/onboarding.service";
 
@@ -46,9 +47,12 @@ export function SetupChecklist({ progress }: SetupChecklistProps) {
   return (
     <Card className="shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="space-y-1">
-          <CardTitle>{ONBOARDING_MESSAGES.checklistTitle}</CardTitle>
-          <CardDescription>{ONBOARDING_MESSAGES.checklistDescription}</CardDescription>
+        <div className="flex items-start gap-4">
+          <OnboardingProgressRing percent={progress.percentComplete} size={64} />
+          <div className="space-y-1">
+            <CardTitle>{ONBOARDING_MESSAGES.checklistTitle}</CardTitle>
+            <CardDescription>{ONBOARDING_MESSAGES.checklistDescription}</CardDescription>
+          </div>
         </div>
         <Button asChild size="sm">
           <Link href={DASHBOARD_ROUTES.onboarding}>Resume setup</Link>

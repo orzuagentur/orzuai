@@ -272,6 +272,16 @@ async function listFollowUpCandidates(
         continue;
       }
 
+      const { data: followUpConfig } = await admin
+        .from("business_ai_config")
+        .select("follow_up_agent_enabled")
+        .eq("business_id", conversation.business_id)
+        .maybeSingle();
+
+      if (followUpConfig?.follow_up_agent_enabled === false) {
+        continue;
+      }
+
       const connected = await isChannelConnected(
         admin,
         conversation.business_id,

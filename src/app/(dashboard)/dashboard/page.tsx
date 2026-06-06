@@ -4,6 +4,7 @@ import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { AiStatusCard } from "@/components/dashboard/AiStatusCard";
 import { AnalyticsCardsGrid } from "@/components/dashboard/AnalyticsCardsGrid";
 import { MultiChannelMetricsPanel } from "@/components/dashboard/MultiChannelMetricsPanel";
+import { PwaInstallBanner } from "@/components/pwa/PwaInstallBanner";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentConversations } from "@/components/dashboard/RecentConversations";
@@ -52,6 +53,8 @@ export default async function DashboardPage() {
           Welcome back, {displayName}. {OVERVIEW_MESSAGES.description}
         </p>
       </div>
+
+      <PwaInstallBanner />
 
       {!onboardingProgress.isComplete ? (
         <SetupChecklist progress={onboardingProgress} />

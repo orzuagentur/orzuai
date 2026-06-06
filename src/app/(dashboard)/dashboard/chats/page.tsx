@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ChatsHub } from "@/components/chats/ChatsHub";
 import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
+import { ChatsMonitorRealtime } from "@/components/chats/ChatsMonitorRealtime";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,7 +49,9 @@ export default async function ChatsPage() {
   return (
     <Suspense fallback={<ChatsMonitorFallback />}>
       <ChatsHub activeChannel={null} monitorChannels={data.channels}>
-        <ChatsMonitorPanel {...data} />
+        <ChatsMonitorRealtime>
+          <ChatsMonitorPanel {...data} />
+        </ChatsMonitorRealtime>
       </ChatsHub>
     </Suspense>
   );

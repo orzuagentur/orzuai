@@ -12,6 +12,7 @@ import type {
   TeamAnalyticsMetrics,
 } from "./dashboard.types";
 import type { AiAgentItem } from "./ai-agent.types";
+import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
@@ -110,6 +111,7 @@ export type AiAssistantPageData = {
   agents: AiAgentItem[];
   usage: AiUsageSummary | null;
   salesAgent: SalesAgentSettings;
+  followUpAgent: FollowUpAgentSettings;
 };
 
 export type ChannelAnalyticsActivityPoint = {

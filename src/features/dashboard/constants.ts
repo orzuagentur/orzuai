@@ -9,6 +9,7 @@ import {
   Plug,
   Settings,
   Users,
+  Workflow,
 } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -39,6 +40,12 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "AI Agents",
     href: DASHBOARD_ROUTES.aiAssistant,
     icon: Bot,
+  },
+  {
+    id: "automations",
+    label: "Automations",
+    href: DASHBOARD_ROUTES.automations,
+    icon: Workflow,
   },
   {
     id: "analytics",

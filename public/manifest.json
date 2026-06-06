@@ -1,0 +1,18 @@
+{
+  "name": "OrzuAI",
+  "short_name": "OrzuAI",
+  "description": "AI assistant for small business messaging, CRM, and voice.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

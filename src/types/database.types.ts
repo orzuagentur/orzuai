@@ -628,6 +628,7 @@ export type Database = {
           channel: MessagingChannel;
           status: ConversationStatus;
           internal_note: string | null;
+          assigned_to: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -638,6 +639,7 @@ export type Database = {
           channel?: MessagingChannel;
           status?: ConversationStatus;
           internal_note?: string | null;
+          assigned_to?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -648,6 +650,7 @@ export type Database = {
           channel?: MessagingChannel;
           status?: ConversationStatus;
           internal_note?: string | null;
+          assigned_to?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -905,6 +908,7 @@ export type Database = {
           auto_task_enabled: boolean;
           auto_task_threshold: number;
           sentiment_analysis_enabled: boolean;
+          follow_up_agent_enabled: boolean;
           updated_at: string;
         };
         Insert: {
@@ -915,6 +919,7 @@ export type Database = {
           auto_task_enabled?: boolean;
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
+          follow_up_agent_enabled?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -925,6 +930,7 @@ export type Database = {
           auto_task_enabled?: boolean;
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
+          follow_up_agent_enabled?: boolean;
           updated_at?: string;
         };
         Relationships: [
@@ -965,6 +971,91 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "channel_analytics_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automations: {
+        Row: {
+          id: string;
+          business_id: string;
+          name: string;
+          trigger_type: string;
+          action_type: string;
+          enabled: boolean;
+          config: unknown;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          name: string;
+          trigger_type: string;
+          action_type: string;
+          enabled?: boolean;
+          config?: unknown;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          name?: string;
+          trigger_type?: string;
+          action_type?: string;
+          enabled?: boolean;
+          config?: unknown;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "automations_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_members: {
+        Row: {
+          id: string;
+          business_id: string;
+          user_id: string | null;
+          invited_email: string;
+          role: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          user_id?: string | null;
+          invited_email: string;
+          role?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          user_id?: string | null;
+          invited_email?: string;
+          role?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";

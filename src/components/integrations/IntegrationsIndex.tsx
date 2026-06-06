@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, StoreIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
@@ -18,13 +21,21 @@ type IntegrationsIndexProps = {
 export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {INTEGRATIONS_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {INTEGRATIONS_MESSAGES.indexDescription}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {INTEGRATIONS_MESSAGES.pageTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {INTEGRATIONS_MESSAGES.indexDescription}
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href={DASHBOARD_ROUTES.marketplace}>
+            <StoreIcon className="size-4" />
+            Marketplace
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -37,4 +37,12 @@ export const AI_ASSISTANT_MESSAGES = {
   autoTaskEnabled: "Auto-create CRM task on high-intent messages",
   autoTaskThresholdLabel: "Intent threshold (0–100)",
   sentimentEnabled: "Analyze sentiment on incoming messages",
+  followUpAgentTitle: "Follow-up Agent",
+  followUpAgentDescription:
+    "Automatically send AI follow-ups at 24h and 48h when customers stop replying.",
+  followUpAgentEnabled: "Enable automatic follow-up messages",
+  followUpAgentSaved: "Follow-up agent settings saved.",
+  followUpAgentStats: (count: number) =>
+    count === 1 ? "1 follow-up sent so far." : `${count} follow-ups sent so far.`,
+  save: "Save",
 } as const;
