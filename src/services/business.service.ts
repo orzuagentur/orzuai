@@ -87,6 +87,7 @@ async function bootstrapBusinessDefaults(businessId: string): Promise<void> {
         {
           business_id: businessId,
           channel,
+          provider: "gemini",
           model: getDefaultGeminiModel(),
           language: DEFAULT_AI_LANGUAGE,
           system_prompt: DEFAULT_AI_SYSTEM_PROMPT,

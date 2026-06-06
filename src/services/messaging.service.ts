@@ -3,7 +3,9 @@ import "server-only";
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { generateAssistantReply } from "@/services/gemini.service";
+import type { AiProvider } from "@/lib/ai/constants";
+import { generateAssistantReply } from "@/services/llm.service";
+import { processSalesAgentRules } from "@/services/sales-agent.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -96,6 +98,23 @@ export async function processChannelAutoReply(input: {
     return;
   }
 
+  const { data: conversation } = await admin
+    .from("conversations")
+    .select("contact_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (conversation?.contact_id) {
+    await processSalesAgentRules({
+      admin,
+      businessId,
+      contactId: conversation.contact_id,
+      message: clientMessage,
+    });
+  }
+
+  const provider = (aiSettings.provider ?? "gemini") as AiProvider;
+
   const { data: history } = await admin
     .from("messages")
     .select("sender_type, content")
@@ -109,6 +128,9 @@ export async function processChannelAutoReply(input: {
   );
 
   const reply = await generateAssistantReply({
+    businessId,
+    conversationId,
+    provider,
     model: aiSettings.model,
     systemPrompt: aiSettings.system_prompt,
     language: aiSettings.language,

@@ -24,7 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
-import { generateAssistantReply } from "@/services/gemini.service";
+import { generateAssistantReply } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -398,6 +398,12 @@ async function processWebsiteFormFollowUp(input: {
   const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
 
   const reply = await generateAssistantReply({
+    businessId,
+    conversationId,
+    provider:
+      aiSettings.provider === "openai" || aiSettings.provider === "claude"
+        ? aiSettings.provider
+        : "gemini",
     model: aiSettings.model,
     systemPrompt: aiSettings.system_prompt,
     language: aiSettings.language,

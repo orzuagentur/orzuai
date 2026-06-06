@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { GEMINI_MODEL_IDS } from "@/lib/gemini/constants";
+import { AI_PROVIDERS } from "@/lib/ai/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
 import type {
   AiPerformanceMetrics,
@@ -9,6 +9,7 @@ import type {
   ResponseTimeMetrics,
 } from "./dashboard.types";
 import type { AiAgentItem } from "./ai-agent.types";
+import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
 export type { MessagingChannel };
@@ -19,14 +20,11 @@ export const AI_LANGUAGE_OPTIONS = [
   { value: "Uzbek", label: "O'zbek" },
 ] as const;
 
-const geminiModelSchema = z.enum(GEMINI_MODEL_IDS, {
-  message: "Select a valid Gemini model.",
-});
-
 export const saveChannelAiSettingsSchema = z.object({
   channel: z.enum(["whatsapp", "instagram", "telegram", "website_forms"]),
   aiEnabled: z.boolean(),
-  model: geminiModelSchema,
+  provider: z.enum(AI_PROVIDERS),
+  model: z.string().trim().min(1).max(100),
   language: z.string().trim().min(1, "Language is required.").max(32),
   systemPrompt: z
     .string()
@@ -36,7 +34,8 @@ export const saveChannelAiSettingsSchema = z.object({
 });
 
 export const applyGlobalAiDefaultsSchema = z.object({
-  model: geminiModelSchema,
+  provider: z.enum(AI_PROVIDERS),
+  model: z.string().trim().min(1).max(100),
   language: z.string().trim().min(1).max(32),
   systemPrompt: z.string().trim().min(20).max(4000),
   applyAiEnabled: z.boolean().optional(),
@@ -71,15 +70,23 @@ export type ChannelContactsData = {
   total: number;
 };
 
+export type AiProviderAvailability = {
+  gemini: boolean;
+  openai: boolean;
+  claude: boolean;
+};
+
 export type ChannelAiSettingsData = {
   hasBusiness: boolean;
   channel: MessagingChannel;
   aiEnabled: boolean;
+  provider: string;
   model: string;
   language: string;
   systemPrompt: string;
   isConfigured: boolean;
   geminiConfigured: boolean;
+  providerAvailability: AiProviderAvailability;
   isChannelConnected: boolean;
   defaultModel: string;
 };
@@ -92,11 +99,14 @@ export type AiAssistantChannelEntry = {
 export type AiAssistantPageData = {
   hasBusiness: boolean;
   geminiConfigured: boolean;
+  providerAvailability: AiProviderAvailability;
   defaultModel: string;
   activeChannel: MessagingChannel;
   channelStatuses: IntegrationChannelStatusMap;
   channels: AiAssistantChannelEntry[];
   agents: AiAgentItem[];
+  usage: AiUsageSummary | null;
+  salesAgent: SalesAgentSettings;
 };
 
 export type ChannelAnalyticsActivityPoint = {
@@ -148,6 +158,7 @@ export type AnalyticsPageData = {
   leadSources: LeadSourceEntry[];
   responseTime: ResponseTimeMetrics;
   crmFunnel: CrmFunnelMetrics;
+  aiCost: AiCostMetrics;
 };
 
 export type ChannelWorkspaceSummary = {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Globe2, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AiModelProviderSelect } from "@/components/ai-assistant/AiModelProviderSelect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,33 +18,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { applyGlobalAiDefaultsAction } from "@/features/ai-assistant/actions/apply-global-ai-defaults";
 import { CHANNEL_WORKSPACE_MESSAGES } from "@/features/channel-workspace";
-import { GEMINI_MODEL_OPTIONS, type GeminiModelId } from "@/lib/gemini/constants";
+import type { AiProvider } from "@/lib/ai/constants";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
 import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
 
 type AiGlobalDefaultsCardProps = {
   template: ChannelAiSettingsData;
-  geminiConfigured: boolean;
 };
 
-export function AiGlobalDefaultsCard({
-  template,
-  geminiConfigured,
-}: AiGlobalDefaultsCardProps) {
-  const [model, setModel] = useState<GeminiModelId>(
-    template.model as GeminiModelId,
+export function AiGlobalDefaultsCard({ template }: AiGlobalDefaultsCardProps) {
+  const [provider, setProvider] = useState<AiProvider>(
+    (template.provider as AiProvider) ?? "gemini",
   );
+  const [model, setModel] = useState(template.model);
   const [language, setLanguage] = useState(template.language);
   const [systemPrompt, setSystemPrompt] = useState(template.systemPrompt);
   const [applyAiEnabled, setApplyAiEnabled] = useState(false);
   const [globalAiEnabled, setGlobalAiEnabled] = useState(template.aiEnabled);
   const [isSaving, setIsSaving] = useState(false);
 
+  const providerReady = template.providerAvailability[provider];
+
   async function handleApply() {
     setIsSaving(true);
 
     try {
       const result = await applyGlobalAiDefaultsAction({
+        provider,
         model,
         language,
         systemPrompt,
@@ -73,22 +74,15 @@ export function AiGlobalDefaultsCard({
         <CardDescription>{AI_ASSISTANT_MESSAGES.globalDescription}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="global-ai-model">{CHANNEL_WORKSPACE_MESSAGES.aiModelLabel}</Label>
-          <select
-            id="global-ai-model"
-            className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={model}
-            onChange={(event) => setModel(event.target.value as GeminiModelId)}
-            disabled={!geminiConfigured}
-          >
-            {GEMINI_MODEL_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <AiModelProviderSelect
+          idPrefix="global-ai"
+          provider={provider}
+          model={model}
+          providerAvailability={template.providerAvailability}
+          disabled={isSaving}
+          onProviderChange={setProvider}
+          onModelChange={setModel}
+        />
 
         <div className="space-y-2">
           <Label htmlFor="global-ai-language">
@@ -145,7 +139,7 @@ export function AiGlobalDefaultsCard({
         <Button
           type="button"
           variant="secondary"
-          disabled={isSaving || !geminiConfigured}
+          disabled={isSaving || !providerReady}
           onClick={() => {
             void handleApply();
           }}

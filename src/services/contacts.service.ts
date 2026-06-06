@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
-import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
+import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { listCrmTasksForContact } from "@/services/crm-tasks.service";
-import { generateText } from "@/services/gemini.service";
+import { generateText, getProviderAvailability } from "@/services/llm.service";
 import type {
   ContactActionResult,
   ContactCustomFields,
@@ -665,7 +665,9 @@ export async function generateContactInsights(
     };
   }
 
-  if (!hasGeminiEnv()) {
+  const providers = getProviderAvailability();
+
+  if (!providers.gemini && !providers.openai && !providers.claude) {
     return {
       success: false,
       error: {
@@ -684,6 +686,18 @@ export async function generateContactInsights(
         code: "VALIDATION_ERROR",
         message:
           parsed.error.issues[0]?.message ?? CONTACTS_MESSAGES.insightsFailed,
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: CONTACTS_MESSAGES.insightsFailed,
       },
     };
   }
@@ -727,6 +741,7 @@ export async function generateContactInsights(
   ].join("\n");
 
   const aiResult = await generateText({
+    businessId,
     prompt,
     systemInstruction:
       "You are a CRM analyst. Score lead intent 0-100 and write a concise summary for sales teams. Reply with valid JSON only.",
@@ -749,18 +764,6 @@ export async function generateContactInsights(
       success: false,
       error: {
         code: "AI_FAILED",
-        message: CONTACTS_MESSAGES.insightsFailed,
-      },
-    };
-  }
-
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return {
-      success: false,
-      error: {
-        code: "NO_BUSINESS",
         message: CONTACTS_MESSAGES.insightsFailed,
       },
     };

@@ -16,9 +16,11 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   aiSystemPromptLabel: "Business instructions",
   aiSystemPromptHint:
     "Tell the assistant how to represent your business. Used for incoming messages on this channel.",
-  aiModelLabel: "Gemini model",
+  aiModelLabel: "AI model",
   aiModelLegacyHint:
     "Consider switching to Gemini 2.5 Flash for better speed and quality.",
+  aiProviderMissing:
+    "Selected AI provider is not configured. Add the API key to your environment.",
   aiLanguageLabel: "Reply language",
   aiTestTitle: "Test reply",
   aiTestDescription:

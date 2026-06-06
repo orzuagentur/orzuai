@@ -19,6 +19,8 @@ import type {
   AnalyticsTotals,
   MessagingChannel,
 } from "@/types/channel-workspace.types";
+import { getAiCostMetrics } from "@/services/ai-usage.service";
+import type { AiCostMetrics } from "@/types/ai-usage.types";
 import type {
   ActivityDataPoint,
   AiPerformanceMetrics,
@@ -63,6 +65,15 @@ const EMPTY_AI_PERFORMANCE: AiPerformanceMetrics = {
   estimatedMinutesSaved: 0,
   aiReplies: 0,
   humanReplies: 0,
+};
+
+const EMPTY_AI_COST: AiCostMetrics = {
+  totalCostUsd: 0,
+  monthCostUsd: 0,
+  totalReplies: 0,
+  monthReplies: 0,
+  avgCostPerReplyUsd: 0,
+  byProvider: [],
 };
 
 function createEmptyOverview(): DashboardOverview {
@@ -495,16 +506,18 @@ export async function getAnalyticsPageData(
       leadSources: [],
       responseTime: EMPTY_RESPONSE_TIME,
       crmFunnel: EMPTY_CRM_FUNNEL,
+      aiCost: EMPTY_AI_COST,
     };
   }
 
-  const [channelStatuses, aiPerformance, leadSources, responseTime, crmFunnel] =
+  const [channelStatuses, aiPerformance, leadSources, responseTime, crmFunnel, aiCost] =
     await Promise.all([
       getChannelConnectionStatuses(businessId),
       getAiPerformanceMetrics(businessId),
       getLeadSourceAttribution(businessId),
       getResponseTimeMetrics(businessId),
       getCrmFunnelMetrics(businessId),
+      getAiCostMetrics(businessId),
     ]);
 
   const channels = await Promise.all(
@@ -533,5 +546,6 @@ export async function getAnalyticsPageData(
     leadSources,
     responseTime,
     crmFunnel,
+    aiCost,
   };
 }

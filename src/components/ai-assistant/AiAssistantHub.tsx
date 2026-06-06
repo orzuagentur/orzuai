@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 import { AiAgentBuilderPanel } from "@/components/ai-assistant/AiAgentBuilderPanel";
 import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaultsCard";
+import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
+import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
 import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -103,12 +105,13 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
         </aside>
 
         <div className="min-w-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
+          <AiUsageLimitsPanel usage={data.usage} />
+
           {templateEntry ? (
-            <AiGlobalDefaultsCard
-              template={templateEntry.settings}
-              geminiConfigured={data.geminiConfigured}
-            />
+            <AiGlobalDefaultsCard template={templateEntry.settings} />
           ) : null}
+
+          <SalesAgentPanel settings={data.salesAgent} />
 
           <AiAgentBuilderPanel
             agents={data.agents}

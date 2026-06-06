@@ -91,6 +91,7 @@ export type Database = {
           address: string | null;
           website: string | null;
           logo_url: string | null;
+          subscription_plan: string;
           created_at: string;
           updated_at: string;
         };
@@ -104,6 +105,7 @@ export type Database = {
           address?: string | null;
           website?: string | null;
           logo_url?: string | null;
+          subscription_plan?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -117,6 +119,7 @@ export type Database = {
           address?: string | null;
           website?: string | null;
           logo_url?: string | null;
+          subscription_plan?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -788,6 +791,7 @@ export type Database = {
           id: string;
           business_id: string;
           channel: MessagingChannel;
+          provider: string;
           model: string;
           language: string;
           system_prompt: string;
@@ -799,6 +803,7 @@ export type Database = {
           id?: string;
           business_id: string;
           channel?: MessagingChannel;
+          provider?: string;
           model: string;
           language: string;
           system_prompt: string;
@@ -810,6 +815,7 @@ export type Database = {
           id?: string;
           business_id?: string;
           channel?: MessagingChannel;
+          provider?: string;
           model?: string;
           language?: string;
           system_prompt?: string;
@@ -822,6 +828,89 @@ export type Database = {
             foreignKeyName: "ai_settings_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_usage_logs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string | null;
+          provider: string;
+          model: string;
+          input_tokens: number;
+          output_tokens: number;
+          estimated_cost_usd: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id?: string | null;
+          provider: string;
+          model: string;
+          input_tokens?: number;
+          output_tokens?: number;
+          estimated_cost_usd?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string | null;
+          provider?: string;
+          model?: string;
+          input_tokens?: number;
+          output_tokens?: number;
+          estimated_cost_usd?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_usage_logs_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_ai_config: {
+        Row: {
+          business_id: string;
+          sales_agent_enabled: boolean;
+          bant_threshold: number;
+          auto_qualify_pipeline: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          sales_agent_enabled?: boolean;
+          bant_threshold?: number;
+          auto_qualify_pipeline?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          sales_agent_enabled?: boolean;
+          bant_threshold?: number;
+          auto_qualify_pipeline?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_ai_config_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },

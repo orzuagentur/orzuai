@@ -66,6 +66,14 @@ export function hasGeminiEnv(): boolean {
   return Boolean(process.env[ENV_KEYS.GEMINI_API_KEY]?.trim());
 }
 
+export function hasOpenAiEnv(): boolean {
+  return Boolean(process.env[ENV_KEYS.OPENAI_API_KEY]?.trim());
+}
+
+export function hasClaudeEnv(): boolean {
+  return Boolean(process.env[ENV_KEYS.ANTHROPIC_API_KEY]?.trim());
+}
+
 export function getGoogleClientId(): string | undefined {
   return process.env[ENV_KEYS.GOOGLE_CLIENT_ID]?.trim() || undefined;
 }

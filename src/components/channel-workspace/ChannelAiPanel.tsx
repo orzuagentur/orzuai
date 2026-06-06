@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Bot, Loader2Icon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AiModelProviderSelect } from "@/components/ai-assistant/AiModelProviderSelect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,11 +29,7 @@ import {
   buildIntegrationActivateHref,
   type IntegrationChannelId,
 } from "@/features/integrations";
-import {
-  GEMINI_MODEL_OPTIONS,
-  isRecommendedGeminiModel,
-  type GeminiModelId,
-} from "@/lib/gemini/constants";
+import type { AiProvider } from "@/lib/ai/constants";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
 import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
 
@@ -44,13 +41,18 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
   const router = useRouter();
   const label = getChannelLabel(data.channel);
   const [aiEnabled, setAiEnabled] = useState(data.aiEnabled);
-  const [model, setModel] = useState<GeminiModelId>(data.model as GeminiModelId);
+  const [provider, setProvider] = useState<AiProvider>(
+    (data.provider as AiProvider) ?? "gemini",
+  );
+  const [model, setModel] = useState(data.model);
   const [language, setLanguage] = useState(data.language);
   const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt);
   const [testMessage, setTestMessage] = useState("");
   const [testReply, setTestReply] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+
+  const providerReady = data.providerAvailability[provider];
 
   if (!data.hasBusiness) {
     return null;
@@ -63,6 +65,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
       const result = await saveChannelAiSettingsAction({
         channel: data.channel,
         aiEnabled,
+        provider,
         model,
         language,
         systemPrompt,
@@ -93,6 +96,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
       await saveChannelAiSettingsAction({
         channel: data.channel,
         aiEnabled,
+        provider,
         model,
         language,
         systemPrompt,
@@ -113,8 +117,6 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
       setIsTesting(false);
     }
   }
-
-  const selectedModel = GEMINI_MODEL_OPTIONS.find((option) => option.id === model);
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -144,9 +146,9 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
           <CardDescription>{CHANNEL_WORKSPACE_MESSAGES.aiDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {!data.geminiConfigured ? (
+          {!providerReady ? (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {CHANNEL_WORKSPACE_MESSAGES.aiGeminiMissing}
+              {CHANNEL_WORKSPACE_MESSAGES.aiProviderMissing}
             </p>
           ) : null}
 
@@ -162,41 +164,22 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
             <Button
               type="button"
               variant={aiEnabled ? "default" : "outline"}
-              disabled={isSaving || !data.geminiConfigured}
+              disabled={isSaving || !providerReady}
               onClick={() => setAiEnabled((value) => !value)}
             >
               {aiEnabled ? "Enabled" : "Disabled"}
             </Button>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`ai-model-${data.channel}`}>
-              {CHANNEL_WORKSPACE_MESSAGES.aiModelLabel}
-            </Label>
-            <select
-              id={`ai-model-${data.channel}`}
-              className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={model}
-              onChange={(event) => setModel(event.target.value as GeminiModelId)}
-              disabled={!data.geminiConfigured}
-            >
-              {GEMINI_MODEL_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {selectedModel ? (
-              <p className="text-xs text-muted-foreground">
-                {selectedModel.description}
-              </p>
-            ) : null}
-            {!isRecommendedGeminiModel(model) ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                {CHANNEL_WORKSPACE_MESSAGES.aiModelLegacyHint}
-              </p>
-            ) : null}
-          </div>
+          <AiModelProviderSelect
+            idPrefix={`ai-${data.channel}`}
+            provider={provider}
+            model={model}
+            providerAvailability={data.providerAvailability}
+            disabled={isSaving}
+            onProviderChange={setProvider}
+            onModelChange={setModel}
+          />
 
           <div className="space-y-2">
             <Label htmlFor={`ai-language-${data.channel}`}>
@@ -244,7 +227,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
 
           <Button
             type="button"
-            disabled={isSaving || !data.geminiConfigured}
+            disabled={isSaving || !providerReady}
             onClick={() => {
               void handleSave();
             }}
@@ -277,12 +260,12 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
             value={testMessage}
             onChange={(event) => setTestMessage(event.target.value)}
             placeholder={CHANNEL_WORKSPACE_MESSAGES.aiTestPlaceholder}
-            disabled={!data.geminiConfigured || isTesting}
+            disabled={!providerReady || isTesting}
           />
           <Button
             type="button"
             variant="secondary"
-            disabled={!data.geminiConfigured || isTesting || !testMessage.trim()}
+            disabled={!providerReady || isTesting || !testMessage.trim()}
             onClick={() => {
               void handleTest();
             }}

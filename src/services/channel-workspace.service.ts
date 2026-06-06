@@ -12,6 +12,7 @@ import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
 } from "@/features/integrations/channel-status";
+import { resolveAiModel, type AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { resolveGeminiModel } from "@/lib/gemini/constants";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -19,7 +20,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { generateAssistantReply } from "@/services/gemini.service";
+import {
+  generateAssistantReply,
+  getProviderAvailability,
+  isProviderConfigured,
+} from "@/services/llm.service";
 import { getInstagramConnection } from "@/services/instagram.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { getTelegramConnection } from "@/services/telegram.service";
@@ -96,11 +101,20 @@ async function ensureChannelAiSettings(
   await supabase.from("ai_settings").insert({
     business_id: businessId,
     channel,
+    provider: "gemini",
     model: getDefaultGeminiModel(),
     language: DEFAULT_AI_LANGUAGE,
     system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
     ai_enabled: false,
   });
+}
+
+function resolveStoredProvider(value: string | null | undefined): AiProvider {
+  if (value === "openai" || value === "claude" || value === "gemini") {
+    return value;
+  }
+
+  return "gemini";
 }
 
 async function syncStoredModelIfNeeded(
@@ -129,16 +143,20 @@ export async function getChannelAiSettingsForBusiness(
 ): Promise<ChannelAiSettingsData> {
   const defaultModel = getDefaultGeminiModel();
 
+  const providerAvailability = getProviderAvailability();
+
   if (!hasSupabaseEnv()) {
     return {
       hasBusiness: true,
       channel,
       aiEnabled: false,
+      provider: "gemini",
       model: defaultModel,
       language: DEFAULT_AI_LANGUAGE,
       systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
       isConfigured: false,
       geminiConfigured: hasGeminiEnv(),
+      providerAvailability,
       isChannelConnected,
       defaultModel,
     };
@@ -149,27 +167,34 @@ export async function getChannelAiSettingsForBusiness(
 
   const { data } = await supabase
     .from("ai_settings")
-    .select("ai_enabled, model, language, system_prompt")
+    .select("ai_enabled, provider, model, language, system_prompt")
     .eq("business_id", businessId)
     .eq("channel", channel)
     .maybeSingle();
 
-  const model = await syncStoredModelIfNeeded(
+  const provider = resolveStoredProvider(data?.provider);
+  const geminiModel = await syncStoredModelIfNeeded(
     supabase,
     businessId,
     channel,
-    data?.model,
+    provider === "gemini" ? data?.model : data?.model,
   );
+  const model =
+    provider === "gemini"
+      ? geminiModel
+      : resolveAiModel(provider, data?.model);
 
   return {
     hasBusiness: true,
     channel,
     aiEnabled: data?.ai_enabled ?? false,
+    provider,
     model,
     language: data?.language ?? DEFAULT_AI_LANGUAGE,
     systemPrompt: data?.system_prompt ?? DEFAULT_AI_SYSTEM_PROMPT,
     isConfigured: Boolean(data),
     geminiConfigured: hasGeminiEnv(),
+    providerAvailability,
     isChannelConnected,
     defaultModel,
   };
@@ -336,11 +361,13 @@ export async function getChannelAiSettings(
       hasBusiness: false,
       channel,
       aiEnabled: false,
+      provider: "gemini",
       model: getDefaultGeminiModel(),
       language: DEFAULT_AI_LANGUAGE,
       systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
       isConfigured: false,
       geminiConfigured: hasGeminiEnv(),
+      providerAvailability: getProviderAvailability(),
       isChannelConnected: false,
       defaultModel: getDefaultGeminiModel(),
     };
@@ -376,13 +403,20 @@ export async function saveChannelAiSettings(
   const supabase = await createClient();
   await ensureChannelAiSettings(supabase, businessId, parsed.data.channel);
 
+  const provider = parsed.data.provider;
+  const model =
+    provider === "gemini"
+      ? resolveGeminiModel(parsed.data.model)
+      : resolveAiModel(provider, parsed.data.model);
+
   const { error } = await supabase
     .from("ai_settings")
     .update({
       ai_enabled: parsed.data.aiEnabled,
+      provider,
       language: parsed.data.language,
       system_prompt: parsed.data.systemPrompt,
-      model: resolveGeminiModel(parsed.data.model),
+      model,
     })
     .eq("business_id", businessId)
     .eq("channel", parsed.data.channel);
@@ -408,13 +442,6 @@ export async function testChannelAiReply(
     };
   }
 
-  if (!hasGeminiEnv()) {
-    return {
-      success: false,
-      message: "Gemini API is not configured. Add GEMINI_API_KEY to your environment.",
-    };
-  }
-
   const businessId = await getOwnedBusinessId();
 
   if (!businessId || !hasSupabaseEnv()) {
@@ -424,7 +451,7 @@ export async function testChannelAiReply(
   const supabase = await createClient();
   const { data: settings } = await supabase
     .from("ai_settings")
-    .select("model, language, system_prompt")
+    .select("provider, model, language, system_prompt")
     .eq("business_id", businessId)
     .eq("channel", parsed.data.channel)
     .maybeSingle();
@@ -433,10 +460,21 @@ export async function testChannelAiReply(
     return { success: false, message: "Save AI settings for this channel first." };
   }
 
+  const provider = resolveStoredProvider(settings.provider);
+
+  if (!isProviderConfigured(provider)) {
+    return {
+      success: false,
+      message: `${provider} API is not configured for this environment.`,
+    };
+  }
+
   const admin = createAdminClient();
   const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
 
   const reply = await generateAssistantReply({
+    businessId,
+    provider,
     model: settings.model,
     systemPrompt: settings.system_prompt,
     language: settings.language,

@@ -88,6 +88,7 @@ export function OnboardingWizard({
       const result = await saveChannelAiSettingsAction({
         channel: aiSettings.channel,
         aiEnabled: true,
+        provider: "gemini",
         model: resolveGeminiModel(aiSettings.model) as GeminiModelId,
         language: aiSettings.language,
         systemPrompt: aiSettings.systemPrompt,

@@ -8,7 +8,7 @@ import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sendInstagramChatMessage } from "@/services/instagram.service";
-import { generateAssistantReply } from "@/services/gemini.service";
+import { generateAssistantReply } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -929,7 +929,7 @@ export async function suggestConversationReply(
   const supabase = await createClient();
   const { data: settings } = await supabase
     .from("ai_settings")
-    .select("model, language, system_prompt")
+    .select("provider, model, language, system_prompt")
     .eq("business_id", businessId)
     .eq("channel", conversation.channel)
     .maybeSingle();
@@ -951,6 +951,12 @@ export async function suggestConversationReply(
   );
 
   const reply = await generateAssistantReply({
+    businessId,
+    conversationId: parsed.data.conversationId,
+    provider:
+      settings.provider === "openai" || settings.provider === "claude"
+        ? settings.provider
+        : "gemini",
     model: settings.model,
     systemPrompt: settings.system_prompt,
     language: settings.language,

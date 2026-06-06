@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BarChart3Icon } from "lucide-react";
 
+import { AiAnalyticsAssistantPanel } from "@/components/analytics/AiAnalyticsAssistantPanel";
+import { AiCostPanel } from "@/components/analytics/AiCostPanel";
 import { AiPerformancePanel } from "@/components/analytics/AiPerformancePanel";
 import { CrmFunnelPanel } from "@/components/analytics/CrmFunnelPanel";
 import { LeadSourcePanel } from "@/components/analytics/LeadSourcePanel";
@@ -171,7 +173,10 @@ export function AnalyticsHub({ data }: AnalyticsHubProps) {
             <LeadSourcePanel sources={data.leadSources} />
             <ResponseTimePanel metrics={data.responseTime} />
             <CrmFunnelPanel funnel={data.crmFunnel} />
+            <AiCostPanel metrics={data.aiCost} />
           </div>
+
+          <AiAnalyticsAssistantPanel />
 
           {activeEntry?.isChannelConnected ? (
             <ChannelAnalyticsPanel data={activeEntry.analytics} />

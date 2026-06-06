@@ -9,7 +9,11 @@ import {
 } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
+import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
+import { getAiUsageSummary } from "@/services/ai-usage.service";
+import { getProviderAvailability } from "@/services/llm.service";
+import { getSalesAgentSettings } from "@/services/sales-agent.service";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -59,17 +63,26 @@ export async function getAiAssistantPageData(
     return {
       hasBusiness: false,
       geminiConfigured: hasGeminiEnv(),
+      providerAvailability: getProviderAvailability(),
       defaultModel,
       activeChannel,
       channelStatuses: {},
       channels: [],
       agents: [],
+      usage: null,
+      salesAgent: {
+        salesAgentEnabled: false,
+        bantThreshold: 70,
+        autoQualifyPipeline: true,
+      },
     };
   }
 
-  const [channelStatuses, agents] = await Promise.all([
+  const [channelStatuses, agents, usage, salesAgent] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     listAiAgents(),
+    getAiUsageSummary(),
+    getSalesAgentSettings(businessId),
   ]);
 
   const channels = await Promise.all(
@@ -86,11 +99,14 @@ export async function getAiAssistantPageData(
   return {
     hasBusiness: true,
     geminiConfigured: hasGeminiEnv(),
+    providerAvailability: getProviderAvailability(),
     defaultModel,
     activeChannel,
     channelStatuses,
     channels,
     agents,
+    usage,
+    salesAgent,
   };
 }
 
@@ -126,6 +142,7 @@ export async function applyGlobalAiDefaults(
       await supabase.from("ai_settings").insert({
         business_id: businessId,
         channel,
+        provider: parsed.data.provider,
         model: parsed.data.model,
         language: parsed.data.language,
         system_prompt: parsed.data.systemPrompt,
@@ -137,11 +154,13 @@ export async function applyGlobalAiDefaults(
   }
 
   const updatePayload: {
+    provider: AiProvider;
     model: string;
     language: string;
     system_prompt: string;
     ai_enabled?: boolean;
   } = {
+    provider: parsed.data.provider,
     model: parsed.data.model,
     language: parsed.data.language,
     system_prompt: parsed.data.systemPrompt,

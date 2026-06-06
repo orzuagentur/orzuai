@@ -23,4 +23,15 @@ export const AI_ASSISTANT_MESSAGES = {
   agentDeleted: "AI agent deleted.",
   saveFailed: "Unable to save agent. Please try again.",
   deleteFailed: "Unable to delete agent. Please try again.",
+  usageTitle: "AI usage limits",
+  usageDescription:
+    "Monthly AI reply quota for your subscription plan. Resets on the first day of each month.",
+  salesAgentTitle: "AI Sales Agent (BANT)",
+  salesAgentDescription:
+    "Score Budget, Authority, Need, and Timeline on incoming messages. High scores can auto-move leads to Qualified.",
+  salesAgentEnabled: "Enable BANT qualification on new customer messages",
+  bantThresholdLabel: "Qualification threshold (0–100)",
+  autoQualifyLabel: "Auto-move to Qualified pipeline when score exceeds threshold",
+  salesAgentSave: "Save sales agent rules",
+  salesAgentSaved: "Sales agent rules saved.",
 } as const;

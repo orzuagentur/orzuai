@@ -3,7 +3,7 @@ import "server-only";
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendInstagramChatMessage } from "@/services/instagram.service";
-import { generateText } from "@/services/gemini.service";
+import { generateText } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -66,6 +66,7 @@ async function isChannelConnected(
 }
 
 async function generateFollowUpMessage(input: {
+  businessId: string;
   contactName: string;
   channel: MessagingChannel;
   lastOutboundContent: string;
@@ -76,6 +77,7 @@ async function generateFollowUpMessage(input: {
   }
 
   const result = await generateText({
+    businessId: input.businessId,
     prompt: [
       `Write a short follow-up #${input.followUpDay} for ${input.channel}.`,
       `Customer name: ${input.contactName}`,
@@ -308,6 +310,7 @@ export async function runDueConversationFollowUps(): Promise<{
 
   for (const candidate of candidates) {
     const content = await generateFollowUpMessage({
+      businessId: candidate.businessId,
       contactName: candidate.contactName,
       channel: candidate.channel,
       lastOutboundContent: candidate.lastOutboundContent,

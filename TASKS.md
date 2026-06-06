@@ -371,11 +371,11 @@ Progress: **100%** (core hub + channels)
 * [x] **P0** AI Follow-Up Agent: cron 24h/48h auto follow-up messages
 * [x] **P1** AI suggest reply в Inbox sidebar
 * [x] **P1** Agent builder UI: prompt + channels + triggers
-* [ ] **P1** Multi-model support: Gemini + OpenAI + Claude (selector)
-* [ ] **P1** AI usage limits per subscription plan
-* [ ] **P1** AI cost tracking ($ per conversation)
-* [ ] **P2** AI Sales Agent: BANT qualification + routing rules
-* [ ] **P2** AI Analytics Assistant: natural language insights («Why did conversions drop?»)
+* [x] **P1** Multi-model support: Gemini + OpenAI + Claude (selector)
+* [x] **P1** AI usage limits per subscription plan
+* [x] **P1** AI cost tracking ($ per conversation)
+* [x] **P2** AI Sales Agent: BANT qualification + routing rules
+* [x] **P2** AI Analytics Assistant: natural language insights («Why did conversions drop?»)
 * [ ] **P2** Sentiment analysis на входящих сообщениях
 * [x] **P2** AI Agent templates library (sales, support, booking)
 * [ ] **P3** AI Call Agent (voice): Retell AI / Vapi / Twilio integration

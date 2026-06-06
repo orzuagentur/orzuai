@@ -5,7 +5,7 @@ import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { generateText } from "@/services/gemini.service";
+import { generateText } from "@/services/llm.service";
 import { z } from "zod";
 
 export const conversationCrmAssistantSchema = z.object({
@@ -97,6 +97,7 @@ export async function getConversationCrmAssistant(
 
   if (hasGeminiEnv() && lastClientMessage) {
     const aiResult = await generateText({
+      businessId: business.id,
       prompt: [
         "Suggest one concrete next action for a sales/support agent.",
         `Contact: ${contact.name}`,

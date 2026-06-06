@@ -35,4 +35,14 @@ export const ANALYTICS_MESSAGES = {
   crmFunnelDescription: "Pipeline distribution and stage conversion rates.",
   newToQualified: "New → Qualified",
   qualifiedToWon: "Qualified → Won",
+  aiCostTitle: "AI cost tracking",
+  aiCostDescription: "Estimated spend per AI reply based on provider token usage.",
+  aiCostMonth: "This month",
+  aiCostPerReply: "Avg per reply",
+  aiCostEmpty: "No AI usage logged yet. Costs appear after the first AI reply.",
+  assistantTitle: "AI Analytics Assistant",
+  assistantDescription:
+    "Ask natural-language questions about conversions, channels, and AI performance.",
+  assistantPlaceholder: "e.g. Why did conversions drop this week?",
+  assistantAsk: "Ask AI",
 } as const;
