@@ -74,6 +74,21 @@ export function hasClaudeEnv(): boolean {
   return Boolean(process.env[ENV_KEYS.ANTHROPIC_API_KEY]?.trim());
 }
 
+export function hasTwilioEnv(): boolean {
+  return Boolean(
+    process.env[ENV_KEYS.TWILIO_ACCOUNT_SID]?.trim() &&
+      process.env[ENV_KEYS.TWILIO_AUTH_TOKEN]?.trim(),
+  );
+}
+
+export function hasRetellEnv(): boolean {
+  return Boolean(process.env[ENV_KEYS.RETELL_API_KEY]?.trim());
+}
+
+export function hasVapiEnv(): boolean {
+  return Boolean(process.env[ENV_KEYS.VAPI_API_KEY]?.trim());
+}
+
 export function getGoogleClientId(): string | undefined {
   return process.env[ENV_KEYS.GOOGLE_CLIENT_ID]?.trim() || undefined;
 }

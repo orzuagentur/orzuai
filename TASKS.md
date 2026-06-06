@@ -378,7 +378,7 @@ Progress: **100%** (core hub + channels)
 * [x] **P2** AI Analytics Assistant: natural language insights («Why did conversions drop?»)
 * [x] **P2** Sentiment analysis на входящих сообщениях
 * [x] **P2** AI Agent templates library (sales, support, booking)
-* [ ] **P3** AI Call Agent (voice): Retell AI / Vapi / Twilio integration
+* [x] **P3** AI Call Agent (voice): Retell AI / Vapi / Twilio integration
 * [ ] **P3** AI Instagram comment replies (не только DM)
 
 ---
@@ -415,7 +415,7 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Integrations — CRM, календари, платежи
 
-* [ ] **P1** Stripe (payments + subscription billing)
+* [x] **P1** Stripe (payments + subscription billing)
 * [ ] **P1** HubSpot sync (contacts, deals)
 * [ ] **P1** Pipedrive sync
 * [ ] **P1** Google Calendar (booking from chat)
@@ -498,7 +498,7 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Settings — брендинг и API
 
-* [ ] **P1** Billing section: plan, usage, invoices (Stripe Customer Portal)
+* [x] **P1** Billing section: plan, usage, invoices (Stripe Customer Portal)
 * [ ] **P2** White-label: custom logo, colors, domain (agency mode)
 * [ ] **P2** API keys management (generate, revoke, scopes)
 * [ ] **P2** Outbound webhook configuration UI
@@ -509,12 +509,12 @@ Progress: **100%** (core hub + channels)
 
 ## Категория: Billing и монетизация
 
-* [ ] **P0** Stripe integration: subscription plans (Free / Starter / Pro / Agency)
+* [x] **P0** Stripe integration: subscription plans (Free / Starter / Pro / Agency)
 * [ ] **P0** Usage-based AI pricing (messages / tokens overage)
-* [ ] **P0** Subscription page: plan comparison, upgrade, cancel
+* [x] **P0** Subscription page: plan comparison, upgrade, cancel
 * [ ] **P1** Free trial (14 days Pro)
 * [ ] **P1** Invoice history + PDF download
-* [ ] **P1** Payment method management
+* [x] **P1** Payment method management
 * [ ] **P2** Agency / reseller pricing tier
 * [ ] **P2** Annual billing discount
 * [ ] **P3** Marketplace revenue share (automations, AI agents)
@@ -546,8 +546,8 @@ Progress: **100%** (core hub + channels)
 * [ ] **P1** Module: **Automations** (visual workflow builder)
 * [ ] **P1** Module: **Analytics V2** (AI + CRM + business metrics)
 * [ ] **P1** Module: **Team** (members, roles, routing)
-* [ ] **P1** Module: **Billing** (Stripe full)
-* [ ] **P2** Module: **Calls** (AI voice agent)
+* [x] **P1** Module: **Billing** (Stripe full)
+* [x] **P2** Module: **Calls** (AI voice agent)
 * [ ] **P2** Module: **Integrations Marketplace**
 * [ ] **P3** Module: **Mobile App** (PWA → React Native)
 

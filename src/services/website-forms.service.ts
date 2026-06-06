@@ -603,6 +603,18 @@ export async function ingestWebsiteFormSubmission(
     clientMessage: body,
   });
 
+  if (phoneNumber && phoneNumber !== "website-form-lead") {
+    const { scheduleOutboundCallAfterOrder } = await import(
+      "@/services/voice-agent.service"
+    );
+    await scheduleOutboundCallAfterOrder({
+      admin,
+      businessId,
+      contactId,
+      phoneNumber,
+    });
+  }
+
   revalidateWebsiteFormsPaths();
   return { success: true };
 }

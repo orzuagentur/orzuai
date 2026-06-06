@@ -3,6 +3,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  CreditCard,
   LayoutDashboard,
   MessageSquare,
   Plug,
@@ -56,6 +57,12 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "Knowledge",
     href: DASHBOARD_ROUTES.knowledgeBase,
     icon: BookOpen,
+  },
+  {
+    id: "subscription",
+    label: "Billing",
+    href: DASHBOARD_ROUTES.subscription,
+    icon: CreditCard,
   },
   {
     id: "settings",

@@ -7,6 +7,7 @@ import { AiAgentBuilderPanel } from "@/components/ai-assistant/AiAgentBuilderPan
 import { AiGlobalDefaultsCard } from "@/components/ai-assistant/AiGlobalDefaultsCard";
 import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
 import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
+import { VoiceAgentPanel } from "@/components/ai-assistant/VoiceAgentPanel";
 import { ChannelAiPanel } from "@/components/channel-workspace/ChannelAiPanel";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,11 @@ export function AiAssistantHub({ data }: AiAssistantHubProps) {
           ) : null}
 
           <SalesAgentPanel settings={data.salesAgent} />
+
+          <VoiceAgentPanel
+            settings={data.voiceAgent}
+            recentCalls={data.voiceCalls}
+          />
 
           <AiAgentBuilderPanel
             agents={data.agents}

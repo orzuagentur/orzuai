@@ -92,6 +92,9 @@ export type Database = {
           website: string | null;
           logo_url: string | null;
           subscription_plan: string;
+          subscription_status: string;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -106,6 +109,9 @@ export type Database = {
           website?: string | null;
           logo_url?: string | null;
           subscription_plan?: string;
+          subscription_status?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -120,6 +126,9 @@ export type Database = {
           website?: string | null;
           logo_url?: string | null;
           subscription_plan?: string;
+          subscription_status?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -959,6 +968,167 @@ export type Database = {
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_agent_config: {
+        Row: {
+          business_id: string;
+          enabled: boolean;
+          provider: string;
+          phone_number: string | null;
+          outbound_enabled: boolean;
+          inbound_enabled: boolean;
+          callback_after_order: boolean;
+          callback_delay_minutes: number;
+          outbound_script: string;
+          inbound_greeting: string;
+          retell_agent_id: string | null;
+          vapi_assistant_id: string | null;
+          twilio_phone_sid: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          enabled?: boolean;
+          provider?: string;
+          phone_number?: string | null;
+          outbound_enabled?: boolean;
+          inbound_enabled?: boolean;
+          callback_after_order?: boolean;
+          callback_delay_minutes?: number;
+          outbound_script?: string;
+          inbound_greeting?: string;
+          retell_agent_id?: string | null;
+          vapi_assistant_id?: string | null;
+          twilio_phone_sid?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          enabled?: boolean;
+          provider?: string;
+          phone_number?: string | null;
+          outbound_enabled?: boolean;
+          inbound_enabled?: boolean;
+          callback_after_order?: boolean;
+          callback_delay_minutes?: number;
+          outbound_script?: string;
+          inbound_greeting?: string;
+          retell_agent_id?: string | null;
+          vapi_assistant_id?: string | null;
+          twilio_phone_sid?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_agent_config_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_call_logs: {
+        Row: {
+          id: string;
+          business_id: string;
+          contact_id: string | null;
+          direction: string;
+          phone_number: string;
+          status: string;
+          provider: string;
+          external_call_id: string | null;
+          trigger_reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          contact_id?: string | null;
+          direction: string;
+          phone_number: string;
+          status?: string;
+          provider: string;
+          external_call_id?: string | null;
+          trigger_reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          contact_id?: string | null;
+          direction?: string;
+          phone_number?: string;
+          status?: string;
+          provider?: string;
+          external_call_id?: string | null;
+          trigger_reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_logs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_logs_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_call_queue: {
+        Row: {
+          id: string;
+          business_id: string;
+          contact_id: string | null;
+          phone_number: string;
+          trigger_reason: string;
+          execute_at: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          contact_id?: string | null;
+          phone_number: string;
+          trigger_reason?: string;
+          execute_at: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          contact_id?: string | null;
+          phone_number?: string;
+          trigger_reason?: string;
+          execute_at?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_queue_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_queue_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
             referencedColumns: ["id"];
           },
         ];

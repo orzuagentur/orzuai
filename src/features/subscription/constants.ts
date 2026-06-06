@@ -1,0 +1,50 @@
+export const SUBSCRIPTION_MESSAGES = {
+  pageTitle: "Subscription & Billing",
+  pageDescription:
+    "Choose a plan, add a payment method, and manage invoices through Stripe.",
+  currentPlan: "Current plan",
+  status: "Status",
+  usage: "AI usage this month",
+  upgrade: "Upgrade plan",
+  manageBilling: "Manage payment method & invoices",
+  stripeMissing:
+    "Stripe is not configured yet. Add STRIPE_SECRET_KEY and price IDs to enable billing.",
+  checkoutFailed: "Unable to start checkout. Please try again.",
+  portalFailed: "Unable to open billing portal. Please try again.",
+  freePlanNote: "Free plan — no payment method required.",
+  successTitle: "Subscription updated",
+  successDescription: "Your plan changes may take a moment to appear.",
+  canceledTitle: "Checkout canceled",
+  canceledDescription: "No charges were made.",
+} as const;
+
+export const VOICE_AGENT_MESSAGES = {
+  panelTitle: "AI Voice Agent",
+  panelDescription:
+    "Outbound callback after orders and inbound AI answers when customers call your number.",
+  enabled: "Enable voice agent",
+  provider: "Voice provider",
+  phoneNumber: "Business phone number (E.164, e.g. +12025550123)",
+  outboundEnabled: "Outbound: call customers back after order / high-intent lead",
+  inboundEnabled: "Inbound: AI answers when customer calls your number",
+  callbackAfterOrder: "Auto-call after website form order (with delay)",
+  callbackDelay: "Delay before callback (minutes)",
+  outboundScript: "Outbound call script (spoken by AI)",
+  inboundGreeting: "Inbound greeting (when customer calls you)",
+  retellAgentId: "Retell agent ID",
+  vapiAssistantId: "Vapi assistant ID",
+  twilioPhoneSid: "Twilio phone number SID (optional)",
+  save: "Save voice settings",
+  saved: "Voice agent settings saved.",
+  saveFailed: "Unable to save voice settings.",
+  providerMissing:
+    "Provider API keys are not configured in server environment.",
+  webhookInbound: "Inbound webhook (set in Twilio / Retell / Vapi)",
+  webhookOutbound: "Outbound TwiML URL (Twilio)",
+  recentCalls: "Recent calls",
+  noCalls: "No voice calls logged yet.",
+  testCall: "Test outbound call",
+  testPhone: "Test phone number",
+  testCallSent: "Test call queued.",
+  testCallFailed: "Unable to place test call.",
+} as const;
