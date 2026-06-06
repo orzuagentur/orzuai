@@ -41,4 +41,15 @@ export const VOICE_MESSAGES = {
   outboundEnabled: "Call customers back",
   aiAssistantHint: "AI Voice is configured in Integrations.",
   openIntegrations: "Open AI Voice integration",
+  aiTitle: "AI conversation",
+  aiDescription:
+    "AI listens and responds on calls using your Knowledge Base and business instructions.",
+  aiEnabled: "AI answers on phone calls",
+  aiActive: "AI voice assistant active",
+  aiInactive: "Static script only (AI off)",
+  aiMissing:
+    "Add GEMINI_API_KEY (or OpenAI / Claude) to enable AI voice conversations.",
+  aiSaved: "AI voice setting updated.",
+  aiSaveFailed: "Unable to update AI voice setting.",
+  knowledgeHint: "Improve answers in Knowledge Base and AI Agents settings.",
 } as const;

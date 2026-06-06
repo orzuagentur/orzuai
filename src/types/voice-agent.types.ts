@@ -26,6 +26,7 @@ export type VoiceConnectionData = {
 
 export type VoiceConnectConfig = {
   isConfigured: boolean;
+  aiConfigured: boolean;
 };
 
 export const saveVoiceAgentSettingsSchema = z.object({
@@ -41,6 +42,9 @@ export const saveVoiceAgentSettingsSchema = z.object({
   retellAgentId: z.string().trim().max(128).optional().default(""),
   vapiAssistantId: z.string().trim().max(128).optional().default(""),
   twilioPhoneSid: z.string().trim().max(64).optional().default(""),
+  aiEnabled: z.boolean().optional().default(true),
+  voiceLanguage: z.string().trim().min(2).max(50).optional().default("English"),
+  voiceSystemPrompt: z.string().trim().max(2000).optional().default(""),
 });
 
 export type SaveVoiceAgentSettingsInput = z.infer<
@@ -60,10 +64,18 @@ export type VoiceAgentSettings = {
   retellAgentId: string;
   vapiAssistantId: string;
   twilioPhoneSid: string;
+  aiEnabled: boolean;
+  voiceLanguage: string;
+  voiceSystemPrompt: string;
   providerConfigured: boolean;
+  aiConfigured: boolean;
   inboundWebhookUrl: string;
   outboundWebhookUrl: string;
 };
+
+export const toggleVoiceAiSchema = z.object({
+  aiEnabled: z.boolean(),
+});
 
 export type VoiceCallLogItem = {
   id: string;

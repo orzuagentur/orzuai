@@ -9,7 +9,8 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Missing businessId", { status: 400 });
   }
 
-  const twiml = await getOutboundVoiceTwiml(businessId);
+  const triggerReason = request.nextUrl.searchParams.get("triggerReason");
+  const twiml = await getOutboundVoiceTwiml(businessId, triggerReason);
 
   return new NextResponse(twiml, {
     status: 200,

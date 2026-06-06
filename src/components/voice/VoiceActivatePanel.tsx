@@ -28,6 +28,7 @@ import {
   disconnectVoiceAgentAction,
 } from "@/features/voice/actions/connect-voice";
 import { triggerTestVoiceCallAction } from "@/features/voice/actions/trigger-test-voice-call";
+import { toggleVoiceAiAction } from "@/features/voice/actions/toggle-voice-ai";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import type {
   VoiceAgentSettings,
@@ -75,6 +76,8 @@ export function VoiceActivatePanel({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(settings.aiEnabled);
+  const [isTogglingAi, setIsTogglingAi] = useState(false);
 
   const cardClassName = embeddedInHub
     ? "w-full max-w-none border-0 bg-transparent shadow-none"
@@ -149,6 +152,25 @@ export function VoiceActivatePanel({
     }
   }
 
+  async function handleToggleAi(nextValue: boolean) {
+    setIsTogglingAi(true);
+
+    try {
+      const result = await toggleVoiceAiAction(nextValue);
+
+      if (!result.success) {
+        toast.error(result.message ?? VOICE_MESSAGES.aiSaveFailed);
+        return;
+      }
+
+      setAiEnabled(nextValue);
+      toast.success(VOICE_MESSAGES.aiSaved);
+      router.refresh();
+    } finally {
+      setIsTogglingAi(false);
+    }
+  }
+
   async function handleTestCall() {
     if (!testPhone.trim()) {
       return;
@@ -205,6 +227,13 @@ export function VoiceActivatePanel({
               </Button>
             </div>
           </div>
+
+          <VoiceAiSection
+            aiEnabled={aiEnabled}
+            aiConfigured={config.aiConfigured}
+            isToggling={isTogglingAi}
+            onToggle={handleToggleAi}
+          />
 
           <VoiceCallHistory calls={recentCalls} />
 
@@ -281,6 +310,14 @@ export function VoiceActivatePanel({
           <p className="mt-1">{VOICE_MESSAGES.autoCallbackDescription}</p>
         </div>
 
+        {config.aiConfigured ? (
+          <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.aiDescription}</p>
+        ) : (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            {VOICE_MESSAGES.aiMissing}
+          </p>
+        )}
+
         <Button
           type="button"
           className="w-full sm:w-auto"
@@ -298,6 +335,50 @@ export function VoiceActivatePanel({
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function VoiceAiSection({
+  aiEnabled,
+  aiConfigured,
+  isToggling,
+  onToggle,
+}: {
+  aiEnabled: boolean;
+  aiConfigured: boolean;
+  isToggling: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">{VOICE_MESSAGES.aiTitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {aiEnabled && aiConfigured
+              ? VOICE_MESSAGES.aiActive
+              : VOICE_MESSAGES.aiInactive}
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 rounded border"
+            checked={aiEnabled}
+            disabled={!aiConfigured || isToggling}
+            onChange={(event) => onToggle(event.target.checked)}
+          />
+          {VOICE_MESSAGES.aiEnabled}
+        </label>
+      </div>
+      {!aiConfigured ? (
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          {VOICE_MESSAGES.aiMissing}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{VOICE_MESSAGES.knowledgeHint}</p>
+      )}
+    </div>
   );
 }
 

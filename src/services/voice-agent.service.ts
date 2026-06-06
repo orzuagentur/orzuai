@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ENV_KEYS } from "@/constants/env-keys";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
+import {
+  buildVoiceConversationTwiml,
+  isVoiceAiConfigured,
+} from "@/services/voice-ai.service";
 import { getAppUrl, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
@@ -27,7 +31,10 @@ type MessagingDbClient = ReturnType<typeof createAdminClient>;
 
 const DEFAULT_SETTINGS: Omit<
   VoiceAgentSettings,
-  "providerConfigured" | "inboundWebhookUrl" | "outboundWebhookUrl"
+  | "providerConfigured"
+  | "aiConfigured"
+  | "inboundWebhookUrl"
+  | "outboundWebhookUrl"
 > = {
   enabled: false,
   provider: "twilio",
@@ -42,6 +49,9 @@ const DEFAULT_SETTINGS: Omit<
   retellAgentId: "",
   vapiAssistantId: "",
   twilioPhoneSid: "",
+  aiEnabled: true,
+  voiceLanguage: "English",
+  voiceSystemPrompt: "",
 };
 
 function isVoiceProviderConfigured(provider: VoiceProvider): boolean {
@@ -72,6 +82,7 @@ function revalidateVoicePaths(): void {
 export function getVoiceConnectConfig(): VoiceConnectConfig {
   return {
     isConfigured: isVoiceProviderConfigured("twilio"),
+    aiConfigured: isVoiceAiConfigured(),
   };
 }
 
@@ -142,6 +153,9 @@ export async function connectVoiceAgent(
     retellAgentId: "",
     vapiAssistantId: "",
     twilioPhoneSid: "",
+    aiEnabled: true,
+    voiceLanguage: existing.voiceLanguage,
+    voiceSystemPrompt: existing.voiceSystemPrompt,
   });
 }
 
@@ -167,6 +181,9 @@ export async function disconnectVoiceAgent(
     retellAgentId: existing.retellAgentId,
     vapiAssistantId: existing.vapiAssistantId,
     twilioPhoneSid: existing.twilioPhoneSid,
+    aiEnabled: existing.aiEnabled,
+    voiceLanguage: existing.voiceLanguage,
+    voiceSystemPrompt: existing.voiceSystemPrompt,
   });
 }
 
@@ -187,6 +204,7 @@ export async function getVoiceAgentSettings(
     return {
       ...DEFAULT_SETTINGS,
       providerConfigured: false,
+      aiConfigured: isVoiceAiConfigured(),
       ...webhooks,
     };
   }
@@ -202,6 +220,7 @@ export async function getVoiceAgentSettings(
     return {
       ...DEFAULT_SETTINGS,
       providerConfigured: isVoiceProviderConfigured(DEFAULT_SETTINGS.provider),
+      aiConfigured: isVoiceAiConfigured(),
       ...webhooks,
     };
   }
@@ -221,7 +240,11 @@ export async function getVoiceAgentSettings(
     retellAgentId: data.retell_agent_id ?? "",
     vapiAssistantId: data.vapi_assistant_id ?? "",
     twilioPhoneSid: data.twilio_phone_sid ?? "",
+    aiEnabled: data.ai_enabled ?? true,
+    voiceLanguage: data.voice_language ?? "English",
+    voiceSystemPrompt: data.voice_system_prompt ?? "",
     providerConfigured: isVoiceProviderConfigured(provider),
+    aiConfigured: isVoiceAiConfigured(),
     ...webhooks,
   };
 }
@@ -259,6 +282,9 @@ export async function saveVoiceAgentSettings(
       retell_agent_id: parsed.data.retellAgentId || null,
       vapi_assistant_id: parsed.data.vapiAssistantId || null,
       twilio_phone_sid: parsed.data.twilioPhoneSid || null,
+      ai_enabled: parsed.data.aiEnabled ?? true,
+      voice_language: parsed.data.voiceLanguage ?? "English",
+      voice_system_prompt: parsed.data.voiceSystemPrompt || null,
     },
     { onConflict: "business_id" },
   );
@@ -464,10 +490,13 @@ export async function placeOutboundVoiceCall(input: {
   let status = "queued";
 
   if (settings.provider === "twilio") {
+    const outboundUrl = new URL(webhooks.outboundWebhookUrl);
+    outboundUrl.searchParams.set("triggerReason", input.triggerReason);
+
     const result = await twilioCreateCall({
       from: settings.phoneNumber,
       to: input.phoneNumber,
-      twimlUrl: webhooks.outboundWebhookUrl,
+      twimlUrl: outboundUrl.toString(),
     });
 
     if (!result.success) {
@@ -632,16 +661,46 @@ export async function getInboundVoiceTwiml(
   businessId: string,
 ): Promise<string> {
   const settings = await getVoiceAgentSettings(businessId);
-  const greeting = settings.inboundGreeting.replace(/[<>&"']/g, "");
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna">${greeting}</Say><Pause length="1"/><Say voice="Polly.Joanna">Please leave your message after the tone. Our team will follow up shortly.</Say></Response>`;
+  if (!settings.inboundEnabled) {
+    return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna">This line is currently unavailable. Please try again later.</Say></Response>`;
+  }
+
+  return buildVoiceConversationTwiml({
+    businessId,
+    direction: "inbound",
+  });
 }
 
 export async function getOutboundVoiceTwiml(
   businessId: string,
+  triggerReason?: string | null,
 ): Promise<string> {
-  const settings = await getVoiceAgentSettings(businessId);
-  const script = settings.outboundScript.replace(/[<>&"']/g, "");
+  return buildVoiceConversationTwiml({
+    businessId,
+    direction: "outbound",
+    triggerReason,
+  });
+}
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna">${script}</Say></Response>`;
+export async function setVoiceAiEnabled(
+  businessId: string,
+  aiEnabled: boolean,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("voice_agent_config")
+    .update({ ai_enabled: aiEnabled })
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateVoicePaths();
+  return { success: true };
 }

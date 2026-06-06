@@ -987,6 +987,9 @@ export type Database = {
           retell_agent_id: string | null;
           vapi_assistant_id: string | null;
           twilio_phone_sid: string | null;
+          ai_enabled: boolean;
+          voice_language: string;
+          voice_system_prompt: string | null;
           updated_at: string;
         };
         Insert: {
@@ -1003,6 +1006,9 @@ export type Database = {
           retell_agent_id?: string | null;
           vapi_assistant_id?: string | null;
           twilio_phone_sid?: string | null;
+          ai_enabled?: boolean;
+          voice_language?: string;
+          voice_system_prompt?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -1019,6 +1025,9 @@ export type Database = {
           retell_agent_id?: string | null;
           vapi_assistant_id?: string | null;
           twilio_phone_sid?: string | null;
+          ai_enabled?: boolean;
+          voice_language?: string;
+          voice_system_prompt?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -1026,6 +1035,47 @@ export type Database = {
             foreignKeyName: "voice_agent_config_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_call_sessions: {
+        Row: {
+          id: string;
+          business_id: string;
+          call_sid: string;
+          direction: string;
+          turns: unknown;
+          turn_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          call_sid: string;
+          direction: string;
+          turns?: unknown;
+          turn_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          call_sid?: string;
+          direction?: string;
+          turns?: unknown;
+          turn_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_sessions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },
