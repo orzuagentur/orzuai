@@ -61,6 +61,7 @@ function revalidateInstagramPaths(): void {
   revalidatePath(APP_ROUTES.dashboard);
   revalidatePath(DASHBOARD_ROUTES.integrations);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/instagram`);
+  revalidatePath(DASHBOARD_ROUTES.marketplace);
   revalidatePath(DASHBOARD_ROUTES.chats);
 }
 
@@ -104,6 +105,43 @@ export function getInstagramConnectConfig(): InstagramConnectConfig {
     isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
     webhookUrl,
   };
+}
+
+export async function disconnectInstagram(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: INSTAGRAM_MESSAGES.genericError };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: INSTAGRAM_MESSAGES.noBusinessDescription };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("instagram_connections")
+    .update({
+      instagram_status: "disconnected",
+      instagram_username: "",
+      meta_page_id: null,
+      meta_ig_user_id: null,
+      meta_access_token: null,
+      meta_business_account_id: null,
+      connected_at: null,
+      last_synced_at: null,
+    })
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateInstagramPaths();
+  return { success: true };
 }
 
 export async function getInstagramEmbeddedSignupConfig(): Promise<InstagramEmbeddedSignupConfig> {

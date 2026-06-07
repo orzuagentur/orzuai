@@ -8,6 +8,7 @@ export const INSTAGRAM_MESSAGES = {
     "Complete the Meta popup — select your business and Instagram Professional account.",
   connectFinishing: "Saving connection…",
   connectSuccess: "Instagram connected.",
+  disconnectSuccess: "Instagram disconnected.",
   connectCancelled: "Setup cancelled. You can try again.",
   connectMissingCode:
     "Meta did not return an authorization code. Close the popup and try again.",

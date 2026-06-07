@@ -9,6 +9,7 @@ export const WHATSAPP_MESSAGES = {
     "Complete the Meta popup — select your business portfolio and WhatsApp phone number.",
   connectFinishing: "Saving connection…",
   connectSuccess: "WhatsApp connected.",
+  disconnectSuccess: "WhatsApp disconnected.",
   connectCancelled: "Setup cancelled. You can try again.",
   connectMissingCode:
     "Meta did not return an authorization code. Close the popup and try again.",

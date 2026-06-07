@@ -8,6 +8,7 @@ import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { TELEGRAM_MESSAGES } from "@/features/telegram/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
+  deleteTelegramWebhook,
   getTelegramBotInfo,
   sendTelegramTextMessage,
   setTelegramWebhook,
@@ -48,6 +49,7 @@ function revalidateTelegramPaths(): void {
   revalidatePath(APP_ROUTES.dashboard);
   revalidatePath(DASHBOARD_ROUTES.integrations);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/telegram`);
+  revalidatePath(DASHBOARD_ROUTES.marketplace);
   revalidatePath(DASHBOARD_ROUTES.chats);
 }
 
@@ -60,6 +62,52 @@ async function getOwnedBusinessId(): Promise<string | null> {
 function getTelegramWebhookUrl(): string {
   const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
   return appUrl ? `${appUrl}/api/webhooks/telegram` : "";
+}
+
+export async function disconnectTelegram(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: TELEGRAM_MESSAGES.genericError };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: TELEGRAM_MESSAGES.noBusinessDescription };
+  }
+
+  const supabase = await createClient();
+  const { data: connection } = await supabase
+    .from("telegram_connections")
+    .select("id, bot_token")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (connection?.bot_token) {
+    await deleteTelegramWebhook(connection.bot_token);
+  }
+
+  const { error } = await supabase
+    .from("telegram_connections")
+    .update({
+      telegram_status: "disconnected",
+      bot_username: "",
+      telegram_bot_id: null,
+      bot_token: null,
+      webhook_secret: null,
+      connected_at: null,
+      last_synced_at: null,
+    })
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateTelegramPaths();
+  return { success: true };
 }
 
 export async function getTelegramConnection(

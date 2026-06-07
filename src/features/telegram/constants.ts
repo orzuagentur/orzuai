@@ -8,6 +8,7 @@ export const TELEGRAM_MESSAGES = {
     "Create a bot with @BotFather on Telegram, then paste the token here. Keep it secret — never share it publicly.",
   connectButton: "Connect Telegram Bot",
   connectSuccess: "Telegram bot connected successfully.",
+  disconnectSuccess: "Telegram bot disconnected.",
   connectWaiting: "Validating bot token and registering webhook…",
   invalidToken:
     "Telegram rejected this bot token. Check the token from @BotFather and try again.",

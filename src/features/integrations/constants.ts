@@ -161,6 +161,17 @@ export const INTEGRATIONS_MESSAGES = {
   activateFirstDescription:
     "Open Activate and complete the connection before using Contacts, AI Assistant, or Analytics for this channel.",
   goToActivate: "Go to Activate",
+  dangerZoneTitle: "Disconnect channel",
+  dangerZoneDescription:
+    "Stop receiving messages and remove this connection from OrzuAI. Your Meta or Telegram account is not deleted.",
+  disconnectStep1Button: "Disconnect…",
+  disconnectStep2Title: "Confirm disconnect",
+  disconnectStep2Description: (resource: string) =>
+    `This will remove ${resource} from OrzuAI. You can connect again from the Marketplace.`,
+  disconnectConfirmButton: "Yes, disconnect",
+  disconnectCancelButton: "Cancel",
+  disconnecting: "Disconnecting…",
+  disconnectError: "Could not disconnect. Please try again.",
   connectedQuickLinks: "Workspace",
   statusConnected: "Connected",
   statusActivated: "Activated",

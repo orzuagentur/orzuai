@@ -7,6 +7,7 @@ import { IntegrationChannelShell } from "@/components/integrations/IntegrationCh
 import { IntegrationSectionPanels } from "@/components/integrations/IntegrationSectionPanels";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { getChannelContacts } from "@/services/channel-workspace.service";
 import {
   getInstagramConnection,
   getInstagramEmbeddedSignupConfig,
@@ -39,6 +40,7 @@ import {
   isIntegrationChannelId,
   isIntegrationSectionId,
   isLegacyIntegrationWorkspaceSection,
+  isMessagingIntegrationChannel,
   type IntegrationChannelId,
   type IntegrationSectionId,
 } from "@/features/integrations";
@@ -118,6 +120,10 @@ export default async function IntegrationsChannelPage({
   });
 
   const isActivated = isChannelActivated(channel, channelStatuses);
+  const channelContacts =
+    business && isMessagingIntegrationChannel(channel)
+      ? await getChannelContacts(channel)
+      : null;
 
   return (
     <Suspense fallback={<IntegrationChannelFallback channel={channel} />}>
@@ -165,6 +171,7 @@ export default async function IntegrationsChannelPage({
                 }
               : undefined
           }
+          channelContacts={channelContacts}
         />
       </IntegrationChannelShell>
     </Suspense>

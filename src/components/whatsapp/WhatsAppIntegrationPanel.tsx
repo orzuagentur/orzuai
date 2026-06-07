@@ -3,7 +3,8 @@
 import Link from "next/link";
 
 import { WhatsAppEmbeddedSignup } from "@/components/whatsapp/WhatsAppEmbeddedSignup";
-import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
+import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
+import { disconnectWhatsAppAction } from "@/features/whatsapp/actions/disconnect";
 import {
   IntegrationWebhookHealth,
   resolveWebhookHealthStatus,
@@ -49,7 +50,7 @@ export function WhatsAppIntegrationPanel({
   connection,
   hasBusiness,
   embeddedSignupConfig,
-  embeddedInHub = false,
+  embeddedInHub: _embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
   if (!hasBusiness) {
     return (
@@ -109,7 +110,11 @@ export function WhatsAppIntegrationPanel({
           ) : null}
         </dl>
 
-        {embeddedInHub ? <IntegrationQuickLinks channel="whatsapp" /> : null}
+        <IntegrationDangerZone
+          resourceLabel={connection.phoneNumber}
+          onDisconnect={disconnectWhatsAppAction}
+          successMessage={WHATSAPP_MESSAGES.disconnectSuccess}
+        />
       </div>
     );
   }

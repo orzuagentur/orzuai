@@ -67,6 +67,9 @@ function missingConfigError(): {
 function revalidateWhatsAppPaths(): void {
   revalidatePath(APP_ROUTES.dashboard);
   revalidatePath(DASHBOARD_ROUTES.integrations);
+  revalidatePath(`${DASHBOARD_ROUTES.integrations}/whatsapp`);
+  revalidatePath(DASHBOARD_ROUTES.marketplace);
+  revalidatePath(DASHBOARD_ROUTES.chats);
 }
 
 async function getOwnedBusinessId(): Promise<string | null> {
@@ -111,6 +114,43 @@ export function getWhatsAppConnectConfig(): WhatsAppConnectConfig {
     isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
     webhookUrl,
   };
+}
+
+export async function disconnectWhatsApp(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: WHATSAPP_MESSAGES.genericError };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: WHATSAPP_MESSAGES.noBusinessDescription };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("whatsapp_connections")
+    .update({
+      whatsapp_status: "disconnected",
+      phone_number: "",
+      meta_phone_number_id: null,
+      meta_access_token: null,
+      meta_waba_id: null,
+      meta_business_account_id: null,
+      connected_at: null,
+      last_synced_at: null,
+    })
+    .eq("business_id", businessId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateWhatsAppPaths();
+  return { success: true };
 }
 
 export async function getWhatsAppEmbeddedSignupConfig(): Promise<WhatsAppEmbeddedSignupConfig> {

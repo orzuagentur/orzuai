@@ -3,7 +3,8 @@
 import Link from "next/link";
 
 import { InstagramEmbeddedSignup } from "@/components/instagram/InstagramEmbeddedSignup";
-import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
+import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
+import { disconnectInstagramAction } from "@/features/instagram/actions/disconnect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -45,7 +46,7 @@ export function InstagramActivatePanel({
   connection,
   hasBusiness,
   embeddedSignupConfig,
-  embeddedInHub = false,
+  embeddedInHub: _embeddedInHub = false,
 }: InstagramActivatePanelProps) {
   if (!hasBusiness) {
     return (
@@ -91,7 +92,11 @@ export function InstagramActivatePanel({
           ) : null}
         </dl>
 
-        {embeddedInHub ? <IntegrationQuickLinks channel="instagram" /> : null}
+        <IntegrationDangerZone
+          resourceLabel={`@${connection.username || "instagram"}`}
+          onDisconnect={disconnectInstagramAction}
+          successMessage={INSTAGRAM_MESSAGES.disconnectSuccess}
+        />
       </div>
     );
   }

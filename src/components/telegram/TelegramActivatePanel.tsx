@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2Icon, Send } from "lucide-react";
 
+import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
+import { disconnectTelegramAction } from "@/features/telegram/actions/disconnect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +95,7 @@ export function TelegramActivatePanel({
             <Badge variant={getStatusVariant(connection.status)}>connected</Badge>
           </div>
         </CardHeader>
-        <CardContent className={embeddedInHub ? "px-0 pb-0" : undefined}>
+        <CardContent className={embeddedInHub ? "space-y-6 px-0 pb-0" : "space-y-6"}>
           <div className="rounded-lg border p-4 text-sm">
             <p>
               <span className="font-medium">Bot:</span> @
@@ -105,6 +107,11 @@ export function TelegramActivatePanel({
               </p>
             ) : null}
           </div>
+          <IntegrationDangerZone
+            resourceLabel={`@${connection.botUsername || "telegram bot"}`}
+            onDisconnect={disconnectTelegramAction}
+            successMessage={TELEGRAM_MESSAGES.disconnectSuccess}
+          />
         </CardContent>
       </Card>
     );

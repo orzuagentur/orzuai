@@ -1,5 +1,5 @@
+import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
-import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { InstagramActivatePanel } from "@/components/instagram/InstagramActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
@@ -34,6 +34,7 @@ import type {
   WebsiteFormConnectConfig,
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
+import type { ChannelContactsData } from "@/types/channel-workspace.types";
 import type {
   VoiceAgentSettings,
   VoiceCallLogItem,
@@ -72,6 +73,7 @@ type IntegrationSectionPanelsProps = {
     recentCalls: VoiceCallLogItem[];
     connectConfig: VoiceConnectConfig;
   };
+  channelContacts?: ChannelContactsData | null;
 };
 
 export function IntegrationSectionPanels({
@@ -84,6 +86,7 @@ export function IntegrationSectionPanels({
   telegram,
   websiteForms,
   voice,
+  channelContacts,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
   const isMessagingChannel = isMessagingIntegrationChannel(channel);
@@ -118,7 +121,13 @@ export function IntegrationSectionPanels({
     return <ActivateFirstPrompt channel={channel} />;
   }
 
-  return <IntegrationQuickLinks channel={channel} />;
+  if (channelContacts) {
+    return <ChannelContactsPanel data={channelContacts} />;
+  }
+
+  return (
+    <p className="text-sm text-muted-foreground">{INTEGRATIONS_MESSAGES.contactsHint}</p>
+  );
 }
 
 function ActivateSection({
@@ -254,9 +263,8 @@ function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) 
           add OAuth, webhooks, and messaging for {label}.
         </p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Activate — connect account</li>
+          <li>Settings — connect account</li>
           <li>Contacts — channel contacts</li>
-          <li>AI Assistant and Analytics — sidebar workspace pages</li>
         </ul>
       </CardContent>
     </Card>

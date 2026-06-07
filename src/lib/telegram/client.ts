@@ -52,6 +52,20 @@ export async function getTelegramBotInfo(
   return { success: true, bot: result.result };
 }
 
+export async function deleteTelegramWebhook(
+  botToken: string,
+): Promise<{ success: true } | { success: false; message: string }> {
+  const result = await callTelegramApi<boolean>(botToken, "deleteWebhook", {
+    drop_pending_updates: true,
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return { success: true };
+}
+
 export async function setTelegramWebhook(
   botToken: string,
   webhookUrl: string,
