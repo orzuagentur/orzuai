@@ -64,6 +64,7 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
       connectWaiting: INSTAGRAM_MESSAGES.connectWaiting,
       connectFinishing: INSTAGRAM_MESSAGES.connectFinishing,
       connectCancelled: INSTAGRAM_MESSAGES.connectCancelled,
+      connectMetaIncomplete: INSTAGRAM_MESSAGES.connectMetaIncomplete,
       connectMissingCode: INSTAGRAM_MESSAGES.connectMissingCode,
       signupIncomplete: INSTAGRAM_MESSAGES.signupIncomplete,
     },

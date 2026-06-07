@@ -24,6 +24,7 @@ export type MetaEmbeddedSignupMessages = {
   connectWaiting: string;
   connectFinishing: string;
   connectCancelled: string;
+  connectMetaIncomplete: string;
   connectMissingCode: string;
   signupIncomplete: string;
 };
@@ -143,12 +144,12 @@ export function useMetaEmbeddedSignupFlow<
       setStatusMessage(
         signupDataRef.current
           ? messages.connectMissingCode
-          : messages.connectCancelled,
+          : messages.connectMetaIncomplete,
       );
     }, EMBEDDED_SIGNUP_MISSING_CODE_DELAY_MS);
   }, [
     clearMissingCodeTimeout,
-    messages.connectCancelled,
+    messages.connectMetaIncomplete,
     messages.connectMissingCode,
   ]);
 

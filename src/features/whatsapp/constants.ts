@@ -11,8 +11,10 @@ export const WHATSAPP_MESSAGES = {
   connectSuccess: "WhatsApp connected.",
   disconnectSuccess: "WhatsApp disconnected.",
   connectCancelled: "Setup cancelled. You can try again.",
+  connectMetaIncomplete:
+    "Meta did not complete the connection. Add this site to App Domains, Allowed domains for the JavaScript SDK, and Valid OAuth Redirect URIs in Meta Developer Console, then try again.",
   connectMissingCode:
-    "Meta did not return an authorization code. Close the popup and try again.",
+    "Meta finished setup but did not return an authorization code. Check OAuth and Embedded Signup settings in Meta Developer Console, then try again.",
   connectedNumber: "Connected number",
   connectedAt: "Connected",
   lastActivity: "Last activity",

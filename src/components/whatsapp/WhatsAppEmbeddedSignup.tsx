@@ -75,6 +75,7 @@ export function WhatsAppEmbeddedSignup({
       connectWaiting: WHATSAPP_MESSAGES.connectWaiting,
       connectFinishing: WHATSAPP_MESSAGES.connectFinishing,
       connectCancelled: WHATSAPP_MESSAGES.connectCancelled,
+      connectMetaIncomplete: WHATSAPP_MESSAGES.connectMetaIncomplete,
       connectMissingCode: WHATSAPP_MESSAGES.connectMissingCode,
       signupIncomplete: WHATSAPP_MESSAGES.signupIncomplete,
     },
