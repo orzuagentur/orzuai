@@ -1,3 +1,19 @@
+import type { FacebookLoginResponse } from "@/types/meta-sdk";
+
+/** FB.login extras required for WA_EMBEDDED_SIGNUP postMessage events (session v3). */
+export const EMBEDDED_SIGNUP_FB_LOGIN_EXTRAS = {
+  feature: "whatsapp_embedded_signup" as const,
+  sessionInfoVersion: "3" as const,
+  setup: {} as Record<string, never>,
+};
+
+/** Wait for FINISH postMessage before treating a missing OAuth code as failure. */
+export const EMBEDDED_SIGNUP_MISSING_CODE_DELAY_MS = 2500;
+
+export function isFbLoginCancelled(response: FacebookLoginResponse): boolean {
+  return response.status === "not_authorized";
+}
+
 export type EmbeddedSignupFinishEvent =
   | "FINISH"
   | "FINISH_ONLY_WABA"

@@ -11,6 +11,7 @@ declare global {
       init: (options: {
         appId: string;
         autoLogAppEvents?: boolean;
+        cookie?: boolean;
         xfbml?: boolean;
         version: string;
       }) => void;

@@ -2,17 +2,17 @@
 
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { Loader2Icon } from "lucide-react";
 
 import { WhatsAppBusinessHelp } from "@/components/whatsapp/WhatsAppBusinessHelp";
 import { Button } from "@/components/ui/button";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import { useCompleteEmbeddedSignup } from "@/hooks/use-complete-embedded-signup";
+import { useMetaEmbeddedSignupFlow } from "@/hooks/use-meta-embedded-signup-flow";
 import {
-  isTrustedEmbeddedSignupOrigin,
   isEmbeddedSignupFinishEvent,
-  parseEmbeddedSignupMessage,
+  type EmbeddedSignupMessage,
 } from "@/lib/whatsapp/embedded-signup";
 import type { WhatsAppEmbeddedSignupConfig } from "@/types/whatsapp.types";
 
@@ -21,27 +21,11 @@ type WhatsAppEmbeddedSignupProps = {
   onConnected?: () => void;
 };
 
-type PendingSignupPayload = {
-  code: string;
-  phoneNumberId: string;
-  wabaId: string;
-  businessAccountId?: string;
-  finishEvent: string;
-};
-
-type SignupStatus = "idle" | "waiting" | "finishing" | "error" | "waba_only";
-
 export function WhatsAppEmbeddedSignup({
   config,
   onConnected,
 }: WhatsAppEmbeddedSignupProps) {
   const router = useRouter();
-  const [sdkReady, setSdkReady] = useState(false);
-  const [status, setStatus] = useState<SignupStatus>("idle");
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const authCodeRef = useRef<string | null>(null);
-  const signupDataRef = useRef<Omit<PendingSignupPayload, "code"> | null>(null);
-  const isSubmittingRef = useRef(false);
 
   const { completeSignup, isLoading } = useCompleteEmbeddedSignup({
     onSuccess: () => {
@@ -50,166 +34,70 @@ export function WhatsAppEmbeddedSignup({
     },
   });
 
-  const submitSignup = useCallback(async () => {
-    const code = authCodeRef.current;
-    const signupData = signupDataRef.current;
+  const mapFinishMessage = useCallback((message: EmbeddedSignupMessage) => {
+    return {
+      phoneNumberId: message.data.phone_number_id ?? "",
+      wabaId: message.data.waba_id ?? "",
+      businessAccountId: message.data.business_id,
+      finishEvent: message.event,
+    };
+  }, []);
 
-    if (!code || !signupData || isSubmittingRef.current) {
-      return;
-    }
-
-    if (
-      !signupData.phoneNumberId ||
-      !signupData.wabaId ||
-      !isEmbeddedSignupFinishEvent(signupData.finishEvent)
-    ) {
-      setStatus("error");
-      setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setStatus("finishing");
-    setStatusMessage(WHATSAPP_MESSAGES.connectFinishing);
-
-    try {
-      const result = await completeSignup({
-        code,
-        phoneNumberId: signupData.phoneNumberId,
-        wabaId: signupData.wabaId,
-        businessAccountId: signupData.businessAccountId,
-        finishEvent: signupData.finishEvent,
-      });
-
-      if (!result.success) {
-        setStatus("error");
-        setStatusMessage(result.error.message);
-        return;
+  const validateSignupData = useCallback(
+    (data: {
+      phoneNumberId: string;
+      wabaId: string;
+      finishEvent: string;
+    }) => {
+      if (
+        !data.phoneNumberId ||
+        !data.wabaId ||
+        !isEmbeddedSignupFinishEvent(data.finishEvent)
+      ) {
+        return WHATSAPP_MESSAGES.signupPhoneNumberRequired;
       }
 
-      setStatus("idle");
-      setStatusMessage(null);
-    } finally {
-      isSubmittingRef.current = false;
-      authCodeRef.current = null;
-      signupDataRef.current = null;
-    }
-  }, [completeSignup]);
+      return null;
+    },
+    [],
+  );
 
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (!isTrustedEmbeddedSignupOrigin(event.origin)) {
-        return;
-      }
-
-      let payload: unknown = event.data;
-
-      if (typeof event.data === "string") {
-        try {
-          payload = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-      }
-
-      const message = parseEmbeddedSignupMessage(payload);
-
-      if (!message) {
-        return;
-      }
-
-      if (message.event === "CANCEL") {
-        setStatus("error");
-        setStatusMessage(WHATSAPP_MESSAGES.connectCancelled);
-        return;
-      }
-
-      if (message.event === "ERROR") {
-        setStatus("error");
-        setStatusMessage(
-          message.data.error_message ?? WHATSAPP_MESSAGES.signupIncomplete,
-        );
-        return;
-      }
-
-      if (message.event === "FINISH_ONLY_WABA") {
+  const {
+    sdkReady,
+    setSdkReady,
+    status,
+    statusMessage,
+    launchEmbeddedSignup,
+    isFinishing,
+  } = useMetaEmbeddedSignupFlow({
+    config,
+    messages: {
+      connectWaiting: WHATSAPP_MESSAGES.connectWaiting,
+      connectFinishing: WHATSAPP_MESSAGES.connectFinishing,
+      connectCancelled: WHATSAPP_MESSAGES.connectCancelled,
+      connectMissingCode: WHATSAPP_MESSAGES.connectMissingCode,
+      signupIncomplete: WHATSAPP_MESSAGES.signupIncomplete,
+    },
+    mapFinishMessage,
+    validateSignupData,
+    completeSignup: async (payload) =>
+      completeSignup({
+        code: payload.code,
+        phoneNumberId: payload.phoneNumberId,
+        wabaId: payload.wabaId,
+        businessAccountId: payload.businessAccountId,
+        finishEvent: payload.finishEvent,
+      }),
+    handleSignupEvent: (event, _message, { setStatus, setStatusMessage }) => {
+      if (event === "FINISH_ONLY_WABA") {
         setStatus("waba_only");
         setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
-        return;
+        return true;
       }
 
-      if (isEmbeddedSignupFinishEvent(message.event)) {
-        signupDataRef.current = {
-          phoneNumberId: message.data.phone_number_id ?? "",
-          wabaId: message.data.waba_id ?? "",
-          businessAccountId: message.data.business_id,
-          finishEvent: message.event,
-        };
-        void submitSignup();
-      }
-    }
-
-    window.addEventListener("message", handleMessage);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [submitSignup]);
-
-  useEffect(() => {
-    if (!sdkReady || !config.isConfigured) {
-      return;
-    }
-
-    window.fbAsyncInit = () => {
-      window.FB?.init({
-        appId: config.appId,
-        autoLogAppEvents: true,
-        xfbml: true,
-        version: config.graphApiVersion,
-      });
-    };
-
-    if (window.FB) {
-      window.fbAsyncInit?.();
-    }
-  }, [config.appId, config.graphApiVersion, config.isConfigured, sdkReady]);
-
-  function launchEmbeddedSignup() {
-    if (!config.isConfigured || !window.FB) {
-      return;
-    }
-
-    setStatus("waiting");
-    setStatusMessage(WHATSAPP_MESSAGES.connectWaiting);
-    authCodeRef.current = null;
-    signupDataRef.current = null;
-
-    window.FB.login(
-      (response) => {
-        const code = response.authResponse?.code;
-
-        if (!code) {
-          setStatus("error");
-          setStatusMessage(WHATSAPP_MESSAGES.connectMissingCode);
-          return;
-        }
-
-        authCodeRef.current = code;
-        void submitSignup();
-      },
-      {
-        config_id: config.configId,
-        response_type: "code",
-        override_default_response_type: true,
-        extras: {
-          feature: "whatsapp_embedded_signup",
-          sessionInfoVersion: "3",
-          setup: {},
-        },
-      },
-    );
-  }
+      return false;
+    },
+  });
 
   if (!config.isConfigured) {
     return (
@@ -231,10 +119,10 @@ export function WhatsAppEmbeddedSignup({
         type="button"
         size="lg"
         className="w-full sm:w-auto"
-        disabled={!sdkReady || isLoading || status === "finishing"}
+        disabled={!sdkReady || isLoading || isFinishing}
         onClick={launchEmbeddedSignup}
       >
-        {isLoading || status === "finishing" ? (
+        {isLoading || isFinishing ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
             {WHATSAPP_MESSAGES.connectFinishing}
