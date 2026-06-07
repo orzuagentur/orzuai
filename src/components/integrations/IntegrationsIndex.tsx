@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, StoreIcon } from "lucide-react";
 
-import { DashboardScrollPage } from "@/components/layout/DashboardWorkspaceLayout";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,8 +29,8 @@ export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
   const activatedChannels = getActivatedIntegrationChannels(channelStatuses);
 
   return (
-    <DashboardScrollPage
-      header={
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">
             {INTEGRATIONS_MESSAGES.pageTitle}
@@ -40,16 +39,14 @@ export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
             {INTEGRATIONS_MESSAGES.indexDescription}
           </p>
         </div>
-      }
-      toolbar={
         <Button variant="outline" asChild>
           <Link href={DASHBOARD_ROUTES.marketplace}>
             <StoreIcon className="size-4" />
             Marketplace
           </Link>
         </Button>
-      }
-    >
+      </div>
+
       {activatedChannels.length === 0 ? (
         <Card className="max-w-2xl shadow-none">
           <CardHeader>
@@ -104,6 +101,6 @@ export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
           })}
         </div>
       )}
-    </DashboardScrollPage>
+    </div>
   );
 }

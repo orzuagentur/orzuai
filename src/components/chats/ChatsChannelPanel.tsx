@@ -52,8 +52,7 @@ export function ChatsChannelPanel({
 
   if (!hasBusiness) {
     return (
-      <div className="flex h-full items-center justify-center overflow-y-auto p-6">
-      <Card className="max-w-2xl shadow-none">
+      <Card className="m-4 max-w-2xl shadow-none md:m-6">
         <CardHeader>
           <CardTitle>{CHAT_MESSAGES.noBusinessTitle}</CardTitle>
           <CardDescription>{CHAT_MESSAGES.noBusinessDescription}</CardDescription>
@@ -64,7 +63,6 @@ export function ChatsChannelPanel({
           </Button>
         </CardContent>
       </Card>
-      </div>
     );
   }
 

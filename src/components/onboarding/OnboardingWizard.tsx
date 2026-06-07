@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { BusinessProfileForm } from "@/components/business/BusinessProfileForm";
 import { KnowledgeEntryForm } from "@/components/knowledge-base/KnowledgeEntryForm";
 import { OnboardingProgressRing } from "@/components/onboarding/OnboardingProgressRing";
-import { WhatsAppManualConnect } from "@/components/whatsapp/WhatsAppManualConnect";
+import { WhatsAppEmbeddedSignup } from "@/components/whatsapp/WhatsAppEmbeddedSignup";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,14 +41,14 @@ import { cn } from "@/lib/utils";
 import type { OnboardingProgress } from "@/services/onboarding.service";
 import type { BusinessProfileData } from "@/types/business.types";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
-import type { WhatsAppConnectConfig } from "@/types/whatsapp.types";
+import type { WhatsAppEmbeddedSignupConfig } from "@/types/whatsapp.types";
 
 type OnboardingWizardProps = {
   step: number;
   progress: OnboardingProgress;
   business: BusinessProfileData | null;
   defaultBusinessName?: string;
-  whatsappConfig: WhatsAppConnectConfig;
+  whatsappEmbeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
   aiSettings: ChannelAiSettingsData | null;
 };
 
@@ -61,7 +61,7 @@ export function OnboardingWizard({
   progress,
   business,
   defaultBusinessName,
-  whatsappConfig,
+  whatsappEmbeddedSignupConfig,
   aiSettings,
 }: OnboardingWizardProps) {
   const router = useRouter();
@@ -199,8 +199,8 @@ export function OnboardingWizard({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <WhatsAppManualConnect
-              config={whatsappConfig}
+            <WhatsAppEmbeddedSignup
+              config={whatsappEmbeddedSignupConfig}
               onConnected={() => {
                 router.refresh();
                 goToStep(router, 3);

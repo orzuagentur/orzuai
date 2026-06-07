@@ -1,19 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Camera } from "lucide-react";
 
 import { InstagramEmbeddedSignup } from "@/components/instagram/InstagramEmbeddedSignup";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { INSTAGRAM_MESSAGES } from "@/features/instagram/constants";
 import type {
@@ -42,6 +34,13 @@ function getStatusVariant(
   return "outline";
 }
 
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function InstagramActivatePanel({
   connection,
   hasBusiness,
@@ -50,100 +49,74 @@ export function InstagramActivatePanel({
 }: InstagramActivatePanelProps) {
   if (!hasBusiness) {
     return (
-      <Card className="max-w-2xl shadow-none">
-        <CardHeader>
-          <CardTitle>{INSTAGRAM_MESSAGES.noBusinessTitle}</CardTitle>
-          <CardDescription>
+      <div className="mx-auto max-w-lg space-y-4 rounded-lg border bg-card p-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">{INSTAGRAM_MESSAGES.noBusinessTitle}</h2>
+          <p className="text-sm text-muted-foreground">
             {INSTAGRAM_MESSAGES.noBusinessDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
-          </Button>
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Button asChild>
+          <Link href={DASHBOARD_ROUTES.settings}>Business settings</Link>
+        </Button>
+      </div>
     );
   }
 
   if (connection?.status === "connected") {
     return (
-      <Card
-        className={
-          embeddedInHub
-            ? "w-full max-w-none border-0 bg-transparent shadow-none"
-            : "max-w-2xl shadow-none"
-        }
-      >
-        <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>{INSTAGRAM_MESSAGES.connectTitle}</CardTitle>
-            <Badge variant={getStatusVariant(connection.status)}>connected</Badge>
-          </div>
-        </CardHeader>
-        <CardContent
-          className={embeddedInHub ? "space-y-4 px-0 pb-0" : "space-y-4"}
-        >
-          <div className="rounded-lg border p-4 text-sm">
-            <p>
-              <span className="font-medium">Instagram:</span> @
-              {connection.username || "—"}
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">{INSTAGRAM_MESSAGES.connectTitle}</h2>
+            <p className="text-sm text-muted-foreground">
+              {INSTAGRAM_MESSAGES.connectedHint}
             </p>
-            {connection.connectedAt ? (
-              <p className="mt-1 text-muted-foreground">
-                Connected {new Date(connection.connectedAt).toLocaleString("en-US")}
-              </p>
-            ) : null}
           </div>
-          {embeddedInHub ? (
-            <IntegrationQuickLinks channel="instagram" />
+          <Badge variant={getStatusVariant(connection.status)}>Connected</Badge>
+        </div>
+
+        <dl className="grid gap-4 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">{INSTAGRAM_MESSAGES.connectedAccount}</dt>
+            <dd className="mt-1 font-medium">
+              @{connection.username || "—"}
+            </dd>
+          </div>
+          {connection.connectedAt ? (
+            <div>
+              <dt className="text-muted-foreground">{INSTAGRAM_MESSAGES.connectedAt}</dt>
+              <dd className="mt-1 font-medium">{formatDate(connection.connectedAt)}</dd>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </dl>
+
+        {embeddedInHub ? <IntegrationQuickLinks channel="instagram" /> : null}
+      </div>
     );
   }
 
-  const cardClassName = embeddedInHub
-    ? "w-full max-w-none border-0 bg-transparent shadow-none"
-    : "max-w-2xl shadow-none";
-
   return (
-    <Card className={cardClassName}>
-      <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
-        <div className="flex items-start gap-3">
-          <Camera className="mt-1 size-5 text-primary" />
-          <div className="space-y-1">
-            <CardTitle>
-              {embeddedInHub
-                ? INSTAGRAM_MESSAGES.connectWithFacebook
-                : INSTAGRAM_MESSAGES.connectTitle}
-            </CardTitle>
-            <CardDescription>{INSTAGRAM_MESSAGES.connectDescription}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent
-        className={embeddedInHub ? "space-y-5 px-0 pb-0" : "space-y-5"}
-      >
-        <RequirementsList />
-        <p className="text-xs text-muted-foreground">
-          {INSTAGRAM_MESSAGES.connectLoginHint}
+    <div className="mx-auto w-full max-w-xl space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">{INSTAGRAM_MESSAGES.connectTitle}</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {INSTAGRAM_MESSAGES.connectDescription}
         </p>
-        <InstagramEmbeddedSignup config={embeddedSignupConfig} />
-      </CardContent>
-    </Card>
-  );
-}
+      </div>
 
-function RequirementsList() {
-  return (
-    <div className="rounded-lg border bg-muted/20 p-4 text-sm">
-      <p className="font-medium">{INSTAGRAM_MESSAGES.requirementsTitle}</p>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>{INSTAGRAM_MESSAGES.requirementProfessional}</li>
-        <li>{INSTAGRAM_MESSAGES.requirementFacebookPage}</li>
-        <li>{INSTAGRAM_MESSAGES.requirementMetaApp}</li>
+      <ul className="space-y-1.5 text-sm text-muted-foreground">
+        <li className="flex gap-2">
+          <span className="text-foreground/40">•</span>
+          {INSTAGRAM_MESSAGES.requirementProfessional}
+        </li>
+        <li className="flex gap-2">
+          <span className="text-foreground/40">•</span>
+          {INSTAGRAM_MESSAGES.requirementFacebookPage}
+        </li>
       </ul>
+
+      <InstagramEmbeddedSignup config={embeddedSignupConfig} />
     </div>
   );
 }

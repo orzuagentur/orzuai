@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, StoreIcon } from "lucide-react";
 
-import { DashboardScrollPage } from "@/components/layout/DashboardWorkspaceLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge";
@@ -30,8 +29,8 @@ export function IntegrationsMarketplace({
   const marketplaceChannels = getMarketplaceIntegrationChannels();
 
   return (
-    <DashboardScrollPage
-      header={
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <StoreIcon className="size-6" />
@@ -41,16 +40,13 @@ export function IntegrationsMarketplace({
             {INTEGRATIONS_MESSAGES.marketplaceDescription}
           </p>
         </div>
-      }
-      toolbar={
         <Button variant="outline" asChild>
           <Link href={DASHBOARD_ROUTES.integrations}>
             {INTEGRATIONS_MESSAGES.backToIntegrations}
           </Link>
         </Button>
-      }
-    >
-      <div className="space-y-8">
+      </div>
+
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Channels
@@ -116,8 +112,7 @@ export function IntegrationsMarketplace({
           ))}
         </div>
       </section>
-      </div>
-    </DashboardScrollPage>
+    </div>
   );
 }
 

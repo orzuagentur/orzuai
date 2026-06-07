@@ -1,35 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
-import { WhatsAppManualConnect } from "@/components/whatsapp/WhatsAppManualConnect";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { WhatsAppEmbeddedSignup } from "@/components/whatsapp/WhatsAppEmbeddedSignup";
 import { IntegrationQuickLinks } from "@/components/integrations/IntegrationQuickLinks";
 import {
   IntegrationWebhookHealth,
   resolveWebhookHealthStatus,
 } from "@/components/integrations/IntegrationWebhookHealth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import type {
-  WhatsAppConnectConfig,
+  WhatsAppEmbeddedSignupConfig,
   WhatsAppConnectionData,
 } from "@/types/whatsapp.types";
 
 type WhatsAppIntegrationPanelProps = {
   connection: WhatsAppConnectionData | null;
   hasBusiness: boolean;
-  connectConfig: WhatsAppConnectConfig;
-  /** When true, panel is shown inside the integrations hub (no outer page title). */
+  embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
   embeddedInHub?: boolean;
 };
 
@@ -47,100 +38,103 @@ function getStatusVariant(
   return "outline";
 }
 
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function WhatsAppIntegrationPanel({
   connection,
   hasBusiness,
-  connectConfig,
+  embeddedSignupConfig,
   embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
-  const router = useRouter();
-
   if (!hasBusiness) {
     return (
-      <Card className="mx-auto max-w-2xl shadow-none">
-        <CardHeader>
-          <CardTitle>{WHATSAPP_MESSAGES.noBusinessTitle}</CardTitle>
-          <CardDescription>
+      <div className="mx-auto max-w-lg space-y-4 rounded-lg border bg-card p-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">{WHATSAPP_MESSAGES.noBusinessTitle}</h2>
+          <p className="text-sm text-muted-foreground">
             {WHATSAPP_MESSAGES.noBusinessDescription}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href={DASHBOARD_ROUTES.settings}>Go to business settings</Link>
-          </Button>
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Button asChild>
+          <Link href={DASHBOARD_ROUTES.settings}>Business settings</Link>
+        </Button>
+      </div>
     );
   }
 
-  const cardClassName = embeddedInHub
-    ? "w-full max-w-none shadow-none border-0 bg-transparent"
-    : "mx-auto w-full max-w-3xl shadow-none";
-
-  return (
-    <Card className={cardClassName}>
-      <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
+  if (connection?.status === "connected") {
+    return (
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle>{WHATSAPP_MESSAGES.connectTitle}</CardTitle>
-            <CardDescription>
-              {WHATSAPP_MESSAGES.connectDescription}
-            </CardDescription>
+            <h2 className="text-lg font-semibold">{WHATSAPP_MESSAGES.connectTitle}</h2>
+            <p className="text-sm text-muted-foreground">
+              {WHATSAPP_MESSAGES.connectedHint}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {connection ? (
-              <Badge variant={getStatusVariant(connection.status)}>
-                {connection.status}
-              </Badge>
-            ) : null}
-            {connection?.status === "connected" ? (
-              <IntegrationWebhookHealth
-                status={resolveWebhookHealthStatus({
-                  connected: true,
-                  lastActivityAt: connection.lastSyncedAt,
-                })}
-              />
-            ) : null}
+          <div className="flex items-center gap-2">
+            <Badge variant={getStatusVariant(connection.status)}>Connected</Badge>
+            <IntegrationWebhookHealth
+              status={resolveWebhookHealthStatus({
+                connected: true,
+                lastActivityAt: connection.lastSyncedAt,
+              })}
+            />
           </div>
         </div>
-      </CardHeader>
-      <CardContent className={embeddedInHub ? "space-y-6 px-0 pb-0" : "space-y-6"}>
-        {connection?.status === "connected" ? (
-          <div className="space-y-4">
-            <div className="space-y-4 rounded-lg border p-4">
-              <div className="space-y-1 text-sm">
-                <p>
-                  <span className="font-medium">Connected number:</span>{" "}
-                  {connection.phoneNumber}
-                </p>
-                {connection.connectedAt ? (
-                  <p>
-                    <span className="font-medium">Connected:</span>{" "}
-                    {new Date(connection.connectedAt).toLocaleString("en-US")}
-                  </p>
-                ) : null}
-                {connection.lastSyncedAt ? (
-                  <p>
-                    <span className="font-medium">Last activity:</span>{" "}
-                    {new Date(connection.lastSyncedAt).toLocaleString("en-US")}
-                  </p>
-                ) : null}
-                <p className="text-muted-foreground">
-                  New messages arrive automatically via Meta webhooks.
-                </p>
-              </div>
-            </div>
-            {embeddedInHub ? (
-              <IntegrationQuickLinks channel="whatsapp" />
-            ) : null}
+
+        <dl className="grid gap-4 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">
+              {WHATSAPP_MESSAGES.connectedNumber}
+            </dt>
+            <dd className="mt-1 font-medium">{connection.phoneNumber}</dd>
           </div>
-        ) : (
-          <WhatsAppManualConnect
-            config={connectConfig}
-            onConnected={() => router.refresh()}
-          />
-        )}
-      </CardContent>
-    </Card>
+          {connection.connectedAt ? (
+            <div>
+              <dt className="text-muted-foreground">{WHATSAPP_MESSAGES.connectedAt}</dt>
+              <dd className="mt-1 font-medium">{formatDate(connection.connectedAt)}</dd>
+            </div>
+          ) : null}
+          {connection.lastSyncedAt ? (
+            <div>
+              <dt className="text-muted-foreground">{WHATSAPP_MESSAGES.lastActivity}</dt>
+              <dd className="mt-1 font-medium">{formatDate(connection.lastSyncedAt)}</dd>
+            </div>
+          ) : null}
+        </dl>
+
+        {embeddedInHub ? <IntegrationQuickLinks channel="whatsapp" /> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-xl space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">{WHATSAPP_MESSAGES.connectTitle}</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {WHATSAPP_MESSAGES.connectDescription}
+        </p>
+      </div>
+
+      <ul className="space-y-1.5 text-sm text-muted-foreground">
+        <li className="flex gap-2">
+          <span className="text-foreground/40">•</span>
+          {WHATSAPP_MESSAGES.requirementMeta}
+        </li>
+        <li className="flex gap-2">
+          <span className="text-foreground/40">•</span>
+          {WHATSAPP_MESSAGES.requirementPhone}
+        </li>
+      </ul>
+
+      <WhatsAppEmbeddedSignup config={embeddedSignupConfig} />
+    </div>
   );
 }

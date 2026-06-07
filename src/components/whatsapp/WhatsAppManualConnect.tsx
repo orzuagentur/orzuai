@@ -150,7 +150,7 @@ export function WhatsAppManualConnect({
         {isLoading ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
-            {WHATSAPP_MESSAGES.connectWaiting}
+            {WHATSAPP_MESSAGES.connectWaitingManual}
           </>
         ) : (
           <>

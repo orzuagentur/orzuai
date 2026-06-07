@@ -1,52 +1,61 @@
 export const WHATSAPP_MESSAGES = {
   pageTitle: "Integrations",
   pageDescription: "Connect WhatsApp Business and enable AI-powered replies.",
-  connectTitle: "Connect WhatsApp",
+  connectTitle: "WhatsApp Business",
   connectDescription:
-    "Enter credentials from Meta Developer Console (WhatsApp → API Setup). Configure the webhook URL below in Meta before connecting.",
-  connectSuccess: "WhatsApp connected successfully.",
-  connectWaiting: "Verifying credentials with Meta...",
+    "Official Meta Embedded Signup. Sign in with Meta, choose your business, and select the WhatsApp number for this workspace.",
+  connectButton: "Connect with Meta",
+  connectWaiting:
+    "Complete the Meta popup — select your business portfolio and WhatsApp phone number.",
+  connectFinishing: "Saving connection…",
+  connectSuccess: "WhatsApp connected.",
+  connectCancelled: "Setup cancelled. You can try again.",
+  connectMissingCode:
+    "Meta did not return an authorization code. Close the popup and try again.",
+  connectedNumber: "Connected number",
+  connectedAt: "Connected",
+  lastActivity: "Last activity",
+  connectedHint: "New messages arrive automatically via Meta webhooks.",
+  requirementsTitle: "You need",
+  requirementMeta: "Meta Business account with WhatsApp Business API access.",
+  requirementPhone: "A verified WhatsApp Business phone number in Meta.",
+  noBusinessTitle: "Business profile required",
+  noBusinessDescription: "Create your business profile before connecting WhatsApp.",
+  signupIncomplete: "Setup was not completed in Meta. Please try again.",
+  signupPhoneNumberRequired:
+    "Add and verify a WhatsApp phone number in the Meta popup, then connect again.",
+  whatsappBusinessHelpTitle: "Add a phone number",
+  whatsappBusinessRequired:
+    "Your Meta business is linked, but no WhatsApp number was selected. Open WhatsApp Business on your phone, verify the number in Meta Business Suite, then connect again.",
+  embeddedSignupNotConfigured:
+    "Embedded Signup is not configured. Set NEXT_PUBLIC_META_APP_ID, NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, and WHATSAPP_APP_SECRET.",
+  alreadyConnected: "WhatsApp is already connected for this business.",
+  invalidCredentials: "Meta could not verify the WhatsApp connection.",
+  genericError: "Unable to complete the WhatsApp request. Please try again.",
+  syncSuccess: "WhatsApp sync completed successfully.",
+  notConfigured:
+    "Set NEXT_PUBLIC_APP_URL (HTTPS) and Supabase env vars to enable WhatsApp.",
   phoneNumberIdLabel: "Phone number ID",
   phoneNumberIdPlaceholder: "From API Setup → Phone number ID",
-  phoneNumberIdHint:
-    "Meta Developer Console → your app → WhatsApp → API Setup.",
+  phoneNumberIdHint: "Meta Developer Console → WhatsApp → API Setup.",
   wabaIdLabel: "WhatsApp Business Account ID",
   wabaIdPlaceholder: "WABA ID from API Setup",
   wabaIdHint: "Used to subscribe this app to your WhatsApp Business Account.",
   accessTokenLabel: "Permanent access token",
   accessTokenPlaceholder: "System user or permanent token from Meta",
-  accessTokenHint:
-    "Generate in Meta Business Settings or API Setup. Needs whatsapp_business_messaging and manage permissions.",
+  accessTokenHint: "Needs whatsapp_business_messaging and manage permissions.",
   businessAccountIdLabel: "Meta Business Account ID (optional)",
   businessAccountIdPlaceholder: "Optional",
   webhookUrlLabel: "Webhook callback URL",
   verifyTokenLabel: "Webhook verify token",
   verifyTokenHint:
-    "Set the same value in Meta and as WHATSAPP_VERIFY_TOKEN in your deployment.",
-  requirementsTitle: "Before you connect",
+    "Use the same value in Meta and as WHATSAPP_VERIFY_TOKEN in your deployment.",
   requirements: [
     "WhatsApp Business API app in Meta Developer Console",
     "Phone number added and verified in WhatsApp Manager",
     "Permanent access token with messaging permissions",
-    "Webhook URL and verify token configured in Meta (see below)",
+    "Webhook URL and verify token configured in Meta",
     "WHATSAPP_APP_SECRET set on the server for incoming webhooks",
   ] as const,
-  notConfigured:
-    "Set NEXT_PUBLIC_APP_URL (HTTPS) and Supabase env vars to enable WhatsApp connection.",
-  syncSuccess: "WhatsApp sync completed successfully.",
-  alreadyConnected: "WhatsApp is already connected for this business.",
-  noBusinessTitle: "Create your business profile first",
-  noBusinessDescription:
-    "Set up your business profile before connecting WhatsApp.",
-  invalidCredentials: "Meta could not verify the WhatsApp connection.",
-  signupIncomplete:
-    "WhatsApp setup was not completed. Please finish Meta Embedded Signup and try again.",
-  signupPhoneNumberRequired:
-    "Please add and verify a WhatsApp phone number in the Meta popup to finish setup.",
-  whatsappBusinessHelpTitle: "WhatsApp Business required",
-  whatsappBusinessRequired:
-    "To connect WhatsApp, you need a WhatsApp Business account. You can install WhatsApp Business for free on your phone, set up your business profile, and then continue the connection here.",
-  embeddedSignupNotConfigured:
-    "Meta Embedded Signup is not configured yet. Add NEXT_PUBLIC_META_APP_ID, NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, and WHATSAPP_APP_SECRET to your environment.",
-  genericError: "Unable to complete the WhatsApp request. Please try again.",
+  connectWaitingManual: "Verifying credentials with Meta...",
 } as const;

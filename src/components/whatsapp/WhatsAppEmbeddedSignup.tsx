@@ -5,31 +5,36 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
+import { WhatsAppBusinessHelp } from "@/components/whatsapp/WhatsAppBusinessHelp";
 import { Button } from "@/components/ui/button";
-import { INSTAGRAM_MESSAGES } from "@/features/instagram/constants";
-import { useCompleteInstagramSignup } from "@/hooks/use-complete-instagram-signup";
+import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
+import { useCompleteEmbeddedSignup } from "@/hooks/use-complete-embedded-signup";
 import {
   isTrustedEmbeddedSignupOrigin,
   isEmbeddedSignupFinishEvent,
   parseEmbeddedSignupMessage,
 } from "@/lib/whatsapp/embedded-signup";
-import type { InstagramEmbeddedSignupConfig } from "@/types/instagram.types";
+import type { WhatsAppEmbeddedSignupConfig } from "@/types/whatsapp.types";
 
-type InstagramEmbeddedSignupProps = {
-  config: InstagramEmbeddedSignupConfig;
+type WhatsAppEmbeddedSignupProps = {
+  config: WhatsAppEmbeddedSignupConfig;
+  onConnected?: () => void;
 };
 
 type PendingSignupPayload = {
   code: string;
-  pageId: string;
-  igUserId: string;
+  phoneNumberId: string;
+  wabaId: string;
   businessAccountId?: string;
   finishEvent: string;
 };
 
-type SignupStatus = "idle" | "waiting" | "finishing" | "error";
+type SignupStatus = "idle" | "waiting" | "finishing" | "error" | "waba_only";
 
-export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps) {
+export function WhatsAppEmbeddedSignup({
+  config,
+  onConnected,
+}: WhatsAppEmbeddedSignupProps) {
   const router = useRouter();
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState<SignupStatus>("idle");
@@ -38,8 +43,11 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
   const signupDataRef = useRef<Omit<PendingSignupPayload, "code"> | null>(null);
   const isSubmittingRef = useRef(false);
 
-  const { completeSignup, isLoading } = useCompleteInstagramSignup({
-    onSuccess: () => router.refresh(),
+  const { completeSignup, isLoading } = useCompleteEmbeddedSignup({
+    onSuccess: () => {
+      router.refresh();
+      onConnected?.();
+    },
   });
 
   const submitSignup = useCallback(async () => {
@@ -51,24 +59,24 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
     }
 
     if (
-      !signupData.pageId ||
-      !signupData.igUserId ||
+      !signupData.phoneNumberId ||
+      !signupData.wabaId ||
       !isEmbeddedSignupFinishEvent(signupData.finishEvent)
     ) {
       setStatus("error");
-      setStatusMessage(INSTAGRAM_MESSAGES.signupPageRequired);
+      setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
       return;
     }
 
     isSubmittingRef.current = true;
     setStatus("finishing");
-    setStatusMessage(INSTAGRAM_MESSAGES.connectFinishing);
+    setStatusMessage(WHATSAPP_MESSAGES.connectFinishing);
 
     try {
       const result = await completeSignup({
         code,
-        pageId: signupData.pageId,
-        igUserId: signupData.igUserId,
+        phoneNumberId: signupData.phoneNumberId,
+        wabaId: signupData.wabaId,
         businessAccountId: signupData.businessAccountId,
         finishEvent: signupData.finishEvent,
       });
@@ -112,23 +120,28 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
 
       if (message.event === "CANCEL") {
         setStatus("error");
-        setStatusMessage(INSTAGRAM_MESSAGES.connectCancelled);
+        setStatusMessage(WHATSAPP_MESSAGES.connectCancelled);
         return;
       }
 
       if (message.event === "ERROR") {
         setStatus("error");
         setStatusMessage(
-          message.data.error_message ?? INSTAGRAM_MESSAGES.signupIncomplete,
+          message.data.error_message ?? WHATSAPP_MESSAGES.signupIncomplete,
         );
+        return;
+      }
+
+      if (message.event === "FINISH_ONLY_WABA") {
+        setStatus("waba_only");
+        setStatusMessage(WHATSAPP_MESSAGES.signupPhoneNumberRequired);
         return;
       }
 
       if (isEmbeddedSignupFinishEvent(message.event)) {
         signupDataRef.current = {
-          pageId: message.data.page_id ?? message.data.phone_number_id ?? "",
-          igUserId:
-            message.data.instagram_account_id ?? message.data.waba_id ?? "",
+          phoneNumberId: message.data.phone_number_id ?? "",
+          wabaId: message.data.waba_id ?? "",
           businessAccountId: message.data.business_id,
           finishEvent: message.event,
         };
@@ -168,7 +181,7 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
     }
 
     setStatus("waiting");
-    setStatusMessage(INSTAGRAM_MESSAGES.connectWaiting);
+    setStatusMessage(WHATSAPP_MESSAGES.connectWaiting);
     authCodeRef.current = null;
     signupDataRef.current = null;
 
@@ -178,7 +191,7 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
 
         if (!code) {
           setStatus("error");
-          setStatusMessage(INSTAGRAM_MESSAGES.connectMissingCode);
+          setStatusMessage(WHATSAPP_MESSAGES.connectMissingCode);
           return;
         }
 
@@ -200,7 +213,9 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
 
   if (!config.isConfigured) {
     return (
-      <p className="text-sm text-destructive">{INSTAGRAM_MESSAGES.notConfigured}</p>
+      <p className="text-sm text-destructive">
+        {WHATSAPP_MESSAGES.embeddedSignupNotConfigured}
+      </p>
     );
   }
 
@@ -222,10 +237,10 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
         {isLoading || status === "finishing" ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
-            {INSTAGRAM_MESSAGES.connectFinishing}
+            {WHATSAPP_MESSAGES.connectFinishing}
           </>
         ) : (
-          INSTAGRAM_MESSAGES.connectButton
+          WHATSAPP_MESSAGES.connectButton
         )}
       </Button>
 
@@ -238,6 +253,8 @@ export function InstagramEmbeddedSignup({ config }: InstagramEmbeddedSignupProps
           {statusMessage}
         </p>
       ) : null}
+
+      {status === "waba_only" ? <WhatsAppBusinessHelp /> : null}
     </div>
   );
 }

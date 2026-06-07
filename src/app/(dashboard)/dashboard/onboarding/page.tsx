@@ -11,7 +11,7 @@ import {
   getEmptyOnboardingProgress,
   getOnboardingProgress,
 } from "@/services/onboarding.service";
-import { getWhatsAppConnectConfig } from "@/services/whatsapp.service";
+import { getWhatsAppEmbeddedSignupConfig } from "@/services/whatsapp.service";
 import { mapBusinessToProfile } from "@/utils/business";
 
 type OnboardingPageProps = {
@@ -43,8 +43,8 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
     ? Math.min(5, Math.max(1, requestedStep))
     : progress.recommendedStep;
 
-  const [whatsappConfig, aiSettings] = await Promise.all([
-    Promise.resolve(getWhatsAppConnectConfig()),
+  const [whatsappEmbeddedSignupConfig, aiSettings] = await Promise.all([
+    getWhatsAppEmbeddedSignupConfig(),
     business && progress.connectedChannel
       ? getChannelAiSettings(progress.connectedChannel)
       : Promise.resolve(null),
@@ -67,7 +67,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
           progress={progress}
           business={business ? mapBusinessToProfile(business) : null}
           defaultBusinessName={defaultBusinessName}
-          whatsappConfig={whatsappConfig}
+          whatsappEmbeddedSignupConfig={whatsappEmbeddedSignupConfig}
           aiSettings={aiSettings}
         />
       </Suspense>

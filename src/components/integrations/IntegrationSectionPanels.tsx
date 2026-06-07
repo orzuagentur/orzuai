@@ -42,7 +42,7 @@ import type {
 } from "@/types/voice-agent.types";
 import type {
   WhatsAppConnectionData,
-  WhatsAppConnectConfig,
+  WhatsAppEmbeddedSignupConfig,
 } from "@/types/whatsapp.types";
 
 type IntegrationSectionPanelsProps = {
@@ -52,7 +52,7 @@ type IntegrationSectionPanelsProps = {
   channelStatuses: IntegrationChannelStatusMap;
   whatsapp?: {
     connection: WhatsAppConnectionData | null;
-    connectConfig: WhatsAppConnectConfig;
+    embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
   };
   instagram?: {
     connection: InstagramConnectionData | null;
@@ -143,7 +143,7 @@ function ActivateSection({
       <WhatsAppIntegrationPanel
         connection={whatsapp.connection}
         hasBusiness={hasBusiness}
-        connectConfig={whatsapp.connectConfig}
+        embeddedSignupConfig={whatsapp.embeddedSignupConfig}
         embeddedInHub
       />
     );
