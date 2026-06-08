@@ -87,13 +87,14 @@ export function InboxDetailsPanel({
       return;
     }
 
+    const activeConversationId = conversationId;
     let cancelled = false;
-    loadedConversationIdRef.current = conversationId;
+    loadedConversationIdRef.current = activeConversationId;
     setCrmData(null);
     setCrmLoadState("loading");
 
-    async function load() {
-      const result = await getConversationCrmAssistantAction({ conversationId });
+    async function load(id: string) {
+      const result = await getConversationCrmAssistantAction({ conversationId: id });
 
       if (cancelled) {
         return;
@@ -109,7 +110,7 @@ export function InboxDetailsPanel({
       setCrmLoadState("error");
     }
 
-    void load();
+    void load(activeConversationId);
 
     return () => {
       cancelled = true;
