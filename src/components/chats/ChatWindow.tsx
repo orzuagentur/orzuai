@@ -180,37 +180,41 @@ export function ChatWindow({
           </div>
         </div>
 
-        <MessageHistory
-          messages={conversation.messages}
-          variant="inbox"
-          className="min-h-0 flex-1"
-        />
-        <div ref={bottomRef} />
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <MessageHistory
+              messages={conversation.messages}
+              variant="inbox"
+              className="min-h-0 flex-1 overflow-y-auto"
+              bottomRef={bottomRef}
+            />
 
-        <InboxChatComposer
-          conversationId={conversation.id}
-          internalNote={conversation.internalNote}
-          draft={draft}
-          onDraftChange={setDraft}
-          cannedResponses={cannedResponses}
-          canSend={canSend}
-          channelNotConnectedMessage={channelNotConnectedMessage}
-          websiteFormsHint={conversation.channel === "website_forms"}
-          isSending={isLoading}
-          composerTab={composerTab}
-          onComposerTabChange={setComposerTab}
-          onSubmit={() => {
-            void handleInboxSend();
-          }}
-          onOpenAiSuggest={() => setSuggestOpen(true)}
-        />
+            <InboxChatComposer
+              conversationId={conversation.id}
+              internalNote={conversation.internalNote}
+              draft={draft}
+              onDraftChange={setDraft}
+              cannedResponses={cannedResponses}
+              canSend={canSend}
+              channelNotConnectedMessage={channelNotConnectedMessage}
+              websiteFormsHint={conversation.channel === "website_forms"}
+              isSending={isLoading}
+              composerTab={composerTab}
+              onComposerTabChange={setComposerTab}
+              onSubmit={() => {
+                void handleInboxSend();
+              }}
+              onOpenAiSuggest={() => setSuggestOpen(true)}
+            />
+          </div>
 
-        <AiSuggestReplyPanel
-          conversationId={conversation.id}
-          open={suggestOpen}
-          onOpenChange={setSuggestOpen}
-          onUseSuggestion={setDraft}
-        />
+          <AiSuggestReplyPanel
+            conversationId={conversation.id}
+            open={suggestOpen}
+            onOpenChange={setSuggestOpen}
+            onUseSuggestion={setDraft}
+          />
+        </div>
       </div>
     );
   }

@@ -45,7 +45,7 @@ export function InboxShell({
 
         <div
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+            "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
             showChatOnMobile ? "flex" : "hidden lg:flex",
           )}
         >

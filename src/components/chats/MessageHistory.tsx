@@ -1,3 +1,5 @@
+import type { RefObject } from "react";
+
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import { formatRelativeTime } from "@/utils/dashboard";
@@ -5,6 +7,7 @@ import { formatRelativeTime } from "@/utils/dashboard";
 type MessageHistoryProps = {
   messages: ChatMessageData[];
   variant?: "default" | "inbox";
+  bottomRef?: RefObject<HTMLDivElement | null>;
   className?: string;
 };
 
@@ -23,6 +26,7 @@ function getSenderLabel(message: ChatMessageData): string {
 export function MessageHistory({
   messages,
   variant = "default",
+  bottomRef,
   className,
 }: MessageHistoryProps) {
   const isInbox = variant === "inbox";
@@ -30,11 +34,12 @@ export function MessageHistory({
     return (
       <div
         className={cn(
-          "flex flex-1 items-center justify-center px-4 py-8 text-sm text-muted-foreground",
+          "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8 text-sm text-muted-foreground",
           className,
         )}
       >
         No messages in this conversation yet.
+        {bottomRef ? <div ref={bottomRef} className="hidden" /> : null}
       </div>
     );
   }
@@ -90,6 +95,7 @@ export function MessageHistory({
           </div>
         );
       })}
+      {bottomRef ? <div ref={bottomRef} /> : null}
     </div>
   );
 }

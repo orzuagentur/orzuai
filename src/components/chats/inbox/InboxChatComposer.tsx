@@ -94,7 +94,7 @@ export function InboxChatComposer({
   }
 
   return (
-    <div className="shrink-0 border-t bg-muted/20">
+    <div className="mt-auto shrink-0 border-t bg-muted/20">
       <div className="flex gap-1 border-b px-3 pt-2">
         <Button
           type="button"
