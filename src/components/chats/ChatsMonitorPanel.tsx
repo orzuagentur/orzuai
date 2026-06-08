@@ -56,6 +56,7 @@ export function ChatsMonitorPanel({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isFetching, startFetching] = useTransition();
   const [draft, setDraft] = useState("");
+  const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
   const skipInitialFetchRef = useRef(true);
 
   const needsAttentionIds = useMemo(
@@ -172,10 +173,11 @@ export function ChatsMonitorPanel({
           aiEnabled={activeAiEnabled}
         />
       }
+      channelTabs={
+        <InboxChannelTabs activeChannel="all" channelStats={channels} />
+      }
       listColumn={
         <>
-          <InboxChannelTabs activeChannel="all" channelStats={channels} />
-
           <div className="min-h-0 flex-1 overflow-y-auto">
             {showNeedsAttentionSection ? (
               <div className="border-b bg-amber-500/5">
@@ -225,9 +227,9 @@ export function ChatsMonitorPanel({
         </>
       }
       chatColumn={
-        <>
+        <div className="flex h-full min-h-0 flex-col">
           {showChatOnMobile ? (
-            <div className="border-b px-3 py-2 lg:hidden">
+            <div className="shrink-0 border-b px-3 py-2 lg:hidden">
               <Button variant="ghost" size="sm" asChild>
                 <Link href={DASHBOARD_ROUTES.chats}>
                   <ArrowLeftIcon className="size-4" />
@@ -246,14 +248,18 @@ export function ChatsMonitorPanel({
             layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
+            className="min-h-0 flex-1"
+            suggestReplyOpen={suggestReplyOpen}
+            onSuggestReplyOpenChange={setSuggestReplyOpen}
           />
-        </>
+        </div>
       }
       detailsColumn={
         <InboxDetailsPanel
           conversation={activeConversation}
           cannedResponses={activeCannedResponses}
           onUseSuggestedReply={setDraft}
+          onGenerateReply={() => setSuggestReplyOpen(true)}
         />
       }
     />

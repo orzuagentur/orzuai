@@ -6,9 +6,7 @@ import {
   Loader2Icon,
   MessageSquareIcon,
   MoreHorizontalIcon,
-  PaperclipIcon,
   SendIcon,
-  SmileIcon,
   SparklesIcon,
   StarIcon,
 } from "lucide-react";
@@ -17,6 +15,7 @@ import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import { ChatCrmAssistantBar } from "@/components/chats/ChatCrmAssistantBar";
 import { QuickRepliesPicker } from "@/components/chats/QuickRepliesPicker";
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
+import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
 import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
@@ -45,6 +44,8 @@ type ChatWindowProps = {
   layout?: "default" | "inbox";
   draft?: string;
   onDraftChange?: (value: string) => void;
+  suggestReplyOpen?: boolean;
+  onSuggestReplyOpenChange?: (open: boolean) => void;
   className?: string;
 };
 
@@ -73,6 +74,8 @@ export function ChatWindow({
   layout = "default",
   draft: controlledDraft,
   onDraftChange,
+  suggestReplyOpen: controlledSuggestOpen,
+  onSuggestReplyOpenChange,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -80,7 +83,9 @@ export function ChatWindow({
   const router = useRouter();
   const [internalDraft, setInternalDraft] = useState("");
   const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
-  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [internalSuggestOpen, setInternalSuggestOpen] = useState(false);
+  const suggestOpen = controlledSuggestOpen ?? internalSuggestOpen;
+  const setSuggestOpen = onSuggestReplyOpenChange ?? setInternalSuggestOpen;
   const bottomRef = useRef<HTMLDivElement>(null);
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
@@ -130,10 +135,21 @@ export function ChatWindow({
     });
   }
 
+  async function handleInboxSend() {
+    if (!conversation || !draft.trim() || composerTab !== "reply") {
+      return;
+    }
+
+    await sendMessage({
+      conversationId: conversation.id,
+      content: draft,
+    });
+  }
+
   if (isInboxLayout) {
     return (
-      <div className={cn("flex h-full min-h-0 flex-col", className)}>
-        <div className="shrink-0 border-b px-4 py-3">
+      <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+        <div className="shrink-0 border-b bg-card px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -166,105 +182,28 @@ export function ChatWindow({
 
         <MessageHistory
           messages={conversation.messages}
+          variant="inbox"
           className="min-h-0 flex-1"
         />
         <div ref={bottomRef} />
 
-        <div className="shrink-0 border-t bg-card">
-          <div className="flex gap-1 border-b px-4 pt-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={composerTab === "reply" ? "secondary" : "ghost"}
-              onClick={() => setComposerTab("reply")}
-            >
-              {CHAT_MESSAGES.composerReplyTab}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={composerTab === "note" ? "secondary" : "ghost"}
-              onClick={() => setComposerTab("note")}
-            >
-              {CHAT_MESSAGES.composerNoteTab}
-            </Button>
-          </div>
-
-          {composerTab === "note" ? (
-            <div className="p-4">
-              <ConversationInternalNotes
-                conversationId={conversation.id}
-                initialNote={conversation.internalNote}
-                layout="compact"
-              />
-            </div>
-          ) : (
-            <form
-              onSubmit={(event) => {
-                void handleSubmit(event);
-              }}
-              className="space-y-2 p-4"
-            >
-              {!canSend ? (
-                <p className="text-xs text-muted-foreground">
-                  {channelNotConnectedMessage}
-                </p>
-              ) : conversation.channel === "website_forms" ? (
-                <p className="text-xs text-muted-foreground">
-                  {CHAT_MESSAGES.websiteFormsReplyHint}
-                </p>
-              ) : null}
-
-              <Textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={CHAT_MESSAGES.composerPlaceholder}
-                rows={3}
-                disabled={isLoading || !canSend}
-                className="min-h-[80px] resize-none border-0 bg-muted/30 px-3 py-2 shadow-none focus-visible:ring-1"
-              />
-
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1">
-                  <Button type="button" variant="ghost" size="icon" className="size-8">
-                    <SmileIcon className="size-4" />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="size-8">
-                    <PaperclipIcon className="size-4" />
-                  </Button>
-                  <QuickRepliesPicker
-                    responses={cannedResponses}
-                    disabled={!canSend}
-                    onSelect={(content) => setDraft(content)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setSuggestOpen(true)}
-                    disabled={!canSend}
-                  >
-                    <SparklesIcon className="size-4" />
-                  </Button>
-                </div>
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-                  disabled={isLoading || !canSend || !draft.trim()}
-                >
-                  {isLoading ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <SendIcon className="size-4" />
-                  )}
-                  Send
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
+        <InboxChatComposer
+          conversationId={conversation.id}
+          internalNote={conversation.internalNote}
+          draft={draft}
+          onDraftChange={setDraft}
+          cannedResponses={cannedResponses}
+          canSend={canSend}
+          channelNotConnectedMessage={channelNotConnectedMessage}
+          websiteFormsHint={conversation.channel === "website_forms"}
+          isSending={isLoading}
+          composerTab={composerTab}
+          onComposerTabChange={setComposerTab}
+          onSubmit={() => {
+            void handleInboxSend();
+          }}
+          onOpenAiSuggest={() => setSuggestOpen(true)}
+        />
 
         <AiSuggestReplyPanel
           conversationId={conversation.id}

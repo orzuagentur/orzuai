@@ -49,6 +49,7 @@ export function ChatsChannelPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [draft, setDraft] = useState("");
+  const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
 
   const filteredConversations = useMemo(
     () =>
@@ -94,10 +95,11 @@ export function ChatsChannelPanel({
           aiEnabled={aiEnabled}
         />
       }
+      channelTabs={
+        <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
+      }
       listColumn={
         <>
-          <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
-
           <div className="min-h-0 flex-1 overflow-y-auto">
             <ChatList
               conversations={filteredConversations}
@@ -115,9 +117,9 @@ export function ChatsChannelPanel({
         </>
       }
       chatColumn={
-        <>
+        <div className="flex h-full min-h-0 flex-col">
           {showChatOnMobile ? (
-            <div className="border-b px-3 py-2 lg:hidden">
+            <div className="shrink-0 border-b px-3 py-2 lg:hidden">
               <Button variant="ghost" size="sm" asChild>
                 <Link href={`${DASHBOARD_ROUTES.chats}/${channelId}`}>
                   <ArrowLeftIcon className="size-4" />
@@ -136,14 +138,18 @@ export function ChatsChannelPanel({
             layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
+            className="min-h-0 flex-1"
+            suggestReplyOpen={suggestReplyOpen}
+            onSuggestReplyOpenChange={setSuggestReplyOpen}
           />
-        </>
+        </div>
       }
       detailsColumn={
         <InboxDetailsPanel
           conversation={activeConversation}
           cannedResponses={cannedResponses}
           onUseSuggestedReply={setDraft}
+          onGenerateReply={() => setSuggestReplyOpen(true)}
         />
       }
     />

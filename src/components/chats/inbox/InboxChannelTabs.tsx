@@ -32,24 +32,27 @@ export function InboxChannelTabs({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-1 overflow-x-auto border-b px-3 py-2",
+        "flex shrink-0 items-center gap-1 overflow-x-auto border-b px-4 py-2",
         className,
       )}
     >
       <Link
         href={DASHBOARD_ROUTES.chats}
+        title={CHAT_MESSAGES.viewAll}
+        aria-label={`${CHAT_MESSAGES.viewAll} (${totalConversations})`}
         className={cn(
-          "inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+          "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
           activeChannel === "all"
-            ? "bg-primary/10 font-medium text-foreground"
+            ? "bg-primary/15 text-foreground ring-1 ring-primary/30"
             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
         )}
       >
-        <LayoutGridIcon className="size-4" />
-        <span>{CHAT_MESSAGES.viewAll}</span>
-        <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs tabular-nums">
-          {totalConversations}
-        </span>
+        <LayoutGridIcon className="size-5" />
+        {totalConversations > 0 ? (
+          <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+            {totalConversations > 99 ? "99+" : totalConversations}
+          </span>
+        ) : null}
       </Link>
 
       {CHAT_CHANNEL_LIST.map((channel) => {
@@ -62,26 +65,26 @@ export function InboxChannelTabs({
           <Link
             key={channel.id}
             href={href}
-            title={channel.label}
+            title={`${channel.label}${count > 0 ? ` (${count})` : ""}`}
+            aria-label={`${channel.label}${count > 0 ? ` (${count})` : ""}`}
             className={cn(
-              "inline-flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",
+              "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
               isActive
-                ? "bg-primary/10 font-medium text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                ? "bg-primary/15 ring-1 ring-primary/30"
+                : "hover:bg-muted/60",
             )}
           >
             <div
               className={cn(
-                "flex size-7 items-center justify-center rounded-md",
+                "flex size-8 items-center justify-center rounded-md",
                 getChannelIconContainerClassName(channel.id),
               )}
             >
               <channel.icon className="size-4" />
             </div>
-            <span className="hidden sm:inline">{channel.label}</span>
             {count > 0 ? (
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs tabular-nums">
-                {count}
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                {count > 99 ? "99+" : count}
               </span>
             ) : null}
           </Link>

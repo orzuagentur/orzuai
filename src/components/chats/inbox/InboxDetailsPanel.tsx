@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CalendarIcon,
@@ -19,6 +19,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getConversationCrmAssistantAction } from "@/features/chats/actions/get-conversation-crm-assistant";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
+import type { ConversationCrmAssistantData } from "@/services/crm-assistant.service";
 import { cn } from "@/lib/utils";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ConversationDetail } from "@/types/chat.types";
@@ -37,6 +38,7 @@ type InboxDetailsPanelProps = {
   conversation: ConversationDetail | null;
   cannedResponses: CannedResponseItem[];
   onUseSuggestedReply: (content: string) => void;
+  onGenerateReply?: () => void;
   className?: string;
 };
 
@@ -63,32 +65,48 @@ export function InboxDetailsPanel({
   conversation,
   cannedResponses,
   onUseSuggestedReply,
+  onGenerateReply,
   className,
 }: InboxDetailsPanelProps) {
-  const [crmData, setCrmData] = useState<Awaited<
-    ReturnType<typeof getConversationCrmAssistantAction>
-  > | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [crmData, setCrmData] = useState<ConversationCrmAssistantData | null>(null);
+  const [crmLoadState, setCrmLoadState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const loadedConversationIdRef = useRef<string | null>(null);
+  const conversationId = conversation?.id ?? null;
 
   useEffect(() => {
-    if (!conversation) {
+    if (!conversationId) {
       setCrmData(null);
+      setCrmLoadState("idle");
+      loadedConversationIdRef.current = null;
       return;
     }
 
-    const conversationId = conversation.id;
+    if (loadedConversationIdRef.current === conversationId) {
+      return;
+    }
+
     let cancelled = false;
+    loadedConversationIdRef.current = conversationId;
+    setCrmData(null);
+    setCrmLoadState("loading");
 
     async function load() {
-      setIsLoading(true);
-      const result = await getConversationCrmAssistantAction({
-        conversationId,
-      });
+      const result = await getConversationCrmAssistantAction({ conversationId });
 
-      if (!cancelled) {
-        setCrmData(result);
-        setIsLoading(false);
+      if (cancelled) {
+        return;
       }
+
+      if (result.success) {
+        setCrmData(result.data);
+        setCrmLoadState("ready");
+        return;
+      }
+
+      setCrmData(null);
+      setCrmLoadState("error");
     }
 
     void load();
@@ -96,7 +114,7 @@ export function InboxDetailsPanel({
     return () => {
       cancelled = true;
     };
-  }, [conversation]);
+  }, [conversationId]);
 
   if (!conversation) {
     return (
@@ -116,7 +134,7 @@ export function InboxDetailsPanel({
   const lastMessageAt =
     conversation.messages[conversation.messages.length - 1]?.createdAt ??
     conversation.updatedAt;
-  const crm = crmData?.success ? crmData.data : null;
+  const isCrmLoading = crmLoadState === "loading";
 
   return (
     <aside className={cn("flex h-full min-h-0 flex-col overflow-y-auto", className)}>
@@ -127,13 +145,13 @@ export function InboxDetailsPanel({
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="truncate font-medium">{conversation.contactName}</p>
-            {crm?.leadScore !== null && crm?.leadScore !== undefined ? (
+            {crmData?.leadScore !== null && crmData?.leadScore !== undefined ? (
               <Badge
                 variant="outline"
-                className={getLeadScoreBadgeClassName(crm.leadScore)}
+                className={getLeadScoreBadgeClassName(crmData.leadScore)}
               >
-                {CHAT_MESSAGES.leadScoreLabel}: {crm.leadScore} ·{" "}
-                {getLeadScoreLabel(crm.leadScore)}
+                {CHAT_MESSAGES.leadScoreLabel}: {crmData.leadScore} ·{" "}
+                {getLeadScoreLabel(crmData.leadScore)}
               </Badge>
             ) : null}
           </div>
@@ -162,34 +180,40 @@ export function InboxDetailsPanel({
       </DetailSection>
 
       <DetailSection title={CHAT_MESSAGES.aiAssistantTitle}>
-        {isLoading ? (
+        {isCrmLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2Icon className="size-3.5 animate-spin" />
             {CHAT_MESSAGES.crmAssistantLoading}
           </div>
         ) : (
           <>
-            {crm?.aiSummary ? (
+            {crmData?.aiSummary ? (
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="mb-1 text-xs font-medium">
                   {CHAT_MESSAGES.leadSummaryTitle}
                 </p>
-                <p className="text-sm text-muted-foreground">{crm.aiSummary}</p>
+                <p className="text-sm text-muted-foreground">{crmData.aiSummary}</p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {CHAT_MESSAGES.leadSummaryEmpty}
               </p>
             )}
-            {crm?.suggestedAction ? (
+            {crmData?.suggestedAction ? (
               <p className="text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">
                   {CHAT_MESSAGES.crmSuggestedAction}:{" "}
                 </span>
-                {crm.suggestedAction}
+                {crmData.suggestedAction}
               </p>
             ) : null}
-            <Button type="button" variant="outline" size="sm" className="gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={onGenerateReply}
+            >
               <SparklesIcon className="size-3.5" />
               {CHAT_MESSAGES.generateReply}
             </Button>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 type InboxShellProps = {
   header: ReactNode;
+  channelTabs?: ReactNode;
   listColumn: ReactNode;
   chatColumn: ReactNode;
   detailsColumn: ReactNode;
@@ -15,6 +16,7 @@ type InboxShellProps = {
 
 export function InboxShell({
   header,
+  channelTabs,
   listColumn,
   chatColumn,
   detailsColumn,
@@ -29,6 +31,7 @@ export function InboxShell({
       )}
     >
       {header}
+      {channelTabs}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div

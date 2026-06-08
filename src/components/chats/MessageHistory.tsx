@@ -4,6 +4,7 @@ import { formatRelativeTime } from "@/utils/dashboard";
 
 type MessageHistoryProps = {
   messages: ChatMessageData[];
+  variant?: "default" | "inbox";
   className?: string;
 };
 
@@ -19,7 +20,12 @@ function getSenderLabel(message: ChatMessageData): string {
   return "You";
 }
 
-export function MessageHistory({ messages, className }: MessageHistoryProps) {
+export function MessageHistory({
+  messages,
+  variant = "default",
+  className,
+}: MessageHistoryProps) {
+  const isInbox = variant === "inbox";
   if (messages.length === 0) {
     return (
       <div
@@ -34,7 +40,13 @@ export function MessageHistory({ messages, className }: MessageHistoryProps) {
   }
 
   return (
-    <div className={cn("flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4", className)}>
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4",
+        isInbox && "gap-1.5 bg-muted/20",
+        className,
+      )}
+    >
       {messages.map((message) => {
         const isOutgoing =
           message.senderType === "user" || message.senderType === "ai";
@@ -46,20 +58,30 @@ export function MessageHistory({ messages, className }: MessageHistoryProps) {
           >
             <div
               className={cn(
-                "max-w-[85%] space-y-1 rounded-2xl px-3 py-2 text-sm",
+                "max-w-[78%] rounded-lg px-3 py-2 text-sm shadow-sm",
                 isOutgoing
-                  ? "rounded-br-md bg-primary text-primary-foreground"
-                  : "rounded-bl-md bg-muted",
+                  ? isInbox
+                    ? "rounded-br-sm bg-emerald-600 text-white"
+                    : "rounded-br-md bg-primary text-primary-foreground"
+                  : isInbox
+                    ? "rounded-bl-sm border bg-card text-foreground"
+                    : "rounded-bl-md bg-muted",
               )}
             >
-              <p className="text-[11px] font-medium opacity-80">
-                {getSenderLabel(message)}
-              </p>
+              {!isInbox ? (
+                <p className="text-[11px] font-medium opacity-80">
+                  {getSenderLabel(message)}
+                </p>
+              ) : null}
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
               <p
                 className={cn(
-                  "text-[10px]",
-                  isOutgoing ? "text-primary-foreground/70" : "text-muted-foreground",
+                  "mt-1 text-right text-[10px]",
+                  isOutgoing
+                    ? isInbox
+                      ? "text-emerald-100"
+                      : "text-primary-foreground/70"
+                    : "text-muted-foreground",
                 )}
               >
                 {formatRelativeTime(message.createdAt)}
