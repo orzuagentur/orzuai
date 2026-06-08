@@ -94,7 +94,7 @@ export function AnalyticsHub({ data }: AnalyticsHubProps) {
         </p>
       </div>
 
-      <div className="flex min-h-[32rem] flex-1 flex-col overflow-hidden rounded-xl border bg-card lg:flex-row">
+      <div className="flex min-h-[32rem] flex-1 flex-col lg:flex-row">
         <aside className="w-full shrink-0 border-b lg:w-56 lg:border-b-0 lg:border-r">
           <div className="border-b px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

@@ -68,8 +68,8 @@ export function IntegrationChannelShell({
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <header className="border-b px-4 py-5 md:px-6">
+      <div>
+        <header className="border-b pb-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               {Icon ? (
@@ -152,7 +152,7 @@ export function IntegrationChannelShell({
           )}
         </header>
 
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="pt-6">{children}</div>
       </div>
     </div>
   );

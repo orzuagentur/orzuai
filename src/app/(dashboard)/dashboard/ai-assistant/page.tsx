@@ -41,7 +41,7 @@ function AiAssistantFallback() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
       <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
-      <div className="min-h-[32rem] animate-pulse rounded-xl border bg-muted/30" />
+      <div className="min-h-[32rem] animate-pulse bg-muted/30" />
     </div>
   );
 }

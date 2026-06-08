@@ -31,16 +31,16 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar collapsible="icon" variant="sidebar">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="h-12">
               <Link href={DASHBOARD_NAV_ITEMS[0].href}>
-                <BrandMark size={32} className="rounded-lg" />
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <BrandMark size={36} className="rounded-lg" />
+                <div className="grid flex-1 text-left text-[15px] leading-tight">
                   <span className="truncate font-semibold">{BRAND_NAME}</span>
-                  <span className="truncate text-xs text-muted-foreground">
+                  <span className="truncate text-sm text-muted-foreground">
                     {BRAND_TAGLINE}
                   </span>
                 </div>
@@ -52,7 +52,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sm">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {DASHBOARD_NAV_ITEMS.map((item) => {
@@ -68,6 +68,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
                       asChild
                       isActive={isActive}
                       tooltip={item.label}
+                      className="h-10 text-[15px] [&_svg]:size-5"
                     >
                       <Link href={item.href}>
                         <item.icon />

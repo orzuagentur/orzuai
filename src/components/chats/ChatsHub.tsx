@@ -49,8 +49,8 @@ export function ChatsHub({
         </p>
       </div>
 
-      <div className="flex min-h-[min(720px,calc(100vh-14rem))] flex-1 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-[32rem] lg:flex-row">
-        <aside className="w-full shrink-0 border-b bg-muted/20 lg:w-64 lg:border-b-0 lg:border-r xl:w-72">
+      <div className="flex min-h-[min(720px,calc(100vh-14rem))] flex-1 flex-col lg:min-h-[32rem] lg:flex-row">
+        <aside className="w-full shrink-0 border-b lg:w-64 lg:border-b-0 lg:border-r xl:w-72">
           <div className="border-b px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {CHAT_MESSAGES.channelsTitle}
