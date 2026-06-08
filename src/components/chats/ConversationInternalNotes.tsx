@@ -14,11 +14,13 @@ import { updateConversationInternalNoteAction } from "@/features/chats/actions/u
 type ConversationInternalNotesProps = {
   conversationId: string;
   initialNote: string | null;
+  layout?: "default" | "compact";
 };
 
 export function ConversationInternalNotes({
   conversationId,
   initialNote,
+  layout = "default",
 }: ConversationInternalNotesProps) {
   const router = useRouter();
   const [note, setNote] = useState(initialNote ?? "");
@@ -43,6 +45,39 @@ export function ConversationInternalNotes({
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (layout === "compact") {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          {CHAT_MESSAGES.internalNotesDescription}
+        </p>
+        <Label htmlFor={`internal-note-${conversationId}`} className="sr-only">
+          {CHAT_MESSAGES.internalNotesTitle}
+        </Label>
+        <Textarea
+          id={`internal-note-${conversationId}`}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={CHAT_MESSAGES.internalNotesPlaceholder}
+          rows={3}
+          className="resize-none bg-muted/30"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={isSaving}
+          onClick={() => {
+            void handleSave();
+          }}
+        >
+          {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+          {CHAT_MESSAGES.internalNotesSave}
+        </Button>
+      </div>
+    );
   }
 
   return (

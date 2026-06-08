@@ -31,6 +31,7 @@ type ChatListProps = {
   hideChannelBadge?: boolean;
   linkToConversationChannel?: boolean;
   linkMode?: "channel" | "overview";
+  variant?: "default" | "inbox";
   emptyVariant?: "default" | "search";
   className?: string;
 };
@@ -57,9 +58,11 @@ export function ChatList({
   hideChannelBadge = false,
   linkToConversationChannel = false,
   linkMode = "channel",
+  variant = "default",
   emptyVariant = "default",
   className,
 }: ChatListProps) {
+  const isInboxVariant = variant === "inbox";
   if (conversations.length === 0) {
     const isSearchEmpty = emptyVariant === "search";
 
@@ -102,13 +105,30 @@ export function ChatList({
             )}
             className={cn(
               "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-              isActive && "bg-primary/5",
-              needsAttention && "border-l-2 border-l-amber-500 bg-amber-500/5",
+              isActive &&
+                (isInboxVariant
+                  ? "bg-muted/80"
+                  : "bg-primary/5"),
+              !isInboxVariant &&
+                needsAttention &&
+                "border-l-2 border-l-amber-500 bg-amber-500/5",
             )}
           >
-            <div className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+            <div className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
               {conversation.contactName.slice(0, 2).toUpperCase()}
-              {awaitingReply ? (
+              {isInboxVariant ? (
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background",
+                    getChannelBadgeClassName(conversation.channel),
+                  )}
+                >
+                  <ChannelBrandIcon
+                    channel={conversation.channel}
+                    className="size-3"
+                  />
+                </span>
+              ) : awaitingReply ? (
                 <span
                   className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-background bg-amber-500"
                   aria-hidden="true"
@@ -117,45 +137,7 @@ export function ChatList({
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="truncate font-medium">
-                      {conversation.contactName}
-                    </p>
-                    {!hideChannelBadge ? (
-                      <Badge
-                        variant="outline"
-                        className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
-                      >
-                        <ChannelBrandIcon
-                          channel={conversation.channel}
-                          className="size-3"
-                        />
-                        {getChannelBadgeLabel(conversation.channel)}
-                      </Badge>
-                    ) : null}
-                    {awaitingReply ? (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
-                      >
-                        {CHAT_MESSAGES.awaitingReply}
-                      </Badge>
-                    ) : null}
-                    {conversation.leadScore !== null &&
-                    conversation.leadScore >= HIGH_INTENT_LEAD_SCORE ? (
-                      <Badge
-                        variant="outline"
-                        className={`shrink-0 text-[10px] ${getLeadScoreBadgeClassName(conversation.leadScore)}`}
-                      >
-                        {CHAT_MESSAGES.highIntentBadge} · {conversation.leadScore}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {formatContactIdentifier(conversation.contactPhone)}
-                  </p>
-                </div>
+                <p className="truncate font-medium">{conversation.contactName}</p>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatRelativeTime(
                     conversation.lastMessageAt ?? conversation.updatedAt,
@@ -163,17 +145,60 @@ export function ChatList({
                 </span>
               </div>
               {conversation.lastMessagePreview ? (
-                <p className="line-clamp-2 text-sm text-muted-foreground">
+                <p className="line-clamp-1 text-sm text-muted-foreground">
                   {conversation.lastMessagePreview}
                 </p>
+              ) : (
+                <p className="truncate text-xs text-muted-foreground">
+                  {formatContactIdentifier(conversation.contactPhone)}
+                </p>
+              )}
+              {!isInboxVariant ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {!hideChannelBadge ? (
+                    <Badge
+                      variant="outline"
+                      className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
+                    >
+                      <ChannelBrandIcon
+                        channel={conversation.channel}
+                        className="size-3"
+                      />
+                      {getChannelBadgeLabel(conversation.channel)}
+                    </Badge>
+                  ) : null}
+                  {awaitingReply ? (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+                    >
+                      {CHAT_MESSAGES.awaitingReply}
+                    </Badge>
+                  ) : null}
+                  {conversation.leadScore !== null &&
+                  conversation.leadScore >= HIGH_INTENT_LEAD_SCORE ? (
+                    <Badge
+                      variant="outline"
+                      className={`shrink-0 text-[10px] ${getLeadScoreBadgeClassName(conversation.leadScore)}`}
+                    >
+                      {CHAT_MESSAGES.highIntentBadge} · {conversation.leadScore}
+                    </Badge>
+                  ) : null}
+                </div>
               ) : null}
             </div>
-            <Badge
-              variant="outline"
-              className={`shrink-0 self-start text-[10px] ${getConversationStatusClassName(conversation.status)}`}
-            >
-              {getConversationStatusLabel(conversation.status)}
-            </Badge>
+            {isInboxVariant && awaitingReply ? (
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                1
+              </span>
+            ) : !isInboxVariant ? (
+              <Badge
+                variant="outline"
+                className={`shrink-0 self-start text-[10px] ${getConversationStatusClassName(conversation.status)}`}
+              >
+                {getConversationStatusLabel(conversation.status)}
+              </Badge>
+            ) : null}
           </Link>
         );
       })}

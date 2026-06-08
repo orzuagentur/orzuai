@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { ChatsChannelPanel } from "@/components/chats/ChatsChannelPanel";
-import { ChatsHub } from "@/components/chats/ChatsHub";
 import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { isChatChannelId, type ChatChannelId } from "@/features/chats";
 import { getChatsChannelPageData, getChatsMonitorData } from "@/services/chat.service";
@@ -41,9 +40,11 @@ export default async function ChatsChannelPage({
 
   return (
     <Suspense fallback={<ChatsChannelFallback />}>
-      <ChatsHub activeChannel={channel} monitorChannels={monitorData.channels}>
-        <ChatsChannelPanel channelId={channel} {...channelData} />
-      </ChatsHub>
+      <ChatsChannelPanel
+        channelId={channel}
+        channelStats={monitorData.channels}
+        {...channelData}
+      />
     </Suspense>
   );
 }

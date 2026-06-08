@@ -2,7 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Loader2Icon, MessageSquareIcon, SendIcon, SparklesIcon } from "lucide-react";
+import {
+  Loader2Icon,
+  MessageSquareIcon,
+  MoreHorizontalIcon,
+  PaperclipIcon,
+  SendIcon,
+  SmileIcon,
+  SparklesIcon,
+  StarIcon,
+} from "lucide-react";
 
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import { ChatCrmAssistantBar } from "@/components/chats/ChatCrmAssistantBar";
@@ -21,6 +30,7 @@ import {
 } from "@/features/chats/channel-ui";
 import { Badge } from "@/components/ui/badge";
 import { useSendChatMessage } from "@/hooks/use-send-chat-message";
+import { cn } from "@/lib/utils";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -32,6 +42,10 @@ type ChatWindowProps = {
   channelConnected: boolean;
   channel: MessagingChannel;
   cannedResponses: CannedResponseItem[];
+  layout?: "default" | "inbox";
+  draft?: string;
+  onDraftChange?: (value: string) => void;
+  className?: string;
 };
 
 function getChannelNotConnectedMessage(channel: MessagingChannel): string {
@@ -56,13 +70,22 @@ export function ChatWindow({
   channelConnected,
   channel,
   cannedResponses,
+  layout = "default",
+  draft: controlledDraft,
+  onDraftChange,
+  className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
   const channelNotConnectedMessage = getChannelNotConnectedMessage(channel);
   const router = useRouter();
-  const [draft, setDraft] = useState("");
+  const [internalDraft, setInternalDraft] = useState("");
+  const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
   const [suggestOpen, setSuggestOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const draft = controlledDraft ?? internalDraft;
+  const setDraft = onDraftChange ?? setInternalDraft;
+  const isInboxLayout = layout === "inbox";
+
   const { sendMessage, isLoading } = useSendChatMessage({
     onSuccess: () => {
       setDraft("");
@@ -80,7 +103,12 @@ export function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+      <div
+        className={cn(
+          "flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center",
+          className,
+        )}
+      >
         <MessageSquareIcon className="size-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           {CHAT_MESSAGES.selectConversationOverview}
@@ -92,7 +120,7 @@ export function ChatWindow({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!conversation || !draft.trim()) {
+    if (!conversation || !draft.trim() || composerTab !== "reply") {
       return;
     }
 
@@ -102,107 +130,253 @@ export function ChatWindow({
     });
   }
 
-  return (
-    <div className="flex h-full min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">{conversation.contactName}</p>
-            <Badge
-              variant="outline"
-              className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
-            >
-              <ChannelBrandIcon
-                channel={conversation.channel}
-                className="size-3.5"
-              />
-              {getChannelBadgeLabel(conversation.channel)}
-            </Badge>
+  if (isInboxLayout) {
+    return (
+      <div className={cn("flex h-full min-h-0 flex-col", className)}>
+        <div className="shrink-0 border-b px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate font-medium">{conversation.contactName}</p>
+                <Badge
+                  variant="outline"
+                  className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
+                >
+                  <ChannelBrandIcon
+                    channel={conversation.channel}
+                    className="size-3.5"
+                  />
+                  {getChannelBadgeLabel(conversation.channel)}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatContactIdentifier(conversation.contactPhone)}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button type="button" variant="ghost" size="icon" className="size-8">
+                <StarIcon className="size-4" />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" className="size-8">
+                <MoreHorizontalIcon className="size-4" />
+              </Button>
+            </div>
           </div>
-          <ConversationStatusSelect
-            conversationId={conversation.id}
-            status={conversation.status}
-          />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {formatContactIdentifier(conversation.contactPhone)}
-        </p>
+
+        <MessageHistory
+          messages={conversation.messages}
+          className="min-h-0 flex-1"
+        />
+        <div ref={bottomRef} />
+
+        <div className="shrink-0 border-t bg-card">
+          <div className="flex gap-1 border-b px-4 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={composerTab === "reply" ? "secondary" : "ghost"}
+              onClick={() => setComposerTab("reply")}
+            >
+              {CHAT_MESSAGES.composerReplyTab}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={composerTab === "note" ? "secondary" : "ghost"}
+              onClick={() => setComposerTab("note")}
+            >
+              {CHAT_MESSAGES.composerNoteTab}
+            </Button>
+          </div>
+
+          {composerTab === "note" ? (
+            <div className="p-4">
+              <ConversationInternalNotes
+                conversationId={conversation.id}
+                initialNote={conversation.internalNote}
+                layout="compact"
+              />
+            </div>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                void handleSubmit(event);
+              }}
+              className="space-y-2 p-4"
+            >
+              {!canSend ? (
+                <p className="text-xs text-muted-foreground">
+                  {channelNotConnectedMessage}
+                </p>
+              ) : conversation.channel === "website_forms" ? (
+                <p className="text-xs text-muted-foreground">
+                  {CHAT_MESSAGES.websiteFormsReplyHint}
+                </p>
+              ) : null}
+
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder={CHAT_MESSAGES.composerPlaceholder}
+                rows={3}
+                disabled={isLoading || !canSend}
+                className="min-h-[80px] resize-none border-0 bg-muted/30 px-3 py-2 shadow-none focus-visible:ring-1"
+              />
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  <Button type="button" variant="ghost" size="icon" className="size-8">
+                    <SmileIcon className="size-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="size-8">
+                    <PaperclipIcon className="size-4" />
+                  </Button>
+                  <QuickRepliesPicker
+                    responses={cannedResponses}
+                    disabled={!canSend}
+                    onSelect={(content) => setDraft(content)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => setSuggestOpen(true)}
+                    disabled={!canSend}
+                  >
+                    <SparklesIcon className="size-4" />
+                  </Button>
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isLoading || !canSend || !draft.trim()}
+                >
+                  {isLoading ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <SendIcon className="size-4" />
+                  )}
+                  Send
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        <AiSuggestReplyPanel
+          conversationId={conversation.id}
+          open={suggestOpen}
+          onOpenChange={setSuggestOpen}
+          onUseSuggestion={setDraft}
+        />
       </div>
+    );
+  }
 
-      <ChatCrmAssistantBar conversationId={conversation.id} />
-
-      <ChatAiStatus
-        channel={conversation.channel}
-        aiEnabled={aiEnabled}
-        onToggle={handleRefresh}
-      />
-
-      <ConversationInternalNotes
-        conversationId={conversation.id}
-        initialNote={conversation.internalNote}
-      />
-
-      <MessageHistory messages={conversation.messages} />
-
-      <div ref={bottomRef} />
-
-      <form
-        onSubmit={(event) => {
-          void handleSubmit(event);
-        }}
-        className="shrink-0 border-t p-3 sm:p-4"
-      >
-        {!canSend ? (
-          <p className="mb-3 text-xs text-muted-foreground">
-            {channelNotConnectedMessage}
+  return (
+    <div className={cn("flex h-full min-h-0 flex-1", className)}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="shrink-0 border-b px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">{conversation.contactName}</p>
+              <Badge
+                variant="outline"
+                className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
+              >
+                <ChannelBrandIcon
+                  channel={conversation.channel}
+                  className="size-3.5"
+                />
+                {getChannelBadgeLabel(conversation.channel)}
+              </Badge>
+            </div>
+            <ConversationStatusSelect
+              conversationId={conversation.id}
+              status={conversation.status}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {formatContactIdentifier(conversation.contactPhone)}
           </p>
-        ) : conversation.channel === "website_forms" ? (
-          <p className="mb-3 text-xs text-muted-foreground">
-            {CHAT_MESSAGES.websiteFormsReplyHint}
-          </p>
-        ) : null}
-        <div className="mb-2 flex flex-wrap justify-end gap-2">
-          <QuickRepliesPicker
-            responses={cannedResponses}
-            disabled={!canSend}
-            onSelect={(content) => setDraft(content)}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setSuggestOpen(true)}
-            disabled={!canSend}
-          >
-            <SparklesIcon className="size-3.5" />
-            AI suggest
-          </Button>
         </div>
-        <div className="flex gap-2">
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Type a reply..."
-            rows={2}
-            disabled={isLoading || !canSend}
-            className="min-h-[72px] flex-1 resize-none"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="shrink-0 self-end"
-            disabled={isLoading || !canSend || !draft.trim()}
-          >
-            {isLoading ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <SendIcon className="size-4" />
-            )}
-          </Button>
-        </div>
-      </form>
+
+        <ChatCrmAssistantBar conversationId={conversation.id} />
+
+        <ChatAiStatus
+          channel={conversation.channel}
+          aiEnabled={aiEnabled}
+          onToggle={handleRefresh}
+        />
+
+        <ConversationInternalNotes
+          conversationId={conversation.id}
+          initialNote={conversation.internalNote}
+        />
+
+        <MessageHistory messages={conversation.messages} className="min-h-0 flex-1" />
+
+        <div ref={bottomRef} />
+
+        <form
+          onSubmit={(event) => {
+            void handleSubmit(event);
+          }}
+          className="shrink-0 border-t p-3 sm:p-4"
+        >
+          {!canSend ? (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {channelNotConnectedMessage}
+            </p>
+          ) : conversation.channel === "website_forms" ? (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {CHAT_MESSAGES.websiteFormsReplyHint}
+            </p>
+          ) : null}
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            <QuickRepliesPicker
+              responses={cannedResponses}
+              disabled={!canSend}
+              onSelect={(content) => setDraft(content)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setSuggestOpen(true)}
+              disabled={!canSend}
+            >
+              <SparklesIcon className="size-3.5" />
+              AI suggest
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Type a reply..."
+              rows={2}
+              disabled={isLoading || !canSend}
+              className="min-h-[72px] flex-1 resize-none"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              className="shrink-0 self-end"
+              disabled={isLoading || !canSend || !draft.trim()}
+            >
+              {isLoading ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <SendIcon className="size-4" />
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
 
       <AiSuggestReplyPanel

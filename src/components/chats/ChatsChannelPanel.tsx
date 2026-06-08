@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-
-import { usePollingRefresh } from "@/hooks/use-polling-refresh";
 import { ArrowLeftIcon } from "lucide-react";
 
-import { ChatInboxToolbar } from "@/components/chats/ChatInboxToolbar";
+import { usePollingRefresh } from "@/hooks/use-polling-refresh";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
+import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
+import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
+import { InboxHeader } from "@/components/chats/inbox/InboxHeader";
+import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,17 +21,22 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES, type ChatChannelId } from "@/features/chats";
-import type { ChatInboxFilter, ChatInboxSort } from "@/features/chats/constants";
+import type { ChatInboxFilter } from "@/features/chats/constants";
 import { filterConversations } from "@/utils/chat-inbox-filters";
 import { sortConversations } from "@/utils/chat-inbox-priority";
-import type { ChatsChannelPageData } from "@/types/chat.types";
+import type {
+  ChatMonitorChannelStats,
+  ChatsChannelPageData,
+} from "@/types/chat.types";
 
 type ChatsChannelPanelProps = ChatsChannelPageData & {
   channelId: ChatChannelId;
+  channelStats: ChatMonitorChannelStats[];
 };
 
 export function ChatsChannelPanel({
   channelId,
+  channelStats,
   hasBusiness,
   channel,
   channelConnected,
@@ -41,7 +48,7 @@ export function ChatsChannelPanel({
   usePollingRefresh(5000);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
-  const [activeSort, setActiveSort] = useState<ChatInboxSort>("latest");
+  const [draft, setDraft] = useState("");
 
   const filteredConversations = useMemo(
     () =>
@@ -50,9 +57,9 @@ export function ChatsChannelPanel({
           searchQuery,
           filter: activeFilter,
         }),
-        activeSort,
+        "latest",
       ),
-    [activeFilter, activeSort, conversations, searchQuery],
+    [activeFilter, conversations, searchQuery],
   );
 
   if (!hasBusiness) {
@@ -75,78 +82,70 @@ export function ChatsChannelPanel({
   const showChatOnMobile = Boolean(activeConversationId);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col lg:flex-row">
-      <aside
-        className={
-          showChatOnMobile
-            ? "hidden h-full min-h-0 w-full flex-col border-r lg:flex lg:w-80 xl:w-96"
-            : "flex h-full min-h-0 w-full flex-col border-r lg:w-80 xl:w-96"
-        }
-      >
-        <div className="flex items-center gap-2 border-b px-3 py-2 lg:hidden">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={DASHBOARD_ROUTES.chats}>
-              <ArrowLeftIcon className="size-4" />
-              {CHAT_MESSAGES.monitorTitle}
-            </Link>
-          </Button>
-        </div>
-        <div className="border-b px-4 py-3">
-          <p className="text-sm font-medium">{CHAT_MESSAGES.channelInbox}</p>
-          <p className="text-xs text-muted-foreground">
-            {filteredConversations.length} / {conversations.length}{" "}
-            {CHAT_MESSAGES.conversationsCount}
-          </p>
-        </div>
-        <ChatInboxToolbar
+    <InboxShell
+      showChatOnMobile={showChatOnMobile}
+      header={
+        <InboxHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
-          activeSort={activeSort}
-          onSortChange={setActiveSort}
-        />
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <ChatList
-            conversations={filteredConversations}
-            activeConversationId={activeConversationId}
-            channelId={channelId}
-            hideChannelBadge
-            emptyVariant={
-              conversations.length > 0 && filteredConversations.length === 0
-                ? "search"
-                : "default"
-            }
-          />
-        </div>
-      </aside>
-
-      <section
-        className={
-          showChatOnMobile
-            ? "flex min-h-0 flex-1 flex-col"
-            : "hidden min-h-0 flex-1 flex-col lg:flex"
-        }
-      >
-        {showChatOnMobile ? (
-          <div className="border-b px-3 py-2 lg:hidden">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`${DASHBOARD_ROUTES.chats}/${channelId}`}>
-                <ArrowLeftIcon className="size-4" />
-                Back to list
-              </Link>
-            </Button>
-          </div>
-        ) : null}
-
-        <ChatWindow
-          conversation={activeConversation}
+          aiChannel={channel}
           aiEnabled={aiEnabled}
-          channelConnected={channelConnected}
-          channel={channel}
-          cannedResponses={cannedResponses}
         />
-      </section>
-    </div>
+      }
+      listColumn={
+        <>
+          <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ChatList
+              conversations={filteredConversations}
+              activeConversationId={activeConversationId}
+              channelId={channelId}
+              hideChannelBadge
+              variant="inbox"
+              emptyVariant={
+                conversations.length > 0 && filteredConversations.length === 0
+                  ? "search"
+                  : "default"
+              }
+            />
+          </div>
+        </>
+      }
+      chatColumn={
+        <>
+          {showChatOnMobile ? (
+            <div className="border-b px-3 py-2 lg:hidden">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={`${DASHBOARD_ROUTES.chats}/${channelId}`}>
+                  <ArrowLeftIcon className="size-4" />
+                  {CHAT_MESSAGES.pageTitle}
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+
+          <ChatWindow
+            conversation={activeConversation}
+            aiEnabled={aiEnabled}
+            channelConnected={channelConnected}
+            channel={channel}
+            cannedResponses={cannedResponses}
+            layout="inbox"
+            draft={draft}
+            onDraftChange={setDraft}
+          />
+        </>
+      }
+      detailsColumn={
+        <InboxDetailsPanel
+          conversation={activeConversation}
+          cannedResponses={cannedResponses}
+          onUseSuggestedReply={setDraft}
+        />
+      }
+    />
   );
 }

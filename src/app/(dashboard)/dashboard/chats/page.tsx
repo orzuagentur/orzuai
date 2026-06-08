@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { ChatsHub } from "@/components/chats/ChatsHub";
 import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
 import { ChatsMonitorRealtime } from "@/components/chats/ChatsMonitorRealtime";
 import { Button } from "@/components/ui/button";
@@ -53,11 +52,9 @@ export default async function ChatsPage({ searchParams }: ChatsPageProps) {
 
   return (
     <Suspense fallback={<ChatsMonitorFallback />}>
-      <ChatsHub activeChannel={null} monitorChannels={data.channels}>
-        <ChatsMonitorRealtime>
-          <ChatsMonitorPanel {...data} />
-        </ChatsMonitorRealtime>
-      </ChatsHub>
+      <ChatsMonitorRealtime>
+        <ChatsMonitorPanel {...data} />
+      </ChatsMonitorRealtime>
     </Suspense>
   );
 }
