@@ -78,6 +78,7 @@ export type ConversationListItem = {
   id: string;
   contactName: string;
   contactPhone: string;
+  leadScore: number | null;
   channel: MessagingChannel;
   status: ConversationStatus;
   updatedAt: string;
@@ -115,6 +116,17 @@ export type ChatsMonitorData = {
   totalConversations: number;
   totalMessages: number;
   unifiedConversations: ConversationListItem[];
+};
+
+export type ChatsMonitorPageData = ChatsMonitorData & {
+  conversations: ConversationListItem[];
+  conversationsTotalCount: number;
+  conversationsHasMore: boolean;
+  needsAttentionConversations: ConversationListItem[];
+  activeConversation: ConversationDetail | null;
+  activeChannelConnected: boolean;
+  activeAiEnabled: boolean | null;
+  activeCannedResponses: CannedResponseItem[];
 };
 
 export type ChatsChannelPageData = {

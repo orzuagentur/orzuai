@@ -83,7 +83,7 @@ export function ChatWindow({
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MessageSquareIcon className="size-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          {CHAT_MESSAGES.selectConversation}
+          {CHAT_MESSAGES.selectConversationOverview}
         </p>
       </div>
     );

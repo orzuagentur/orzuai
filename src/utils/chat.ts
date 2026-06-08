@@ -17,8 +17,8 @@ type RawConversationRow = {
   status: ConversationListItem["status"];
   updated_at: string;
   contact:
-    | { id?: string; name: string; phone_number: string }
-    | Array<{ id?: string; name: string; phone_number: string }>
+    | { id?: string; name: string; phone_number: string; lead_score?: number | null }
+    | Array<{ id?: string; name: string; phone_number: string; lead_score?: number | null }>
     | null;
 };
 
@@ -36,7 +36,12 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
 
 export function resolveContactFromRow(
   contact: RawConversationRow["contact"] | { id?: string; phone_number: string },
-): { id?: string; name?: string; phone_number: string } | null {
+): {
+  id?: string;
+  name?: string;
+  phone_number: string;
+  lead_score?: number | null;
+} | null {
   if (!contact) {
     return null;
   }
@@ -122,6 +127,7 @@ export function mapConversationListItem(
     id: row.id,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    leadScore: contact.lead_score ?? null,
     channel: row.channel,
     status: row.status,
     updatedAt: row.updated_at,

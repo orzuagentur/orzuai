@@ -15,7 +15,11 @@ import {
 import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
-import { getChatsMonitorData } from "@/services/chat.service";
+import { getChatsMonitorPageData } from "@/services/chat.service";
+
+type ChatsPageProps = {
+  searchParams: Promise<{ conversation?: string }>;
+};
 
 function ChatsMonitorFallback() {
   return (
@@ -25,8 +29,9 @@ function ChatsMonitorFallback() {
   );
 }
 
-export default async function ChatsPage() {
-  const data = await getChatsMonitorData();
+export default async function ChatsPage({ searchParams }: ChatsPageProps) {
+  const { conversation } = await searchParams;
+  const data = await getChatsMonitorPageData(conversation?.trim());
 
   if (!data.hasBusiness) {
     return (

@@ -19,8 +19,9 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES, type ChatChannelId } from "@/features/chats";
-import type { ChatInboxFilter } from "@/features/chats/constants";
+import type { ChatInboxFilter, ChatInboxSort } from "@/features/chats/constants";
 import { filterConversations } from "@/utils/chat-inbox-filters";
+import { sortConversations } from "@/utils/chat-inbox-priority";
 import type { ChatsChannelPageData } from "@/types/chat.types";
 
 type ChatsChannelPanelProps = ChatsChannelPageData & {
@@ -40,14 +41,18 @@ export function ChatsChannelPanel({
   usePollingRefresh(5000);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
+  const [activeSort, setActiveSort] = useState<ChatInboxSort>("latest");
 
   const filteredConversations = useMemo(
     () =>
-      filterConversations(conversations, {
-        searchQuery,
-        filter: activeFilter,
-      }),
-    [activeFilter, conversations, searchQuery],
+      sortConversations(
+        filterConversations(conversations, {
+          searchQuery,
+          filter: activeFilter,
+        }),
+        activeSort,
+      ),
+    [activeFilter, activeSort, conversations, searchQuery],
   );
 
   if (!hasBusiness) {
@@ -98,6 +103,8 @@ export function ChatsChannelPanel({
           onSearchChange={setSearchQuery}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+          activeSort={activeSort}
+          onSortChange={setActiveSort}
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ChatList

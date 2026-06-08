@@ -25,6 +25,7 @@ import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
   ChatsMonitorData,
+  ChatsMonitorPageData,
   ChatsPageData,
   ConversationDetail,
   ConversationListItem,
@@ -50,6 +51,7 @@ import {
   mapConversationListItem,
   resolveContactFromRow,
 } from "@/utils/chat";
+import { listConversationsPage } from "@/services/chat-inbox-query.service";
 
 function missingConfigError(): {
   success: false;
@@ -94,7 +96,7 @@ export async function listConversations(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, contact:contacts(name, phone_number)",
+      "id, channel, status, updated_at, contact:contacts(name, phone_number, lead_score)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -335,14 +337,86 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
     0,
   );
 
-  const unifiedConversations = await listConversations(business.id);
-
   return {
     hasBusiness: true,
     channels,
     totalConversations,
     totalMessages,
-    unifiedConversations,
+    unifiedConversations: [],
+  };
+}
+
+export async function getChatsMonitorPageData(
+  activeConversationId?: string,
+): Promise<ChatsMonitorPageData> {
+  const monitor = await getChatsMonitorData();
+
+  if (!monitor.hasBusiness) {
+    return {
+      ...monitor,
+      conversations: [],
+      conversationsTotalCount: 0,
+      conversationsHasMore: false,
+      needsAttentionConversations: [],
+      activeConversation: null,
+      activeChannelConnected: false,
+      activeAiEnabled: null,
+      activeCannedResponses: [],
+    };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return {
+      ...monitor,
+      conversations: [],
+      conversationsTotalCount: 0,
+      conversationsHasMore: false,
+      needsAttentionConversations: [],
+      activeConversation: null,
+      activeChannelConnected: false,
+      activeAiEnabled: null,
+      activeCannedResponses: [],
+    };
+  }
+
+  const [page, needsAttentionPage] = await Promise.all([
+    listConversationsPage(business.id, { limit: 50, offset: 0 }),
+    listConversationsPage(business.id, {
+      view: "needs_reply",
+      limit: 8,
+      offset: 0,
+    }),
+  ]);
+
+  const selectedId = activeConversationId?.trim() || null;
+
+  const activeConversation = selectedId
+    ? await getConversationDetail(selectedId, business.id)
+    : null;
+
+  const activeChannel = activeConversation?.channel;
+  const [activeChannelConnected, activeAiEnabled, activeCannedResponses] =
+    activeChannel
+      ? await Promise.all([
+          isChatChannelConnected(business.id, activeChannel),
+          getAiEnabledForChannel(business.id, activeChannel),
+          listCannedResponses(activeChannel),
+        ])
+      : [false, null, []];
+
+  return {
+    ...monitor,
+    conversations: page.items,
+    conversationsTotalCount: page.totalCount,
+    conversationsHasMore: page.hasMore,
+    needsAttentionConversations: needsAttentionPage.items,
+    activeConversation,
+    activeChannelConnected,
+    activeAiEnabled,
+    activeCannedResponses,
   };
 }
 

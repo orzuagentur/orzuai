@@ -46,6 +46,25 @@ export const CHAT_MESSAGES = {
   unifiedInboxTitle: "All channels",
   unifiedInboxDescription:
     "Every conversation across WhatsApp, Instagram, Telegram, and Website Forms.",
+  monitorConversationsSummary: (visible: number, total: number) =>
+    `${visible} / ${total} ${total === 1 ? "conversation" : "conversations"}`,
+  loadMoreConversations: "Load more conversations",
+  monitorKpiConversations: "Conversations",
+  monitorKpiMessages: "Messages",
+  monitorChannelsLabel: "Channels",
+  sortLabel: "Sort",
+  sortLatest: "Latest",
+  sortNeedsReplyFirst: "Needs reply first",
+  sortByChannel: "By channel",
+  needsAttentionTitle: "Needs attention",
+  needsAttentionDescription: "Customers waiting for your reply",
+  awaitingReply: "Awaiting reply",
+  viewAll: "All",
+  viewNeedsReply: "Needs reply",
+  viewHighIntent: "High intent",
+  highIntentBadge: "Hot lead",
+  serverSearchHint: "Search runs across names, phones, and message text.",
+  selectConversationOverview: "Select a conversation to preview and reply.",
   internalNotesTitle: "Internal note",
   internalNotesDescription:
     "Visible only to your team. Customers never see this note.",
@@ -69,3 +88,8 @@ export const CHAT_MESSAGES = {
 } as const;
 
 export type ChatInboxFilter = "all" | "ai_handled" | "needs_human" | "active";
+export type ChatInboxSort = "latest" | "needs_reply_first" | "channel";
+export type ChatInboxQuickView = "all" | "needs_reply" | "high_intent";
+
+export const HIGH_INTENT_LEAD_SCORE = 70;
+export const INBOX_PAGE_SIZE = 50;
