@@ -1,5 +1,5 @@
 import { BrandMark } from "@/components/brand/BrandMark";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/constants/brand";
+import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { cn } from "@/lib/utils";
 
 type OrzuLogoProps = {
@@ -27,12 +27,7 @@ export function OrzuLogo({
     >
       <BrandMark size={markSize} priority />
       {showWordmark ? (
-        <div className={align === "center" ? "text-center" : "text-left"}>
-          <p className="text-xl font-semibold tracking-tight text-foreground">
-            {BRAND_NAME}
-          </p>
-          <p className="text-xs text-muted-foreground">{BRAND_TAGLINE}</p>
-        </div>
+        <BrandWordmark size={size === "lg" ? "lg" : "md"} />
       ) : null}
     </div>
   );

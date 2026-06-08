@@ -53,7 +53,7 @@ async function fetchPage(url: string): Promise<string | null> {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "OrzuAI-KnowledgeSync/1.0 (+https://orzuaibot.vercel.app)",
+        "User-Agent": "OrzuX-KnowledgeSync/1.0 (+https://orzuaibot.vercel.app)",
         Accept: "text/html,application/xhtml+xml",
       },
       cache: "no-store",

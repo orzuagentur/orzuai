@@ -13,7 +13,7 @@ export const CHAT_MESSAGES = {
   messagesToday: "messages",
   notConnectedHint: "Connect this channel in Integrations to receive messages.",
   websiteFormsReplyHint:
-    "Website form leads are saved in OrzuAI. Replies here are stored in the conversation (no external send).",
+    "Website form leads are saved in OrzuX. Replies here are stored in the conversation (no external send).",
   noBusinessTitle: "Create your business profile first",
   noBusinessDescription:
     "Set up your business profile before viewing customer conversations.",

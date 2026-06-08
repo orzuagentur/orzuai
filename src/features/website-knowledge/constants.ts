@@ -1,7 +1,7 @@
 export const WEBSITE_KNOWLEDGE_MESSAGES = {
   connectTitle: "Website Knowledge Sync",
   connectDescription:
-    "Enter your website URL. OrzuAI scans pages and builds your AI knowledge base automatically.",
+    "Enter your website URL. OrzuX scans pages and builds your AI knowledge base automatically.",
   siteUrlLabel: "Website address",
   siteUrlPlaceholder: "https://yourcompany.com",
   saveAndSync: "Save & sync now",
@@ -16,7 +16,7 @@ export const WEBSITE_KNOWLEDGE_MESSAGES = {
     "Pages were scanned but no usable business information was found.",
   autoSyncLabel: "Automatic sync when the site changes",
   autoSyncHint:
-    "OrzuAI re-scans your site on a schedule and refreshes AI knowledge entries.",
+    "OrzuX re-scans your site on a schedule and refreshes AI knowledge entries.",
   intervalLabel: "Sync schedule",
   lastSynced: "Last sync",
   nextSync: "Next auto sync",

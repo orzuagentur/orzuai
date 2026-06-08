@@ -125,7 +125,7 @@ function LandingPageContent() {
 
       <footer className="relative z-10 space-y-3 px-6 pb-8 pt-4 text-center text-xs text-muted-foreground">
         <LegalFooterLinks />
-        <p>© {new Date().getFullYear()} OrzuAI. Built for modern small businesses.</p>
+        <p>© {new Date().getFullYear()} OrzuX. Built for modern small businesses.</p>
       </footer>
 
       <AuthModal open={authOpen} onOpenChange={setAuthOpen} />

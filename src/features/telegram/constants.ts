@@ -1,7 +1,7 @@
 export const TELEGRAM_MESSAGES = {
   connectTitle: "Connect Telegram",
   connectDescription:
-    "Connect a Telegram Bot to receive and reply to customer messages through OrzuAI.",
+    "Connect a Telegram Bot to receive and reply to customer messages through OrzuX.",
   botTokenLabel: "Bot token",
   botTokenPlaceholder: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
   botTokenHint:
@@ -23,6 +23,6 @@ export const TELEGRAM_MESSAGES = {
   alreadyConnected: "Telegram is already connected for this business.",
   noBusinessTitle: "Create your business profile first",
   noBusinessDescription:
-    "Set up your business profile in OrzuAI before connecting Telegram.",
+    "Set up your business profile in OrzuX before connecting Telegram.",
   genericError: "Unable to complete the Telegram request. Please try again.",
 } as const;

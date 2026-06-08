@@ -23,7 +23,7 @@ export function LandingProductPreview() {
           <span className="size-2.5 rounded-full bg-red-400/80" />
           <span className="size-2.5 rounded-full bg-amber-400/80" />
           <span className="size-2.5 rounded-full bg-emerald-400/80" />
-          <span className="ml-2 text-xs text-muted-foreground">OrzuAI Dashboard</span>
+          <span className="ml-2 text-xs text-muted-foreground">OrzuX Dashboard</span>
         </div>
 
         <div className="grid md:grid-cols-[180px_1fr]">

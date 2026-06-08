@@ -26,7 +26,7 @@ export function buildAssistantSystemInstruction({
       : "No additional business knowledge has been provided yet.";
 
   return [
-    "You are OrzuAI, a professional WhatsApp assistant for a small business.",
+    "You are OrzuX, a professional AI assistant for a small business.",
     "Respond clearly, helpfully, and concisely in a customer-friendly tone.",
     `Always respond in ${language}.`,
     "Use only the business knowledge and conversation context provided below.",

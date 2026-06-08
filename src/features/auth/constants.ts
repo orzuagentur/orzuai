@@ -50,7 +50,7 @@ export const PASSWORD_RESET_MESSAGES = {
   confirmationDescription:
     "If an account exists for this email, you will receive a password reset link shortly.",
   resetTitle: "Choose a new password",
-  resetDescription: "Enter a new password for your OrzuAI account.",
+  resetDescription: "Enter a new password for your OrzuX account.",
   successTitle: "Password updated",
   successDescription:
     "Your password has been updated. You can now sign in with your new password.",

@@ -51,9 +51,9 @@ export const LANDING_I18N: Record<LandingLocale, LandingCopy> = {
         "Inbox, CRM, AI replies, and channel analytics — without switching between apps.",
     },
     comparison: {
-      title: "Why teams switch to OrzuAI",
+      title: "Why teams switch to OrzuX",
       subtitle:
-        "ManyChat and Intercom are great at one channel or one use case. OrzuAI unifies messaging + CRM + AI in one place.",
+        "ManyChat and Intercom are great at one channel or one use case. OrzuX unifies messaging + CRM + AI in one place.",
     },
     faqTitle: "Frequently asked questions",
   },
@@ -74,9 +74,9 @@ export const LANDING_I18N: Record<LandingLocale, LandingCopy> = {
         "Инбокс, CRM, AI-ответы и аналитика по каналам — без переключения между приложениями.",
     },
     comparison: {
-      title: "Почему команды переходят на OrzuAI",
+      title: "Почему команды переходят на OrzuX",
       subtitle:
-        "ManyChat и Intercom сильны в одном канале или сценарии. OrzuAI объединяет мессенджеры, CRM и AI в одном месте.",
+        "ManyChat и Intercom сильны в одном канале или сценарии. OrzuX объединяет мессенджеры, CRM и AI в одном месте.",
     },
     faqTitle: "Частые вопросы",
   },
@@ -97,9 +97,9 @@ export const LANDING_I18N: Record<LandingLocale, LandingCopy> = {
         "Inbox, CRM, AI javoblar va kanal analitikasi — ilovalar o'rtasida almashmasdan.",
     },
     comparison: {
-      title: "Nima uchun jamoalar OrzuAI ga o'tadi",
+      title: "Nima uchun jamoalar OrzuX ga o'tadi",
       subtitle:
-        "ManyChat va Intercom bitta kanal yoki vazifada yaxshi. OrzuAI xabarlar, CRM va AI ni bir joyga birlashtiradi.",
+        "ManyChat va Intercom bitta kanal yoki vazifada yaxshi. OrzuX xabarlar, CRM va AI ni bir joyga birlashtiradi.",
     },
     faqTitle: "Ko'p beriladigan savollar",
   },

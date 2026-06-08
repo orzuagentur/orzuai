@@ -1,7 +1,7 @@
 export const WEBSITE_FORMS_MESSAGES = {
   connectTitle: "Website Forms",
   connectDescription:
-    "Connect any website or CMS. Each submission creates a lead, contact, and conversation in OrzuAI.",
+    "Connect any website or CMS. Each submission creates a lead, contact, and conversation in OrzuX.",
   connectWithOneClick: "Enable Website Forms",
   connectSuccess: "Website Forms enabled. Copy your webhook URL and API key below.",
   noBusinessTitle: "Business profile required",
@@ -22,7 +22,7 @@ export const WEBSITE_FORMS_MESSAGES = {
   siteUrlLabel: "Site URL (optional)",
   followUpTitle: "AI follow-up channel",
   followUpDescription:
-    "After a form is submitted, OrzuAI can reply using AI on WhatsApp, Email, or in-app (Website Forms inbox).",
+    "After a form is submitted, OrzuX can reply using AI on WhatsApp, Email, or in-app (Website Forms inbox).",
   followUpWhatsapp: "WhatsApp (needs phone in form + WhatsApp connected)",
   followUpEmail: "Email (needs email in form + Resend configured)",
   followUpTelegram:

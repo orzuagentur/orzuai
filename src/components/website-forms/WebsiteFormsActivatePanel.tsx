@@ -136,7 +136,7 @@ document.getElementById("orzu-lead-form").addEventListener("submit", async (e) =
         </p>
         <ol className="list-decimal space-y-2 pl-5">
           <li>Install a webhook plugin (CF7 + webhook add-on or WP Webhooks).</li>
-          <li>Set URL to your OrzuAI Webhook URL.</li>
+          <li>Set URL to your OrzuX Webhook URL.</li>
           <li>Map fields to: name, email, phone, message.</li>
         </ol>
       </div>

@@ -22,7 +22,7 @@ export function renderVerificationEmail({
       Verify your email address
     </h1>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${"#71717a"};">
-      Thanks for signing up for OrzuAI. Please confirm your email address to activate your account and access the dashboard.
+      Thanks for signing up for OrzuX. Please confirm your email address to activate your account and access the dashboard.
     </p>
     ${renderPrimaryButton(verificationUrl, "Verify Email")}
     <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${"#71717a"};">
@@ -32,14 +32,14 @@ export function renderVerificationEmail({
       <a href="${safeUrl}" style="color:#7c3aed;text-decoration:underline;">${safeUrl}</a>
     </p>
     <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${"#71717a"};">
-      If you did not create an OrzuAI account, you can safely ignore this email.
+      If you did not create an OrzuX account, you can safely ignore this email.
     </p>
   `;
 
   return {
     subject: EMAIL_SUBJECTS.verification,
     html: renderBaseEmailLayout({
-      previewText: "Verify your OrzuAI account to get started.",
+      previewText: "Verify your OrzuX account to get started.",
       title: EMAIL_SUBJECTS.verification,
       bodyHtml,
     }),

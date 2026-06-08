@@ -15,12 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OrzuAI",
-  description: "The easiest AI WhatsApp Assistant platform for small businesses",
+  title: "OrzuX",
+  description: "AI Business Communication Platform",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "OrzuAI",
+    title: "OrzuX",
     statusBarStyle: "default",
   },
   icons: {

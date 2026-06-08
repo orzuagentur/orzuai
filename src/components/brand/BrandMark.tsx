@@ -21,7 +21,7 @@ export function BrandMark({
       width={size}
       height={size}
       priority={priority}
-      className={cn("rounded-xl object-cover shadow-lg shadow-primary/20", className)}
+      className={cn("object-contain", className)}
     />
   );
 }

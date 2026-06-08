@@ -1,5 +1,5 @@
 export const ONBOARDING_MESSAGES = {
-  pageTitle: "Set up OrzuAI",
+  pageTitle: "Set up OrzuX",
   pageDescription:
     "Complete these steps to launch your multi-channel AI assistant.",
   progressLabel: "Setup progress",

@@ -7,4 +7,4 @@ export {
 } from "./env-keys";
 export type { EnvKey } from "./env-keys";
 export { APP_ROUTES, AUTH_ROUTES, DASHBOARD_ROUTES, PROTECTED_ROUTE_PREFIXES } from "./routes";
-export { BRAND_ICON_PATH, BRAND_NAME, BRAND_TAGLINE } from "./brand";
+export { BRAND_DESCRIPTION, BRAND_ICON_PATH, BRAND_NAME } from "./brand";

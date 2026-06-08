@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { BrandMark } from "@/components/brand/BrandMark";
+import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/constants/brand";
 import {
   Sidebar,
   SidebarContent,
@@ -37,13 +37,8 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="h-12">
               <Link href={DASHBOARD_NAV_ITEMS[0].href}>
-                <BrandMark size={36} className="rounded-lg" />
-                <div className="grid flex-1 text-left text-[15px] leading-tight">
-                  <span className="truncate font-semibold">{BRAND_NAME}</span>
-                  <span className="truncate text-sm text-muted-foreground">
-                    {BRAND_TAGLINE}
-                  </span>
-                </div>
+                <BrandMark size={36} />
+                <BrandWordmark className="flex-1" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

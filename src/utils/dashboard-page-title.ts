@@ -34,5 +34,5 @@ export function resolveDashboardPageTitle(pathname: string): string {
     return item.label;
   }
 
-  return "OrzuAI";
+  return "OrzuX";
 }

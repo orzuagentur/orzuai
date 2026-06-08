@@ -34,7 +34,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Welcome back to OrzuAI</CardTitle>
+          <CardTitle>Welcome back to OrzuX</CardTitle>
           <CardDescription>
             Sign in to manage your multi-channel AI inbox.
           </CardDescription>

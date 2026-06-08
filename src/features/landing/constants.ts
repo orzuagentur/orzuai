@@ -3,7 +3,7 @@ export const LANDING_COPY = {
   subtitle:
     "Unify customer conversations, automate replies with AI trained on your business knowledge, and grow faster — all from one dashboard.",
   startButton: "START",
-  modalTitle: "Welcome to OrzuAI",
+  modalTitle: "Welcome to OrzuX",
   modalDescription:
     "Sign in or create an account to launch your multi-channel AI assistant.",
 } as const;
@@ -29,7 +29,7 @@ export const LANDING_HEADER = {
 
 export const LANDING_BOOK_DEMO = {
   label: "Book a demo",
-  href: "mailto:hello@orzuai.com?subject=OrzuAI%20demo%20request",
+  href: "mailto:hello@orzuai.com?subject=OrzuX%20demo%20request",
 } as const;
 
 export const LANDING_PRODUCT = {
@@ -45,7 +45,7 @@ export const LANDING_PRODUCT = {
 
 export const LANDING_SOCIAL_PROOF = {
   title: "Trusted by growing teams",
-  subtitle: "Small businesses use OrzuAI to reply faster across every channel.",
+  subtitle: "Small businesses use OrzuX to reply faster across every channel.",
   logos: ["Retail", "Clinics", "Agencies", "E-commerce", "Education"],
   testimonials: [
     {
@@ -101,10 +101,10 @@ export const LANDING_PRICING = {
 } as const;
 
 export const LANDING_FEATURE_COMPARISON = {
-  title: "Why teams switch to OrzuAI",
+  title: "Why teams switch to OrzuX",
   subtitle:
-    "ManyChat and Intercom are great at one channel or one use case. OrzuAI unifies messaging + CRM + AI in one place.",
-  columns: ["OrzuAI", "ManyChat", "Intercom"] as const,
+    "ManyChat and Intercom are great at one channel or one use case. OrzuX unifies messaging + CRM + AI in one place.",
+  columns: ["OrzuX", "ManyChat", "Intercom"] as const,
   rows: [
     {
       feature: "WhatsApp + Instagram + Telegram",
@@ -149,7 +149,7 @@ export const LANDING_FAQ = {
   title: "Frequently asked questions",
   items: [
     {
-      question: "Which channels does OrzuAI support?",
+      question: "Which channels does OrzuX support?",
       answer:
         "WhatsApp Business Cloud API, Instagram Direct, Telegram Bot API, and Website Forms leads — all in one inbox.",
     },

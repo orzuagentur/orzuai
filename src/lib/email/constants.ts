@@ -1,12 +1,11 @@
-export const EMAIL_APP_NAME = "OrzuAI";
+export const EMAIL_APP_NAME = "OrzuX";
 
-export const EMAIL_TAGLINE =
-  "The easiest AI WhatsApp Assistant platform for small businesses";
+export const EMAIL_TAGLINE = "AI Business Communication Platform";
 
 export const EMAIL_SUBJECTS = {
-  verification: "Verify your OrzuAI account",
-  passwordReset: "Reset your OrzuAI password",
-  onboardingDay0: "Welcome to OrzuAI — start your setup",
+  verification: "Verify your OrzuX account",
+  passwordReset: "Reset your OrzuX password",
+  onboardingDay0: "Welcome to OrzuX — start your setup",
   onboardingDay1: "Day 1: connect your first channel",
   onboardingDay3: "Day 3: train your AI with knowledge",
 } as const;

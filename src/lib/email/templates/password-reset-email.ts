@@ -22,7 +22,7 @@ export function renderPasswordResetEmail({
       Reset your password
     </h1>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${"#71717a"};">
-      We received a request to reset your OrzuAI password. Click the button below to choose a new password.
+      We received a request to reset your OrzuX password. Click the button below to choose a new password.
     </p>
     ${renderPrimaryButton(resetUrl, "Reset Password")}
     <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${"#71717a"};">
@@ -39,7 +39,7 @@ export function renderPasswordResetEmail({
   return {
     subject: EMAIL_SUBJECTS.passwordReset,
     html: renderBaseEmailLayout({
-      previewText: "Reset your OrzuAI password.",
+      previewText: "Reset your OrzuX password.",
       title: EMAIL_SUBJECTS.passwordReset,
       bodyHtml,
     }),

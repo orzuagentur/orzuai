@@ -44,7 +44,7 @@ export function PwaInstallBanner() {
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
       <div className="flex items-center gap-2">
         <DownloadIcon className="size-4" />
-        <span>Install OrzuAI on your device for quick access.</span>
+        <span>Install OrzuX on your device for quick access.</span>
       </div>
       <div className="flex items-center gap-2">
         <Button type="button" size="sm" onClick={handleInstall}>

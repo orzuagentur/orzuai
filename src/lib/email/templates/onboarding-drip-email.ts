@@ -19,8 +19,8 @@ const DRIP_CONTENT: Record<
 > = {
   0: {
     subject: EMAIL_SUBJECTS.onboardingDay0,
-    preview: "Welcome to OrzuAI — here is how to get your first channel live.",
-    title: "Welcome to OrzuAI",
+    preview: "Welcome to OrzuX — here is how to get your first channel live.",
+    title: "Welcome to OrzuX",
     body: "Your account is ready. Complete the 5-step setup wizard to connect a channel, add business knowledge, and test your first AI reply.",
     cta: "Start setup",
   },
@@ -35,7 +35,7 @@ const DRIP_CONTENT: Record<
     subject: EMAIL_SUBJECTS.onboardingDay3,
     preview: "Day 3 tip: add knowledge entries so AI replies sound like your brand.",
     title: "Train your AI assistant",
-    body: "Add FAQs, pricing, and policies to Knowledge. OrzuAI uses this context for every auto-reply across WhatsApp, Instagram, and Telegram.",
+    body: "Add FAQs, pricing, and policies to Knowledge. OrzuX uses this context for every auto-reply across WhatsApp, Instagram, and Telegram.",
     cta: "Add knowledge",
   },
 };

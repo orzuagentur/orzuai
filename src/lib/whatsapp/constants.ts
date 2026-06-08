@@ -2,7 +2,7 @@ export const DEFAULT_WHATSAPP_API_VERSION = "v25.0";
 
 export const WHATSAPP_GRAPH_API_BASE = "https://graph.facebook.com";
 
-/** OrzuAI Meta app (public — Embedded Signup SDK) */
+/** OrzuX Meta app (public — Embedded Signup SDK) */
 export const META_APP_ID = "2417886435376369";
 
 /** Embedded Signup configuration ID from Meta Developer Console */

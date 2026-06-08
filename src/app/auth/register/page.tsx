@@ -24,7 +24,7 @@ export default async function RegisterPage() {
     <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Create your OrzuAI account</CardTitle>
+          <CardTitle>Create your OrzuX account</CardTitle>
           <CardDescription>
             Create an account to launch your multi-channel AI assistant.
           </CardDescription>

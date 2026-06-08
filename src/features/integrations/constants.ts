@@ -163,11 +163,11 @@ export const INTEGRATIONS_MESSAGES = {
   goToActivate: "Go to Activate",
   dangerZoneTitle: "Disconnect channel",
   dangerZoneDescription:
-    "Stop receiving messages and remove this connection from OrzuAI. Your Meta or Telegram account is not deleted.",
+    "Stop receiving messages and remove this connection from OrzuX. Your Meta or Telegram account is not deleted.",
   disconnectStep1Button: "Disconnect…",
   disconnectStep2Title: "Confirm disconnect",
   disconnectStep2Description: (resource: string) =>
-    `This will remove ${resource} from OrzuAI. You can connect again from the Marketplace.`,
+    `This will remove ${resource} from OrzuX. You can connect again from the Marketplace.`,
   disconnectConfirmButton: "Yes, disconnect",
   disconnectCancelButton: "Cancel",
   disconnecting: "Disconnecting…",

@@ -44,7 +44,7 @@ export function LegalPageShell({
 
       <footer className="border-t px-6 py-8 text-center text-xs text-muted-foreground">
         <LegalFooterLinks className="mb-4" />
-        <p>© {new Date().getFullYear()} OrzuAI. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} OrzuX. All rights reserved.</p>
       </footer>
     </div>
   );

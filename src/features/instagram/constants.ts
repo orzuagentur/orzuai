@@ -3,7 +3,7 @@ export const INSTAGRAM_MESSAGES = {
   connectWithFacebook: "Connect with Meta",
   connectButton: "Connect with Meta",
   connectDescription:
-    "Official Meta login. Link your Professional Instagram account to receive and reply to Direct messages in OrzuAI.",
+    "Official Meta login. Link your Professional Instagram account to receive and reply to Direct messages in OrzuX.",
   connectWaiting:
     "Complete the Meta popup — select your business and Instagram Professional account.",
   connectFinishing: "Saving connection…",
@@ -29,7 +29,7 @@ export const INSTAGRAM_MESSAGES = {
   alreadyConnected: "Instagram is already connected for this business.",
   noBusinessTitle: "Business profile required",
   noBusinessDescription:
-    "Create your business profile in OrzuAI before connecting Instagram.",
+    "Create your business profile in OrzuX before connecting Instagram.",
   genericError: "Unable to complete the Instagram request. Please try again.",
   connectLoginHint:
     "Use the Facebook login that manages your Instagram. Select an existing business — do not create a new personal profile.",

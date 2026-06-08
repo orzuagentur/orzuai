@@ -1,7 +1,7 @@
 {
-  "name": "OrzuAI",
-  "short_name": "OrzuAI",
-  "description": "AI assistant for small business messaging, CRM, and voice.",
+  "name": "OrzuX",
+  "short_name": "OrzuX",
+  "description": "AI Business Communication Platform",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",

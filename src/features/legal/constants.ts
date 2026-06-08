@@ -1,5 +1,5 @@
 export const LEGAL_COMPANY = {
-  name: "OrzuAI",
+  name: "OrzuX",
   contactEmail: "support@orzuai.com",
   lastUpdated: "May 30, 2026",
 } as const;
