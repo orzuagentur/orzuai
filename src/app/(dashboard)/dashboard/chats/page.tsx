@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
-import { ChatsMonitorRealtime } from "@/components/chats/ChatsMonitorRealtime";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,9 +51,7 @@ export default async function ChatsPage({ searchParams }: ChatsPageProps) {
 
   return (
     <Suspense fallback={<ChatsMonitorFallback />}>
-      <ChatsMonitorRealtime>
-        <ChatsMonitorPanel {...data} />
-      </ChatsMonitorRealtime>
+      <ChatsMonitorPanel {...data} />
     </Suspense>
   );
 }

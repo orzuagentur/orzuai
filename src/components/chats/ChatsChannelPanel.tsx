@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 
-import { usePollingRefresh } from "@/hooks/use-polling-refresh";
+import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
+import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
@@ -41,15 +42,38 @@ export function ChatsChannelPanel({
   channel,
   channelConnected,
   aiEnabled,
-  conversations,
+  conversations: initialConversations,
   activeConversation,
   cannedResponses,
 }: ChatsChannelPanelProps) {
-  usePollingRefresh(5000);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
+  const [conversations, setConversations] = useState(initialConversations);
+
+  useEffect(() => {
+    setConversations(initialConversations);
+  }, [initialConversations]);
+
+  const refreshConversations = useCallback(async () => {
+    const result = await fetchMonitorConversationsAction({
+      channel: channelId,
+      offset: 0,
+      limit: 100,
+      view: "all",
+      filter: "all",
+      sort: "latest",
+    });
+
+    if (result.success) {
+      setConversations(result.data.items);
+    }
+  }, [channelId]);
+
+  useInboxListPolling(() => {
+    void refreshConversations();
+  });
 
   const filteredConversations = useMemo(
     () =>

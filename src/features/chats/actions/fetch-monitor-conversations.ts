@@ -14,6 +14,9 @@ import { hasSupabaseEnv } from "@/lib/env";
 const fetchMonitorConversationsSchema = z.object({
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(50),
+  channel: z
+    .enum(["whatsapp", "telegram", "instagram", "website_forms"])
+    .optional(),
   search: z.string().max(200).optional(),
   view: z.enum(["all", "needs_reply", "high_intent"]).default("all"),
   filter: z
@@ -60,6 +63,7 @@ export async function fetchMonitorConversationsAction(
   const result = await listConversationsPage(business.id, {
     offset: parsed.data.offset,
     limit: parsed.data.limit,
+    channel: parsed.data.channel,
     search: parsed.data.search,
     view: parsed.data.view as InboxQuickView,
     filter: parsed.data.filter,

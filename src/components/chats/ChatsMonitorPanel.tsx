@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { CHAT_MESSAGES } from "@/features/chats";
+import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
 import type {
   ChatInboxFilter,
   ChatInboxQuickView,
@@ -83,8 +84,8 @@ export function ChatsMonitorPanel({
   const aiChannel = activeConversation?.channel ?? null;
 
   const fetchConversations = useCallback(
-    (offset: number, append: boolean) => {
-      startFetching(async () => {
+    (offset: number, append: boolean, silent = false) => {
+      const run = async () => {
         const [listResult, needsAttentionResult] = await Promise.all([
           fetchMonitorConversationsAction({
             offset,
@@ -122,10 +123,21 @@ export function ChatsMonitorPanel({
         } else if (offset === 0 && activeQuickView !== "all") {
           setNeedsAttentionConversations([]);
         }
-      });
+      };
+
+      if (silent) {
+        void run();
+        return;
+      }
+
+      startFetching(run);
     },
     [activeFilter, activeQuickView, activeSort, debouncedSearch],
   );
+
+  useInboxListPolling(() => {
+    fetchConversations(0, false, true);
+  });
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

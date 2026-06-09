@@ -30,11 +30,42 @@ type InboxChromeContextValue = {
 
 export const InboxChromeContext = createContext<InboxChromeContextValue | null>(null);
 
+function chromePrimitivesEqual(a: InboxChromeConfig, b: InboxChromeConfig): boolean {
+  return (
+    a.searchQuery === b.searchQuery &&
+    a.activeFilter === b.activeFilter &&
+    a.aiChannel === b.aiChannel &&
+    a.aiEnabled === b.aiEnabled
+  );
+}
+
 export function InboxChromeProvider({ children }: { children: ReactNode }) {
   const [chrome, setChromeState] = useState<InboxChromeConfig | null>(null);
 
   const setChrome = useCallback((next: InboxChromeConfig | null) => {
-    setChromeState(next);
+    setChromeState((prev) => {
+      if (prev === null && next === null) {
+        return prev;
+      }
+
+      if (prev === null || next === null) {
+        return next;
+      }
+
+      if (!chromePrimitivesEqual(prev, next)) {
+        return next;
+      }
+
+      if (
+        prev.onSearchChange !== next.onSearchChange ||
+        prev.onFilterChange !== next.onFilterChange ||
+        prev.onAiToggle !== next.onAiToggle
+      ) {
+        return next;
+      }
+
+      return prev;
+    });
   }, []);
 
   const value = useMemo(
@@ -66,12 +97,17 @@ export function useInboxChromeContext() {
 
 export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
   const context = useOptionalInboxChromeContext();
+  const enabled =
+    config !== null &&
+    typeof config.onSearchChange === "function" &&
+    typeof config.onFilterChange === "function";
+
   const searchQuery = config?.searchQuery ?? "";
-  const onSearchChange = config?.onSearchChange;
   const activeFilter = config?.activeFilter ?? "all";
-  const onFilterChange = config?.onFilterChange;
   const aiChannel = config?.aiChannel ?? null;
   const aiEnabled = config?.aiEnabled ?? null;
+  const onSearchChange = config?.onSearchChange;
+  const onFilterChange = config?.onFilterChange;
   const onAiToggle = config?.onAiToggle;
 
   useEffect(() => {
@@ -79,7 +115,7 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
       return;
     }
 
-    if (!config || !onSearchChange || !onFilterChange) {
+    if (!enabled || !onSearchChange || !onFilterChange) {
       context.setChrome(null);
       return;
     }
@@ -99,13 +135,13 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
     };
   }, [
     context,
-    config,
+    enabled,
     searchQuery,
-    onSearchChange,
     activeFilter,
-    onFilterChange,
     aiChannel,
     aiEnabled,
+    onSearchChange,
+    onFilterChange,
     onAiToggle,
   ]);
 }
