@@ -6,6 +6,7 @@ import { AiStatusCard } from "@/components/dashboard/AiStatusCard";
 import { AnalyticsCardsGrid } from "@/components/dashboard/AnalyticsCardsGrid";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { MultiChannelMetricsPanel } from "@/components/dashboard/MultiChannelMetricsPanel";
+import { PushNotificationsBanner } from "@/components/pwa/PushNotificationsBanner";
 import { PwaInstallBanner } from "@/components/pwa/PwaInstallBanner";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { QuickActions } from "@/components/dashboard/QuickActions";
@@ -59,6 +60,7 @@ async function DashboardPageContent() {
       </p>
 
       <PwaInstallBanner />
+      <PushNotificationsBanner />
 
       {!onboardingProgress.isComplete ? (
         <SetupChecklist progress={onboardingProgress} />

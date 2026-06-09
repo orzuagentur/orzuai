@@ -68,8 +68,12 @@ export function ChatsMonitorPanel({
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
-  const [, setChannels] = useState<ChatMonitorChannelStats[]>(
+  const [channelStats, setChannels] = useState<ChatMonitorChannelStats[]>(
     initialChannels ?? [],
+  );
+  const visibleChannelIds = useMemo(
+    () => channelStats.map((item) => item.channel),
+    [channelStats],
   );
   const [conversations, setConversations] = useState<ConversationListItem[]>(
     initialConversations ?? [],
@@ -432,6 +436,7 @@ export function ChatsMonitorPanel({
         <InboxChannelTabs
           activeChannel={favoritesOnly ? "favorites" : "all"}
           unreadByChannel={unreadByChannel}
+          visibleChannelIds={visibleChannelIds}
         />
       }
       listColumn={

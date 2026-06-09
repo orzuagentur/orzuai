@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 
 import { InboxToolbar } from "@/components/chats/inbox/InboxToolbar";
+import { ContactsToolbar } from "@/components/contacts/ContactsToolbar";
+import { useOptionalContactsChrome } from "@/components/contacts/contacts-chrome-context";
 import { useOptionalInboxChrome } from "@/components/chats/inbox/use-optional-inbox-chrome";
 import { DashboardPageHeading } from "@/components/dashboard/DashboardPageHeading";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -16,11 +18,19 @@ function isInboxPath(pathname: string): boolean {
   );
 }
 
+function isContactsPath(pathname: string): boolean {
+  return pathname === DASHBOARD_ROUTES.contacts;
+}
+
 export function DashboardHeader() {
   const pathname = usePathname();
   const pageMeta = getDashboardPageHeaderMeta(pathname);
   const inboxChrome = useOptionalInboxChrome();
+  const contactsChrome = useOptionalContactsChrome();
   const showInboxToolbar = isInboxPath(pathname) && inboxChrome !== null;
+  const showContactsToolbar =
+    isContactsPath(pathname) && contactsChrome !== null;
+  const compactHeading = showInboxToolbar || showContactsToolbar;
 
   return (
     <header className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b px-3 sm:gap-3 sm:px-4">
@@ -31,12 +41,16 @@ export function DashboardHeader() {
           <DashboardPageHeading
             title={pageMeta.title}
             description={pageMeta.description}
-            compact={showInboxToolbar}
+            compact={compactHeading}
           />
 
           {showInboxToolbar && inboxChrome ? (
             <div className="min-w-0 flex-1">
               <InboxToolbar {...inboxChrome} className="justify-end" />
+            </div>
+          ) : showContactsToolbar && contactsChrome ? (
+            <div className="min-w-0 flex-1">
+              <ContactsToolbar {...contactsChrome} className="justify-end" />
             </div>
           ) : (
             <div className="min-w-0 flex-1" />

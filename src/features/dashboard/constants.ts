@@ -93,9 +93,10 @@ export const SETTINGS_MESSAGES = {
 export const OVERVIEW_MESSAGES = {
   title: "Home",
   description: "Monitor messages, AI performance, and activity across all channels.",
-  channelMetricsTitle: "Multi-channel metrics",
+  channelMetricsTitle: "Connected channels",
   channelMetricsDescription:
-    "Per-channel message, contact, and AI volume from channel_analytics.",
+    "Live performance for your active messaging channels.",
+  connectChannelCta: "Connect channel",
   emptyBusinessTitle: "Set up your business",
   emptyBusinessDescription:
     "Create your business profile to start tracking messages, contacts, and AI performance.",
@@ -105,7 +106,7 @@ export const ANALYTICS_CARD_LABELS = {
   totalMessages: "Total Messages",
   uniqueContacts: "Unique Contacts",
   aiResponses: "AI Responses",
-  conversionRate: "Conversion Rate",
+  conversionRate: "AI Coverage",
 } as const;
 
 export const DASHBOARD_COMING_SOON_MESSAGE =

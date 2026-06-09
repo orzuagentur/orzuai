@@ -133,17 +133,24 @@ async function buildChannelMetrics(
     (rows ?? []).map((row) => [row.channel as DbMessagingChannel, row]),
   );
 
-  return MESSAGING_CHANNELS.map((channel) => {
-    const row = rowByChannel.get(channel);
-    const status = channelStatuses[channel]?.status ?? "disconnected";
+  return MESSAGING_CHANNELS.flatMap((channel) => {
+    const connectionStatus = channelStatuses[channel]?.status ?? "disconnected";
 
-    return {
-      channel,
-      totalMessages: row?.total_messages ?? 0,
-      totalContacts: row?.total_contacts ?? 0,
-      aiReplies: row?.ai_replies ?? 0,
-      connected: status === "connected",
-    };
+    if (connectionStatus !== "connected" && connectionStatus !== "pending") {
+      return [];
+    }
+
+    const row = rowByChannel.get(channel);
+
+    return [
+      {
+        channel,
+        totalMessages: row?.total_messages ?? 0,
+        totalContacts: row?.total_contacts ?? 0,
+        aiReplies: row?.ai_replies ?? 0,
+        status: connectionStatus,
+      },
+    ];
   });
 }
 
@@ -550,6 +557,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
   const [
     channelAnalyticsResult,
     channelMetrics,
+    contactsCountResult,
     whatsappResult,
     aiSettingsResult,
     conversationsResult,
@@ -560,6 +568,10 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
       .select("total_messages, total_contacts, ai_replies")
       .eq("business_id", business.id),
     buildChannelMetrics(business.id),
+    supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", business.id),
     supabase
       .from("whatsapp_connections")
       .select("whatsapp_status, phone_number")
@@ -587,10 +599,7 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
     (sum, row) => sum + (row.total_messages ?? 0),
     0,
   );
-  const uniqueContacts = channelRows.reduce(
-    (sum, row) => sum + (row.total_contacts ?? 0),
-    0,
-  );
+  const uniqueContacts = contactsCountResult.count ?? 0;
   const aiResponses = channelRows.reduce(
     (sum, row) => sum + (row.ai_replies ?? 0),
     0,

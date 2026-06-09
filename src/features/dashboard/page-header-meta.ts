@@ -41,7 +41,7 @@ export function getDashboardPageHeaderMeta(
   if (pathname === DASHBOARD_ROUTES.contacts) {
     return {
       title: CONTACTS_MESSAGES.pageTitle,
-      description: CONTACTS_MESSAGES.pageDescription,
+      description: CONTACTS_MESSAGES.pageSubtitle,
     };
   }
 

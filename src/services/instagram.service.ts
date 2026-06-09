@@ -28,6 +28,7 @@ import {
   notifyClientTyping,
   resolveConversationIdForChannelSender,
 } from "@/services/conversation-typing.service";
+import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
@@ -567,6 +568,16 @@ async function ingestInstagramMessage(
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
+
+  if (createdContact) {
+    scheduleNewLeadPush({
+      businessId,
+      contactId,
+      contactName: message.contactName,
+      channel: "instagram",
+      preview: getMessagePlainText(content),
+    });
+  }
 
   await admin
     .from("instagram_connections")

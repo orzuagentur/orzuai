@@ -3,11 +3,18 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import {
+  CONTACTS_MESSAGES,
+  CONTACTS_PAGE_SIZE,
+} from "@/features/contacts/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import {
+  listCrmDealsForContact,
+  syncContactToPrimaryDeal,
+} from "@/services/crm-deals.service";
 import { listCrmTasksForContact } from "@/services/crm-tasks.service";
 import { generateText, getProviderAvailability } from "@/services/llm.service";
 import type {
@@ -271,15 +278,94 @@ function isContactsView(value: string | null | undefined): value is "list" | "pi
   return value === "list" || value === "pipeline";
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
+function parseContactsPage(value: string | null | undefined): number {
+  const parsed = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+export type GetUnifiedContactsInput = {
+  channel?: string | null;
+  segment?: string | null;
+  view?: string | null;
+  q?: string | null;
+  page?: string | null;
+  contact?: string | null;
+};
+
+async function resolveActiveContactId(
+  businessId: string,
+  contactId: string | null | undefined,
+): Promise<string | null> {
+  const candidate = contactId?.trim();
+
+  if (!candidate || !UUID_PATTERN.test(candidate)) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("id", candidate)
+    .maybeSingle();
+
+  return data?.id ?? null;
+}
+
+function buildContactsQuery(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  activeChannelFilter: MessagingChannel | null,
+  activeSegment: ContactSegment,
+  searchQuery: string,
+) {
+  let query = supabase
+    .from("contacts")
+    .select(
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
+      {
+        count: "exact",
+      },
+    )
+    .eq("business_id", businessId)
+    .order("last_message_at", { ascending: false, nullsFirst: false });
+
+  if (activeChannelFilter) {
+    query = query.eq("channel", activeChannelFilter);
+  }
+
+  if (activeSegment === "hot_leads") {
+    query = query.gte("lead_score", 70);
+  }
+
+  if (searchQuery) {
+    const pattern = `%${escapeIlikePattern(searchQuery)}%`;
+    query = query.or(
+      `name.ilike.${pattern},phone_number.ilike.${pattern},email.ilike.${pattern}`,
+    );
+  }
+
+  return query;
+}
+
 export async function getUnifiedContacts(
-  channelFilter?: string | null,
-  segmentFilter?: string | null,
-  viewFilter?: string | null,
+  input: GetUnifiedContactsInput = {},
 ): Promise<UnifiedContactsPageData> {
   const activeChannelFilter =
-    channelFilter && isMessagingChannel(channelFilter) ? channelFilter : null;
-  const activeSegment = isContactSegment(segmentFilter) ? segmentFilter : "all";
-  const activeView = isContactsView(viewFilter) ? viewFilter : "list";
+    input.channel && isMessagingChannel(input.channel) ? input.channel : null;
+  const activeSegment = isContactSegment(input.segment) ? input.segment : "all";
+  const activeView = isContactsView(input.view) ? input.view : "list";
+  const searchQuery = (input.q ?? "").trim();
+  const page = parseContactsPage(input.page);
+  const pageSize = CONTACTS_PAGE_SIZE;
 
   const businessId = await getOwnedBusinessId();
 
@@ -291,58 +377,121 @@ export async function getUnifiedContacts(
       activeChannelFilter,
       activeSegment,
       activeView,
+      activeContactId: null,
+      searchQuery,
+      page,
+      pageSize,
+      hasMore: false,
     };
   }
 
   const supabase = await createClient();
-  let query = supabase
-    .from("contacts")
-    .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
-      {
-      count: "exact",
-    })
-    .eq("business_id", businessId)
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .limit(100);
+  const activeContactId = await resolveActiveContactId(businessId, input.contact);
 
-  if (activeChannelFilter) {
-    query = query.eq("channel", activeChannelFilter);
+  if (activeSegment === "no_reply_48h") {
+    const { data } = await buildContactsQuery(
+      supabase,
+      businessId,
+      activeChannelFilter,
+      activeSegment,
+      searchQuery,
+    ).limit(500);
+
+    const allContacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
+    const filtered = await filterContactsBySegment(
+      allContacts,
+      activeSegment,
+      businessId,
+    );
+    const offset = (page - 1) * pageSize;
+    const contacts = filtered.slice(offset, offset + pageSize);
+
+    return {
+      hasBusiness: true,
+      contacts,
+      total: filtered.length,
+      activeChannelFilter,
+      activeSegment,
+      activeView,
+      activeContactId,
+      searchQuery,
+      page,
+      pageSize,
+      hasMore: offset + contacts.length < filtered.length,
+    };
   }
 
-  const { data, count } = await query;
-  const allContacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
-  const contacts = await filterContactsBySegment(
-    allContacts,
-    activeSegment,
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data, count } = await buildContactsQuery(
+    supabase,
     businessId,
-  );
+    activeChannelFilter,
+    activeSegment,
+    searchQuery,
+  ).range(from, to);
+
+  const contacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
+  const total = count ?? contacts.length;
 
   return {
     hasBusiness: true,
     contacts,
-    total: activeSegment === "all" ? (count ?? allContacts.length) : contacts.length,
+    total,
     activeChannelFilter,
     activeSegment,
     activeView,
+    activeContactId,
+    searchQuery,
+    page,
+    pageSize,
+    hasMore: from + contacts.length < total,
   };
 }
 
 export async function getContactPipeline(
-  channelFilter?: string | null,
+  input: Pick<GetUnifiedContactsInput, "channel" | "q"> = {},
 ): Promise<ContactPipelinePageData> {
-  const data = await getUnifiedContacts(channelFilter, "all", "pipeline");
+  const activeChannelFilter =
+    input.channel && isMessagingChannel(input.channel) ? input.channel : null;
+  const searchQuery = (input.q ?? "").trim();
+  const emptyColumns = PIPELINE_STAGES.reduce(
+    (acc, stage) => {
+      acc[stage] = [];
+      return acc;
+    },
+    {} as Record<PipelineStage, UnifiedContactItem[]>,
+  );
 
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      hasBusiness: false,
+      columns: emptyColumns,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data } = await buildContactsQuery(
+    supabase,
+    businessId,
+    activeChannelFilter,
+    "all",
+    searchQuery,
+  ).limit(500);
+
+  const contacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
   const columns = PIPELINE_STAGES.reduce(
     (acc, stage) => {
-      acc[stage] = data.contacts.filter((contact) => contact.pipelineStage === stage);
+      acc[stage] = contacts.filter((contact) => contact.pipelineStage === stage);
       return acc;
     },
     {} as Record<PipelineStage, UnifiedContactItem[]>,
   );
 
   return {
-    hasBusiness: data.hasBusiness,
+    hasBusiness: true,
     columns,
   };
 }
@@ -379,6 +528,13 @@ export async function updateContactPipelineStage(
   }
 
   const supabase = await createClient();
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("deal_value, expected_close_date")
+    .eq("id", parsed.data.contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("contacts")
     .update({ pipeline_stage: parsed.data.pipelineStage })
@@ -391,6 +547,12 @@ export async function updateContactPipelineStage(
       error: { code: "UPDATE_FAILED", message: CONTACTS_MESSAGES.contactSaveFailed },
     };
   }
+
+  await syncContactToPrimaryDeal(parsed.data.contactId, businessId, {
+    dealValue: existingContact?.deal_value ?? null,
+    pipelineStage: parsed.data.pipelineStage,
+    expectedCloseDate: existingContact?.expected_close_date ?? null,
+  });
 
   revalidateContactPaths();
   return { success: true };
@@ -474,13 +636,17 @@ export async function getContactProfile(
     );
   }
 
-  const tasks = await listCrmTasksForContact(contactId);
+  const [tasks, deals] = await Promise.all([
+    listCrmTasksForContact(contactId),
+    listCrmDealsForContact(contactId),
+  ]);
 
   return {
     contact,
     conversationId: conversation?.id ?? null,
     timeline,
     tasks,
+    deals,
   };
 }
 
@@ -542,6 +708,13 @@ export async function updateContact(
   }
 
   const supabase = await createClient();
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("pipeline_stage, deal_value, expected_close_date")
+    .eq("id", parsed.data.contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("contacts")
     .update({
@@ -564,6 +737,21 @@ export async function updateContact(
       error: { code: "UPDATE_FAILED", message: CONTACTS_MESSAGES.contactSaveFailed },
     };
   }
+
+  await syncContactToPrimaryDeal(parsed.data.contactId, businessId, {
+    dealValue:
+      parsed.data.dealValue !== undefined
+        ? parsed.data.dealValue
+        : (existingContact?.deal_value ?? null),
+    pipelineStage:
+      parsed.data.pipelineStage ??
+      (existingContact?.pipeline_stage as PipelineStage) ??
+      "new",
+    expectedCloseDate:
+      parsed.data.expectedCloseDate !== undefined
+        ? parsed.data.expectedCloseDate?.trim() || null
+        : (existingContact?.expected_close_date ?? null),
+  });
 
   revalidateContactPaths();
   return { success: true };

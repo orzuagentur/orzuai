@@ -75,7 +75,9 @@ export function ChatsHub({
               </div>
             </Link>
 
-            {CHAT_CHANNEL_LIST.map((channel) => {
+            {CHAT_CHANNEL_LIST.filter((channel) =>
+              statsByChannel.has(channel.id),
+            ).map((channel) => {
               const href = `${DASHBOARD_ROUTES.chats}/${channel.id}`;
               const isActive = pathname.startsWith(href);
               const stats = statsByChannel.get(channel.id);

@@ -7,10 +7,25 @@ const channelLabelById = new Map(
   INTEGRATION_CHANNEL_LIST.map((channel) => [channel.id, channel.label]),
 );
 
+export const CONTACTS_PAGE_SIZE = 50;
+
 export const CONTACTS_MESSAGES = {
   pageTitle: "CRM",
+  pageSubtitle: "Contacts & pipeline",
   pageDescription:
     "All contacts across WhatsApp, Instagram, Telegram, and Website Forms.",
+  filtersLabel: "Filters",
+  segmentsLabel: "Segments",
+  searchPlaceholder: "Search by name, phone, or email…",
+  searchEmptyTitle: "No matches",
+  searchEmptyDescription: "Try a different name, phone number, or email.",
+  selectContactTitle: "Select a contact",
+  selectContactDescription:
+    "Choose a contact from the list or pipeline to view their record.",
+  backToList: "Back to contacts",
+  previousPage: "Previous",
+  nextPage: "Next",
+  pageIndicator: (page: number) => `Page ${page}`,
   emptyTitle: "No contacts yet",
   emptyDescription:
     "Connect a channel in Integrations. Contacts appear when customers message you.",
@@ -20,6 +35,7 @@ export const CONTACTS_MESSAGES = {
   timelineTitle: "Recent activity",
   timelineEmpty: "No messages yet.",
   openInbox: "Open in Inbox",
+  viewInChat: "View in chat",
   lastMessage: "Last message",
   contactsCount: (count: number) =>
     count === 1 ? "1 contact" : `${count} contacts`,
@@ -75,6 +91,17 @@ export const CONTACTS_MESSAGES = {
   taskDone: "Done",
   taskOpen: "Open",
   sentimentLabel: "Sentiment",
+  dealsTitle: "Deals",
+  dealTitleLabel: "Deal title",
+  addDeal: "Add deal",
+  primaryDeal: "Primary",
+  setPrimaryDeal: "Set as primary",
+  dealSaved: "Deal saved.",
+  dealSaveFailed: "Unable to save deal. Please try again.",
+  dealDeleted: "Deal deleted.",
+  dealDeleteFailed: "Unable to delete deal.",
+  pipelineDragHint: "Drag cards between columns or use the stage menu.",
+  dropHere: "Drop to move here",
 } as const;
 
 export const CONTACT_SEGMENT_FILTERS = [

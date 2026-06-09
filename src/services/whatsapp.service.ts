@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
+import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
@@ -660,6 +661,16 @@ async function ingestIncomingMessage(
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
+
+  if (createdContact) {
+    scheduleNewLeadPush({
+      businessId,
+      contactId,
+      contactName: message.contactName,
+      channel: "whatsapp",
+      preview: getMessagePlainText(content),
+    });
+  }
 
   await admin
     .from("whatsapp_connections")

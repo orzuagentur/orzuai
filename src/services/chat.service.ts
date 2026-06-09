@@ -17,7 +17,11 @@ import {
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
-import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
+import {
+  getActiveMessagingChannelIds,
+  MESSAGING_INTEGRATION_CHANNELS,
+} from "@/features/integrations";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -306,6 +310,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
     return {
       hasBusiness: false,
       channels: [],
+      visibleChannelIds: [],
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -319,6 +324,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
     return {
       hasBusiness: false,
       channels: [],
+      visibleChannelIds: [],
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -326,9 +332,11 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   }
 
   const supabase = await createClient();
+  const channelStatuses = await getChannelConnectionStatuses(business.id);
+  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const channels: ChatMonitorChannelStats[] = [];
 
-  for (const channel of MESSAGING_INTEGRATION_CHANNELS) {
+  for (const channel of visibleChannelIds) {
     const [connected, analyticsResult, conversationsResult, lastConversation] =
       await Promise.all([
         isChatChannelConnected(business.id, channel),
@@ -375,6 +383,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   return {
     hasBusiness: true,
     channels,
+    visibleChannelIds,
     totalConversations,
     totalMessages,
     unifiedConversations: [],

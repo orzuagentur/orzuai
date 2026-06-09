@@ -1,17 +1,27 @@
 import { Suspense } from "react";
 
-import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard";
+import { ContactRecordHub } from "@/components/contacts/ContactRecordHub";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
+import { getActiveMessagingChannelIds } from "@/features/integrations";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { getPrimaryBusiness } from "@/services/business.service";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import {
   getContactPipeline,
   getUnifiedContacts,
 } from "@/services/contacts.service";
+import { getCurrentUser } from "@/services/auth.service";
 
 type ContactsPageProps = {
-  searchParams: Promise<{ channel?: string; segment?: string; view?: string }>;
+  searchParams: Promise<{
+    channel?: string;
+    segment?: string;
+    view?: string;
+    contact?: string;
+    q?: string;
+    page?: string;
+  }>;
 };
 
 export default function ContactsPage({ searchParams }: ContactsPageProps) {
@@ -23,10 +33,17 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
 }
 
 async function ContactsPageContent({ searchParams }: ContactsPageProps) {
-  const { channel, segment, view } = await searchParams;
-  const data = await getUnifiedContacts(channel, segment, view);
+  const { channel, segment, view, contact, q, page } = await searchParams;
+  const listData = await getUnifiedContacts({
+    channel,
+    segment,
+    view,
+    contact,
+    q,
+    page,
+  });
 
-  if (!data.hasBusiness) {
+  if (!listData.hasBusiness) {
     return (
       <DashboardSetupPrompt
         title={CONTACTS_MESSAGES.pageTitle}
@@ -35,16 +52,23 @@ async function ContactsPageContent({ searchParams }: ContactsPageProps) {
     );
   }
 
-  if (data.activeView === "pipeline") {
-    const pipeline = await getContactPipeline(channel);
+  const pipelineData =
+    listData.activeView === "pipeline"
+      ? await getContactPipeline({ channel, q })
+      : null;
 
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <UnifiedContactsPanel {...data} />
-        <ContactPipelineBoard {...pipeline} />
-      </div>
-    );
-  }
+  const authUser = await getCurrentUser();
+  const business = authUser ? await getPrimaryBusiness(authUser.id) : null;
+  const channelStatuses = business
+    ? await getChannelConnectionStatuses(business.id)
+    : {};
+  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
 
-  return <UnifiedContactsPanel {...data} />;
+  return (
+    <ContactRecordHub
+      listData={listData}
+      pipelineData={pipelineData}
+      visibleChannelIds={visibleChannelIds}
+    />
+  );
 }

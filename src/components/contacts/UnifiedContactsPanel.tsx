@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
-import { ContactProfileDrawer } from "@/components/contacts/ContactProfileDrawer";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -12,226 +10,96 @@ import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
 } from "@/features/chats/channel-ui";
-import {
-  CONTACT_CHANNEL_FILTERS,
-  CONTACT_SEGMENT_FILTERS,
-  CONTACTS_MESSAGES,
-} from "@/features/contacts/constants";
-import type { ContactSegment } from "@/types/contact.types";
+import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { cn } from "@/lib/utils";
 import type { UnifiedContactsPageData } from "@/types/contact.types";
+import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
-import { formatRelativeTime } from "@/utils/dashboard";
-import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 
-type UnifiedContactsPanelProps = UnifiedContactsPageData;
+type UnifiedContactsPanelProps = UnifiedContactsPageData & {
+  embedded?: boolean;
+};
 
-function buildContactsHref(
-  channel: string | null,
-  segment: ContactSegment,
-  view: "list" | "pipeline" = "list",
+function buildContactHref(
+  data: UnifiedContactsPageData,
+  contactId: string,
 ): string {
-  const params = new URLSearchParams();
-
-  if (channel) {
-    params.set("channel", channel);
-  }
-
-  if (segment !== "all") {
-    params.set("segment", segment);
-  }
-
-  if (view === "pipeline") {
-    params.set("view", "pipeline");
-  }
-
-  const query = params.toString();
-
-  return query
-    ? `${DASHBOARD_ROUTES.contacts}?${query}`
-    : DASHBOARD_ROUTES.contacts;
+  return buildContactsHref({
+    channel: data.activeChannelFilter,
+    segment: data.activeSegment,
+    view: data.activeView,
+    contact: contactId,
+    q: data.searchQuery || null,
+    page: data.page,
+  });
 }
 
 export function UnifiedContactsPanel({
-  hasBusiness,
-  contacts,
-  total,
-  activeChannelFilter,
-  activeSegment,
-  activeView,
+  embedded = false,
+  ...listData
 }: UnifiedContactsPanelProps) {
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(
-    null,
-  );
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  if (!hasBusiness) {
+  if (!listData.hasBusiness) {
     return null;
   }
 
-  function openContact(contactId: string) {
-    setSelectedContactId(contactId);
-    setDrawerOpen(true);
+  const { contacts, searchQuery, activeContactId } = listData;
+
+  if (contacts.length === 0) {
+    const isSearch = searchQuery.trim().length > 0;
+
+    return (
+      <EmptyState
+        variant="contacts"
+        title={
+          isSearch
+            ? CONTACTS_MESSAGES.searchEmptyTitle
+            : CONTACTS_MESSAGES.emptyTitle
+        }
+        description={
+          isSearch
+            ? CONTACTS_MESSAGES.searchEmptyDescription
+            : CONTACTS_MESSAGES.emptyDescription
+        }
+        actionLabel={isSearch ? undefined : CONTACTS_MESSAGES.emptyCta}
+        actionHref={isSearch ? undefined : DASHBOARD_ROUTES.integrations}
+      />
+    );
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <p className="text-sm text-muted-foreground">
-        {CONTACTS_MESSAGES.contactsCount(total)}
-      </p>
+    <ul className={cn("divide-y", embedded && "bg-card")}>
+      {contacts.map((contact) => {
+        const isSelected = contact.id === activeContactId;
 
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href={buildContactsHref(activeChannelFilter, activeSegment, "list")}
-          className={cn(
-            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-            activeView === "list"
-              ? "border-primary/40 bg-primary/10 text-foreground"
-              : "border-border bg-background text-muted-foreground hover:bg-muted/50",
-          )}
-        >
-          {CONTACTS_MESSAGES.viewList}
-        </Link>
-        <Link
-          href={buildContactsHref(activeChannelFilter, activeSegment, "pipeline")}
-          className={cn(
-            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-            activeView === "pipeline"
-              ? "border-primary/40 bg-primary/10 text-foreground"
-              : "border-border bg-background text-muted-foreground hover:bg-muted/50",
-          )}
-        >
-          {CONTACTS_MESSAGES.viewPipeline}
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {CONTACT_SEGMENT_FILTERS.map((filter) => {
-          const isActive = filter.id === activeSegment;
-
-          return (
+        return (
+          <li key={contact.id}>
             <Link
-              key={filter.id}
-              href={buildContactsHref(activeChannelFilter, filter.id, activeView)}
+              href={buildContactHref(listData, contact.id)}
               className={cn(
-                "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                isActive
-                  ? "border-primary/40 bg-primary/10 text-foreground"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
+                isSelected && "bg-primary/5",
               )}
             >
-              {filter.label}
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {CONTACT_CHANNEL_FILTERS.map((filter) => {
-          const isActive =
-            filter.id === activeChannelFilter ||
-            (filter.id === null && !activeChannelFilter);
-
-          return (
-            <Link
-              key={filter.id ?? "all"}
-              href={buildContactsHref(filter.id, activeSegment, activeView)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                isActive
-                  ? "border-primary/40 bg-primary/10 text-foreground"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted/50",
-              )}
-            >
-              {filter.id ? (
-                <ChannelBrandIcon channel={filter.id} className="size-3.5" />
-              ) : null}
-              {filter.id
-                ? getChannelBadgeLabel(filter.id)
-                : CONTACTS_MESSAGES.filterAll}
-            </Link>
-          );
-        })}
-      </div>
-
-      {contacts.length === 0 ? (
-        <EmptyState
-          variant="contacts"
-          title={CONTACTS_MESSAGES.emptyTitle}
-          description={CONTACTS_MESSAGES.emptyDescription}
-          actionLabel={CONTACTS_MESSAGES.emptyCta}
-          actionHref={DASHBOARD_ROUTES.integrations}
-        />
-      ) : (
-        <ul className="divide-y rounded-xl border bg-card">
-          {contacts.map((contact) => (
-            <li key={contact.id}>
-              <button
-                type="button"
-                onClick={() => openContact(contact.id)}
-                className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{contact.name}</p>
+                <p className="text-caption truncate text-muted-foreground">
+                  {formatContactIdentifier(contact.identifier)}
+                </p>
+              </div>
+              <Badge
+                variant="outline"
+                className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(contact.channel)}`}
               >
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{contact.name}</p>
-                    {contact.leadScore !== null ? (
-                      <Badge
-                        variant="outline"
-                        className={`px-1.5 py-0 text-[10px] ${getLeadScoreBadgeClassName(contact.leadScore)}`}
-                      >
-                        {contact.leadScore}
-                      </Badge>
-                    ) : null}
-                    <Badge
-                      variant="outline"
-                      className={`gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(contact.channel)}`}
-                    >
-                      <ChannelBrandIcon
-                        channel={contact.channel}
-                        className="size-3"
-                      />
-                      {getChannelBadgeLabel(contact.channel)}
-                    </Badge>
-                  </div>
-                  <p className="text-caption">
-                    {formatContactIdentifier(contact.identifier)}
-                    {contact.email ? ` · ${contact.email}` : ""}
-                  </p>
-                  {contact.tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {contact.tags.slice(0, 3).map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="px-1.5 py-0 text-[10px]"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                  {contact.lastMessagePreview ? (
-                    <p className="text-body line-clamp-2 text-muted-foreground">
-                      {contact.lastMessagePreview}
-                    </p>
-                  ) : null}
-                </div>
-                {contact.lastMessageAt ? (
-                  <span className="shrink-0 text-caption">
-                    {formatRelativeTime(contact.lastMessageAt)}
-                  </span>
-                ) : null}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <ContactProfileDrawer
-        contactId={selectedContactId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
-    </div>
+                <ChannelBrandIcon
+                  channel={contact.channel}
+                  className="size-3"
+                />
+                {getChannelBadgeLabel(contact.channel)}
+              </Badge>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

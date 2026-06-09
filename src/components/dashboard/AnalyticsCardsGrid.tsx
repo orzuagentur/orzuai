@@ -29,7 +29,7 @@ const CARD_CONFIG = [
   {
     key: "uniqueContacts" as const,
     label: ANALYTICS_CARD_LABELS.uniqueContacts,
-    description: "Distinct customers who have contacted your business.",
+    description: "Customers in your CRM across all channels.",
     icon: UsersIcon,
     format: formatMetricValue,
   },
@@ -43,7 +43,7 @@ const CARD_CONFIG = [
   {
     key: "conversionRate" as const,
     label: ANALYTICS_CARD_LABELS.conversionRate,
-    description: "Share of messages handled by AI responses.",
+    description: "Share of all messages answered by AI.",
     icon: PercentIcon,
     format: formatConversionRate,
   },

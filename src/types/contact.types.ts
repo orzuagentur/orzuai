@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { CrmDealItem } from "./crm-deal.types";
 import type { CrmTaskItem } from "./crm-task.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
@@ -100,6 +101,7 @@ export type ContactProfileData = {
   conversationId: string | null;
   timeline: ContactTimelineEntry[];
   tasks: CrmTaskItem[];
+  deals: CrmDealItem[];
 };
 
 export const CONTACT_SEGMENTS = ["all", "hot_leads", "no_reply_48h"] as const;
@@ -127,4 +129,9 @@ export type UnifiedContactsPageData = {
   activeChannelFilter: MessagingChannel | null;
   activeSegment: ContactSegment;
   activeView: "list" | "pipeline";
+  activeContactId: string | null;
+  searchQuery: string;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 };

@@ -28,12 +28,14 @@ export type RecentConversationItem = {
   updatedAt: string;
 };
 
+export type ChannelMetricStatus = "connected" | "pending";
+
 export type ChannelMetricSummary = {
   channel: MessagingChannel;
   totalMessages: number;
   totalContacts: number;
   aiReplies: number;
-  connected: boolean;
+  status: ChannelMetricStatus;
 };
 
 export type DashboardOverview = {

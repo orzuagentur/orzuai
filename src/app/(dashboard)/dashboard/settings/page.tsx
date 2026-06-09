@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { BusinessSettingsPanel } from "@/components/business/BusinessSettingsPanel";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
+import { PushNotificationsPanel } from "@/components/pwa/PushNotificationsPanel";
 import { CannedResponsesPanel } from "@/components/settings/CannedResponsesPanel";
 import { TeamPanel } from "@/components/team/TeamPanel";
 import { getCurrentUser } from "@/services/auth.service";
@@ -34,6 +35,7 @@ async function SettingsPageContent() {
       {business ? (
         <>
           <TeamPanel members={teamMembers} />
+          <PushNotificationsPanel />
           <div className="mx-auto w-full max-w-3xl">
             <CannedResponsesPanel initialResponses={cannedResponses} />
           </div>

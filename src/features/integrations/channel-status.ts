@@ -5,7 +5,11 @@ import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type { WhatsAppConnectionData } from "@/types/whatsapp.types";
 
-import type { IntegrationChannelId } from "./constants";
+import {
+  MESSAGING_INTEGRATION_CHANNELS,
+  type IntegrationChannelId,
+  type MessagingIntegrationChannelId,
+} from "./constants";
 
 export type IntegrationChannelStatus =
   | "connected"
@@ -144,4 +148,20 @@ export function isChannelConnectedForWorkspace(
   statuses: IntegrationChannelStatusMap,
 ): boolean {
   return statuses[channel]?.status === "connected";
+}
+
+export function isActiveMessagingChannel(
+  channel: MessagingIntegrationChannelId,
+  statuses: IntegrationChannelStatusMap,
+): boolean {
+  const status = statuses[channel]?.status ?? "disconnected";
+  return status === "connected" || status === "pending";
+}
+
+export function getActiveMessagingChannelIds(
+  statuses: IntegrationChannelStatusMap,
+): MessagingIntegrationChannelId[] {
+  return MESSAGING_INTEGRATION_CHANNELS.filter((channel) =>
+    isActiveMessagingChannel(channel, statuses),
+  );
 }

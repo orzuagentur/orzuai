@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
+import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
   findContactForChannel,
@@ -570,6 +571,16 @@ export async function ingestWebsiteFormSubmission(
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
+
+  if (createdContact) {
+    scheduleNewLeadPush({
+      businessId,
+      contactId,
+      contactName: displayName,
+      channel: "website_forms",
+      preview: body,
+    });
+  }
 
   await admin
     .from("website_form_connections")

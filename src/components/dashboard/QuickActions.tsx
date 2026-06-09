@@ -19,7 +19,7 @@ import {
 const QUICK_ACTIONS = [
   {
     id: "connect",
-    label: "Connect WhatsApp",
+    label: "Connect channel",
     href: DASHBOARD_ROUTES.integrations,
     icon: PlugIcon,
   },

@@ -30,6 +30,8 @@ export {
 } from "./channel-lists";
 export {
   buildIntegrationChannelStatuses,
+  getActiveMessagingChannelIds,
+  isActiveMessagingChannel,
   isChannelConnectedForWorkspace,
 } from "./channel-status";
 export type {

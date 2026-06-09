@@ -15,14 +15,19 @@ export type InboxChannelTabId = ChatChannelId | "all" | "favorites";
 type InboxChannelTabsProps = {
   activeChannel: InboxChannelTabId;
   unreadByChannel?: Partial<Record<MessagingChannel, number>>;
+  visibleChannelIds?: MessagingChannel[];
   className?: string;
 };
 
 export function InboxChannelTabs({
   activeChannel,
   unreadByChannel = {},
+  visibleChannelIds = [],
   className,
 }: InboxChannelTabsProps) {
+  const visibleChannels = CHAT_CHANNEL_LIST.filter((channel) =>
+    visibleChannelIds.includes(channel.id),
+  );
   const totalUnread = Object.values(unreadByChannel).reduce(
     (sum, count) => sum + (count ?? 0),
     0,
@@ -73,7 +78,7 @@ export function InboxChannelTabs({
         />
       </Link>
 
-      {CHAT_CHANNEL_LIST.map((channel) => {
+      {visibleChannels.map((channel) => {
         const unreadCount = unreadByChannel[channel.id] ?? 0;
         const isActive = activeChannel === channel.id;
         const href = `${DASHBOARD_ROUTES.chats}/${channel.id}`;

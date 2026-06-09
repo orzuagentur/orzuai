@@ -118,6 +118,7 @@ export type ChatMonitorChannelStats = {
 export type ChatsMonitorData = {
   hasBusiness: boolean;
   channels: ChatMonitorChannelStats[];
+  visibleChannelIds: MessagingChannel[];
   totalConversations: number;
   totalMessages: number;
   unifiedConversations: ConversationListItem[];

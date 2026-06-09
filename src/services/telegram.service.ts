@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
+import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
@@ -382,6 +383,16 @@ async function ingestTelegramMessage(
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
+
+  if (createdContact) {
+    scheduleNewLeadPush({
+      businessId,
+      contactId,
+      contactName: message.contactName,
+      channel: "telegram",
+      preview: getMessagePlainText(content),
+    });
+  }
 
   await admin
     .from("telegram_connections")

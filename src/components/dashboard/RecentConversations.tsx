@@ -10,9 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { buildIntegrationActivateHref } from "@/features/integrations";
 import type { RecentConversationItem } from "@/types/dashboard.types";
 import { formatRelativeTime } from "@/utils/dashboard";
+import { cn } from "@/lib/utils";
 
 type RecentConversationsProps = {
   conversations: RecentConversationItem[];
@@ -30,6 +30,10 @@ function getStatusVariant(
   }
 
   return "outline";
+}
+
+function buildConversationHref(conversationId: string): string {
+  return `${DASHBOARD_ROUTES.chats}?conversation=${conversationId}`;
 }
 
 export function RecentConversations({
@@ -58,17 +62,19 @@ export function RecentConversations({
               receiving messages.
             </p>
             <Button asChild size="sm">
-              <Link href={buildIntegrationActivateHref("whatsapp")}>
-                Connect a channel
-              </Link>
+              <Link href={DASHBOARD_ROUTES.integrations}>Connect a channel</Link>
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
             {conversations.map((conversation) => (
-              <div
+              <Link
                 key={conversation.id}
-                className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3"
+                href={buildConversationHref(conversation.id)}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border px-3 py-3",
+                  "transition-colors hover:bg-muted/40",
+                )}
               >
                 <div className="min-w-0 space-y-1">
                   <p className="truncate font-medium">
@@ -86,7 +92,7 @@ export function RecentConversations({
                     {formatRelativeTime(conversation.updatedAt)}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

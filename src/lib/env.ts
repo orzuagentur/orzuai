@@ -160,6 +160,24 @@ export function hasTelegramWebhookEnv(): boolean {
   return hasTelegramEnv();
 }
 
+export function getVapidPublicKey(): string | undefined {
+  return process.env[ENV_KEYS.NEXT_PUBLIC_VAPID_PUBLIC_KEY]?.trim() || undefined;
+}
+
+export function getVapidPrivateKey(): string | undefined {
+  return process.env[ENV_KEYS.VAPID_PRIVATE_KEY]?.trim() || undefined;
+}
+
+export function getVapidSubject(): string {
+  return (
+    process.env[ENV_KEYS.VAPID_SUBJECT]?.trim() || "mailto:support@orzuit.com"
+  );
+}
+
+export function hasPushEnv(): boolean {
+  return Boolean(getVapidPublicKey() && getVapidPrivateKey());
+}
+
 export {
   getDefaultGeminiModel,
   getMissingEnvKeys,

@@ -68,8 +68,12 @@ export function ChatsChannelPanel({
   const [channel, setChannel] = useState<MessagingChannel>(
     initialChannel ?? channelId,
   );
-  const [, setChannelStats] = useState<ChatMonitorChannelStats[]>(
+  const [channelStats, setChannelStats] = useState<ChatMonitorChannelStats[]>(
     initialChannelStats ?? [],
+  );
+  const visibleChannelIds = useMemo(
+    () => channelStats.map((item) => item.channel),
+    [channelStats],
   );
   const [channelConnected, setChannelConnected] = useState(
     initialChannelConnected ?? false,
@@ -309,6 +313,7 @@ export function ChatsChannelPanel({
         <InboxChannelTabs
           activeChannel={channelId}
           unreadByChannel={unreadByChannel}
+          visibleChannelIds={visibleChannelIds}
         />
       }
       listColumn={
