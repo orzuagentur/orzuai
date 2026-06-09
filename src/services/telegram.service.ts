@@ -34,8 +34,16 @@ import type {
   TelegramWebhookPayload,
 } from "@/types/telegram.types";
 import { telegramConnectSchema } from "@/types/telegram.types";
+import {
+  downloadAndStoreTelegramInboundMedia,
+} from "@/services/inbound-media.service";
+import {
+  buildInboundMediaFallbackContent,
+  getMessagePlainText,
+} from "@/utils/chat-media";
 import { mapTelegramConnection } from "@/utils/telegram";
 import { parseTelegramWebhookPayload } from "@/utils/telegram-webhook";
+import type { TelegramInboundMessage } from "@/types/telegram.types";
 
 function missingConfigError(): ConnectTelegramBotResult {
   return {
@@ -276,11 +284,7 @@ export async function connectTelegramBot(
 async function ingestTelegramMessage(
   admin: ReturnType<typeof createAdminClient>,
   connection: TelegramConnection,
-  message: {
-    chatId: string;
-    body: string;
-    contactName: string;
-  },
+  message: TelegramInboundMessage,
 ): Promise<void> {
   const businessId = connection.business_id;
   const identifier = `tg:${message.chatId}`;
@@ -335,11 +339,43 @@ async function ingestTelegramMessage(
     return;
   }
 
+  let content =
+    message.kind === "text"
+      ? message.body
+      : null;
+
+  if (message.kind === "media") {
+    if (connection.bot_token) {
+      content = await downloadAndStoreTelegramInboundMedia({
+        botToken: connection.bot_token,
+        fileId: message.fileId,
+        businessId,
+        conversationId,
+        kind: message.mediaKind,
+        fileName: message.fileName,
+        mimeType: message.mimeType,
+        caption: message.caption,
+      });
+    }
+
+    if (!content) {
+      content = buildInboundMediaFallbackContent(
+        message.mediaKind,
+        message.caption,
+        message.fileName,
+      );
+    }
+  }
+
+  if (!content) {
+    return;
+  }
+
   await insertChannelMessage(admin, {
     conversationId,
     channel: "telegram",
     senderType: "client",
-    content: message.body,
+    content,
   });
 
   await incrementMessagingAnalytics(admin, businessId, "telegram", {
@@ -357,7 +393,7 @@ async function ingestTelegramMessage(
     businessId,
     channel: "telegram",
     conversationId,
-    clientMessage: message.body,
+    clientMessage: getMessagePlainText(content),
     sendReply: async (text) => {
       if (!connection.bot_token) {
         return { success: false };

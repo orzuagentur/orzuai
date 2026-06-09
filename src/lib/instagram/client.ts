@@ -154,6 +154,109 @@ type SendInstagramMessageResult =
   | { success: true; messageId: string }
   | { success: false; message: string };
 
+type InstagramAttachmentType = "image" | "video" | "audio" | "file";
+
+function resolveInstagramAttachmentType(
+  mediaKind: "image" | "audio" | "document" | "video",
+): InstagramAttachmentType {
+  if (mediaKind === "document") {
+    return "file";
+  }
+
+  return mediaKind;
+}
+
+export async function sendInstagramMediaMessage(
+  pageId: string,
+  accessToken: string,
+  recipientId: string,
+  mediaKind: "image" | "audio" | "document" | "video",
+  mediaUrl: string,
+): Promise<SendInstagramMessageResult> {
+  const response = await fetch(buildInstagramApiUrl(`${pageId}/messages`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "instagram",
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: resolveInstagramAttachmentType(mediaKind),
+          payload: {
+            url: mediaUrl,
+            is_reusable: true,
+          },
+        },
+      },
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { message_id?: string; error?: { message?: string } }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message || "Unable to send Instagram media via Meta.",
+    };
+  }
+
+  const messageId = payload?.message_id;
+
+  if (!messageId) {
+    return {
+      success: false,
+      message: "Meta accepted the media request but did not return a message ID.",
+    };
+  }
+
+  return { success: true, messageId };
+}
+
+export type InstagramSenderAction = "typing_on" | "typing_off" | "mark_seen";
+
+export async function sendInstagramTypingAction(
+  pageId: string,
+  accessToken: string,
+  recipientId: string,
+  senderAction: InstagramSenderAction,
+): Promise<{ success: true } | { success: false; message: string }> {
+  const response = await fetch(buildInstagramApiUrl(`${pageId}/messages`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "instagram",
+      recipient: { id: recipientId },
+      sender_action: senderAction,
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: { message?: string } }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message ||
+        "Unable to send Instagram typing indicator via Meta.",
+    };
+  }
+
+  return { success: true };
+}
+
 export async function sendInstagramTextMessage(
   pageId: string,
   accessToken: string,

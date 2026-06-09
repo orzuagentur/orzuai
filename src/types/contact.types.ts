@@ -6,6 +6,7 @@ import type { MessageSenderType, MessagingChannel } from "./database.types";
 export type ContactCustomFields = {
   company?: string;
   notes?: string;
+  location?: string;
 };
 
 export const PIPELINE_STAGES = [
@@ -56,7 +57,9 @@ export const updateContactSchema = z.object({
   customFields: z.object({
     company: z.string().trim().max(200).optional(),
     notes: z.string().trim().max(2000).optional(),
+    location: z.string().trim().max(200).optional(),
   }),
+  pipelineStage: z.enum(PIPELINE_STAGES).optional(),
   dealValue: z.number().min(0).max(999999999).optional().nullable(),
   expectedCloseDate: z.string().trim().max(32).optional().nullable(),
 });

@@ -33,6 +33,7 @@ import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-
 import { CHAT_MESSAGES } from "@/features/chats";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
+import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import type {
   ChatInboxFilter,
   ChatInboxQuickView,
@@ -44,6 +45,10 @@ import type {
   ChatsMonitorPageData,
   ConversationListItem,
 } from "@/types/chat.types";
+import {
+  countUnreadByChannel,
+  markConversationListItemRead,
+} from "@/utils/conversation-unread";
 
 type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData>;
 
@@ -60,7 +65,7 @@ export function ChatsMonitorPanel({
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
-  const [channels, setChannels] = useState<ChatMonitorChannelStats[]>(
+  const [, setChannels] = useState<ChatMonitorChannelStats[]>(
     initialChannels ?? [],
   );
   const [conversations, setConversations] = useState<ConversationListItem[]>(
@@ -81,6 +86,7 @@ export function ChatsMonitorPanel({
     cannedResponses: activeCannedResponses,
     isLoadingConversation,
     appendMessage,
+    isClientTyping,
   } = useInboxActiveConversation({
     initialConversationId,
     initialConversation: null,
@@ -118,6 +124,37 @@ export function ChatsMonitorPanel({
     [conversations, needsAttentionIds, showNeedsAttentionSection],
   );
 
+  const unreadByChannel = useMemo(() => {
+    const merged = new Map<string, ConversationListItem>();
+
+    for (const conversation of [
+      ...conversations,
+      ...needsAttentionConversations,
+    ]) {
+      merged.set(conversation.id, conversation);
+    }
+
+    return countUnreadByChannel([...merged.values()]);
+  }, [conversations, needsAttentionConversations]);
+
+  const handleConversationSelect = useCallback(
+    (conversationId: string | null) => {
+      selectConversation(conversationId);
+
+      if (!conversationId) {
+        return;
+      }
+
+      setConversations((current) =>
+        markConversationListItemRead(current, conversationId),
+      );
+      setNeedsAttentionConversations((current) =>
+        markConversationListItemRead(current, conversationId),
+      );
+    },
+    [selectConversation],
+  );
+
   const selectedListItem = useMemo(() => {
     if (!selectedConversationId) {
       return null;
@@ -129,6 +166,19 @@ export function ChatsMonitorPanel({
       null
     );
   }, [conversations, needsAttentionConversations, selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    setConversations((current) =>
+      markConversationListItemRead(current, selectedConversationId),
+    );
+    setNeedsAttentionConversations((current) =>
+      markConversationListItemRead(current, selectedConversationId),
+    );
+  }, [selectedConversationId]);
 
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
@@ -218,6 +268,20 @@ export function ChatsMonitorPanel({
     };
   }, [usesClientBootstrap]);
 
+  const hasActiveListFilters =
+    Boolean(debouncedSearch) ||
+    activeFilter !== "all" ||
+    activeQuickView !== "all";
+
+  useInboxListRealtime({
+    enabled: hasBusiness && !isInitialLoading,
+    selectedConversationId,
+    hasActiveFilters: hasActiveListFilters,
+    onConversationsChange: setConversations,
+    onNeedsAttentionChange: setNeedsAttentionConversations,
+    onRefresh: () => fetchConversations(0, false, true),
+  });
+
   useInboxListPolling(() => {
     if (!isInitialLoading) {
       fetchConversations(0, false, true);
@@ -299,7 +363,7 @@ export function ChatsMonitorPanel({
     <InboxShell
       showChatOnMobile={showChatOnMobile}
       channelTabs={
-        <InboxChannelTabs activeChannel="all" channelStats={channels} />
+        <InboxChannelTabs activeChannel="all" unreadByChannel={unreadByChannel} />
       }
       listColumn={
         <>
@@ -319,7 +383,7 @@ export function ChatsMonitorPanel({
                       channelId="whatsapp"
                       linkToConversationChannel
                       linkMode="overview"
-                      onConversationSelect={selectConversation}
+                      onConversationSelect={handleConversationSelect}
                       variant="inbox"
                     />
                   </div>
@@ -331,7 +395,7 @@ export function ChatsMonitorPanel({
                   channelId="whatsapp"
                   linkToConversationChannel
                   linkMode="overview"
-                  onConversationSelect={selectConversation}
+                  onConversationSelect={handleConversationSelect}
                   variant="inbox"
                   emptyVariant={
                     totalCount > 0 && conversations.length === 0
@@ -369,7 +433,7 @@ export function ChatsMonitorPanel({
                 variant="ghost"
                 size="sm"
                 type="button"
-                onClick={() => selectConversation(null)}
+                onClick={() => handleConversationSelect(null)}
               >
                 <ArrowLeftIcon className="size-4" />
                 {CHAT_MESSAGES.pageTitle}
@@ -379,6 +443,7 @@ export function ChatsMonitorPanel({
 
           <ChatWindow
             conversation={activeConversation}
+            isClientTyping={isClientTyping}
             aiEnabled={activeAiEnabled}
             channelConnected={activeChannelConnected}
             channel={activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp"}
@@ -396,7 +461,7 @@ export function ChatsMonitorPanel({
             layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
-            className="min-h-0 flex-1"
+            className="min-h-0 min-w-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
             onMessageSent={(message) => {
@@ -404,7 +469,7 @@ export function ChatsMonitorPanel({
               fetchConversations(0, false, true);
             }}
             onContactDeleted={() => {
-              selectConversation(null);
+              handleConversationSelect(null);
               fetchConversations(0, false, true);
             }}
           />

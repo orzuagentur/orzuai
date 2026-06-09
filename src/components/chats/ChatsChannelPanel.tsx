@@ -9,6 +9,7 @@ import { fetchChatsChannelInitialAction } from "@/features/chats/actions/fetch-c
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
+import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
@@ -36,6 +37,10 @@ import type {
 } from "@/types/chat.types";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { MessagingChannel } from "@/types/database.types";
+import {
+  countUnreadByChannel,
+  markConversationListItemRead,
+} from "@/utils/conversation-unread";
 
 type ChatsChannelPanelProps = {
   channelId: ChatChannelId;
@@ -63,7 +68,7 @@ export function ChatsChannelPanel({
   const [channel, setChannel] = useState<MessagingChannel>(
     initialChannel ?? channelId,
   );
-  const [channelStats, setChannelStats] = useState<ChatMonitorChannelStats[]>(
+  const [, setChannelStats] = useState<ChatMonitorChannelStats[]>(
     initialChannelStats ?? [],
   );
   const [channelConnected, setChannelConnected] = useState(
@@ -89,6 +94,7 @@ export function ChatsChannelPanel({
     cannedResponses,
     isLoadingConversation,
     appendMessage,
+    isClientTyping,
   } = useInboxActiveConversation({
     initialConversationId,
     initialConversation: null,
@@ -174,11 +180,45 @@ export function ChatsChannelPanel({
     }
   }, [channelId]);
 
+  const hasActiveListFilters =
+    Boolean(searchQuery.trim()) || activeFilter !== "all";
+
+  useInboxListRealtime({
+    enabled: hasBusiness && !isInitialLoading,
+    channelFilter: channelId,
+    selectedConversationId,
+    hasActiveFilters: hasActiveListFilters,
+    onConversationsChange: setConversations,
+    onRefresh: () => {
+      void refreshConversations();
+    },
+  });
+
   useInboxListPolling(() => {
     if (!isInitialLoading) {
       void refreshConversations();
     }
   });
+
+  const unreadByChannel = useMemo(
+    () => countUnreadByChannel(conversations),
+    [conversations],
+  );
+
+  const handleConversationSelect = useCallback(
+    (conversationId: string | null) => {
+      selectConversation(conversationId);
+
+      if (!conversationId) {
+        return;
+      }
+
+      setConversations((current) =>
+        markConversationListItemRead(current, conversationId),
+      );
+    },
+    [selectConversation],
+  );
 
   const filteredConversations = useMemo(
     () =>
@@ -201,6 +241,16 @@ export function ChatsChannelPanel({
       conversations.find((item) => item.id === selectedConversationId) ?? null
     );
   }, [conversations, selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    setConversations((current) =>
+      markConversationListItemRead(current, selectedConversationId),
+    );
+  }, [selectedConversationId]);
 
   useInboxChromeRegistration(
     hasBusiness && !isInitialLoading
@@ -241,7 +291,10 @@ export function ChatsChannelPanel({
     <InboxShell
       showChatOnMobile={showChatOnMobile}
       channelTabs={
-        <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
+        <InboxChannelTabs
+          activeChannel={channelId}
+          unreadByChannel={unreadByChannel}
+        />
       }
       listColumn={
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -253,7 +306,7 @@ export function ChatsChannelPanel({
               activeConversationId={activeConversationId}
               channelId={channelId}
               hideChannelBadge
-              onConversationSelect={selectConversation}
+              onConversationSelect={handleConversationSelect}
               variant="inbox"
               emptyVariant={
                 conversations.length > 0 && filteredConversations.length === 0
@@ -272,7 +325,7 @@ export function ChatsChannelPanel({
                 variant="ghost"
                 size="sm"
                 type="button"
-                onClick={() => selectConversation(null)}
+                onClick={() => handleConversationSelect(null)}
               >
                 <ArrowLeftIcon className="size-4" />
                 {CHAT_MESSAGES.pageTitle}
@@ -282,6 +335,7 @@ export function ChatsChannelPanel({
 
           <ChatWindow
             conversation={activeConversation}
+            isClientTyping={isClientTyping}
             aiEnabled={aiEnabled ?? channelAiEnabled}
             channelConnected={resolvedChannelConnected}
             channel={channel}
@@ -299,7 +353,7 @@ export function ChatsChannelPanel({
             layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
-            className="min-h-0 flex-1"
+            className="min-h-0 min-w-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
             onMessageSent={(message) => {
@@ -307,7 +361,7 @@ export function ChatsChannelPanel({
               void refreshConversations();
             }}
             onContactDeleted={() => {
-              selectConversation(null);
+              handleConversationSelect(null);
               void refreshConversations();
             }}
           />

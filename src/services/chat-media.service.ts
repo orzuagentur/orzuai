@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
-import {
-  CHAT_ATTACHMENTS_BUCKET,
-  MAX_CHAT_ATTACHMENT_BYTES,
-} from "@/features/chats/chat-attachments";
+import { MAX_CHAT_ATTACHMENT_BYTES } from "@/features/chats/chat-attachments";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
+import { sendInstagramMediaMessage } from "@/lib/instagram/client";
+import { sendTelegramMediaMessage } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -18,13 +17,18 @@ import {
 } from "@/lib/whatsapp/client";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
+import {
+  getChatAttachmentSignedUrl,
+  uploadChatAttachmentFile,
+} from "@/services/chat-attachment-storage.service";
 import { incrementMessagingAnalytics, insertChannelMessage } from "@/services/messaging.service";
 import type { SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { mapChatMessage, resolveContactFromRow } from "@/utils/chat";
 import {
+  buildMediaPayloadFromUpload,
   encodeMediaMessage,
-  resolveWhatsAppMediaKind,
+  resolveMediaKind,
   type ChatMediaKind,
 } from "@/utils/chat-media";
 
@@ -64,56 +68,217 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-function mediaNotSupported(channel: MessagingChannel): SendChatMessageResult {
-  return {
-    success: false,
-    error: {
-      code: "SEND_FAILED",
-      message:
-        channel === "whatsapp"
-          ? CHAT_MESSAGES.mediaSendFailed
-          : CHAT_MESSAGES.mediaNotSupportedForChannel,
-    },
-  };
-}
-
-async function uploadChatAttachment(
+async function isChannelConnected(
   businessId: string,
-  conversationId: string,
-  file: File,
-): Promise<{ url: string } | null> {
-  const admin = createAdminClient();
-  const extension = file.name.includes(".")
-    ? file.name.slice(file.name.lastIndexOf("."))
-    : "";
-  const path = `${businessId}/${conversationId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  channel: MessagingChannel,
+): Promise<boolean> {
+  const supabase = await createClient();
 
-  const { error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .upload(path, buffer, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
-    });
+  if (channel === "whatsapp") {
+    const { data } = await supabase
+      .from("whatsapp_connections")
+      .select("whatsapp_status")
+      .eq("business_id", businessId)
+      .maybeSingle();
 
-  if (error) {
-    return null;
+    return data?.whatsapp_status === "connected";
   }
 
-  const { data } = admin.storage.from(CHAT_ATTACHMENTS_BUCKET).getPublicUrl(path);
+  if (channel === "telegram") {
+    const { data } = await supabase
+      .from("telegram_connections")
+      .select("telegram_status")
+      .eq("business_id", businessId)
+      .maybeSingle();
 
-  return data.publicUrl ? { url: data.publicUrl } : null;
+    return data?.telegram_status === "connected";
+  }
+
+  if (channel === "instagram") {
+    const { data } = await supabase
+      .from("instagram_connections")
+      .select("instagram_status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.instagram_status === "connected";
+  }
+
+  if (channel === "website_forms") {
+    const { data } = await supabase
+      .from("website_form_connections")
+      .select("connection_status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.connection_status === "connected";
+  }
+
+  return false;
 }
 
-async function isWhatsAppConnected(businessId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("whatsapp_connections")
-    .select("whatsapp_status")
-    .eq("business_id", businessId)
-    .maybeSingle();
+function channelNotConnectedMessage(channel: MessagingChannel): string {
+  if (channel === "instagram") {
+    return CHAT_MESSAGES.instagramNotConnected;
+  }
 
-  return data?.whatsapp_status === "connected";
+  if (channel === "telegram") {
+    return CHAT_MESSAGES.telegramNotConnected;
+  }
+
+  if (channel === "website_forms") {
+    return CHAT_MESSAGES.websiteFormsNotConnected;
+  }
+
+  return CHAT_MESSAGES.whatsappNotConnected;
+}
+
+function resolveRecipientId(
+  channel: MessagingChannel,
+  phoneNumber: string,
+): string | null {
+  if (channel === "whatsapp") {
+    return phoneNumber.replace(/^\+/, "");
+  }
+
+  if (channel === "telegram") {
+    return phoneNumber.replace(/^tg:/, "") || null;
+  }
+
+  if (channel === "instagram") {
+    return phoneNumber.replace(/^ig:/, "") || null;
+  }
+
+  return null;
+}
+
+async function sendMediaToChannel(input: {
+  channel: MessagingChannel;
+  businessId: string;
+  recipientId: string;
+  file: File;
+  mimeType: string;
+  mediaKind: ChatMediaKind;
+  caption: string;
+  publicUrl: string;
+  storagePath: string;
+}): Promise<{ success: true } | { success: false; message: string }> {
+  const supabase = await createClient();
+
+  if (input.channel === "website_forms") {
+    return { success: true };
+  }
+
+  if (input.channel === "whatsapp") {
+    const { data: connection } = await supabase
+      .from("whatsapp_connections")
+      .select("meta_phone_number_id, meta_access_token")
+      .eq("business_id", input.businessId)
+      .eq("whatsapp_status", "connected")
+      .maybeSingle();
+
+    if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
+      return { success: false, message: CHAT_MESSAGES.whatsappNotConnected };
+    }
+
+    const uploadResult = await uploadWhatsAppMedia(
+      connection.meta_phone_number_id,
+      connection.meta_access_token,
+      input.file,
+      input.mimeType,
+      input.file.name,
+    );
+
+    if (!uploadResult.success) {
+      return { success: false, message: uploadResult.message };
+    }
+
+    const sendResult = await sendWhatsAppMediaMessage(
+      connection.meta_phone_number_id,
+      connection.meta_access_token,
+      input.recipientId,
+      input.mediaKind,
+      uploadResult.mediaId,
+      {
+        caption: input.caption || undefined,
+        filename: input.file.name,
+      },
+    );
+
+    if (!sendResult.success) {
+      return { success: false, message: sendResult.message };
+    }
+
+    return { success: true };
+  }
+
+  if (input.channel === "telegram") {
+    const { data: connection } = await supabase
+      .from("telegram_connections")
+      .select("bot_token")
+      .eq("business_id", input.businessId)
+      .eq("telegram_status", "connected")
+      .maybeSingle();
+
+    if (!connection?.bot_token) {
+      return { success: false, message: CHAT_MESSAGES.telegramNotConnected };
+    }
+
+    const sendResult = await sendTelegramMediaMessage(
+      connection.bot_token,
+      input.recipientId,
+      input.file,
+      input.file.name,
+      input.mimeType,
+      { caption: input.caption || undefined },
+    );
+
+    if (!sendResult.success) {
+      return { success: false, message: sendResult.message };
+    }
+
+    return { success: true };
+  }
+
+  if (input.channel === "instagram") {
+    const { data: connection } = await supabase
+      .from("instagram_connections")
+      .select("meta_page_id, meta_access_token")
+      .eq("business_id", input.businessId)
+      .eq("instagram_status", "connected")
+      .maybeSingle();
+
+    if (!connection?.meta_page_id || !connection.meta_access_token) {
+      return { success: false, message: CHAT_MESSAGES.instagramNotConnected };
+    }
+
+    const instagramMediaUrl =
+      input.publicUrl ||
+      (await getChatAttachmentSignedUrl(input.storagePath, 3600));
+
+    if (!instagramMediaUrl) {
+      return { success: false, message: CHAT_MESSAGES.mediaSendFailed };
+    }
+
+    const sendResult = await sendInstagramMediaMessage(
+      connection.meta_page_id,
+      connection.meta_access_token,
+      input.recipientId,
+      input.mediaKind,
+      instagramMediaUrl,
+    );
+
+    if (!sendResult.success) {
+      return { success: false, message: sendResult.message };
+    }
+
+    return { success: true };
+  }
+
+  return {
+    success: false,
+    message: CHAT_MESSAGES.mediaNotSupportedForChannel,
+  };
 }
 
 export async function sendChatMedia(
@@ -177,18 +342,14 @@ export async function sendChatMedia(
     };
   }
 
-  if (conversation.channel !== "whatsapp") {
-    return mediaNotSupported(conversation.channel);
-  }
-
-  const connected = await isWhatsAppConnected(businessId);
+  const connected = await isChannelConnected(businessId, conversation.channel);
 
   if (!connected) {
     return {
       success: false,
       error: {
-        code: "WHATSAPP_NOT_CONNECTED",
-        message: CHAT_MESSAGES.whatsappNotConnected,
+        code: "SEND_FAILED",
+        message: channelNotConnectedMessage(conversation.channel),
       },
     };
   }
@@ -205,73 +366,73 @@ export async function sendChatMedia(
     };
   }
 
-  const { data: connection } = await supabase
-    .from("whatsapp_connections")
-    .select("meta_phone_number_id, meta_access_token")
-    .eq("business_id", businessId)
-    .eq("whatsapp_status", "connected")
-    .maybeSingle();
+  const recipientId = resolveRecipientId(
+    conversation.channel,
+    contact.phone_number,
+  );
 
-  if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
+  if (!recipientId && conversation.channel !== "website_forms") {
     return {
       success: false,
       error: {
-        code: "WHATSAPP_NOT_CONNECTED",
-        message: CHAT_MESSAGES.whatsappNotConnected,
+        code: "NOT_FOUND",
+        message: CHAT_MESSAGES.genericError,
       },
     };
   }
 
   const mimeType = file.type || "application/octet-stream";
-  const mediaKind: ChatMediaKind = resolveWhatsAppMediaKind(mimeType);
-  const uploadResult = await uploadWhatsAppMedia(
-    connection.meta_phone_number_id,
-    connection.meta_access_token,
-    file,
-    mimeType,
-    file.name,
-  );
+  const mediaKind = resolveMediaKind(mimeType);
+  const stored = await uploadChatAttachmentFile(businessId, conversationId, file);
 
-  if (!uploadResult.success) {
+  if (!stored?.url) {
     return {
       success: false,
       error: {
         code: "SEND_FAILED",
-        message: uploadResult.message,
+        message: CHAT_MESSAGES.mediaSendFailed,
       },
     };
   }
 
-  const sendResult = await sendWhatsAppMediaMessage(
-    connection.meta_phone_number_id,
-    connection.meta_access_token,
-    contact.phone_number.replace(/^\+/, ""),
-    mediaKind,
-    uploadResult.mediaId,
-    {
-      caption: caption || undefined,
-      filename: file.name,
-    },
-  );
+  if (recipientId) {
+    const instagramSignedUrl = await getChatAttachmentSignedUrl(
+      stored.path,
+      3600,
+    );
 
-  if (!sendResult.success) {
-    return {
-      success: false,
-      error: {
-        code: "SEND_FAILED",
-        message: sendResult.message,
-      },
-    };
+    const sendResult = await sendMediaToChannel({
+      channel: conversation.channel,
+      businessId,
+      recipientId,
+      file,
+      mimeType,
+      mediaKind,
+      caption,
+      publicUrl: instagramSignedUrl ?? stored.url,
+      storagePath: stored.path,
+    });
+
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: {
+          code: "SEND_FAILED",
+          message: sendResult.message,
+        },
+      };
+    }
   }
 
-  const stored = await uploadChatAttachment(businessId, conversationId, file);
   const content = encodeMediaMessage(
-    {
+    buildMediaPayloadFromUpload({
       kind: mediaKind,
-      url: stored?.url ?? "",
       fileName: file.name,
       mimeType,
-    },
+      path: stored.path,
+      sizeBytes: stored.sizeBytes,
+      legacyUrl: stored.url,
+    }),
     caption,
   );
 

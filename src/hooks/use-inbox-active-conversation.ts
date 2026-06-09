@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
+import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
 import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
@@ -109,6 +110,16 @@ export function useInboxActiveConversation({
     });
   }, []);
 
+  const appendMessageRef = useRef(appendMessage);
+  appendMessageRef.current = appendMessage;
+
+  const { isClientTyping } = useConversationRealtime({
+    conversationId: selectedConversationId,
+    onMessage: (message) => {
+      appendMessageRef.current(message);
+    },
+  });
+
   const selectConversation = useCallback(
     (conversationId: string | null) => {
       setSelectedConversationId(conversationId);
@@ -166,5 +177,6 @@ export function useInboxActiveConversation({
     isLoadingConversation,
     refreshConversation,
     appendMessage,
+    isClientTyping,
   };
 }

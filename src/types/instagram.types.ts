@@ -82,14 +82,37 @@ export type ConnectManualInstagramResult = InstagramActionResult<{
   connection: InstagramConnectionData;
 }>;
 
-export type InstagramWebhookMessage = {
-  messageId: string;
+export type InstagramTypingEvent = {
+  kind: "typing";
   from: string;
-  timestamp: string;
-  body: string;
-  contactName: string;
   pageId: string;
+  isTyping: boolean;
+  timestamp: string;
 };
+
+export type InstagramWebhookMessage =
+  | {
+      kind: "text";
+      messageId: string;
+      from: string;
+      timestamp: string;
+      body: string;
+      contactName: string;
+      pageId: string;
+    }
+  | {
+      kind: "media";
+      messageId: string;
+      from: string;
+      timestamp: string;
+      contactName: string;
+      pageId: string;
+      sourceUrl: string;
+      mediaKind: "image" | "audio" | "document" | "video";
+      fileName?: string;
+      mimeType?: string;
+      caption?: string;
+    };
 
 export type InstagramWebhookPayload = {
   object?: string;
@@ -100,10 +123,17 @@ export type InstagramWebhookPayload = {
       sender?: { id?: string };
       recipient?: { id?: string };
       timestamp?: number;
+      sender_action?: "typing_on" | "typing_off" | "mark_seen";
       message?: {
         mid?: string;
         text?: string;
         is_echo?: boolean;
+        attachments?: Array<{
+          type?: string;
+          payload?: {
+            url?: string;
+          };
+        }>;
       };
     }>;
   }>;

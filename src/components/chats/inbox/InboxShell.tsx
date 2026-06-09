@@ -30,16 +30,23 @@ function InboxShellContent({
   return (
     <div
       className={cn(
-        "flex h-[calc(100svh-3.5rem)] min-h-0 flex-col overflow-hidden bg-background",
+        "flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background",
         className,
       )}
     >
       {channelTabs}
 
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div
+        className={cn(
+          "grid min-h-0 min-w-0 flex-1 overflow-hidden",
+          detailsOpen
+            ? "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,20rem)]"
+            : "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
+        )}
+      >
         <div
           className={cn(
-            "flex min-h-0 w-full min-w-0 flex-col overflow-hidden border-r lg:w-[22rem] lg:shrink-0 xl:w-80",
+            "flex min-h-0 min-w-0 flex-col overflow-hidden border-r",
             showChatOnMobile && "hidden lg:flex",
           )}
         >
@@ -48,7 +55,7 @@ function InboxShellContent({
 
         <div
           className={cn(
-            "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+            "flex min-h-0 min-w-0 flex-col overflow-hidden",
             showChatOnMobile ? "flex" : "hidden lg:flex",
           )}
         >
@@ -56,7 +63,7 @@ function InboxShellContent({
         </div>
 
         {detailsOpen ? (
-          <div className="hidden min-h-0 w-80 min-w-80 max-w-80 shrink-0 basis-80 overflow-hidden border-l xl:flex xl:flex-col">
+          <div className="hidden min-h-0 min-w-0 flex-col overflow-hidden border-l xl:flex">
             {detailsColumn}
           </div>
         ) : null}

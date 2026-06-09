@@ -86,6 +86,7 @@ export type ConversationListItem = {
   lastMessageAt: string | null;
   lastMessageSenderType: MessageSenderType | null;
   lastMessageAiGenerated: boolean;
+  isUnread: boolean;
 };
 
 export type ConversationDetail = {

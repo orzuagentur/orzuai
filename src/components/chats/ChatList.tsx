@@ -93,7 +93,7 @@ export function ChatList({
       {conversations.map((conversation) => {
         const isActive = conversation.id === activeConversationId;
         const needsAttention = isConversationNeedsAttention(conversation);
-        const awaitingReply = conversation.lastMessageSenderType === "client";
+        const isUnread = conversation.isUnread;
 
         const rowClassName = cn(
           "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
@@ -120,7 +120,7 @@ export function ChatList({
                     className="size-3"
                   />
                 </span>
-              ) : awaitingReply ? (
+              ) : isUnread ? (
                 <span
                   className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-background bg-amber-500"
                   aria-hidden="true"
@@ -159,7 +159,7 @@ export function ChatList({
                       {getChannelBadgeLabel(conversation.channel)}
                     </Badge>
                   ) : null}
-                  {awaitingReply ? (
+                  {isUnread ? (
                     <Badge
                       variant="outline"
                       className="shrink-0 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
@@ -179,10 +179,11 @@ export function ChatList({
                 </div>
               ) : null}
             </div>
-            {isInboxVariant && awaitingReply ? (
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                1
-              </span>
+            {isInboxVariant && isUnread ? (
+              <span
+                className="size-2.5 shrink-0 rounded-full bg-primary"
+                aria-label={CHAT_MESSAGES.unreadMessage}
+              />
             ) : !isInboxVariant ? (
               <Badge
                 variant="outline"

@@ -4,20 +4,7 @@ VALUES (
   'chat-attachments',
   true,
   16777216,
-  ARRAY[
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'audio/ogg',
-    'audio/mpeg',
-    'audio/mp4',
-    'audio/webm',
-    'video/mp4',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ]
+  NULL
 )
 ON CONFLICT (id) DO NOTHING;
 

@@ -21,6 +21,7 @@ import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { markConversationRead } from "@/services/conversation-read.service";
 import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
@@ -269,6 +270,7 @@ export async function getActiveConversationContext(
     isChatChannelConnected(businessId, conversation.channel),
     getAiEnabledForChannel(businessId, conversation.channel),
     listCannedResponses(conversation.channel),
+    markConversationRead(businessId, conversationId),
   ]);
 
   return {

@@ -1,5 +1,7 @@
 import type { MessageSenderType, MessagingChannel } from "@/types/database.types";
 import type { ChatMessageData, ConversationListItem } from "@/types/chat.types";
+import { getMessagePreviewText } from "@/utils/chat-media";
+import { withConversationUnread } from "@/utils/conversation-unread";
 
 type RawMessageRow = {
   id: string;
@@ -16,6 +18,7 @@ type RawConversationRow = {
   channel: MessagingChannel;
   status: ConversationListItem["status"];
   updated_at: string;
+  last_read_at?: string | null;
   contact:
     | { id?: string; name: string; phone_number: string; lead_score?: number | null }
     | Array<{ id?: string; name: string; phone_number: string; lead_score?: number | null }>
@@ -86,7 +89,7 @@ export function buildLastMessagePreviewMap(
     }
 
     map.set(message.conversation_id, {
-      preview: truncatePreview(message.content),
+      preview: truncatePreview(getMessagePreviewText(message.content)),
       createdAt: message.created_at,
       senderType: message.sender_type,
       aiGenerated: message.ai_generated,
@@ -123,7 +126,7 @@ export function mapConversationListItem(
     return null;
   }
 
-  return {
+  return withConversationUnread({
     id: row.id,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
@@ -135,5 +138,6 @@ export function mapConversationListItem(
     lastMessageAt: lastMessage?.createdAt ?? null,
     lastMessageSenderType: lastMessage?.senderType ?? null,
     lastMessageAiGenerated: lastMessage?.aiGenerated ?? false,
-  };
+    lastReadAt: row.last_read_at ?? null,
+  });
 }

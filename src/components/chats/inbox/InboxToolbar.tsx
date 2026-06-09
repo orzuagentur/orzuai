@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BellIcon,
   BotIcon,
   FilterIcon,
   Loader2Icon,
@@ -110,16 +109,6 @@ export function InboxToolbar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="relative size-8 shrink-0"
-        aria-label={CHAT_MESSAGES.notificationsLabel}
-      >
-        <BellIcon className="size-4" />
-        <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive" />
-      </Button>
     </div>
   );
 }

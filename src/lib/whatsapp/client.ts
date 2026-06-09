@@ -306,6 +306,73 @@ export async function subscribeAppToWaba(
   };
 }
 
+type DownloadMediaResult =
+  | {
+      success: true;
+      buffer: Buffer;
+      mimeType: string;
+      fileName: string;
+    }
+  | { success: false; message: string };
+
+export async function downloadWhatsAppMedia(
+  accessToken: string,
+  mediaId: string,
+  fallbackFileName = "file",
+): Promise<DownloadMediaResult> {
+  const metaResponse = await fetch(buildWhatsAppApiUrl(mediaId), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  const metaPayload = (await metaResponse.json().catch(() => null)) as
+    | { url?: string; mime_type?: string; error?: { message?: string } }
+    | null;
+
+  if (!metaResponse.ok || !metaPayload?.url) {
+    return {
+      success: false,
+      message:
+        metaPayload?.error?.message || "Unable to resolve WhatsApp media URL.",
+    };
+  }
+
+  const fileResponse = await fetch(metaPayload.url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!fileResponse.ok) {
+    return {
+      success: false,
+      message: "Unable to download WhatsApp media file.",
+    };
+  }
+
+  const mimeType =
+    metaPayload.mime_type ||
+    fileResponse.headers.get("content-type") ||
+    "application/octet-stream";
+  const extension = mimeType.includes("/")
+    ? `.${mimeType.split("/")[1]?.split(";")[0] ?? "bin"}`
+    : "";
+  const fileName = fallbackFileName.includes(".")
+    ? fallbackFileName
+    : `${fallbackFileName}${extension}`;
+  const buffer = Buffer.from(await fileResponse.arrayBuffer());
+
+  return {
+    success: true,
+    buffer,
+    mimeType,
+    fileName,
+  };
+}
+
 export function verifyWhatsAppWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,

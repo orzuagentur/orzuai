@@ -59,6 +59,7 @@ export type TelegramWebhookPayload = {
 type TelegramWebhookMessage = {
   message_id?: number;
   text?: string;
+  caption?: string;
   from?: {
     id?: number;
     is_bot?: boolean;
@@ -70,10 +71,44 @@ type TelegramWebhookMessage = {
     id: number;
     type?: string;
   };
+  photo?: Array<{
+    file_id: string;
+    file_unique_id?: string;
+  }>;
+  document?: {
+    file_id: string;
+    file_name?: string;
+    mime_type?: string;
+  };
+  voice?: {
+    file_id: string;
+    mime_type?: string;
+  };
+  video?: {
+    file_id: string;
+    mime_type?: string;
+  };
+  audio?: {
+    file_id: string;
+    mime_type?: string;
+    file_name?: string;
+  };
 };
 
-export type TelegramInboundMessage = {
-  chatId: string;
-  body: string;
-  contactName: string;
-};
+export type TelegramInboundMessage =
+  | {
+      kind: "text";
+      chatId: string;
+      body: string;
+      contactName: string;
+    }
+  | {
+      kind: "media";
+      chatId: string;
+      contactName: string;
+      fileId: string;
+      mediaKind: "image" | "audio" | "document" | "video";
+      mimeType?: string;
+      fileName?: string;
+      caption?: string;
+    };

@@ -19,6 +19,7 @@ import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
+import { useAgentTypingIndicator } from "@/hooks/use-agent-typing-indicator";
 import { useSendChatMedia } from "@/hooks/use-send-chat-media";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
@@ -61,6 +62,7 @@ type ChatWindowProps = {
   onSuggestReplyOpenChange?: (open: boolean) => void;
   onMessageSent?: (message: ChatMessageData) => void;
   onContactDeleted?: () => void;
+  isClientTyping?: boolean;
   className?: string;
 };
 
@@ -95,6 +97,7 @@ export function ChatWindow({
   onSuggestReplyOpenChange,
   onMessageSent,
   onContactDeleted,
+  isClientTyping = false,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -124,6 +127,16 @@ export function ChatWindow({
     },
   });
 
+  useAgentTypingIndicator({
+    conversationId: conversation?.id ?? null,
+    draft,
+    enabled:
+      isInboxLayout &&
+      composerTab === "reply" &&
+      canSend &&
+      Boolean(conversation),
+  });
+
   const { sendMedia, isLoading: isSendingMedia } = useSendChatMedia({
     onSuccess: (result) => {
       if (result.success && result.data?.message) {
@@ -134,7 +147,7 @@ export function ChatWindow({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.messages.length]);
+  }, [conversation?.messages.length, isClientTyping]);
 
   function handleRefresh() {
     router.refresh();
@@ -143,7 +156,7 @@ export function ChatWindow({
   if (!conversation) {
     if (isLoadingConversation && loadingPreview && isInboxLayout) {
       return (
-        <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+        <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
           <div className="shrink-0 border-b bg-card px-4 py-3">
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -212,7 +225,7 @@ export function ChatWindow({
 
   if (isInboxLayout) {
     return (
-      <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+      <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
         <div className="shrink-0 border-b bg-card px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -230,7 +243,9 @@ export function ChatWindow({
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatContactIdentifier(conversation.contactPhone)}
+                {isClientTyping
+                  ? CHAT_MESSAGES.customerTyping(conversation.contactName)
+                  : formatContactIdentifier(conversation.contactPhone)}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -266,13 +281,15 @@ export function ChatWindow({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
             <MessageHistory
               messages={conversation.messages}
               variant="inbox"
               className="min-h-0 flex-1 overflow-y-auto"
               bottomRef={bottomRef}
+              isClientTyping={isClientTyping}
+              typingContactName={conversation.contactName}
             />
 
             <InboxChatComposer

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
+import { useDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +16,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
@@ -27,8 +29,24 @@ type AppSidebarProps = {
   userProfile: DashboardUserProfile;
 };
 
+function getNavBadgeCount(
+  itemId: string,
+  counts: ReturnType<typeof useDashboardNavBadges>["counts"],
+): number {
+  if (itemId === "chats") {
+    return counts.inboxUnread;
+  }
+
+  if (itemId === "contacts") {
+    return counts.crmUnread;
+  }
+
+  return 0;
+}
+
 export function AppSidebar({ userProfile }: AppSidebarProps) {
   const pathname = usePathname();
+  const { counts } = useDashboardNavBadges();
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -56,6 +74,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
                     ? pathname === item.href
                     : pathname === item.href ||
                       pathname.startsWith(`${item.href}/`);
+                const badgeCount = getNavBadgeCount(item.id, counts);
 
                 return (
                   <SidebarMenuItem key={item.id}>
@@ -68,6 +87,11 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
                       <Link href={item.href}>
                         <item.icon />
                         <span>{item.label}</span>
+                        {badgeCount > 0 ? (
+                          <SidebarMenuBadge>
+                            {badgeCount > 99 ? "99+" : badgeCount}
+                          </SidebarMenuBadge>
+                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

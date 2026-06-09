@@ -25,6 +25,10 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
+  notifyClientTyping,
+  resolveConversationIdForChannelSender,
+} from "@/services/conversation-typing.service";
+import {
   findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -46,8 +50,19 @@ import {
   completeInstagramEmbeddedSignupSchema,
   connectManualInstagramSchema,
 } from "@/types/instagram.types";
+import {
+  downloadAndStoreUrlInboundMedia,
+} from "@/services/inbound-media.service";
+import {
+  buildInboundMediaFallbackContent,
+  getMessagePlainText,
+} from "@/utils/chat-media";
 import { mapInstagramConnection } from "@/utils/instagram";
-import { parseInstagramWebhookPayload } from "@/utils/instagram-webhook";
+import {
+  parseInstagramWebhookPayload,
+  parseInstagramWebhookTypingEvents,
+} from "@/utils/instagram-webhook";
+import type { InstagramWebhookMessage } from "@/types/instagram.types";
 
 function missingConfigError(): CompleteInstagramEmbeddedSignupResult {
   return {
@@ -456,11 +471,7 @@ export async function connectManualInstagram(
 async function ingestInstagramMessage(
   admin: ReturnType<typeof createAdminClient>,
   connection: InstagramConnection,
-  message: {
-    from: string;
-    body: string;
-    contactName: string;
-  },
+  message: InstagramWebhookMessage,
 ): Promise<void> {
   const businessId = connection.business_id;
   const identifier = `ig:${message.from}`;
@@ -515,11 +526,41 @@ async function ingestInstagramMessage(
     return;
   }
 
+  let content =
+    message.kind === "text"
+      ? message.body
+      : null;
+
+  if (message.kind === "media") {
+    content = await downloadAndStoreUrlInboundMedia({
+      sourceUrl: message.sourceUrl,
+      businessId,
+      conversationId,
+      kind: message.mediaKind,
+      fileName: message.fileName,
+      mimeType: message.mimeType,
+      caption: message.caption,
+      accessToken: connection.meta_access_token ?? undefined,
+    });
+
+    if (!content) {
+      content = buildInboundMediaFallbackContent(
+        message.mediaKind,
+        message.caption,
+        message.fileName,
+      );
+    }
+  }
+
+  if (!content) {
+    return;
+  }
+
   await insertChannelMessage(admin, {
     conversationId,
     channel: "instagram",
     senderType: "client",
-    content: message.body,
+    content,
   });
 
   await incrementMessagingAnalytics(admin, businessId, "instagram", {
@@ -537,7 +578,7 @@ async function ingestInstagramMessage(
     businessId,
     channel: "instagram",
     conversationId,
-    clientMessage: message.body,
+    clientMessage: getMessagePlainText(content),
     sendReply: async (text) => {
       if (!connection.meta_page_id || !connection.meta_access_token) {
         return { success: false };
@@ -555,6 +596,23 @@ async function ingestInstagramMessage(
   });
 }
 
+async function ingestInstagramTypingEvent(
+  connection: InstagramConnection,
+  event: ReturnType<typeof parseInstagramWebhookTypingEvents>[number],
+): Promise<void> {
+  const conversationId = await resolveConversationIdForChannelSender(
+    connection.business_id,
+    "instagram",
+    `ig:${event.from}`,
+  );
+
+  if (!conversationId) {
+    return;
+  }
+
+  await notifyClientTyping(conversationId, event.isTyping);
+}
+
 export async function processInstagramWebhook(
   payload: InstagramWebhookPayload,
 ): Promise<{ processed: number }> {
@@ -563,8 +621,9 @@ export async function processInstagramWebhook(
   }
 
   const messages = parseInstagramWebhookPayload(payload);
+  const typingEvents = parseInstagramWebhookTypingEvents(payload);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && typingEvents.length === 0) {
     return { processed: 0 };
   }
 
@@ -583,16 +642,28 @@ export async function processInstagramWebhook(
       continue;
     }
 
-    await ingestInstagramMessage(admin, connection, {
-      from: message.from,
-      body: message.body,
-      contactName: message.contactName,
-    });
+    await ingestInstagramMessage(admin, connection, message);
 
     processed += 1;
   }
 
-  if (processed > 0) {
+  for (const event of typingEvents) {
+    const { data: connection } = await admin
+      .from("instagram_connections")
+      .select("*")
+      .eq("meta_page_id", event.pageId)
+      .eq("instagram_status", "connected")
+      .maybeSingle();
+
+    if (!connection) {
+      continue;
+    }
+
+    await ingestInstagramTypingEvent(connection, event);
+    processed += 1;
+  }
+
+  if (messages.length > 0) {
     revalidateInstagramPaths();
   }
 

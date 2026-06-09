@@ -48,10 +48,18 @@ import {
   connectManualWhatsAppSchema,
 } from "@/types/whatsapp.types";
 import {
+  downloadAndStoreWhatsAppInboundMedia,
+} from "@/services/inbound-media.service";
+import {
+  buildInboundMediaFallbackContent,
+  getMessagePlainText,
+} from "@/utils/chat-media";
+import {
   mapWhatsAppConnection,
   normalizePhoneNumber,
   parseWhatsAppWebhookPayload,
 } from "@/utils/whatsapp";
+import type { WhatsAppWebhookMessage } from "@/types/whatsapp.types";
 
 function missingConfigError(): {
   success: false;
@@ -553,11 +561,7 @@ export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {
 async function ingestIncomingMessage(
   admin: ReturnType<typeof createAdminClient>,
   connection: WhatsappConnection,
-  message: {
-    from: string;
-    body: string;
-    contactName: string;
-  },
+  message: WhatsAppWebhookMessage,
 ): Promise<void> {
   const businessId = connection.business_id;
   const normalizedPhone = normalizePhoneNumber(message.from);
@@ -613,11 +617,43 @@ async function ingestIncomingMessage(
     return;
   }
 
+  let content =
+    message.kind === "text"
+      ? message.body
+      : null;
+
+  if (message.kind === "media") {
+    if (connection.meta_access_token) {
+      content = await downloadAndStoreWhatsAppInboundMedia({
+        accessToken: connection.meta_access_token,
+        mediaId: message.mediaId,
+        businessId,
+        conversationId,
+        kind: message.mediaKind,
+        fileName: message.fileName,
+        mimeType: message.mimeType,
+        caption: message.caption,
+      });
+    }
+
+    if (!content) {
+      content = buildInboundMediaFallbackContent(
+        message.mediaKind,
+        message.caption,
+        message.fileName,
+      );
+    }
+  }
+
+  if (!content) {
+    return;
+  }
+
   await insertChannelMessage(admin, {
     conversationId,
     channel: "whatsapp",
     senderType: "client",
-    content: message.body,
+    content,
   });
 
   await incrementMessagingAnalytics(admin, businessId, "whatsapp", {
@@ -635,7 +671,7 @@ async function ingestIncomingMessage(
     businessId,
     channel: "whatsapp",
     conversationId,
-    clientMessage: message.body,
+    clientMessage: getMessagePlainText(content),
     sendReply: async (text) => {
       if (!connection.meta_phone_number_id || !connection.meta_access_token) {
         return { success: false };
@@ -681,11 +717,7 @@ export async function processWhatsAppWebhook(
       continue;
     }
 
-    await ingestIncomingMessage(admin, connection, {
-      from: message.from,
-      body: message.body,
-      contactName: message.contactName,
-    });
+    await ingestIncomingMessage(admin, connection, message);
 
     processed += 1;
   }

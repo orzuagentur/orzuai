@@ -85,6 +85,182 @@ export async function setTelegramWebhook(
   return { success: true };
 }
 
+type TelegramFileInfo = {
+  file_id: string;
+  file_path?: string;
+};
+
+async function sendTelegramMultipart(
+  botToken: string,
+  method: string,
+  fields: Record<string, string>,
+  fileField: string,
+  file: Blob,
+  fileName: string,
+): Promise<{ success: true } | { success: false; message: string }> {
+  const formData = new FormData();
+
+  for (const [key, value] of Object.entries(fields)) {
+    formData.append(key, value);
+  }
+
+  formData.append(fileField, file, fileName);
+
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/${method}`, {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | TelegramApiResponse<{ message_id: number }>
+    | null;
+
+  if (!response.ok || !payload?.ok) {
+    return {
+      success: false,
+      message: payload?.description ?? "Telegram media request failed.",
+    };
+  }
+
+  return { success: true };
+}
+
+export async function sendTelegramMediaMessage(
+  botToken: string,
+  chatId: string,
+  file: Blob,
+  fileName: string,
+  mimeType: string,
+  options?: { caption?: string },
+): Promise<{ success: true } | { success: false; message: string }> {
+  const caption = options?.caption?.trim();
+  const fields: Record<string, string> = { chat_id: chatId };
+
+  if (caption) {
+    fields.caption = caption;
+  }
+
+  if (mimeType.startsWith("image/")) {
+    return sendTelegramMultipart(botToken, "sendPhoto", fields, "photo", file, fileName);
+  }
+
+  if (mimeType === "audio/ogg" || mimeType === "audio/opus") {
+    return sendTelegramMultipart(botToken, "sendVoice", fields, "voice", file, fileName);
+  }
+
+  if (mimeType.startsWith("audio/")) {
+    return sendTelegramMultipart(botToken, "sendAudio", fields, "audio", file, fileName);
+  }
+
+  if (mimeType.startsWith("video/")) {
+    return sendTelegramMultipart(botToken, "sendVideo", fields, "video", file, fileName);
+  }
+
+  return sendTelegramMultipart(
+    botToken,
+    "sendDocument",
+    fields,
+    "document",
+    file,
+    fileName,
+  );
+}
+
+export async function getTelegramFile(
+  botToken: string,
+  fileId: string,
+): Promise<
+  | { success: true; file: TelegramFileInfo }
+  | { success: false; message: string }
+> {
+  const result = await callTelegramApi<TelegramFileInfo>(botToken, "getFile", {
+    file_id: fileId,
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  if (!result.result.file_path) {
+    return {
+      success: false,
+      message: "Telegram file path is missing.",
+    };
+  }
+
+  return { success: true, file: result.result };
+}
+
+export async function downloadTelegramFile(
+  botToken: string,
+  fileId: string,
+  fallbackFileName: string,
+): Promise<
+  | {
+      success: true;
+      buffer: Buffer;
+      mimeType: string;
+      fileName: string;
+    }
+  | { success: false; message: string }
+> {
+  const fileResult = await getTelegramFile(botToken, fileId);
+
+  if (!fileResult.success) {
+    return fileResult;
+  }
+
+  const response = await fetch(
+    `${TELEGRAM_API_BASE}/file/bot${botToken}/${fileResult.file.file_path}`,
+    { cache: "no-store" },
+  );
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: "Unable to download Telegram file.",
+    };
+  }
+
+  const mimeType =
+    response.headers.get("content-type") || "application/octet-stream";
+  const fileName = fallbackFileName.includes(".")
+    ? fallbackFileName
+    : fileResult.file.file_path?.split("/").pop() || fallbackFileName;
+
+  return {
+    success: true,
+    buffer: Buffer.from(await response.arrayBuffer()),
+    mimeType,
+    fileName,
+  };
+}
+
+export type TelegramChatAction =
+  | "typing"
+  | "upload_photo"
+  | "upload_video"
+  | "upload_voice"
+  | "upload_document";
+
+export async function sendTelegramChatAction(
+  botToken: string,
+  chatId: string,
+  action: TelegramChatAction,
+): Promise<{ success: true } | { success: false; message: string }> {
+  const result = await callTelegramApi<boolean>(botToken, "sendChatAction", {
+    chat_id: chatId,
+    action,
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return { success: true };
+}
+
 export async function sendTelegramTextMessage(
   botToken: string,
   chatId: string,

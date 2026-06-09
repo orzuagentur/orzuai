@@ -85,14 +85,29 @@ export type SyncWhatsAppResult = WhatsAppActionResult<{
   syncedAt: string;
 }>;
 
-export type WhatsAppWebhookMessage = {
-  messageId: string;
-  from: string;
-  timestamp: string;
-  body: string;
-  contactName: string;
-  phoneNumberId: string;
-};
+export type WhatsAppWebhookMessage =
+  | {
+      kind: "text";
+      messageId: string;
+      from: string;
+      timestamp: string;
+      body: string;
+      contactName: string;
+      phoneNumberId: string;
+    }
+  | {
+      kind: "media";
+      messageId: string;
+      from: string;
+      timestamp: string;
+      contactName: string;
+      phoneNumberId: string;
+      mediaId: string;
+      mediaKind: "image" | "audio" | "document" | "video";
+      mimeType?: string;
+      fileName?: string;
+      caption?: string;
+    };
 
 export type WhatsAppWebhookPayload = {
   object?: string;
@@ -115,6 +130,35 @@ export type WhatsAppWebhookPayload = {
           type?: string;
           text?: {
             body?: string;
+          };
+          image?: {
+            id?: string;
+            caption?: string;
+            mime_type?: string;
+          };
+          audio?: {
+            id?: string;
+            mime_type?: string;
+            voice?: boolean;
+          };
+          voice?: {
+            id?: string;
+            mime_type?: string;
+          };
+          video?: {
+            id?: string;
+            caption?: string;
+            mime_type?: string;
+          };
+          document?: {
+            id?: string;
+            caption?: string;
+            filename?: string;
+            mime_type?: string;
+          };
+          sticker?: {
+            id?: string;
+            mime_type?: string;
           };
         }>;
       };

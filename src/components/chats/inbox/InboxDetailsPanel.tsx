@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Building2Icon,
   CalendarIcon,
   Loader2Icon,
   MailIcon,
   MapPinIcon,
   PhoneIcon,
   SparklesIcon,
+  TagIcon,
   UserIcon,
 } from "lucide-react";
 
@@ -19,10 +21,13 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getConversationCrmAssistantAction } from "@/features/chats/actions/get-conversation-crm-assistant";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
+import { getContactProfileAction } from "@/features/contacts/actions/get-contact-profile";
+import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import type { ConversationCrmAssistantData } from "@/services/crm-assistant.service";
 import { cn } from "@/lib/utils";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ConversationDetail } from "@/types/chat.types";
+import type { PipelineStage, UnifiedContactItem } from "@/types/contact.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
 import {
@@ -40,6 +45,14 @@ type InboxDetailsPanelProps = {
   onUseSuggestedReply: (content: string) => void;
   onGenerateReply?: () => void;
   className?: string;
+};
+
+const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  new: CONTACTS_MESSAGES.pipelineNew,
+  qualified: CONTACTS_MESSAGES.pipelineQualified,
+  proposal: CONTACTS_MESSAGES.pipelineProposal,
+  won: CONTACTS_MESSAGES.pipelineWon,
+  lost: CONTACTS_MESSAGES.pipelineLost,
 };
 
 function DetailSection({
@@ -61,6 +74,14 @@ function DetailSection({
   );
 }
 
+function formatDealValue(value: number | null): string {
+  if (value === null) {
+    return CHAT_MESSAGES.notAvailable;
+  }
+
+  return `$${value.toLocaleString()}`;
+}
+
 export function InboxDetailsPanel({
   conversation,
   cannedResponses,
@@ -69,15 +90,20 @@ export function InboxDetailsPanel({
   className,
 }: InboxDetailsPanelProps) {
   const [crmData, setCrmData] = useState<ConversationCrmAssistantData | null>(null);
+  const [contactProfile, setContactProfile] = useState<UnifiedContactItem | null>(
+    null,
+  );
   const [crmLoadState, setCrmLoadState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
   const loadedConversationIdRef = useRef<string | null>(null);
   const conversationId = conversation?.id ?? null;
+  const contactId = conversation?.contactId ?? crmData?.contactId ?? null;
 
   useEffect(() => {
     if (!conversationId) {
       setCrmData(null);
+      setContactProfile(null);
       setCrmLoadState("idle");
       loadedConversationIdRef.current = null;
       return;
@@ -91,31 +117,48 @@ export function InboxDetailsPanel({
     let cancelled = false;
     loadedConversationIdRef.current = activeConversationId;
     setCrmData(null);
+    setContactProfile(null);
     setCrmLoadState("loading");
 
-    async function load(id: string) {
-      const result = await getConversationCrmAssistantAction({ conversationId: id });
+    async function load(id: string, resolvedContactId: string | null) {
+      const [assistantResult, profileResult] = await Promise.all([
+        getConversationCrmAssistantAction({ conversationId: id }),
+        resolvedContactId
+          ? getContactProfileAction(resolvedContactId)
+          : Promise.resolve(null),
+      ]);
 
       if (cancelled) {
         return;
       }
 
-      if (result.success) {
-        setCrmData(result.data);
-        setCrmLoadState("ready");
-        return;
+      if (assistantResult.success) {
+        setCrmData(assistantResult.data);
+      } else {
+        setCrmData(null);
       }
 
-      setCrmData(null);
-      setCrmLoadState("error");
+      if (profileResult?.contact) {
+        setContactProfile(profileResult.contact);
+      } else if (assistantResult.success) {
+        const fallbackProfile = await getContactProfileAction(
+          assistantResult.data.contactId,
+        );
+
+        if (!cancelled && fallbackProfile?.contact) {
+          setContactProfile(fallbackProfile.contact);
+        }
+      }
+
+      setCrmLoadState(assistantResult.success ? "ready" : "error");
     }
 
-    void load(activeConversationId);
+    void load(activeConversationId, conversation?.contactId ?? null);
 
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [conversation?.contactId, conversationId]);
 
   if (!conversation) {
     return (
@@ -136,6 +179,11 @@ export function InboxDetailsPanel({
     conversation.messages[conversation.messages.length - 1]?.createdAt ??
     conversation.updatedAt;
   const isCrmLoading = crmLoadState === "loading";
+  const leadScore = contactProfile?.leadScore ?? crmData?.leadScore ?? null;
+  const aiSummary = contactProfile?.aiSummary ?? crmData?.aiSummary ?? null;
+  const crmHref = contactId
+    ? DASHBOARD_ROUTES.contacts
+    : DASHBOARD_ROUTES.contacts;
 
   return (
     <aside
@@ -151,37 +199,106 @@ export function InboxDetailsPanel({
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="truncate font-medium">{conversation.contactName}</p>
-            {crmData?.leadScore !== null && crmData?.leadScore !== undefined ? (
+            {leadScore !== null ? (
               <Badge
                 variant="outline"
-                className={getLeadScoreBadgeClassName(crmData.leadScore)}
+                className={getLeadScoreBadgeClassName(leadScore)}
               >
-                {CHAT_MESSAGES.leadScoreLabel}: {crmData.leadScore} ·{" "}
-                {getLeadScoreLabel(crmData.leadScore)}
+                {CHAT_MESSAGES.leadScoreLabel}: {leadScore} ·{" "}
+                {getLeadScoreLabel(leadScore)}
               </Badge>
+            ) : null}
+            {contactProfile?.sentiment ? (
+              <p className="text-xs text-muted-foreground capitalize">
+                {CONTACTS_MESSAGES.sentimentLabel}: {contactProfile.sentiment}
+              </p>
             ) : null}
           </div>
         </div>
 
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <PhoneIcon className="size-3.5 shrink-0" />
-            <span className="truncate">
-              {formatContactIdentifier(conversation.contactPhone)}
-            </span>
+        {isCrmLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2Icon className="size-3.5 animate-spin" />
+            {CHAT_MESSAGES.crmAssistantLoading}
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MailIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{CHAT_MESSAGES.contactEmailUnavailable}</span>
+        ) : (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <PhoneIcon className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {formatContactIdentifier(conversation.contactPhone)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MailIcon className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {contactProfile?.email ?? CHAT_MESSAGES.contactEmailUnavailable}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Building2Icon className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {contactProfile?.customFields.company ?? CHAT_MESSAGES.notAvailable}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPinIcon className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {contactProfile?.customFields.location ??
+                  CHAT_MESSAGES.contactLocationUnavailable}
+              </span>
+            </div>
+            {contactProfile?.tags.length ? (
+              <div className="flex items-start gap-2 text-muted-foreground">
+                <TagIcon className="mt-0.5 size-3.5 shrink-0" />
+                <div className="flex flex-wrap gap-1">
+                  {contactProfile.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[10px]">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="grid gap-2 rounded-lg border bg-muted/20 p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  {CONTACTS_MESSAGES.pipelineStageLabel}
+                </span>
+                <span>
+                  {contactProfile
+                    ? PIPELINE_STAGE_LABELS[contactProfile.pipelineStage]
+                    : CHAT_MESSAGES.notAvailable}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  {CONTACTS_MESSAGES.dealValueLabel}
+                </span>
+                <span>{formatDealValue(contactProfile?.dealValue ?? null)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  {CONTACTS_MESSAGES.expectedCloseLabel}
+                </span>
+                <span>
+                  {contactProfile?.expectedCloseDate ?? CHAT_MESSAGES.notAvailable}
+                </span>
+              </div>
+            </div>
+            {contactProfile?.customFields.notes ? (
+              <p className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
+                <span className="font-medium text-foreground">
+                  {CONTACTS_MESSAGES.notesLabel}:{" "}
+                </span>
+                {contactProfile.customFields.notes}
+              </p>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MapPinIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{CHAT_MESSAGES.contactLocationUnavailable}</span>
-          </div>
-        </div>
+        )}
 
         <Button variant="link" size="sm" className="h-auto p-0" asChild>
-          <Link href={DASHBOARD_ROUTES.contacts}>{CHAT_MESSAGES.viewInCrm}</Link>
+          <Link href={crmHref}>{CHAT_MESSAGES.viewInCrm}</Link>
         </Button>
       </DetailSection>
 
@@ -193,12 +310,14 @@ export function InboxDetailsPanel({
           </div>
         ) : (
           <>
-            {crmData?.aiSummary ? (
+            {aiSummary ? (
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="mb-1 text-xs font-medium">
                   {CHAT_MESSAGES.leadSummaryTitle}
                 </p>
-                <p className="text-sm text-muted-foreground">{crmData.aiSummary}</p>
+                <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
+                  {aiSummary}
+                </p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -206,7 +325,7 @@ export function InboxDetailsPanel({
               </p>
             )}
             {crmData?.suggestedAction ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
                 <span className="font-medium text-foreground">
                   {CHAT_MESSAGES.crmSuggestedAction}:{" "}
                 </span>

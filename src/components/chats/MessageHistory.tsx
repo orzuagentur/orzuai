@@ -1,6 +1,8 @@
 import type { RefObject } from "react";
 
 import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
+import { TypingIndicator } from "@/components/chats/TypingIndicator";
+import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage } from "@/utils/chat-media";
@@ -10,6 +12,8 @@ type MessageHistoryProps = {
   messages: ChatMessageData[];
   variant?: "default" | "inbox";
   bottomRef?: RefObject<HTMLDivElement | null>;
+  isClientTyping?: boolean;
+  typingContactName?: string;
   className?: string;
 };
 
@@ -29,6 +33,8 @@ export function MessageHistory({
   messages,
   variant = "default",
   bottomRef,
+  isClientTyping = false,
+  typingContactName = "Customer",
   className,
 }: MessageHistoryProps) {
   const isInbox = variant === "inbox";
@@ -69,7 +75,8 @@ export function MessageHistory({
           >
             <div
               className={cn(
-                "max-w-[min(78%,32rem)] min-w-0 rounded-lg px-3 py-2 text-sm shadow-sm",
+                "max-w-[min(85%,28rem)] min-w-0 shrink rounded-lg text-sm shadow-sm",
+                media ? "px-1.5 py-1.5" : "px-3 py-2",
                 isOutgoing
                   ? isInbox
                     ? "rounded-br-sm bg-emerald-600 text-white"
@@ -91,7 +98,7 @@ export function MessageHistory({
                   isOutgoing={isOutgoing}
                 />
               ) : (
-                <p className="overflow-wrap-anywhere whitespace-pre-wrap break-words">
+                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]">
                   {text}
                 </p>
               )}
@@ -111,6 +118,11 @@ export function MessageHistory({
           </div>
         );
       })}
+      {isClientTyping && isInbox ? (
+        <TypingIndicator
+          label={CHAT_MESSAGES.customerTyping(typingContactName)}
+        />
+      ) : null}
       {bottomRef ? <div ref={bottomRef} /> : null}
     </div>
   );

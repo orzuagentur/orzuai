@@ -39,7 +39,8 @@ import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
 } from "@/features/chats/channel-ui";
-import type { ContactProfileData } from "@/types/contact.types";
+import type { ContactProfileData, PipelineStage } from "@/types/contact.types";
+import { PIPELINE_STAGES } from "@/types/contact.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
 import {
@@ -53,23 +54,13 @@ type ContactProfileDrawerProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-function getActivityLabel(
-  entry: ContactProfileData["timeline"][number],
-): string {
-  if (entry.activityType === "internal_note") {
-    return CONTACTS_MESSAGES.internalNoteActivity;
-  }
-
-  if (entry.senderType === "client") {
-    return "Customer";
-  }
-
-  if (entry.senderType === "ai" || entry.aiGenerated) {
-    return "AI";
-  }
-
-  return "Team";
-}
+const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  new: CONTACTS_MESSAGES.pipelineNew,
+  qualified: CONTACTS_MESSAGES.pipelineQualified,
+  proposal: CONTACTS_MESSAGES.pipelineProposal,
+  won: CONTACTS_MESSAGES.pipelineWon,
+  lost: CONTACTS_MESSAGES.pipelineLost,
+};
 
 function tagsToInput(tags: string[]): string {
   return tags.join(", ");
@@ -98,7 +89,9 @@ export function ContactProfileDrawer({
   const [email, setEmail] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>("new");
   const [dealValue, setDealValue] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -117,7 +110,9 @@ export function ContactProfileDrawer({
       setEmail(data.contact.email ?? "");
       setTagsInput(tagsToInput(data.contact.tags));
       setCompany(data.contact.customFields.company ?? "");
+      setLocation(data.contact.customFields.location ?? "");
       setNotes(data.contact.customFields.notes ?? "");
+      setPipelineStage(data.contact.pipelineStage);
       setDealValue(
         data.contact.dealValue !== null ? String(data.contact.dealValue) : "",
       );
@@ -154,7 +149,8 @@ export function ContactProfileDrawer({
         name,
         email,
         tags: parseTagsInput(tagsInput),
-        customFields: { company, notes },
+        customFields: { company, location, notes },
+        pipelineStage,
         dealValue: dealValue.trim() ? Number(dealValue) : null,
         expectedCloseDate: expectedCloseDate || null,
       });
@@ -273,6 +269,11 @@ export function ContactProfileDrawer({
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+          {isLoading || !profile ? (
+            <SheetHeader className="sr-only">
+              <SheetTitle>{CONTACTS_MESSAGES.profileTitle}</SheetTitle>
+            </SheetHeader>
+          ) : null}
           {isLoading ? (
             <div className="flex flex-1 items-center justify-center">
               <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
@@ -392,6 +393,35 @@ export function ContactProfileDrawer({
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="contact-location">
+                        {CONTACTS_MESSAGES.locationLabel}
+                      </Label>
+                      <Input
+                        id="contact-location"
+                        value={location}
+                        onChange={(event) => setLocation(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-pipeline-stage">
+                        {CONTACTS_MESSAGES.pipelineStageLabel}
+                      </Label>
+                      <select
+                        id="contact-pipeline-stage"
+                        value={pipelineStage}
+                        onChange={(event) =>
+                          setPipelineStage(event.target.value as PipelineStage)
+                        }
+                        className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
+                      >
+                        {PIPELINE_STAGES.map((stage) => (
+                          <option key={stage} value={stage}>
+                            {PIPELINE_STAGE_LABELS[stage]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="contact-notes">
                         {CONTACTS_MESSAGES.notesLabel}
                       </Label>
@@ -501,6 +531,20 @@ export function ContactProfileDrawer({
                         {profile.contact.customFields.company}
                       </p>
                     ) : null}
+                    {profile.contact.customFields.location ? (
+                      <p>
+                        <span className="text-caption font-medium">
+                          {CONTACTS_MESSAGES.locationLabel}:{" "}
+                        </span>
+                        {profile.contact.customFields.location}
+                      </p>
+                    ) : null}
+                    <p>
+                      <span className="text-caption font-medium">
+                        {CONTACTS_MESSAGES.pipelineStageLabel}:{" "}
+                      </span>
+                      {PIPELINE_STAGE_LABELS[profile.contact.pipelineStage]}
+                    </p>
                     {profile.contact.customFields.notes ? (
                       <p className="text-muted-foreground">
                         {profile.contact.customFields.notes}
@@ -611,34 +655,6 @@ export function ContactProfileDrawer({
                   </div>
                 ) : null}
 
-                <p className="text-h3 mb-3">{CONTACTS_MESSAGES.timelineTitle}</p>
-
-                {profile.timeline.length === 0 ? (
-                  <p className="text-body text-muted-foreground">
-                    {CONTACTS_MESSAGES.timelineEmpty}
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {profile.timeline.map((entry) => (
-                      <li
-                        key={entry.id}
-                        className="rounded-lg border px-3 py-2.5 text-sm"
-                      >
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="text-caption font-medium">
-                            {getActivityLabel(entry)}
-                          </span>
-                          <span className="text-caption">
-                            {formatRelativeTime(entry.createdAt)}
-                          </span>
-                        </div>
-                        <p className="line-clamp-3 text-muted-foreground">
-                          {entry.content}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
 
               <div className="border-t px-6 py-4">

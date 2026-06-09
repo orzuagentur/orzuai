@@ -13,11 +13,7 @@ export const NEEDS_ATTENTION_LIMIT = 8;
 export function isConversationNeedsAttention(
   conversation: ConversationListItem,
 ): boolean {
-  if (conversation.lastMessageSenderType !== "client") {
-    return false;
-  }
-
-  return OPEN_STATUSES.has(conversation.status);
+  return conversation.isUnread && OPEN_STATUSES.has(conversation.status);
 }
 
 export function getConversationActivityTime(

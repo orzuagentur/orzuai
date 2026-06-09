@@ -74,6 +74,10 @@ function parseCustomFields(
       typeof value.notes === "string" && value.notes.trim().length > 0
         ? value.notes.trim()
         : undefined,
+    location:
+      typeof value.location === "string" && value.location.trim().length > 0
+        ? value.location.trim()
+        : undefined,
   };
 }
 
@@ -533,6 +537,10 @@ export async function updateContact(
     customFields.notes = parsed.data.customFields.notes.trim();
   }
 
+  if (parsed.data.customFields.location?.trim()) {
+    customFields.location = parsed.data.customFields.location.trim();
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("contacts")
@@ -542,8 +550,10 @@ export async function updateContact(
       tags: parsed.data.tags,
       custom_fields: customFields,
       deal_value: parsed.data.dealValue ?? null,
-      expected_close_date:
-        parsed.data.expectedCloseDate?.trim() || null,
+      expected_close_date: parsed.data.expectedCloseDate?.trim() || null,
+      ...(parsed.data.pipelineStage
+        ? { pipeline_stage: parsed.data.pipelineStage }
+        : {}),
     })
     .eq("id", parsed.data.contactId)
     .eq("business_id", businessId);

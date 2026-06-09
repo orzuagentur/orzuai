@@ -629,6 +629,7 @@ export type Database = {
           status: ConversationStatus;
           internal_note: string | null;
           assigned_to: string | null;
+          last_read_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -640,6 +641,7 @@ export type Database = {
           status?: ConversationStatus;
           internal_note?: string | null;
           assigned_to?: string | null;
+          last_read_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -651,6 +653,7 @@ export type Database = {
           status?: ConversationStatus;
           internal_note?: string | null;
           assigned_to?: string | null;
+          last_read_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

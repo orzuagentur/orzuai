@@ -46,6 +46,7 @@ type RawConversationQueryRow = {
   channel: ConversationListItem["channel"];
   status: ConversationListItem["status"];
   updated_at: string;
+  last_read_at: string | null;
   contact:
     | {
         name: string;
@@ -204,7 +205,7 @@ async function fetchConversationRows(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, contact:contacts(name, phone_number, lead_score)",
+      "id, channel, status, updated_at, last_read_at, contact:contacts(name, phone_number, lead_score)",
       { count: "exact" },
     )
     .eq("business_id", businessId)
@@ -365,4 +366,30 @@ export async function listConversationsPage(
     totalCount: items.length,
     hasMore,
   };
+}
+
+export async function getConversationListItem(
+  businessId: string,
+  conversationId: string,
+): Promise<ConversationListItem | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("conversations")
+    .select(
+      "id, channel, status, updated_at, last_read_at, contact:contacts(name, phone_number, lead_score)",
+    )
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!data) {
+    return null;
+  }
+
+  const items = await mapConversationRows([data as RawConversationQueryRow]);
+  return items[0] ?? null;
 }
