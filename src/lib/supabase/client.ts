@@ -1,12 +1,22 @@
 import { createBrowserClient } from "@supabase/ssr";
 
+import { ENV_KEYS } from "@/constants/env-keys";
 import {
   getSupabaseAnonKey,
   getSupabaseUrl,
   hasClientSupabaseEnv,
 } from "@/lib/env";
-import { ENV_KEYS } from "@/constants/env-keys";
 import type { Database } from "@/types/database.types";
+
+let browserClient: ReturnType<typeof createBrowserClient<Database>> | null =
+  null;
+
+function getBrowserEnv() {
+  return {
+    url: process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL]?.trim() ?? "",
+    anonKey: process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]?.trim() ?? "",
+  };
+}
 
 export function createClient() {
   return createBrowserClient<Database>(
@@ -21,8 +31,10 @@ export function createClientIfConfigured() {
     return null;
   }
 
-  return createBrowserClient<Database>(
-    process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL]!.trim(),
-    process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]!.trim(),
-  );
+  if (!browserClient) {
+    const { url, anonKey } = getBrowserEnv();
+    browserClient = createBrowserClient<Database>(url, anonKey);
+  }
+
+  return browserClient;
 }

@@ -3,11 +3,6 @@
 import { useEffect, useRef } from "react";
 
 import { sendAgentTypingAction } from "@/features/chats/actions/send-agent-typing";
-import { createClientIfConfigured } from "@/lib/supabase/client";
-import {
-  CONVERSATION_TYPING_EVENT,
-  getConversationRealtimeChannelName,
-} from "@/lib/realtime/conversation-channel";
 
 const IDLE_TYPING_MS = 2_500;
 const CHANNEL_TYPING_THROTTLE_MS = 4_000;
@@ -24,7 +19,6 @@ export function useAgentTypingIndicator({
   enabled = true,
 }: UseAgentTypingIndicatorOptions) {
   const idleTimeoutRef = useRef<number | null>(null);
-  const channelThrottleRef = useRef<number | null>(null);
   const lastChannelTypingAtRef = useRef(0);
   const isTypingRef = useRef(false);
 
@@ -32,64 +26,6 @@ export function useAgentTypingIndicator({
     if (!conversationId || !enabled) {
       return;
     }
-
-    const supabase = createClientIfConfigured();
-
-    if (!supabase) {
-      return;
-    }
-
-    const channelName = getConversationRealtimeChannelName(conversationId);
-
-    const broadcastAgentTyping = async (isTyping: boolean) => {
-      const channel = supabase.channel(channelName, {
-        config: { broadcast: { self: false } },
-      });
-
-      await new Promise<void>((resolve) => {
-        let settled = false;
-
-        const finish = () => {
-          if (settled) {
-            return;
-          }
-
-          settled = true;
-          void supabase.removeChannel(channel);
-          resolve();
-        };
-
-        const timeoutId = window.setTimeout(finish, 2_000);
-
-        channel.subscribe(async (status) => {
-          if (status !== "SUBSCRIBED") {
-            return;
-          }
-
-          await channel.send({
-            type: "broadcast",
-            event: CONVERSATION_TYPING_EVENT,
-            payload: {
-              sender: "agent",
-              isTyping,
-              at: Date.now(),
-            },
-          });
-
-          window.clearTimeout(timeoutId);
-          finish();
-        });
-      });
-    };
-
-    const stopTyping = () => {
-      if (!isTypingRef.current) {
-        return;
-      }
-
-      isTypingRef.current = false;
-      void broadcastAgentTyping(false);
-    };
 
     const clearIdleTimeout = () => {
       if (idleTimeoutRef.current !== null) {
@@ -102,13 +38,12 @@ export function useAgentTypingIndicator({
 
     if (!trimmedDraft) {
       clearIdleTimeout();
-      stopTyping();
+      isTypingRef.current = false;
       return;
     }
 
     if (!isTypingRef.current) {
       isTypingRef.current = true;
-      void broadcastAgentTyping(true);
     }
 
     const now = Date.now();
@@ -120,16 +55,11 @@ export function useAgentTypingIndicator({
 
     clearIdleTimeout();
     idleTimeoutRef.current = window.setTimeout(() => {
-      stopTyping();
+      isTypingRef.current = false;
     }, IDLE_TYPING_MS);
 
     return () => {
       clearIdleTimeout();
-
-      if (channelThrottleRef.current !== null) {
-        window.clearTimeout(channelThrottleRef.current);
-        channelThrottleRef.current = null;
-      }
     };
   }, [conversationId, draft, enabled]);
 

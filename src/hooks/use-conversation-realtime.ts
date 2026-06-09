@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import {
+  bindSupabaseRealtimeAuthRefresh,
+  ensureSupabaseRealtimeAuth,
+} from "@/lib/supabase/realtime-auth";
+import {
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
   type ConversationTypingPayload,
@@ -51,6 +55,9 @@ export function useConversationRealtime({
     }
 
     const channelName = getConversationRealtimeChannelName(conversationId);
+    let unbindAuthRefresh: (() => void) | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
     const clearTypingTimeout = () => {
       if (typingTimeoutRef.current !== null) {
@@ -66,55 +73,92 @@ export function useConversationRealtime({
       }, CLIENT_TYPING_TIMEOUT_MS);
     };
 
-    const channel = supabase
-      .channel(channelName, {
-        config: { broadcast: { self: false } },
-      })
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          const row = payload.new as RealtimeMessageRow;
-          const message = mapChatMessage(row);
-          onMessageRef.current?.(message);
+    void (async () => {
+      const authed = await ensureSupabaseRealtimeAuth(supabase);
 
-          if (row.sender_type === "client") {
+      if (cancelled) {
+        return;
+      }
+
+      if (!authed) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            `[realtime] conversation skipped — no authenticated session (${conversationId})`,
+          );
+        }
+        return;
+      }
+
+      unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
+
+      if (cancelled) {
+        return;
+      }
+
+      channel = supabase
+        .channel(channelName, {
+          config: { broadcast: { self: true } },
+        })
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            const row = payload.new as RealtimeMessageRow;
+            const message = mapChatMessage(row);
+            onMessageRef.current?.(message);
+
+            if (row.sender_type === "client") {
+              clearTypingTimeout();
+              setIsClientTyping(false);
+            }
+          },
+        )
+        .on(
+          "broadcast",
+          { event: CONVERSATION_TYPING_EVENT },
+          (payload) => {
+            const event = payload.payload as ConversationTypingPayload;
+
+            if (event.sender !== "client") {
+              return;
+            }
+
+            if (event.isTyping) {
+              setIsClientTyping(true);
+              scheduleTypingClear();
+              return;
+            }
+
             clearTypingTimeout();
             setIsClientTyping(false);
+          },
+        )
+        .subscribe((status) => {
+          if (
+            process.env.NODE_ENV === "development" &&
+            (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+          ) {
+            console.warn(
+              `[realtime] conversation channel ${status} for ${conversationId}`,
+            );
           }
-        },
-      )
-      .on(
-        "broadcast",
-        { event: CONVERSATION_TYPING_EVENT },
-        (payload) => {
-          const event = payload.payload as ConversationTypingPayload;
-
-          if (event.sender !== "client") {
-            return;
-          }
-
-          if (event.isTyping) {
-            setIsClientTyping(true);
-            scheduleTypingClear();
-            return;
-          }
-
-          clearTypingTimeout();
-          setIsClientTyping(false);
-        },
-      )
-      .subscribe();
+        });
+    })();
 
     return () => {
+      cancelled = true;
       clearTypingTimeout();
       setIsClientTyping(false);
-      void supabase.removeChannel(channel);
+      unbindAuthRefresh?.();
+
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, [conversationId]);
 

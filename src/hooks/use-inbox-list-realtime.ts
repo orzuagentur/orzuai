@@ -4,6 +4,10 @@ import { useEffect, useRef } from "react";
 
 import { fetchConversationListItemAction } from "@/features/chats/actions/fetch-conversation-list-item";
 import { createClientIfConfigured } from "@/lib/supabase/client";
+import {
+  bindSupabaseRealtimeAuthRefresh,
+  ensureSupabaseRealtimeAuth,
+} from "@/lib/supabase/realtime-auth";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import {
@@ -63,6 +67,10 @@ export function useInboxListRealtime({
     if (!supabase) {
       return;
     }
+
+    let unbindAuthRefresh: (() => void) | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
     const scheduleRefresh = () => {
       if (refreshTimeoutRef.current !== null) {
@@ -176,55 +184,89 @@ export function useInboxListRealtime({
       applyListUpdates(updatedItem);
     };
 
-    const channel = supabase
-      .channel("inbox-list")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-        },
-        (payload) => {
-          handleMessageInsert(payload.new as InboxRealtimeMessageRow);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "conversations",
-        },
-        (payload) => {
-          void handleConversationUpsert(
-            payload.new as InboxRealtimeConversationRow,
-            true,
-          );
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversations",
-        },
-        (payload) => {
-          void handleConversationUpsert(
-            payload.new as InboxRealtimeConversationRow,
-            false,
-          );
-        },
-      )
-      .subscribe();
+    void (async () => {
+      const authed = await ensureSupabaseRealtimeAuth(supabase);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!authed) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[realtime] inbox list skipped — no authenticated session");
+        }
+        return;
+      }
+
+      unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
+
+      if (cancelled) {
+        return;
+      }
+
+      channel = supabase
+        .channel("inbox-list")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+          },
+          (payload) => {
+            handleMessageInsert(payload.new as InboxRealtimeMessageRow);
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "conversations",
+          },
+          (payload) => {
+            void handleConversationUpsert(
+              payload.new as InboxRealtimeConversationRow,
+              true,
+            );
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "conversations",
+          },
+          (payload) => {
+            void handleConversationUpsert(
+              payload.new as InboxRealtimeConversationRow,
+              false,
+            );
+          },
+        )
+        .subscribe((status) => {
+          if (
+            process.env.NODE_ENV === "development" &&
+            (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+          ) {
+            console.warn(`[realtime] inbox-list channel ${status}`);
+          }
+        });
+    })();
 
     return () => {
+      cancelled = true;
+
       if (refreshTimeoutRef.current !== null) {
         window.clearTimeout(refreshTimeoutRef.current);
       }
 
-      void supabase.removeChannel(channel);
+      unbindAuthRefresh?.();
+
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, [channelFilter, enabled]);
 }

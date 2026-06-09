@@ -6,6 +6,7 @@ import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-conte
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-bootstrap";
 
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
@@ -13,6 +14,8 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ userProfile, children }: DashboardShellProps) {
+  useSupabaseRealtimeBootstrap();
+
   return (
     <InboxChromeProvider>
       <SidebarProvider>
