@@ -1,7 +1,9 @@
 import type { RefObject } from "react";
 
+import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
+import { parseMediaMessage } from "@/utils/chat-media";
 import { formatRelativeTime } from "@/utils/dashboard";
 
 type MessageHistoryProps = {
@@ -47,7 +49,7 @@ export function MessageHistory({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4",
+        "flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto px-4 py-4",
         isInbox && "gap-1.5 bg-muted/20",
         className,
       )}
@@ -55,15 +57,19 @@ export function MessageHistory({
       {messages.map((message) => {
         const isOutgoing =
           message.senderType === "user" || message.senderType === "ai";
+        const { media, text } = parseMediaMessage(message.content);
 
         return (
           <div
             key={message.id}
-            className={cn("flex", isOutgoing ? "justify-end" : "justify-start")}
+            className={cn(
+              "flex min-w-0 w-full",
+              isOutgoing ? "justify-end" : "justify-start",
+            )}
           >
             <div
               className={cn(
-                "max-w-[78%] rounded-lg px-3 py-2 text-sm shadow-sm",
+                "max-w-[min(78%,32rem)] min-w-0 rounded-lg px-3 py-2 text-sm shadow-sm",
                 isOutgoing
                   ? isInbox
                     ? "rounded-br-sm bg-emerald-600 text-white"
@@ -78,7 +84,17 @@ export function MessageHistory({
                   {getSenderLabel(message)}
                 </p>
               ) : null}
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {media ? (
+                <ChatMediaMessage
+                  media={media}
+                  caption={text}
+                  isOutgoing={isOutgoing}
+                />
+              ) : (
+                <p className="overflow-wrap-anywhere whitespace-pre-wrap break-words">
+                  {text}
+                </p>
+              )}
               <p
                 className={cn(
                   "mt-1 text-right text-[10px]",

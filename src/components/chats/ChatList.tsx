@@ -31,6 +31,7 @@ type ChatListProps = {
   hideChannelBadge?: boolean;
   linkToConversationChannel?: boolean;
   linkMode?: "channel" | "overview";
+  onConversationSelect?: (conversationId: string) => void;
   variant?: "default" | "inbox";
   emptyVariant?: "default" | "search";
   className?: string;
@@ -58,6 +59,7 @@ export function ChatList({
   hideChannelBadge = false,
   linkToConversationChannel = false,
   linkMode = "channel",
+  onConversationSelect,
   variant = "default",
   emptyVariant = "default",
   className,
@@ -93,27 +95,17 @@ export function ChatList({
         const needsAttention = isConversationNeedsAttention(conversation);
         const awaitingReply = conversation.lastMessageSenderType === "client";
 
-        return (
-          <Link
-            key={conversation.id}
-            href={buildConversationHref(
-              channelId,
-              conversation.id,
-              conversation.channel,
-              linkToConversationChannel,
-              linkMode,
-            )}
-            className={cn(
-              "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-              isActive &&
-                (isInboxVariant
-                  ? "bg-muted/80"
-                  : "bg-primary/5"),
-              !isInboxVariant &&
-                needsAttention &&
-                "border-l-2 border-l-amber-500 bg-amber-500/5",
-            )}
-          >
+        const rowClassName = cn(
+          "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+          isActive &&
+            (isInboxVariant ? "bg-muted/80" : "bg-primary/5"),
+          !isInboxVariant &&
+            needsAttention &&
+            "border-l-2 border-l-amber-500 bg-amber-500/5",
+        );
+
+        const rowContent = (
+          <>
             <div className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
               {conversation.contactName.slice(0, 2).toUpperCase()}
               {isInboxVariant ? (
@@ -199,6 +191,35 @@ export function ChatList({
                 {getConversationStatusLabel(conversation.status)}
               </Badge>
             ) : null}
+          </>
+        );
+
+        if (onConversationSelect) {
+          return (
+            <button
+              key={conversation.id}
+              type="button"
+              onClick={() => onConversationSelect(conversation.id)}
+              className={rowClassName}
+            >
+              {rowContent}
+            </button>
+          );
+        }
+
+        return (
+          <Link
+            key={conversation.id}
+            href={buildConversationHref(
+              channelId,
+              conversation.id,
+              conversation.channel,
+              linkToConversationChannel,
+              linkMode,
+            )}
+            className={rowClassName}
+          >
+            {rowContent}
           </Link>
         );
       })}

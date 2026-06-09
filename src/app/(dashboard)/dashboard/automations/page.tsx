@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { AutomationsHub } from "@/components/automations/AutomationsHub";
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +14,15 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getAutomationsPageData } from "@/services/automations.service";
 
-export default async function AutomationsPage() {
+export default function AutomationsPage() {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton cards={2} />}>
+      <AutomationsPageContent />
+    </Suspense>
+  );
+}
+
+async function AutomationsPageContent() {
   const data = await getAutomationsPageData();
 
   if (!data.hasBusiness) {

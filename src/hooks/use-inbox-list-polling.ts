@@ -9,18 +9,30 @@ export function useInboxListPolling(
   intervalMs = INBOX_LIST_POLL_INTERVAL_MS,
 ) {
   const onPollRef = useRef(onPoll);
+  const isPollingRef = useRef(false);
   onPollRef.current = onPoll;
 
   useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState !== "visible") {
+    const tick = async () => {
+      if (
+        document.visibilityState !== "visible" ||
+        isPollingRef.current
+      ) {
         return;
       }
 
-      void onPollRef.current();
+      isPollingRef.current = true;
+
+      try {
+        await onPollRef.current();
+      } finally {
+        isPollingRef.current = false;
+      }
     };
 
-    const intervalId = window.setInterval(tick, intervalMs);
+    const intervalId = window.setInterval(() => {
+      void tick();
+    }, intervalMs);
 
     return () => {
       window.clearInterval(intervalId);

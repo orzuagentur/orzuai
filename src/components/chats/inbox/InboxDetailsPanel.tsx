@@ -138,7 +138,12 @@ export function InboxDetailsPanel({
   const isCrmLoading = crmLoadState === "loading";
 
   return (
-    <aside className={cn("flex h-full min-h-0 flex-col overflow-y-auto", className)}>
+    <aside
+      className={cn(
+        "flex h-full min-h-0 w-full flex-col overflow-x-hidden overflow-y-auto",
+        className,
+      )}
+    >
       <DetailSection title={CHAT_MESSAGES.contactDetailsTitle}>
         <div className="flex items-start gap-3">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -97,6 +98,9 @@ export function useInboxChromeContext() {
 
 export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
   const context = useOptionalInboxChromeContext();
+  const setChromeRef = useRef(context?.setChrome);
+  setChromeRef.current = context?.setChrome;
+
   const enabled =
     config !== null &&
     typeof config.onSearchChange === "function" &&
@@ -111,16 +115,18 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
   const onAiToggle = config?.onAiToggle;
 
   useEffect(() => {
-    if (!context) {
+    const setChrome = setChromeRef.current;
+
+    if (!setChrome) {
       return;
     }
 
     if (!enabled || !onSearchChange || !onFilterChange) {
-      context.setChrome(null);
+      setChrome(null);
       return;
     }
 
-    context.setChrome({
+    setChrome({
       searchQuery,
       onSearchChange,
       activeFilter,
@@ -131,10 +137,9 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
     });
 
     return () => {
-      context.setChrome(null);
+      setChrome(null);
     };
   }, [
-    context,
     enabled,
     searchQuery,
     activeFilter,

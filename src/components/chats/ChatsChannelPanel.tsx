@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { fetchChatsChannelInitialAction } from "@/features/chats/actions/fetch-chats-channel-initial";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
+import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
+import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
@@ -28,33 +32,132 @@ import { sortConversations } from "@/utils/chat-inbox-priority";
 import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
+  ConversationListItem,
 } from "@/types/chat.types";
+import type { CannedResponseItem } from "@/types/canned-response.types";
+import type { MessagingChannel } from "@/types/database.types";
 
-type ChatsChannelPanelProps = ChatsChannelPageData & {
+type ChatsChannelPanelProps = {
   channelId: ChatChannelId;
-  channelStats: ChatMonitorChannelStats[];
-};
+} & Partial<
+  ChatsChannelPageData & {
+    channelStats: ChatMonitorChannelStats[];
+  }
+>;
 
 export function ChatsChannelPanel({
   channelId,
-  channelStats,
-  hasBusiness,
-  channel,
-  channelConnected,
-  aiEnabled,
+  hasBusiness: initialHasBusiness,
+  channel: initialChannel,
+  channelStats: initialChannelStats,
+  channelConnected: initialChannelConnected,
+  aiEnabled: initialAiEnabled,
   conversations: initialConversations,
-  activeConversation,
-  cannedResponses,
+  cannedResponses: initialCannedResponses,
 }: ChatsChannelPanelProps) {
+  const usesClientBootstrap = initialConversations === undefined;
+  const searchParams = useSearchParams();
+  const initialConversationId = searchParams.get("conversation")?.trim() || null;
+
+  const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
+  const [channel, setChannel] = useState<MessagingChannel>(
+    initialChannel ?? channelId,
+  );
+  const [channelStats, setChannelStats] = useState<ChatMonitorChannelStats[]>(
+    initialChannelStats ?? [],
+  );
+  const [channelConnected, setChannelConnected] = useState(
+    initialChannelConnected ?? false,
+  );
+  const [channelAiEnabled, setChannelAiEnabled] = useState<boolean | null>(
+    initialAiEnabled ?? null,
+  );
+  const [conversations, setConversations] = useState<ConversationListItem[]>(
+    initialConversations ?? [],
+  );
+  const [bootstrapCannedResponses, setBootstrapCannedResponses] = useState<
+    CannedResponseItem[]
+  >(initialCannedResponses ?? []);
+  const [isInitialLoading, setIsInitialLoading] = useState(usesClientBootstrap);
+
+  const {
+    selectedConversationId,
+    selectConversation,
+    conversation: activeConversation,
+    channelConnected: activeChannelConnected,
+    aiEnabled,
+    cannedResponses,
+    isLoadingConversation,
+    appendMessage,
+  } = useInboxActiveConversation({
+    initialConversationId,
+    initialConversation: null,
+    initialChannelConnected: channelConnected,
+    initialAiEnabled: channelAiEnabled,
+    initialCannedResponses: bootstrapCannedResponses,
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
-  const [conversations, setConversations] = useState(initialConversations);
 
   useEffect(() => {
-    setConversations(initialConversations);
-  }, [initialConversations]);
+    if (!usesClientBootstrap) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void fetchChatsChannelInitialAction({ channel: channelId }).then((result) => {
+      if (cancelled) {
+        return;
+      }
+
+      if (!result.success) {
+        setIsInitialLoading(false);
+        return;
+      }
+
+      const data = result.data;
+      setHasBusiness(data.hasBusiness);
+      setChannel(data.channel);
+      setChannelStats(data.channelStats);
+      setChannelConnected(data.channelConnected);
+      setChannelAiEnabled(data.aiEnabled);
+      setConversations(data.conversations);
+      setBootstrapCannedResponses(data.cannedResponses);
+      setIsInitialLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [channelId, usesClientBootstrap]);
+
+  useEffect(() => {
+    if (usesClientBootstrap) {
+      return;
+    }
+
+    setHasBusiness(initialHasBusiness ?? true);
+    setChannel(initialChannel ?? channelId);
+    setChannelStats(initialChannelStats ?? []);
+    setChannelConnected(initialChannelConnected ?? false);
+    setChannelAiEnabled(initialAiEnabled ?? null);
+    setConversations(initialConversations ?? []);
+    setBootstrapCannedResponses(initialCannedResponses ?? []);
+  }, [
+    channelId,
+    initialAiEnabled,
+    initialCannedResponses,
+    initialChannel,
+    initialChannelConnected,
+    initialChannelStats,
+    initialConversations,
+    initialHasBusiness,
+    usesClientBootstrap,
+  ]);
 
   const refreshConversations = useCallback(async () => {
     const result = await fetchMonitorConversationsAction({
@@ -72,7 +175,9 @@ export function ChatsChannelPanel({
   }, [channelId]);
 
   useInboxListPolling(() => {
-    void refreshConversations();
+    if (!isInitialLoading) {
+      void refreshConversations();
+    }
   });
 
   const filteredConversations = useMemo(
@@ -87,20 +192,30 @@ export function ChatsChannelPanel({
     [activeFilter, conversations, searchQuery],
   );
 
+  const selectedListItem = useMemo(() => {
+    if (!selectedConversationId) {
+      return null;
+    }
+
+    return (
+      conversations.find((item) => item.id === selectedConversationId) ?? null
+    );
+  }, [conversations, selectedConversationId]);
+
   useInboxChromeRegistration(
-    hasBusiness
+    hasBusiness && !isInitialLoading
       ? {
           searchQuery,
           onSearchChange: setSearchQuery,
           activeFilter,
           onFilterChange: setActiveFilter,
           aiChannel: channel,
-          aiEnabled,
+          aiEnabled: aiEnabled ?? channelAiEnabled,
         }
       : null,
   );
 
-  if (!hasBusiness) {
+  if (!isInitialLoading && !hasBusiness) {
     return (
       <Card className="m-4 max-w-2xl shadow-none md:m-6">
         <CardHeader>
@@ -116,8 +231,11 @@ export function ChatsChannelPanel({
     );
   }
 
-  const activeConversationId = activeConversation?.id ?? null;
+  const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
+  const resolvedChannelConnected = activeConversation
+    ? activeChannelConnected
+    : channelConnected;
 
   return (
     <InboxShell
@@ -126,13 +244,16 @@ export function ChatsChannelPanel({
         <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
       }
       listColumn={
-        <>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isInitialLoading ? (
+            <ConversationListSkeleton rows={8} />
+          ) : (
             <ChatList
               conversations={filteredConversations}
               activeConversationId={activeConversationId}
               channelId={channelId}
               hideChannelBadge
+              onConversationSelect={selectConversation}
               variant="inbox"
               emptyVariant={
                 conversations.length > 0 && filteredConversations.length === 0
@@ -140,34 +261,55 @@ export function ChatsChannelPanel({
                   : "default"
               }
             />
-          </div>
-        </>
+          )}
+        </div>
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">
           {showChatOnMobile ? (
             <div className="shrink-0 border-b px-3 py-2 lg:hidden">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`${DASHBOARD_ROUTES.chats}/${channelId}`}>
-                  <ArrowLeftIcon className="size-4" />
-                  {CHAT_MESSAGES.pageTitle}
-                </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => selectConversation(null)}
+              >
+                <ArrowLeftIcon className="size-4" />
+                {CHAT_MESSAGES.pageTitle}
               </Button>
             </div>
           ) : null}
 
           <ChatWindow
             conversation={activeConversation}
-            aiEnabled={aiEnabled}
-            channelConnected={channelConnected}
+            aiEnabled={aiEnabled ?? channelAiEnabled}
+            channelConnected={resolvedChannelConnected}
             channel={channel}
             cannedResponses={cannedResponses}
+            isLoadingConversation={isLoadingConversation}
+            loadingPreview={
+              selectedListItem
+                ? {
+                    contactName: selectedListItem.contactName,
+                    contactPhone: selectedListItem.contactPhone,
+                    channel: selectedListItem.channel,
+                  }
+                : null
+            }
             layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
             className="min-h-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
+            onMessageSent={(message) => {
+              appendMessage(message);
+              void refreshConversations();
+            }}
+            onContactDeleted={() => {
+              selectConversation(null);
+              void refreshConversations();
+            }}
           />
         </div>
       }

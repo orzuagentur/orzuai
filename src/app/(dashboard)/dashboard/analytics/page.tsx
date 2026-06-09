@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AnalyticsHub } from "@/components/analytics/AnalyticsHub";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
@@ -12,9 +13,15 @@ type AnalyticsPageProps = {
   searchParams: Promise<{ channel?: string }>;
 };
 
-export default async function AnalyticsPage({
-  searchParams,
-}: AnalyticsPageProps) {
+export default function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton />}>
+      <AnalyticsPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function AnalyticsPageContent({ searchParams }: AnalyticsPageProps) {
   const { channel } = await searchParams;
 
   if (
@@ -30,18 +37,5 @@ export default async function AnalyticsPage({
     return <DashboardSetupPrompt title="Analytics" />;
   }
 
-  return (
-    <Suspense fallback={<AnalyticsFallback />}>
-      <AnalyticsHub data={data} />
-    </Suspense>
-  );
-}
-
-function AnalyticsFallback() {
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
-      <div className="min-h-[32rem] animate-pulse bg-muted/30" />
-    </div>
-  );
+  return <AnalyticsHub data={data} />;
 }

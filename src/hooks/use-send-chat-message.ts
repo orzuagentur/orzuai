@@ -11,7 +11,7 @@ import type {
 } from "@/types/chat.types";
 
 type UseSendChatMessageOptions = {
-  onSuccess?: () => void;
+  onSuccess?: (result: SendChatMessageResult) => void;
 };
 
 export function useSendChatMessage({ onSuccess }: UseSendChatMessageOptions = {}) {
@@ -26,7 +26,7 @@ export function useSendChatMessage({ onSuccess }: UseSendChatMessageOptions = {}
 
         if (result.success) {
           toast.success(CHAT_MESSAGES.sendSuccess);
-          onSuccess?.();
+          onSuccess?.(result);
           return result;
         }
 

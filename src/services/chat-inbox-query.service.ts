@@ -14,6 +14,7 @@ import {
   buildLastMessagePreviewMap,
   mapConversationListItem,
 } from "@/utils/chat";
+import { phoneDigitsOnly } from "@/utils/whatsapp";
 import {
   isConversationNeedsAttention,
   sortConversations,
@@ -162,6 +163,26 @@ async function mapConversationRows(
   });
 }
 
+function dedupeConversationsByContactPhone(
+  items: ConversationListItem[],
+): ConversationListItem[] {
+  const latestByContact = new Map<string, ConversationListItem>();
+
+  for (const item of items) {
+    const key = `${item.channel}:${phoneDigitsOnly(item.contactPhone)}`;
+    const existing = latestByContact.get(key);
+
+    if (
+      !existing ||
+      new Date(item.updatedAt).getTime() > new Date(existing.updatedAt).getTime()
+    ) {
+      latestByContact.set(key, item);
+    }
+  }
+
+  return Array.from(latestByContact.values());
+}
+
 async function fetchConversationRows(
   businessId: string,
   {
@@ -262,12 +283,14 @@ async function listNeedsReplyConversationsPage(
     }
   }
 
-  const items = sortConversations(
-    filterConversations(collected, {
-      searchQuery: "",
-      filter: input.filter ?? "all",
-    }),
-    input.sort ?? "latest",
+  const items = dedupeConversationsByContactPhone(
+    sortConversations(
+      filterConversations(collected, {
+        searchQuery: "",
+        filter: input.filter ?? "all",
+      }),
+      input.sort ?? "latest",
+    ),
   );
 
   return {
@@ -315,7 +338,7 @@ export async function listConversationsPage(
     }
   }
 
-  const { rows, count } = await fetchConversationRows(businessId, {
+  const { rows } = await fetchConversationRows(businessId, {
     channel: input.channel,
     conversationIds,
     contactIds,
@@ -327,6 +350,8 @@ export async function listConversationsPage(
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
   let items = await mapConversationRows(pageRows);
 
+  items = dedupeConversationsByContactPhone(items);
+
   items = sortConversations(
     filterConversations(items, {
       searchQuery: search,
@@ -337,7 +362,7 @@ export async function listConversationsPage(
 
   return {
     items,
-    totalCount: count ?? items.length,
+    totalCount: items.length,
     hasMore,
   };
 }

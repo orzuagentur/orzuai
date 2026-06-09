@@ -19,9 +19,11 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
+  findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
   processChannelAutoReply,
+  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
 import type {
@@ -283,13 +285,12 @@ async function ingestTelegramMessage(
   const businessId = connection.business_id;
   const identifier = `tg:${message.chatId}`;
 
-  const { data: existingContact } = await admin
-    .from("contacts")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("channel", "telegram")
-    .eq("phone_number", identifier)
-    .maybeSingle();
+  const existingContact = await findContactForChannel(
+    admin,
+    businessId,
+    "telegram",
+    identifier,
+  );
 
   let contactId = existingContact?.id;
   let createdContact = false;
@@ -323,31 +324,12 @@ async function ingestTelegramMessage(
     return;
   }
 
-  const { data: existingConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", "telegram")
-    .eq("status", "active")
-    .maybeSingle();
-
-  let conversationId = existingConversation?.id;
-
-  if (!conversationId) {
-    const { data: createdConversation } = await admin
-      .from("conversations")
-      .insert({
-        business_id: businessId,
-        channel: "telegram",
-        contact_id: contactId,
-        status: "active",
-      })
-      .select("id")
-      .single();
-
-    conversationId = createdConversation?.id;
-  }
+  const conversationId = await resolveInboundConversation(
+    admin,
+    businessId,
+    contactId,
+    "telegram",
+  );
 
   if (!conversationId) {
     return;

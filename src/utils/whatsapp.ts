@@ -19,7 +19,27 @@ export function mapWhatsAppConnection(
   };
 }
 
+export function phoneDigitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+export function canonicalPhoneNumber(value: string): string {
+  const digits = phoneDigitsOnly(value);
+
+  if (!digits) {
+    return "";
+  }
+
+  return `+${digits}`;
+}
+
 export function normalizePhoneNumber(value: string): string {
+  const canonical = canonicalPhoneNumber(value);
+
+  if (canonical) {
+    return canonical;
+  }
+
   return value.replace(/[^\d+]/g, "");
 }
 

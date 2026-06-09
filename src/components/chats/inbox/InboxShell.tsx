@@ -2,6 +2,10 @@
 
 import type { ReactNode } from "react";
 
+import {
+  InboxLayoutProvider,
+  useInboxLayout,
+} from "@/components/chats/inbox/inbox-layout-context";
 import { cn } from "@/lib/utils";
 
 type InboxShellProps = {
@@ -13,7 +17,7 @@ type InboxShellProps = {
   className?: string;
 };
 
-export function InboxShell({
+function InboxShellContent({
   channelTabs,
   listColumn,
   chatColumn,
@@ -21,6 +25,8 @@ export function InboxShell({
   showChatOnMobile = false,
   className,
 }: InboxShellProps) {
+  const { detailsOpen } = useInboxLayout();
+
   return (
     <div
       className={cn(
@@ -30,7 +36,7 @@ export function InboxShell({
     >
       {channelTabs}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div
           className={cn(
             "flex min-h-0 w-full min-w-0 flex-col overflow-hidden border-r lg:w-[22rem] lg:shrink-0 xl:w-80",
@@ -49,10 +55,20 @@ export function InboxShell({
           {chatColumn}
         </div>
 
-        <div className="hidden min-h-0 w-80 shrink-0 border-l xl:flex xl:flex-col">
-          {detailsColumn}
-        </div>
+        {detailsOpen ? (
+          <div className="hidden min-h-0 w-80 min-w-80 max-w-80 shrink-0 basis-80 overflow-hidden border-l xl:flex xl:flex-col">
+            {detailsColumn}
+          </div>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+export function InboxShell(props: InboxShellProps) {
+  return (
+    <InboxLayoutProvider>
+      <InboxShellContent {...props} />
+    </InboxLayoutProvider>
   );
 }

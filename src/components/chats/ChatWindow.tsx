@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   Loader2Icon,
   MessageSquareIcon,
-  MoreHorizontalIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
   SendIcon,
   SparklesIcon,
   StarIcon,
@@ -16,10 +17,14 @@ import { ChatCrmAssistantBar } from "@/components/chats/ChatCrmAssistantBar";
 import { QuickRepliesPicker } from "@/components/chats/QuickRepliesPicker";
 import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
+import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
+import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
+import { useSendChatMedia } from "@/hooks/use-send-chat-media";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
 import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
 import { MessageHistory } from "@/components/chats/MessageHistory";
+import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
@@ -31,9 +36,15 @@ import { Badge } from "@/components/ui/badge";
 import { useSendChatMessage } from "@/hooks/use-send-chat-message";
 import { cn } from "@/lib/utils";
 import type { CannedResponseItem } from "@/types/canned-response.types";
-import type { ConversationDetail } from "@/types/chat.types";
+import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
+
+type ChatLoadingPreview = {
+  contactName: string;
+  contactPhone: string;
+  channel: MessagingChannel;
+};
 
 type ChatWindowProps = {
   conversation: ConversationDetail | null;
@@ -41,11 +52,15 @@ type ChatWindowProps = {
   channelConnected: boolean;
   channel: MessagingChannel;
   cannedResponses: CannedResponseItem[];
+  isLoadingConversation?: boolean;
+  loadingPreview?: ChatLoadingPreview | null;
   layout?: "default" | "inbox";
   draft?: string;
   onDraftChange?: (value: string) => void;
   suggestReplyOpen?: boolean;
   onSuggestReplyOpenChange?: (open: boolean) => void;
+  onMessageSent?: (message: ChatMessageData) => void;
+  onContactDeleted?: () => void;
   className?: string;
 };
 
@@ -71,11 +86,15 @@ export function ChatWindow({
   channelConnected,
   channel,
   cannedResponses,
+  isLoadingConversation = false,
+  loadingPreview = null,
   layout = "default",
   draft: controlledDraft,
   onDraftChange,
   suggestReplyOpen: controlledSuggestOpen,
   onSuggestReplyOpenChange,
+  onMessageSent,
+  onContactDeleted,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -90,11 +109,26 @@ export function ChatWindow({
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
   const isInboxLayout = layout === "inbox";
+  const inboxLayout = useOptionalInboxLayout();
 
   const { sendMessage, isLoading } = useSendChatMessage({
-    onSuccess: () => {
+    onSuccess: (result) => {
       setDraft("");
+
+      if (result.success && result.data?.message) {
+        onMessageSent?.(result.data.message);
+        return;
+      }
+
       router.refresh();
+    },
+  });
+
+  const { sendMedia, isLoading: isSendingMedia } = useSendChatMedia({
+    onSuccess: (result) => {
+      if (result.success && result.data?.message) {
+        onMessageSent?.(result.data.message);
+      }
     },
   });
 
@@ -107,6 +141,36 @@ export function ChatWindow({
   }
 
   if (!conversation) {
+    if (isLoadingConversation && loadingPreview && isInboxLayout) {
+      return (
+        <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+          <div className="shrink-0 border-b bg-card px-4 py-3">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-medium">{loadingPreview.contactName}</p>
+                  <Badge
+                    variant="outline"
+                    className={`gap-1 ${getChannelBadgeClassName(loadingPreview.channel)}`}
+                  >
+                    <ChannelBrandIcon
+                      channel={loadingPreview.channel}
+                      className="size-3.5"
+                    />
+                    {getChannelBadgeLabel(loadingPreview.channel)}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {formatContactIdentifier(loadingPreview.contactPhone)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <MessageHistorySkeleton className="min-h-0 flex-1 overflow-y-auto" />
+        </div>
+      );
+    }
+
     return (
       <div
         className={cn(
@@ -150,8 +214,8 @@ export function ChatWindow({
     return (
       <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
         <div className="shrink-0 border-b bg-card px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate font-medium">{conversation.contactName}</p>
                 <Badge
@@ -173,9 +237,31 @@ export function ChatWindow({
               <Button type="button" variant="ghost" size="icon" className="size-8">
                 <StarIcon className="size-4" />
               </Button>
-              <Button type="button" variant="ghost" size="icon" className="size-8">
-                <MoreHorizontalIcon className="size-4" />
-              </Button>
+              <InboxChatMenu
+                conversation={conversation}
+                onContactDeleted={onContactDeleted}
+              />
+              {inboxLayout ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="hidden size-8 xl:inline-flex"
+                  aria-label={
+                    inboxLayout.detailsOpen
+                      ? CHAT_MESSAGES.hideContactDetails
+                      : CHAT_MESSAGES.showContactDetails
+                  }
+                  aria-pressed={inboxLayout.detailsOpen}
+                  onClick={inboxLayout.toggleDetails}
+                >
+                  {inboxLayout.detailsOpen ? (
+                    <PanelRightCloseIcon className="size-4" />
+                  ) : (
+                    <PanelRightOpenIcon className="size-4" />
+                  )}
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -191,6 +277,7 @@ export function ChatWindow({
 
             <InboxChatComposer
               conversationId={conversation.id}
+              channel={conversation.channel}
               internalNote={conversation.internalNote}
               draft={draft}
               onDraftChange={setDraft}
@@ -199,12 +286,24 @@ export function ChatWindow({
               channelNotConnectedMessage={channelNotConnectedMessage}
               websiteFormsHint={conversation.channel === "website_forms"}
               isSending={isLoading}
+              isSendingMedia={isSendingMedia}
               composerTab={composerTab}
               onComposerTabChange={setComposerTab}
               onSubmit={() => {
                 void handleInboxSend();
               }}
               onOpenAiSuggest={() => setSuggestOpen(true)}
+              onSendMedia={(file) => {
+                void sendMedia(
+                  conversation.id,
+                  file,
+                  draft.trim() || undefined,
+                ).then((result) => {
+                  if (result.success) {
+                    setDraft("");
+                  }
+                });
+              }}
             />
           </div>
 

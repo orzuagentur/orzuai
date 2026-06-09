@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { KnowledgeBasePanel } from "@/components/knowledge-base/KnowledgeBasePanel";
 import { WebsiteKnowledgeSection } from "@/components/knowledge-base/WebsiteKnowledgeSection";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +25,17 @@ function KnowledgeSearchFallback() {
   return <Skeleton className="h-8 w-full max-w-3xl" />;
 }
 
-export default async function KnowledgeBasePage({
+export default function KnowledgeBasePage({
+  searchParams,
+}: KnowledgeBasePageProps) {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton cards={2} />}>
+      <KnowledgeBasePageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function KnowledgeBasePageContent({
   searchParams,
 }: KnowledgeBasePageProps) {
   const user = await getCurrentUser();

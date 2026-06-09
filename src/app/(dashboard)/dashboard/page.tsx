@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { AiStatusCard } from "@/components/dashboard/AiStatusCard";
 import { AnalyticsCardsGrid } from "@/components/dashboard/AnalyticsCardsGrid";
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { MultiChannelMetricsPanel } from "@/components/dashboard/MultiChannelMetricsPanel";
 import { PwaInstallBanner } from "@/components/pwa/PwaInstallBanner";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
@@ -19,7 +21,15 @@ import { getChannelConnectionStatuses } from "@/services/channel-workspace.servi
 import { getOnboardingProgress } from "@/services/onboarding.service";
 import { getUserProfile } from "@/services/user.service";
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton cards={4} />}>
+      <DashboardPageContent />
+    </Suspense>
+  );
+}
+
+async function DashboardPageContent() {
   const authUser = await getCurrentUser();
   const business = authUser ? await getPrimaryBusiness(authUser.id) : null;
 

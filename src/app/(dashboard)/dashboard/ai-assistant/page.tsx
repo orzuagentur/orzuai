@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AiAssistantHub } from "@/components/ai-assistant/AiAssistantHub";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
@@ -12,9 +13,15 @@ type AiAssistantPageProps = {
   searchParams: Promise<{ channel?: string }>;
 };
 
-export default async function AiAssistantPage({
-  searchParams,
-}: AiAssistantPageProps) {
+export default function AiAssistantPage({ searchParams }: AiAssistantPageProps) {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton />}>
+      <AiAssistantPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function AiAssistantPageContent({ searchParams }: AiAssistantPageProps) {
   const { channel } = await searchParams;
 
   if (
@@ -30,18 +37,5 @@ export default async function AiAssistantPage({
     return <DashboardSetupPrompt title="AI Assistant" />;
   }
 
-  return (
-    <Suspense fallback={<AiAssistantFallback />}>
-      <AiAssistantHub data={data} />
-    </Suspense>
-  );
-}
-
-function AiAssistantFallback() {
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
-      <div className="min-h-[32rem] animate-pulse bg-muted/30" />
-    </div>
-  );
+  return <AiAssistantHub data={data} />;
 }

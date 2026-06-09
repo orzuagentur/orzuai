@@ -25,9 +25,11 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
+  findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
   processChannelAutoReply,
+  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WhatsappConnection } from "@/types/database.types";
 import type {
@@ -560,13 +562,12 @@ async function ingestIncomingMessage(
   const businessId = connection.business_id;
   const normalizedPhone = normalizePhoneNumber(message.from);
 
-  const { data: existingContact } = await admin
-    .from("contacts")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("channel", "whatsapp")
-    .eq("phone_number", normalizedPhone)
-    .maybeSingle();
+  const existingContact = await findContactForChannel(
+    admin,
+    businessId,
+    "whatsapp",
+    normalizedPhone,
+  );
 
   let contactId = existingContact?.id;
   let createdContact = false;
@@ -591,6 +592,7 @@ async function ingestIncomingMessage(
       .from("contacts")
       .update({
         name: message.contactName,
+        phone_number: normalizedPhone,
         last_message_at: new Date().toISOString(),
       })
       .eq("id", contactId);
@@ -600,31 +602,12 @@ async function ingestIncomingMessage(
     return;
   }
 
-  const { data: existingConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", "whatsapp")
-    .eq("status", "active")
-    .maybeSingle();
-
-  let conversationId = existingConversation?.id;
-
-  if (!conversationId) {
-    const { data: createdConversation } = await admin
-      .from("conversations")
-      .insert({
-        business_id: businessId,
-        channel: "whatsapp",
-        contact_id: contactId,
-        status: "active",
-      })
-      .select("id")
-      .single();
-
-    conversationId = createdConversation?.id;
-  }
+  const conversationId = await resolveInboundConversation(
+    admin,
+    businessId,
+    contactId,
+    "whatsapp",
+  );
 
   if (!conversationId) {
     return;

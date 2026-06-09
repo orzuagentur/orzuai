@@ -90,6 +90,7 @@ export type ConversationListItem = {
 
 export type ConversationDetail = {
   id: string;
+  contactId: string | null;
   contactName: string;
   contactPhone: string;
   channel: MessagingChannel;

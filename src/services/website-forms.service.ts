@@ -26,10 +26,12 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
+  findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
   listKnowledgeEntriesForBusiness,
   processChannelAutoReply,
+  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WebsiteFormConnection } from "@/types/database.types";
 import type {
@@ -507,13 +509,12 @@ export async function ingestWebsiteFormSubmission(
   const { phoneNumber, displayName } =
     resolveWebsiteFormContactIdentifier(submission);
 
-  const { data: existingContact } = await admin
-    .from("contacts")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("channel", "website_forms")
-    .eq("phone_number", phoneNumber)
-    .maybeSingle();
+  const existingContact = await findContactForChannel(
+    admin,
+    businessId,
+    "website_forms",
+    phoneNumber,
+  );
 
   let contactId = existingContact?.id;
   let createdContact = false;
@@ -547,31 +548,12 @@ export async function ingestWebsiteFormSubmission(
     return { success: false };
   }
 
-  const { data: existingConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", "website_forms")
-    .eq("status", "active")
-    .maybeSingle();
-
-  let conversationId = existingConversation?.id;
-
-  if (!conversationId) {
-    const { data: createdConversation } = await admin
-      .from("conversations")
-      .insert({
-        business_id: businessId,
-        channel: "website_forms",
-        contact_id: contactId,
-        status: "active",
-      })
-      .select("id")
-      .single();
-
-    conversationId = createdConversation?.id;
-  }
+  const conversationId = await resolveInboundConversation(
+    admin,
+    businessId,
+    contactId,
+    "website_forms",
+  );
 
   if (!conversationId) {
     return { success: false };

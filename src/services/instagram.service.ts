@@ -25,9 +25,11 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannelOnConnect } from "@/services/channel-workspace.service";
 import {
+  findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
   processChannelAutoReply,
+  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { InstagramConnection } from "@/types/database.types";
 import type {
@@ -463,13 +465,12 @@ async function ingestInstagramMessage(
   const businessId = connection.business_id;
   const identifier = `ig:${message.from}`;
 
-  const { data: existingContact } = await admin
-    .from("contacts")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("channel", "instagram")
-    .eq("phone_number", identifier)
-    .maybeSingle();
+  const existingContact = await findContactForChannel(
+    admin,
+    businessId,
+    "instagram",
+    identifier,
+  );
 
   let contactId = existingContact?.id;
   let createdContact = false;
@@ -503,31 +504,12 @@ async function ingestInstagramMessage(
     return;
   }
 
-  const { data: existingConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", "instagram")
-    .eq("status", "active")
-    .maybeSingle();
-
-  let conversationId = existingConversation?.id;
-
-  if (!conversationId) {
-    const { data: createdConversation } = await admin
-      .from("conversations")
-      .insert({
-        business_id: businessId,
-        channel: "instagram",
-        contact_id: contactId,
-        status: "active",
-      })
-      .select("id")
-      .single();
-
-    conversationId = createdConversation?.id;
-  }
+  const conversationId = await resolveInboundConversation(
+    admin,
+    businessId,
+    contactId,
+    "instagram",
+  );
 
   if (!conversationId) {
     return;

@@ -1,5 +1,8 @@
+import { Suspense } from "react";
+
 import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import {
@@ -11,7 +14,15 @@ type ContactsPageProps = {
   searchParams: Promise<{ channel?: string; segment?: string; view?: string }>;
 };
 
-export default async function ContactsPage({ searchParams }: ContactsPageProps) {
+export default function ContactsPage({ searchParams }: ContactsPageProps) {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton />}>
+      <ContactsPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ContactsPageContent({ searchParams }: ContactsPageProps) {
   const { channel, segment, view } = await searchParams;
   const data = await getUnifiedContacts(channel, segment, view);
 

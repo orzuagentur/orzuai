@@ -142,7 +142,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, internal_note, updated_at, contact:contacts(name, phone_number)",
+      "id, channel, status, internal_note, updated_at, contact:contacts(id, name, phone_number)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -168,6 +168,7 @@ export async function getConversationDetail(
 
   return {
     id: conversation.id,
+    contactId: contact.id ?? null,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
     channel: conversation.channel,
@@ -245,6 +246,37 @@ export async function isChatChannelConnected(
   }
 
   return isWebsiteFormsConnected(businessId);
+}
+
+export type ActiveConversationContext = {
+  conversation: ConversationDetail;
+  channelConnected: boolean;
+  aiEnabled: boolean | null;
+  cannedResponses: Awaited<ReturnType<typeof listCannedResponses>>;
+};
+
+export async function getActiveConversationContext(
+  conversationId: string,
+  businessId: string,
+): Promise<ActiveConversationContext | null> {
+  const conversation = await getConversationDetail(conversationId, businessId);
+
+  if (!conversation) {
+    return null;
+  }
+
+  const [channelConnected, aiEnabled, cannedResponses] = await Promise.all([
+    isChatChannelConnected(businessId, conversation.channel),
+    getAiEnabledForChannel(businessId, conversation.channel),
+    listCannedResponses(conversation.channel),
+  ]);
+
+  return {
+    conversation,
+    channelConnected,
+    aiEnabled,
+    cannedResponses,
+  };
 }
 
 async function getAiEnabledForChannel(
@@ -346,9 +378,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   };
 }
 
-export async function getChatsMonitorPageData(
-  activeConversationId?: string,
-): Promise<ChatsMonitorPageData> {
+export async function getChatsMonitorPageData(): Promise<ChatsMonitorPageData> {
   const monitor = await getChatsMonitorData();
 
   if (!monitor.hasBusiness) {
@@ -391,32 +421,16 @@ export async function getChatsMonitorPageData(
     }),
   ]);
 
-  const selectedId = activeConversationId?.trim() || null;
-
-  const activeConversation = selectedId
-    ? await getConversationDetail(selectedId, business.id)
-    : null;
-
-  const activeChannel = activeConversation?.channel;
-  const [activeChannelConnected, activeAiEnabled, activeCannedResponses] =
-    activeChannel
-      ? await Promise.all([
-          isChatChannelConnected(business.id, activeChannel),
-          getAiEnabledForChannel(business.id, activeChannel),
-          listCannedResponses(activeChannel),
-        ])
-      : [false, null, []];
-
   return {
     ...monitor,
     conversations: page.items,
     conversationsTotalCount: page.totalCount,
     conversationsHasMore: page.hasMore,
     needsAttentionConversations: needsAttentionPage.items,
-    activeConversation,
-    activeChannelConnected,
-    activeAiEnabled,
-    activeCannedResponses,
+    activeConversation: null,
+    activeChannelConnected: false,
+    activeAiEnabled: null,
+    activeCannedResponses: [],
   };
 }
 
@@ -497,7 +511,6 @@ export async function updateConversationInternalNote(
 
 export async function getChatsChannelPageData(
   channel: DbMessagingChannel,
-  activeConversationId?: string,
 ): Promise<ChatsChannelPageData> {
   if (!hasSupabaseEnv()) {
     return {
@@ -532,16 +545,6 @@ export async function getChatsChannelPageData(
     listCannedResponses(channel),
   ]);
 
-  const selectedId =
-    activeConversationId &&
-    conversations.some((conversation) => conversation.id === activeConversationId)
-      ? activeConversationId
-      : null;
-
-  const activeConversation = selectedId
-    ? await getConversationDetail(selectedId, business.id)
-    : null;
-
   const aiEnabled = await getAiEnabledForChannel(business.id, channel);
 
   return {
@@ -550,7 +553,7 @@ export async function getChatsChannelPageData(
     channelConnected,
     aiEnabled,
     conversations,
-    activeConversation,
+    activeConversation: null,
     cannedResponses,
   };
 }

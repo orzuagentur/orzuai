@@ -9,8 +9,11 @@ import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
+import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
+
+const OPEN_CONVERSATION_STATUSES = ["open", "pending", "active"] as const;
 
 export type ChannelMessageInsert = {
   conversationId: string;
@@ -31,6 +34,101 @@ export async function insertChannelMessage(
     content: input.content,
     ai_generated: input.aiGenerated ?? false,
   });
+}
+
+export async function findContactForChannel(
+  admin: MessagingDbClient,
+  businessId: string,
+  channel: MessagingChannel,
+  identifier: string,
+): Promise<{ id: string } | null> {
+  if (channel === "whatsapp") {
+    const canonical = canonicalPhoneNumber(identifier);
+    const digits = phoneDigitsOnly(identifier);
+    const variants = [...new Set([canonical, digits, `+${digits}`].filter(Boolean))];
+
+    for (const phoneNumber of variants) {
+      const { data } = await admin
+        .from("contacts")
+        .select("id")
+        .eq("business_id", businessId)
+        .eq("channel", channel)
+        .eq("phone_number", phoneNumber)
+        .maybeSingle();
+
+      if (data?.id) {
+        return { id: data.id };
+      }
+    }
+
+    return null;
+  }
+
+  const { data } = await admin
+    .from("contacts")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("channel", channel)
+    .eq("phone_number", identifier)
+    .maybeSingle();
+
+  return data?.id ? { id: data.id } : null;
+}
+
+export async function resolveInboundConversation(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  channel: MessagingChannel,
+): Promise<string | null> {
+  const now = new Date().toISOString();
+
+  const { data: openConversation } = await admin
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("channel", channel)
+    .in("status", [...OPEN_CONVERSATION_STATUSES])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (openConversation?.id) {
+    return openConversation.id;
+  }
+
+  const { data: latestConversation } = await admin
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("channel", channel)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestConversation?.id) {
+    await admin
+      .from("conversations")
+      .update({ status: "open", updated_at: now })
+      .eq("id", latestConversation.id);
+
+    return latestConversation.id;
+  }
+
+  const { data: createdConversation } = await admin
+    .from("conversations")
+    .insert({
+      business_id: businessId,
+      channel,
+      contact_id: contactId,
+      status: "open",
+    })
+    .select("id")
+    .single();
+
+  return createdConversation?.id ?? null;
 }
 
 export async function incrementMessagingAnalytics(
