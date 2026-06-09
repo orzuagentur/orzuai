@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { fetchConversationListItemAction } from "@/features/chats/actions/fetch-conversation-list-item";
-import { createClient } from "@/lib/supabase/client";
+import { createClientIfConfigured } from "@/lib/supabase/client";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import {
@@ -58,7 +58,11 @@ export function useInboxListRealtime({
       return;
     }
 
-    const supabase = createClient();
+    const supabase = createClientIfConfigured();
+
+    if (!supabase) {
+      return;
+    }
 
     const scheduleRefresh = () => {
       if (refreshTimeoutRef.current !== null) {

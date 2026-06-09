@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { sendAgentTypingAction } from "@/features/chats/actions/send-agent-typing";
-import { createClient } from "@/lib/supabase/client";
+import { createClientIfConfigured } from "@/lib/supabase/client";
 import {
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
@@ -33,7 +33,12 @@ export function useAgentTypingIndicator({
       return;
     }
 
-    const supabase = createClient();
+    const supabase = createClientIfConfigured();
+
+    if (!supabase) {
+      return;
+    }
+
     const channelName = getConversationRealtimeChannelName(conversationId);
 
     const broadcastAgentTyping = async (isTyping: boolean) => {

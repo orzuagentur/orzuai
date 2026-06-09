@@ -31,10 +31,16 @@ export function getSupabaseServiceRoleKey(): string {
   return getRequiredEnv(ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-export function hasSupabaseEnv(): boolean {
+export function hasClientSupabaseEnv(): boolean {
   return Boolean(
     process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL]?.trim() &&
-      process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]?.trim() &&
+      process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]?.trim(),
+  );
+}
+
+export function hasSupabaseEnv(): boolean {
+  return Boolean(
+    hasClientSupabaseEnv() &&
       process.env[ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY]?.trim(),
   );
 }
