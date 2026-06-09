@@ -69,8 +69,21 @@ export const CHAT_MESSAGES = {
   attachFileLabel: "Attach file",
   attachNotSupported: "File attachments are not supported yet for this channel.",
   voiceMessageLabel: "Record voice message",
-  voiceRecordingLabel: "Recording… Tap to stop and send",
+  voiceRecordingLabel: "Recording voice message",
+  voiceStopRecording: "Stop",
+  voicePreviewTitle: "Voice message preview",
   voiceNotSupported: "Voice recording is not supported in this browser.",
+  mediaPreviewTitle: "Attachment preview",
+  mediaPreviewHint: "Review your attachment before sending.",
+  mediaCaptionLabel: "Caption",
+  mediaCaptionPlaceholder: "Add a caption (optional)…",
+  mediaFullscreenPreview: "View fullscreen",
+  voicePlay: "Play",
+  voicePause: "Pause",
+  sendAttachment: "Send",
+  discardAttachment: "Discard",
+  chatFullscreen: "Fullscreen chat",
+  chatExitFullscreen: "Exit fullscreen",
   mediaSendSuccess: "Media sent successfully.",
   mediaSendFailed: "Unable to send media. Please try again.",
   mediaInvalidFile: "Choose a valid file to send.",
@@ -122,6 +135,8 @@ export const CHAT_MESSAGES = {
   internalNotesDescription:
     "Visible only to your team. Customers never see this note.",
   internalNotesPlaceholder: "Add context for your team…",
+  internalNotesHint: "Use notes for handoffs, follow-ups, and customer context.",
+  internalNotesPrivateBadge: "Team only",
   internalNotesSave: "Save note",
   internalNoteSaved: "Internal note saved.",
   statusLabel: "Conversation status",
@@ -138,11 +153,26 @@ export const CHAT_MESSAGES = {
   crmAssistantTitle: "CRM assistant",
   crmAssistantLoading: "Loading CRM insights…",
   crmSuggestedAction: "Suggested action",
+  favoritesTabLabel: "Favorite contacts",
+  favoritesEmptyTitle: "No favorite contacts yet",
+  favoritesEmptyDescription:
+    "Star a contact from any chat to add them here.",
+  favoriteAddedTitle: "Added to favorites",
+  favoriteAddedDescription: (name: string) =>
+    `${name} is now in your favorites.`,
+  favoriteRemovedTitle: "Removed from favorites",
+  favoriteRemovedDescription: (name: string) =>
+    `${name} was removed from your favorites.`,
+  favoriteToggleLabel: "Toggle favorite contact",
 } as const;
 
 export type ChatInboxFilter = "all" | "ai_handled" | "needs_human" | "active";
 export type ChatInboxSort = "latest" | "needs_reply_first" | "channel";
-export type ChatInboxQuickView = "all" | "needs_reply" | "high_intent";
+export type ChatInboxQuickView =
+  | "all"
+  | "needs_reply"
+  | "high_intent"
+  | "favorites";
 
 export const HIGH_INTENT_LEAD_SCORE = 70;
 export const INBOX_PAGE_SIZE = 50;

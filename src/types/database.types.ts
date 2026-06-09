@@ -572,6 +572,7 @@ export type Database = {
           sentiment: string | null;
           channel: MessagingChannel;
           last_message_at: string | null;
+          is_favorite: boolean;
           created_at: string;
         };
         Insert: {
@@ -590,6 +591,7 @@ export type Database = {
           sentiment?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
+          is_favorite?: boolean;
           created_at?: string;
         };
         Update: {
@@ -608,6 +610,7 @@ export type Database = {
           sentiment?: string | null;
           channel?: MessagingChannel;
           last_message_at?: string | null;
+          is_favorite?: boolean;
           created_at?: string;
         };
         Relationships: [

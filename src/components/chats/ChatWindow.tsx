@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   Loader2Icon,
+  Maximize2Icon,
   MessageSquareIcon,
+  Minimize2Icon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
   SendIcon,
@@ -28,6 +31,7 @@ import { MessageHistory } from "@/components/chats/MessageHistory";
 import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
   getChannelBadgeClassName,
@@ -62,6 +66,7 @@ type ChatWindowProps = {
   onSuggestReplyOpenChange?: (open: boolean) => void;
   onMessageSent?: (message: ChatMessageData) => void;
   onContactDeleted?: () => void;
+  onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
   isClientTyping?: boolean;
   className?: string;
 };
@@ -97,6 +102,7 @@ export function ChatWindow({
   onSuggestReplyOpenChange,
   onMessageSent,
   onContactDeleted,
+  onContactFavoriteChange,
   isClientTyping = false,
   className,
 }: ChatWindowProps) {
@@ -113,6 +119,20 @@ export function ChatWindow({
   const setDraft = onDraftChange ?? setInternalDraft;
   const isInboxLayout = layout === "inbox";
   const inboxLayout = useOptionalInboxLayout();
+  const [isFavorite, setIsFavorite] = useState(
+    conversation?.contactIsFavorite ?? false,
+  );
+  const [isFavoritePending, startFavoriteTransition] = useTransition();
+
+  useEffect(() => {
+    setIsFavorite(conversation?.contactIsFavorite ?? false);
+  }, [conversation?.contactId, conversation?.contactIsFavorite]);
+
+  useEffect(() => {
+    if (!conversation && inboxLayout?.chatFullscreen) {
+      inboxLayout.setChatFullscreen(false);
+    }
+  }, [conversation, inboxLayout]);
 
   const { sendMessage, isLoading } = useSendChatMessage({
     onSuccess: (result) => {
@@ -151,6 +171,46 @@ export function ChatWindow({
 
   function handleRefresh() {
     router.refresh();
+  }
+
+  function handleToggleFavorite() {
+    if (!conversation?.contactId || isFavoritePending) {
+      return;
+    }
+
+    startFavoriteTransition(() => {
+      void (async () => {
+        const result = await toggleContactFavoriteAction({
+          contactId: conversation.contactId!,
+        });
+
+        if (!result.success) {
+          toast.error(result.error.message);
+          return;
+        }
+
+        setIsFavorite(result.data.isFavorite);
+        onContactFavoriteChange?.(
+          result.data.contactId,
+          result.data.isFavorite,
+        );
+
+        if (result.data.isFavorite) {
+          toast.success(CHAT_MESSAGES.favoriteAddedTitle, {
+            description: CHAT_MESSAGES.favoriteAddedDescription(
+              result.data.contactName,
+            ),
+          });
+          return;
+        }
+
+        toast.info(CHAT_MESSAGES.favoriteRemovedTitle, {
+          description: CHAT_MESSAGES.favoriteRemovedDescription(
+            result.data.contactName,
+          ),
+        });
+      })();
+    });
   }
 
   if (!conversation) {
@@ -249,9 +309,46 @@ export function ChatWindow({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Button type="button" variant="ghost" size="icon" className="size-8">
-                <StarIcon className="size-4" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                disabled={!conversation.contactId || isFavoritePending}
+                aria-label={CHAT_MESSAGES.favoriteToggleLabel}
+                aria-pressed={isFavorite}
+                onClick={handleToggleFavorite}
+              >
+                <StarIcon
+                  className={cn(
+                    "size-4",
+                    isFavorite
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-muted-foreground",
+                  )}
+                />
               </Button>
+              {inboxLayout ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label={
+                    inboxLayout.chatFullscreen
+                      ? CHAT_MESSAGES.chatExitFullscreen
+                      : CHAT_MESSAGES.chatFullscreen
+                  }
+                  aria-pressed={inboxLayout.chatFullscreen}
+                  onClick={inboxLayout.toggleChatFullscreen}
+                >
+                  {inboxLayout.chatFullscreen ? (
+                    <Minimize2Icon className="size-4" />
+                  ) : (
+                    <Maximize2Icon className="size-4" />
+                  )}
+                </Button>
+              ) : null}
               <InboxChatMenu
                 conversation={conversation}
                 onContactDeleted={onContactDeleted}
@@ -310,16 +407,14 @@ export function ChatWindow({
                 void handleInboxSend();
               }}
               onOpenAiSuggest={() => setSuggestOpen(true)}
-              onSendMedia={(file) => {
-                void sendMedia(
+              onSendMedia={async (file, caption) => {
+                const result = await sendMedia(
                   conversation.id,
                   file,
-                  draft.trim() || undefined,
-                ).then((result) => {
-                  if (result.success) {
-                    setDraft("");
-                  }
-                });
+                  caption,
+                );
+
+                return result.success;
               }}
             />
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGridIcon } from "lucide-react";
+import { LayoutGridIcon, StarIcon } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
@@ -10,8 +10,10 @@ import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 
+export type InboxChannelTabId = ChatChannelId | "all" | "favorites";
+
 type InboxChannelTabsProps = {
-  activeChannel: ChatChannelId | "all";
+  activeChannel: InboxChannelTabId;
   unreadByChannel?: Partial<Record<MessagingChannel, number>>;
   className?: string;
 };
@@ -50,6 +52,25 @@ export function InboxChannelTabs({
             {totalUnread > 99 ? "99+" : totalUnread}
           </span>
         ) : null}
+      </Link>
+
+      <Link
+        href={DASHBOARD_ROUTES.chatsFavorites}
+        title={CHAT_MESSAGES.favoritesTabLabel}
+        aria-label={CHAT_MESSAGES.favoritesTabLabel}
+        className={cn(
+          "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
+          activeChannel === "favorites"
+            ? "bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-300"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        )}
+      >
+        <StarIcon
+          className={cn(
+            "size-5",
+            activeChannel === "favorites" ? "fill-amber-500 text-amber-500" : "",
+          )}
+        />
       </Link>
 
       {CHAT_CHANNEL_LIST.map((channel) => {

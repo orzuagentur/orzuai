@@ -76,8 +76,10 @@ export type ChatMessageData = {
 
 export type ConversationListItem = {
   id: string;
+  contactId: string;
   contactName: string;
   contactPhone: string;
+  contactIsFavorite: boolean;
   leadScore: number | null;
   channel: MessagingChannel;
   status: ConversationStatus;
@@ -92,6 +94,7 @@ export type ConversationListItem = {
 export type ConversationDetail = {
   id: string;
   contactId: string | null;
+  contactIsFavorite: boolean;
   contactName: string;
   contactPhone: string;
   channel: MessagingChannel;

@@ -50,7 +50,9 @@ import {
   markConversationListItemRead,
 } from "@/utils/conversation-unread";
 
-type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData>;
+type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData> & {
+  favoritesOnly?: boolean;
+};
 
 export function ChatsMonitorPanel({
   hasBusiness: initialHasBusiness,
@@ -59,6 +61,7 @@ export function ChatsMonitorPanel({
   conversationsTotalCount: initialTotalCount,
   conversationsHasMore: initialHasMore,
   needsAttentionConversations: initialNeedsAttention,
+  favoritesOnly = false,
 }: ChatsMonitorPanelProps = {}) {
   const usesClientBootstrap = initialConversations === undefined;
   const searchParams = useSearchParams();
@@ -75,7 +78,9 @@ export function ChatsMonitorPanel({
     useState<ConversationListItem[]>(initialNeedsAttention ?? []);
   const [totalCount, setTotalCount] = useState(initialTotalCount ?? 0);
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
-  const [isInitialLoading, setIsInitialLoading] = useState(usesClientBootstrap);
+  const [isInitialLoading, setIsInitialLoading] = useState(
+    usesClientBootstrap && !favoritesOnly,
+  );
 
   const {
     selectedConversationId,
@@ -87,6 +92,7 @@ export function ChatsMonitorPanel({
     isLoadingConversation,
     appendMessage,
     isClientTyping,
+    refreshConversation,
   } = useInboxActiveConversation({
     initialConversationId,
     initialConversation: null,
@@ -99,7 +105,9 @@ export function ChatsMonitorPanel({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [activeSort] = useState<ChatInboxSort>("latest");
-  const [activeQuickView] = useState<ChatInboxQuickView>("all");
+  const [activeQuickView] = useState<ChatInboxQuickView>(
+    favoritesOnly ? "favorites" : "all",
+  );
   const [isFetching, startFetching] = useTransition();
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
@@ -111,6 +119,7 @@ export function ChatsMonitorPanel({
   );
 
   const showNeedsAttentionSection =
+    !favoritesOnly &&
     activeQuickView === "all" &&
     !debouncedSearch &&
     activeFilter === "all" &&
@@ -236,8 +245,65 @@ export function ChatsMonitorPanel({
     [activeFilter, activeQuickView, activeSort, debouncedSearch],
   );
 
+  const handleContactFavoriteChange = useCallback(
+    (contactId: string, isFavorite: boolean) => {
+      if (favoritesOnly && !isFavorite) {
+        setConversations((current) =>
+          current.filter((item) => item.contactId !== contactId),
+        );
+
+        if (
+          selectedConversationId &&
+          conversations.some(
+            (item) =>
+              item.id === selectedConversationId &&
+              item.contactId === contactId,
+          )
+        ) {
+          selectConversation(null);
+        }
+
+        return;
+      }
+
+      setConversations((current) =>
+        current.map((item) =>
+          item.contactId === contactId
+            ? { ...item, contactIsFavorite: isFavorite }
+            : item,
+        ),
+      );
+      setNeedsAttentionConversations((current) =>
+        current.map((item) =>
+          item.contactId === contactId
+            ? { ...item, contactIsFavorite: isFavorite }
+            : item,
+        ),
+      );
+
+      if (favoritesOnly && isFavorite) {
+        fetchConversations(0, false, true);
+      }
+
+      void refreshConversation(true);
+    },
+    [
+      conversations,
+      favoritesOnly,
+      fetchConversations,
+      refreshConversation,
+      selectConversation,
+      selectedConversationId,
+    ],
+  );
+
   useEffect(() => {
     if (!usesClientBootstrap) {
+      return;
+    }
+
+    if (favoritesOnly) {
+      setHasBusiness(true);
       return;
     }
 
@@ -266,7 +332,7 @@ export function ChatsMonitorPanel({
     return () => {
       cancelled = true;
     };
-  }, [usesClientBootstrap]);
+  }, [favoritesOnly, usesClientBootstrap]);
 
   const hasActiveListFilters =
     Boolean(debouncedSearch) ||
@@ -363,7 +429,10 @@ export function ChatsMonitorPanel({
     <InboxShell
       showChatOnMobile={showChatOnMobile}
       channelTabs={
-        <InboxChannelTabs activeChannel="all" unreadByChannel={unreadByChannel} />
+        <InboxChannelTabs
+          activeChannel={favoritesOnly ? "favorites" : "all"}
+          unreadByChannel={unreadByChannel}
+        />
       }
       listColumn={
         <>
@@ -394,13 +463,15 @@ export function ChatsMonitorPanel({
                   activeConversationId={activeConversationId}
                   channelId="whatsapp"
                   linkToConversationChannel
-                  linkMode="overview"
+                  linkMode={favoritesOnly ? "favorites" : "overview"}
                   onConversationSelect={handleConversationSelect}
                   variant="inbox"
                   emptyVariant={
-                    totalCount > 0 && conversations.length === 0
-                      ? "search"
-                      : "default"
+                    favoritesOnly
+                      ? "favorites"
+                      : totalCount > 0 && conversations.length === 0
+                        ? "search"
+                        : "default"
                   }
                 />
               </>
@@ -472,6 +543,7 @@ export function ChatsMonitorPanel({
               handleConversationSelect(null);
               fetchConversations(0, false, true);
             }}
+            onContactFavoriteChange={handleContactFavoriteChange}
           />
         </div>
       }

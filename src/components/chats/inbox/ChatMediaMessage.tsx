@@ -75,6 +75,37 @@ function getDocumentIcon(mimeType: string) {
   return FileIcon;
 }
 
+function MediaDownloadButton({
+  url,
+  fileName,
+  isOutgoing,
+  className,
+}: {
+  url: string;
+  fileName: string;
+  isOutgoing?: boolean;
+  className?: string;
+}) {
+  return (
+    <a
+      href={url}
+      download={fileName}
+      target="_blank"
+      rel="noreferrer"
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
+        isOutgoing
+          ? "bg-emerald-800/50 text-white hover:bg-emerald-800/70"
+          : "bg-background hover:bg-muted",
+        className,
+      )}
+      aria-label={CHAT_MESSAGES.downloadAttachment}
+    >
+      <DownloadIcon className="size-4" />
+    </a>
+  );
+}
+
 function CaptionText({
   caption,
   isOutgoing,
@@ -135,20 +166,30 @@ function ChatMediaImage({
 
   return (
     <div className="space-y-1">
-      <button
-        type="button"
-        onClick={() => setLightboxOpen(true)}
-        className="group relative block max-w-[min(280px,100%)] overflow-hidden rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
-        aria-label={CHAT_MESSAGES.openMediaPreview}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={resolvedUrl}
-          alt={media.fileName}
-          loading="lazy"
-          className="max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95"
-        />
-      </button>
+      <div className="group relative max-w-[min(280px,100%)]">
+        <button
+          type="button"
+          onClick={() => setLightboxOpen(true)}
+          className="block w-full overflow-hidden rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+          aria-label={CHAT_MESSAGES.openMediaPreview}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolvedUrl}
+            alt={media.fileName}
+            loading="lazy"
+            className="max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95"
+          />
+        </button>
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <MediaDownloadButton
+            url={resolvedUrl}
+            fileName={media.fileName}
+            isOutgoing={isOutgoing}
+            className="bg-black/55 text-white hover:bg-black/70"
+          />
+        </div>
+      </div>
 
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
         <DialogContent
@@ -156,16 +197,23 @@ function ChatMediaImage({
           className="flex max-h-[95vh] max-w-[95vw] items-center justify-center border-none bg-black/95 p-2 sm:max-w-[95vw]"
         >
           <DialogTitle className="sr-only">{media.fileName}</DialogTitle>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 z-10 text-white hover:bg-white/10"
-            onClick={() => setLightboxOpen(false)}
-            aria-label={CHAT_MESSAGES.closeMediaPreview}
-          >
-            <XIcon className="size-5" />
-          </Button>
+          <div className="absolute top-2 right-2 z-10 flex gap-1">
+            <MediaDownloadButton
+              url={resolvedUrl}
+              fileName={media.fileName}
+              className="bg-white/10 text-white hover:bg-white/20"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/10"
+              onClick={() => setLightboxOpen(false)}
+              aria-label={CHAT_MESSAGES.closeMediaPreview}
+            >
+              <XIcon className="size-5" />
+            </Button>
+          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={resolvedUrl}
@@ -228,6 +276,13 @@ function ChatMediaVideo({
           <VideoIcon className="mr-1 inline size-3" />
           {formatMediaFileSize(media.sizeBytes) || "Video"}
         </div>
+        <div className="absolute top-2 right-2">
+          <MediaDownloadButton
+            url={resolvedUrl}
+            fileName={media.fileName}
+            className="bg-black/55 text-white hover:bg-black/70"
+          />
+        </div>
       </div>
       <CaptionText caption={caption} isOutgoing={isOutgoing} />
     </div>
@@ -286,6 +341,11 @@ function ChatMediaAudio({
         <audio controls preload="metadata" className="h-8 min-w-0 flex-1">
           <source src={resolvedUrl} type={media.mimeType} />
         </audio>
+        <MediaDownloadButton
+          url={resolvedUrl}
+          fileName={media.fileName}
+          isOutgoing={isOutgoing}
+        />
       </div>
       <CaptionText caption={caption} isOutgoing={isOutgoing} />
     </div>
@@ -335,21 +395,11 @@ function ChatMediaDocument({
         {isLoading ? (
           <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
         ) : resolvedUrl && !hasError ? (
-          <a
-            href={resolvedUrl}
-            download={media.fileName}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
-              isOutgoing
-                ? "bg-emerald-800/50 hover:bg-emerald-800/70"
-                : "bg-background hover:bg-muted",
-            )}
-            aria-label={CHAT_MESSAGES.downloadAttachment}
-          >
-            <DownloadIcon className="size-4" />
-          </a>
+          <MediaDownloadButton
+            url={resolvedUrl}
+            fileName={media.fileName}
+            isOutgoing={isOutgoing}
+          />
         ) : (
           <PlayIcon className="size-4 shrink-0 opacity-30" />
         )}

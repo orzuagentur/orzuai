@@ -30,10 +30,10 @@ type ChatListProps = {
   channelId: ChatChannelId;
   hideChannelBadge?: boolean;
   linkToConversationChannel?: boolean;
-  linkMode?: "channel" | "overview";
+  linkMode?: "channel" | "overview" | "favorites";
   onConversationSelect?: (conversationId: string) => void;
   variant?: "default" | "inbox";
-  emptyVariant?: "default" | "search";
+  emptyVariant?: "default" | "search" | "favorites";
   className?: string;
 };
 
@@ -42,8 +42,12 @@ function buildConversationHref(
   conversationId: string,
   conversationChannel: ConversationListItem["channel"],
   linkToConversationChannel: boolean,
-  linkMode: "channel" | "overview",
+  linkMode: "channel" | "overview" | "favorites",
 ): string {
+  if (linkMode === "favorites") {
+    return `${DASHBOARD_ROUTES.chatsFavorites}?conversation=${conversationId}`;
+  }
+
   if (linkMode === "overview") {
     return `${DASHBOARD_ROUTES.chats}?conversation=${conversationId}`;
   }
@@ -67,23 +71,34 @@ export function ChatList({
   const isInboxVariant = variant === "inbox";
   if (conversations.length === 0) {
     const isSearchEmpty = emptyVariant === "search";
+    const isFavoritesEmpty = emptyVariant === "favorites";
 
     return (
       <EmptyState
         variant="inbox"
         className={className}
         title={
-          isSearchEmpty
-            ? CHAT_MESSAGES.emptySearchTitle
-            : CHAT_MESSAGES.emptyListTitle
+          isFavoritesEmpty
+            ? CHAT_MESSAGES.favoritesEmptyTitle
+            : isSearchEmpty
+              ? CHAT_MESSAGES.emptySearchTitle
+              : CHAT_MESSAGES.emptyListTitle
         }
         description={
-          isSearchEmpty
-            ? CHAT_MESSAGES.emptySearchDescription
-            : CHAT_MESSAGES.emptyListDescription
+          isFavoritesEmpty
+            ? CHAT_MESSAGES.favoritesEmptyDescription
+            : isSearchEmpty
+              ? CHAT_MESSAGES.emptySearchDescription
+              : CHAT_MESSAGES.emptyListDescription
         }
-        actionLabel={isSearchEmpty ? undefined : "Open Integrations"}
-        actionHref={isSearchEmpty ? undefined : DASHBOARD_ROUTES.integrations}
+        actionLabel={
+          isSearchEmpty || isFavoritesEmpty ? undefined : "Open Integrations"
+        }
+        actionHref={
+          isSearchEmpty || isFavoritesEmpty
+            ? undefined
+            : DASHBOARD_ROUTES.integrations
+        }
       />
     );
   }

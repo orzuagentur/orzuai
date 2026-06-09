@@ -25,7 +25,7 @@ function InboxShellContent({
   showChatOnMobile = false,
   className,
 }: InboxShellProps) {
-  const { detailsOpen } = useInboxLayout();
+  const { detailsOpen, chatFullscreen } = useInboxLayout();
 
   return (
     <div
@@ -34,35 +34,39 @@ function InboxShellContent({
         className,
       )}
     >
-      {channelTabs}
+      {!chatFullscreen ? channelTabs : null}
 
       <div
         className={cn(
           "grid min-h-0 min-w-0 flex-1 overflow-hidden",
-          detailsOpen
-            ? "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,20rem)]"
-            : "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
+          chatFullscreen
+            ? "grid-cols-1"
+            : detailsOpen
+              ? "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,20rem)]"
+              : "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
         )}
       >
-        <div
-          className={cn(
-            "flex min-h-0 min-w-0 flex-col overflow-hidden border-r",
-            showChatOnMobile && "hidden lg:flex",
-          )}
-        >
-          {listColumn}
-        </div>
+        {!chatFullscreen ? (
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col overflow-hidden border-r",
+              showChatOnMobile && "hidden lg:flex",
+            )}
+          >
+            {listColumn}
+          </div>
+        ) : null}
 
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-col overflow-hidden",
-            showChatOnMobile ? "flex" : "hidden lg:flex",
+            chatFullscreen || showChatOnMobile ? "flex" : "hidden lg:flex",
           )}
         >
           {chatColumn}
         </div>
 
-        {detailsOpen ? (
+        {!chatFullscreen && detailsOpen ? (
           <div className="hidden min-h-0 min-w-0 flex-col overflow-hidden border-l xl:flex">
             {detailsColumn}
           </div>

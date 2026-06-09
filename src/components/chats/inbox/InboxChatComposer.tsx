@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2Icon,
   MessageSquareQuoteIcon,
@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  ComposerAttachmentPreview,
+  ComposerRecordingBar,
+  type ComposerAttachmentKind,
+} from "@/components/chats/inbox/ComposerAttachmentPreview";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +41,15 @@ const QUICK_EMOJIS = [
   "😉", "🤝", "💯", "⭐", "📎",
 ];
 
+const TEXTAREA_MAX_HEIGHT_PX = 160;
+
+type PendingAttachment = {
+  file: File;
+  previewUrl: string | null;
+  kind: ComposerAttachmentKind;
+  durationMs?: number;
+};
+
 type InboxChatComposerProps = {
   conversationId: string;
   channel: MessagingChannel;
@@ -52,7 +66,7 @@ type InboxChatComposerProps = {
   onComposerTabChange: (tab: "reply" | "note") => void;
   onSubmit: () => void;
   onOpenAiSuggest: () => void;
-  onSendMedia?: (file: File) => void;
+  onSendMedia?: (file: File, caption?: string) => Promise<boolean> | boolean;
 };
 
 function supportsMediaChannel(channel: MessagingChannel): boolean {
@@ -62,6 +76,30 @@ function supportsMediaChannel(channel: MessagingChannel): boolean {
     channel === "instagram" ||
     channel === "website_forms"
   );
+}
+
+function detectAttachmentKind(file: File): ComposerAttachmentKind {
+  if (file.type.startsWith("image/")) {
+    return "image";
+  }
+
+  if (file.type.startsWith("video/")) {
+    return "video";
+  }
+
+  if (file.type.startsWith("audio/")) {
+    return "audio";
+  }
+
+  return "document";
+}
+
+function createPreviewUrl(file: File, kind: ComposerAttachmentKind): string | null {
+  if (kind === "image" || kind === "video" || kind === "audio") {
+    return URL.createObjectURL(file);
+  }
+
+  return null;
 }
 
 export function InboxChatComposer({
@@ -83,17 +121,59 @@ export function InboxChatComposer({
   onSendMedia,
 }: InboxChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const [pendingAttachment, setPendingAttachment] =
+    useState<PendingAttachment | null>(null);
+  const [mediaCaption, setMediaCaption] = useState("");
   const mediaSupported = supportsMediaChannel(channel);
   const isBusy = isSending || isSendingMedia;
+  const hasPendingAttachment = pendingAttachment !== null;
+
+  const clearPendingAttachment = useCallback(() => {
+    setMediaCaption("");
+    setPendingAttachment((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+
+      return null;
+    });
+  }, []);
+
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [draft, resizeTextarea]);
 
   useEffect(() => {
     return () => {
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+
+      if (recordingTimerRef.current !== null) {
+        window.clearInterval(recordingTimerRef.current);
+      }
+
+      if (pendingAttachment?.previewUrl) {
+        URL.revokeObjectURL(pendingAttachment.previewUrl);
+      }
     };
-  }, []);
+  }, [pendingAttachment?.previewUrl]);
 
   function insertEmoji(emoji: string) {
     onDraftChange(draft + emoji);
@@ -106,6 +186,24 @@ export function InboxChatComposer({
     }
 
     fileInputRef.current?.click();
+  }
+
+  function stageAttachment(file: File, durationMs?: number) {
+    const kind = detectAttachmentKind(file);
+    const previewUrl = createPreviewUrl(file, kind);
+
+    setPendingAttachment((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+
+      return {
+        file,
+        previewUrl,
+        kind,
+        durationMs,
+      };
+    });
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -121,7 +219,14 @@ export function InboxChatComposer({
       return;
     }
 
-    onSendMedia(file);
+    stageAttachment(file);
+  }
+
+  function clearRecordingTimer() {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
   }
 
   async function startVoiceRecording() {
@@ -155,10 +260,14 @@ export function InboxChatComposer({
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        clearRecordingTimer();
 
         const blob = new Blob(mediaChunksRef.current, { type: mimeType });
 
         if (!blob.size) {
+          setIsRecording(false);
+          setRecordingElapsed(0);
+          recordingStartedAtRef.current = null;
           return;
         }
 
@@ -170,11 +279,26 @@ export function InboxChatComposer({
         const file = new File([blob], `voice-${Date.now()}.${extension}`, {
           type: mimeType,
         });
+        const durationMs = recordingStartedAtRef.current
+          ? Date.now() - recordingStartedAtRef.current
+          : undefined;
 
-        onSendMedia(file);
+        stageAttachment(file, durationMs);
+        setIsRecording(false);
+        setRecordingElapsed(0);
+        recordingStartedAtRef.current = null;
       };
 
       mediaRecorderRef.current = recorder;
+      recordingStartedAtRef.current = Date.now();
+      setRecordingElapsed(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        if (recordingStartedAtRef.current) {
+          setRecordingElapsed(
+            Math.floor((Date.now() - recordingStartedAtRef.current) / 1000),
+          );
+        }
+      }, 250);
       recorder.start();
       setIsRecording(true);
     } catch {
@@ -187,12 +311,12 @@ export function InboxChatComposer({
 
     if (!recorder || recorder.state === "inactive") {
       setIsRecording(false);
+      clearRecordingTimer();
       return;
     }
 
     recorder.stop();
     mediaRecorderRef.current = null;
-    setIsRecording(false);
   }
 
   function handleVoiceClick() {
@@ -201,14 +325,33 @@ export function InboxChatComposer({
       return;
     }
 
+    if (hasPendingAttachment) {
+      return;
+    }
+
     void startVoiceRecording();
+  }
+
+  async function handleSendPendingAttachment() {
+    if (!pendingAttachment || !onSendMedia) {
+      return;
+    }
+
+    const success = await onSendMedia(
+      pendingAttachment.file,
+      mediaCaption.trim() || undefined,
+    );
+
+    if (success) {
+      clearPendingAttachment();
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
 
-      if (canSend && draft.trim() && !isBusy) {
+      if (canSend && draft.trim() && !isBusy && !hasPendingAttachment) {
         onSubmit();
       }
     }
@@ -256,9 +399,26 @@ export function InboxChatComposer({
           ) : null}
 
           {isRecording ? (
-            <p className="text-xs font-medium text-destructive">
-              {CHAT_MESSAGES.voiceRecordingLabel}
-            </p>
+            <ComposerRecordingBar
+              elapsedSeconds={recordingElapsed}
+              onStop={stopVoiceRecording}
+            />
+          ) : null}
+
+          {pendingAttachment ? (
+            <ComposerAttachmentPreview
+              file={pendingAttachment.file}
+              previewUrl={pendingAttachment.previewUrl}
+              kind={pendingAttachment.kind}
+              durationMs={pendingAttachment.durationMs}
+              caption={mediaCaption}
+              onCaptionChange={setMediaCaption}
+              isSending={isSendingMedia}
+              onCancel={clearPendingAttachment}
+              onSend={() => {
+                void handleSendPendingAttachment();
+              }}
+            />
           ) : null}
 
           <div className="flex items-end gap-2">
@@ -270,7 +430,7 @@ export function InboxChatComposer({
                     variant="ghost"
                     size="icon"
                     className="size-9 rounded-full"
-                    disabled={!canSend || isBusy}
+                    disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
                     aria-label={CHAT_MESSAGES.emojiPickerLabel}
                   >
                     <SmileIcon className="size-5 text-muted-foreground" />
@@ -299,7 +459,7 @@ export function InboxChatComposer({
                 variant="ghost"
                 size="icon"
                 className="size-9 rounded-full"
-                disabled={!canSend || isBusy}
+                disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
                 aria-label={CHAT_MESSAGES.attachFileLabel}
                 onClick={handleAttachClick}
               >
@@ -318,7 +478,7 @@ export function InboxChatComposer({
                 variant={isRecording ? "destructive" : "ghost"}
                 size="icon"
                 className="size-9 rounded-full"
-                disabled={!canSend || isBusy}
+                disabled={!canSend || isBusy || hasPendingAttachment}
                 aria-label={CHAT_MESSAGES.voiceMessageLabel}
                 onClick={handleVoiceClick}
               >
@@ -336,7 +496,7 @@ export function InboxChatComposer({
                     variant="ghost"
                     size="icon"
                     className="size-9 rounded-full"
-                    disabled={!canSend || isBusy}
+                    disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
                     aria-label={CANNED_RESPONSES_MESSAGES.pickerLabel}
                   >
                     <MessageSquareQuoteIcon className="size-5 text-muted-foreground" />
@@ -373,7 +533,7 @@ export function InboxChatComposer({
                 variant="ghost"
                 size="icon"
                 className="size-9 rounded-full"
-                disabled={!canSend || isBusy}
+                disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
                 aria-label={CHAT_MESSAGES.suggestReplyButton}
                 onClick={onOpenAiSuggest}
               >
@@ -383,22 +543,26 @@ export function InboxChatComposer({
 
             <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm">
               <Textarea
+                ref={textareaRef}
                 value={draft}
                 onChange={(event) => onDraftChange(event.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={CHAT_MESSAGES.composerPlaceholder}
                 rows={1}
-                disabled={isBusy || !canSend}
+                disabled={isBusy || !canSend || isRecording}
                 className={cn(
-                  "max-h-32 min-h-[24px] flex-1 resize-none border-0 bg-transparent p-0 shadow-none",
+                  "min-h-[24px] flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 shadow-none",
                   "focus-visible:ring-0",
                 )}
+                style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
               />
               <Button
                 type="button"
                 size="icon"
                 className="size-10 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isBusy || !canSend || !draft.trim()}
+                disabled={
+                  isBusy || !canSend || !draft.trim() || isRecording || hasPendingAttachment
+                }
                 aria-label={CHAT_MESSAGES.sendLabel}
                 onClick={onSubmit}
               >

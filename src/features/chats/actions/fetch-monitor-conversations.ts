@@ -18,7 +18,9 @@ const fetchMonitorConversationsSchema = z.object({
     .enum(["whatsapp", "telegram", "instagram", "website_forms"])
     .optional(),
   search: z.string().max(200).optional(),
-  view: z.enum(["all", "needs_reply", "high_intent"]).default("all"),
+  view: z
+    .enum(["all", "needs_reply", "high_intent", "favorites"])
+    .default("all"),
   filter: z
     .enum(["all", "ai_handled", "needs_human", "active"])
     .default("all"),

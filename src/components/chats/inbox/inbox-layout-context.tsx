@@ -16,12 +16,16 @@ type InboxLayoutContextValue = {
   detailsOpen: boolean;
   setDetailsOpen: (open: boolean) => void;
   toggleDetails: () => void;
+  chatFullscreen: boolean;
+  setChatFullscreen: (open: boolean) => void;
+  toggleChatFullscreen: () => void;
 };
 
 const InboxLayoutContext = createContext<InboxLayoutContextValue | null>(null);
 
 export function InboxLayoutProvider({ children }: { children: ReactNode }) {
   const [detailsOpen, setDetailsOpenState] = useState(true);
+  const [chatFullscreen, setChatFullscreenState] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(INBOX_DETAILS_OPEN_STORAGE_KEY);
@@ -44,13 +48,31 @@ export function InboxLayoutProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setChatFullscreen = useCallback((open: boolean) => {
+    setChatFullscreenState(open);
+  }, []);
+
+  const toggleChatFullscreen = useCallback(() => {
+    setChatFullscreenState((current) => !current);
+  }, []);
+
   const value = useMemo(
     () => ({
       detailsOpen,
       setDetailsOpen,
       toggleDetails,
+      chatFullscreen,
+      setChatFullscreen,
+      toggleChatFullscreen,
     }),
-    [detailsOpen, setDetailsOpen, toggleDetails],
+    [
+      chatFullscreen,
+      detailsOpen,
+      setChatFullscreen,
+      setDetailsOpen,
+      toggleChatFullscreen,
+      toggleDetails,
+    ],
   );
 
   return (

@@ -23,7 +23,7 @@ import { filterConversations } from "@/utils/chat-inbox-filters";
 
 export const NEEDS_REPLY_SCAN_LIMIT = 500;
 
-export type InboxQuickView = "all" | "needs_reply" | "high_intent";
+export type InboxQuickView = "all" | "needs_reply" | "high_intent" | "favorites";
 
 export type ListConversationsPageInput = {
   channel?: DbMessagingChannel;
@@ -49,14 +49,18 @@ type RawConversationQueryRow = {
   last_read_at: string | null;
   contact:
     | {
+        id: string;
         name: string;
         phone_number: string;
         lead_score?: number | null;
+        is_favorite?: boolean | null;
       }
     | Array<{
+        id: string;
         name: string;
         phone_number: string;
         lead_score?: number | null;
+        is_favorite?: boolean | null;
       }>
     | null;
 };
@@ -141,6 +145,17 @@ async function findHighIntentContactIds(businessId: string): Promise<string[]> {
   return contacts?.map((contact) => contact.id) ?? [];
 }
 
+async function findFavoriteContactIds(businessId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("is_favorite", true);
+
+  return contacts?.map((contact) => contact.id) ?? [];
+}
+
 async function mapConversationRows(
   rows: RawConversationQueryRow[],
 ): Promise<ConversationListItem[]> {
@@ -205,7 +220,7 @@ async function fetchConversationRows(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, last_read_at, contact:contacts(name, phone_number, lead_score)",
+      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
       { count: "exact" },
     )
     .eq("business_id", businessId)
@@ -337,6 +352,12 @@ export async function listConversationsPage(
     if (!contactIds.length) {
       return { items: [], totalCount: 0, hasMore: false };
     }
+  } else if (view === "favorites") {
+    contactIds = await findFavoriteContactIds(businessId);
+
+    if (!contactIds.length) {
+      return { items: [], totalCount: 0, hasMore: false };
+    }
   }
 
   const { rows } = await fetchConversationRows(businessId, {
@@ -380,7 +401,7 @@ export async function getConversationListItem(
   const { data } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, last_read_at, contact:contacts(name, phone_number, lead_score)",
+      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)

@@ -20,8 +20,20 @@ type RawConversationRow = {
   updated_at: string;
   last_read_at?: string | null;
   contact:
-    | { id?: string; name: string; phone_number: string; lead_score?: number | null }
-    | Array<{ id?: string; name: string; phone_number: string; lead_score?: number | null }>
+    | {
+        id?: string;
+        name: string;
+        phone_number: string;
+        lead_score?: number | null;
+        is_favorite?: boolean | null;
+      }
+    | Array<{
+        id?: string;
+        name: string;
+        phone_number: string;
+        lead_score?: number | null;
+        is_favorite?: boolean | null;
+      }>
     | null;
 };
 
@@ -44,6 +56,7 @@ export function resolveContactFromRow(
   name?: string;
   phone_number: string;
   lead_score?: number | null;
+  is_favorite?: boolean | null;
 } | null {
   if (!contact) {
     return null;
@@ -128,8 +141,10 @@ export function mapConversationListItem(
 
   return withConversationUnread({
     id: row.id,
+    contactId: contact.id ?? "",
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    contactIsFavorite: contact.is_favorite ?? false,
     leadScore: contact.lead_score ?? null,
     channel: row.channel,
     status: row.status,

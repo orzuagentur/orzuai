@@ -95,6 +95,7 @@ export function ChatsChannelPanel({
     isLoadingConversation,
     appendMessage,
     isClientTyping,
+    refreshConversation,
   } = useInboxActiveConversation({
     initialConversationId,
     initialConversation: null,
@@ -203,6 +204,20 @@ export function ChatsChannelPanel({
   const unreadByChannel = useMemo(
     () => countUnreadByChannel(conversations),
     [conversations],
+  );
+
+  const handleContactFavoriteChange = useCallback(
+    (contactId: string, isFavorite: boolean) => {
+      setConversations((current) =>
+        current.map((item) =>
+          item.contactId === contactId
+            ? { ...item, contactIsFavorite: isFavorite }
+            : item,
+        ),
+      );
+      void refreshConversation(true);
+    },
+    [refreshConversation],
   );
 
   const handleConversationSelect = useCallback(
@@ -364,6 +379,7 @@ export function ChatsChannelPanel({
               handleConversationSelect(null);
               void refreshConversations();
             }}
+            onContactFavoriteChange={handleContactFavoriteChange}
           />
         </div>
       }

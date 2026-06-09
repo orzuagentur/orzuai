@@ -97,7 +97,7 @@ export async function listConversations(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, contact:contacts(name, phone_number, lead_score)",
+      "id, channel, status, updated_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -143,7 +143,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, internal_note, updated_at, contact:contacts(id, name, phone_number)",
+      "id, channel, status, internal_note, updated_at, contact:contacts(id, name, phone_number, is_favorite)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -170,6 +170,7 @@ export async function getConversationDetail(
   return {
     id: conversation.id,
     contactId: contact.id ?? null,
+    contactIsFavorite: contact.is_favorite ?? false,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
     channel: conversation.channel,
