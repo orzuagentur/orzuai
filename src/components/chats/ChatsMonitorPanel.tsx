@@ -15,7 +15,7 @@ import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
-import { InboxHeader } from "@/components/chats/inbox/InboxHeader";
+import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -156,6 +156,19 @@ export function ChatsMonitorPanel({
     initialNeedsAttention,
   ]);
 
+  useInboxChromeRegistration(
+    hasBusiness
+      ? {
+          searchQuery,
+          onSearchChange: setSearchQuery,
+          activeFilter,
+          onFilterChange: setActiveFilter,
+          aiChannel,
+          aiEnabled: activeAiEnabled,
+        }
+      : null,
+  );
+
   if (!hasBusiness) {
     return null;
   }
@@ -163,16 +176,6 @@ export function ChatsMonitorPanel({
   return (
     <InboxShell
       showChatOnMobile={showChatOnMobile}
-      header={
-        <InboxHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          aiChannel={aiChannel}
-          aiEnabled={activeAiEnabled}
-        />
-      }
       channelTabs={
         <InboxChannelTabs activeChannel="all" channelStats={channels} />
       }

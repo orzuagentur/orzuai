@@ -9,7 +9,7 @@ import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
-import { InboxHeader } from "@/components/chats/inbox/InboxHeader";
+import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +63,19 @@ export function ChatsChannelPanel({
     [activeFilter, conversations, searchQuery],
   );
 
+  useInboxChromeRegistration(
+    hasBusiness
+      ? {
+          searchQuery,
+          onSearchChange: setSearchQuery,
+          activeFilter,
+          onFilterChange: setActiveFilter,
+          aiChannel: channel,
+          aiEnabled,
+        }
+      : null,
+  );
+
   if (!hasBusiness) {
     return (
       <Card className="m-4 max-w-2xl shadow-none md:m-6">
@@ -85,16 +98,6 @@ export function ChatsChannelPanel({
   return (
     <InboxShell
       showChatOnMobile={showChatOnMobile}
-      header={
-        <InboxHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          aiChannel={channel}
-          aiEnabled={aiEnabled}
-        />
-      }
       channelTabs={
         <InboxChannelTabs activeChannel={channelId} channelStats={channelStats} />
       }

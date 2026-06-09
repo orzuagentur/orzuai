@@ -2,6 +2,7 @@
 
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
+import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -13,12 +14,14 @@ type DashboardShellProps = {
 
 export function DashboardShell({ userProfile, children }: DashboardShellProps) {
   return (
-    <SidebarProvider>
-      <AppSidebar userProfile={userProfile} />
-      <SidebarInset>
-        <DashboardHeader />
-        <div className="flex flex-1 flex-col">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <InboxChromeProvider>
+      <SidebarProvider>
+        <AppSidebar userProfile={userProfile} />
+        <SidebarInset>
+          <DashboardHeader />
+          <div className="flex flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </InboxChromeProvider>
   );
 }
