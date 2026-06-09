@@ -29,7 +29,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
 
     return (
       <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <UnifiedContactsPanel {...data} headerOnly />
+        <UnifiedContactsPanel {...data} />
         <ContactPipelineBoard {...pipeline} />
       </div>
     );

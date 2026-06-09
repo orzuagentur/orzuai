@@ -24,9 +24,7 @@ import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
 import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 
-type UnifiedContactsPanelProps = UnifiedContactsPageData & {
-  headerOnly?: boolean;
-};
+type UnifiedContactsPanelProps = UnifiedContactsPageData;
 
 function buildContactsHref(
   channel: string | null,
@@ -61,7 +59,6 @@ export function UnifiedContactsPanel({
   activeChannelFilter,
   activeSegment,
   activeView,
-  headerOnly = false,
 }: UnifiedContactsPanelProps) {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
@@ -79,15 +76,9 @@ export function UnifiedContactsPanel({
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-h1">{CONTACTS_MESSAGES.pageTitle}</h1>
-        <p className="text-body text-muted-foreground">
-          {CONTACTS_MESSAGES.pageDescription}
-        </p>
-        <p className="text-caption">
-          {CONTACTS_MESSAGES.contactsCount(total)}
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {CONTACTS_MESSAGES.contactsCount(total)}
+      </p>
 
       <div className="flex flex-wrap gap-2">
         <Link
@@ -163,7 +154,7 @@ export function UnifiedContactsPanel({
         })}
       </div>
 
-      {headerOnly ? null : contacts.length === 0 ? (
+      {contacts.length === 0 ? (
         <EmptyState
           variant="contacts"
           title={CONTACTS_MESSAGES.emptyTitle}
@@ -236,13 +227,11 @@ export function UnifiedContactsPanel({
         </ul>
       )}
 
-      {headerOnly ? null : (
-        <ContactProfileDrawer
-          contactId={selectedContactId}
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-        />
-      )}
+      <ContactProfileDrawer
+        contactId={selectedContactId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

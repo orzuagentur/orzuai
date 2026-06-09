@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRightIcon, StoreIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,16 +30,7 @@ export function IntegrationsMarketplace({
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <StoreIcon className="size-6" />
-            {INTEGRATIONS_MESSAGES.marketplaceTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {INTEGRATIONS_MESSAGES.marketplaceDescription}
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button variant="outline" asChild>
           <Link href={DASHBOARD_ROUTES.integrations}>
             {INTEGRATIONS_MESSAGES.backToIntegrations}

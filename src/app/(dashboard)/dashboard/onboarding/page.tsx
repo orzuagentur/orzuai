@@ -3,7 +3,6 @@ import { Suspense } from "react";
 
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { ONBOARDING_MESSAGES } from "@/features/onboarding/constants";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getChannelAiSettings } from "@/services/channel-workspace.service";
@@ -52,15 +51,6 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {ONBOARDING_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {ONBOARDING_MESSAGES.pageDescription}
-        </p>
-      </div>
-
       <Suspense fallback={<OnboardingWizardFallback />}>
         <OnboardingWizard
           step={step}

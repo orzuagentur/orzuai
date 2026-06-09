@@ -84,6 +84,12 @@ export const DASHBOARD_NAV_ITEMS = [
   icon: LucideIcon;
 }>;
 
+export const SETTINGS_MESSAGES = {
+  pageTitle: "Settings",
+  pageDescription:
+    "Manage your business profile, logo, contact information, and account.",
+} as const;
+
 export const OVERVIEW_MESSAGES = {
   title: "Home",
   description: "Monitor messages, AI performance, and activity across all channels.",

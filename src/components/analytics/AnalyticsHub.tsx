@@ -85,15 +85,6 @@ export function AnalyticsHub({ data }: AnalyticsHubProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {ANALYTICS_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {ANALYTICS_MESSAGES.pageDescription}
-        </p>
-      </div>
-
       <div className="flex min-h-[32rem] flex-1 flex-col lg:flex-row">
         <aside className="w-full shrink-0 border-b lg:w-56 lg:border-b-0 lg:border-r">
           <div className="border-b px-4 py-3">

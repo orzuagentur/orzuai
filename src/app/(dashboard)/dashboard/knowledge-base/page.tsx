@@ -43,15 +43,6 @@ export default async function KnowledgeBasePage({
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {KNOWLEDGE_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {KNOWLEDGE_MESSAGES.pageDescription}
-        </p>
-      </div>
-
       <WebsiteKnowledgeSection
         sync={websiteKnowledgeSync}
         hasBusiness={Boolean(business)}

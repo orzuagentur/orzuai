@@ -117,9 +117,6 @@ export async function ChannelWorkspacePage({
     return (
       <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
         <ChannelWorkspaceBanner channel={channel} />
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
-        </div>
         <ChannelContactsPanel data={data} />
       </div>
     );
@@ -135,12 +132,9 @@ export async function ChannelWorkspacePage({
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
       <ChannelWorkspaceBanner channel={channel} />
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          Status: {statuses[channel]?.status ?? "unknown"}
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Status: {statuses[channel]?.status ?? "unknown"}
+      </p>
       <ChannelAnalyticsPanel data={data} />
     </div>
   );

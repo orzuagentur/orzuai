@@ -11,7 +11,6 @@ import { RecentConversations } from "@/components/dashboard/RecentConversations"
 import { WhatsAppStatusCard } from "@/components/dashboard/WhatsAppStatusCard";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
-import { OVERVIEW_MESSAGES } from "@/features/dashboard/constants";
 import { getDashboardOverview } from "@/services/analytics.service";
 import { getUserDisplayName } from "@/utils/dashboard";
 import { getCurrentUser } from "@/services/auth.service";
@@ -45,14 +44,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {OVERVIEW_MESSAGES.title}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Welcome back, {displayName}. {OVERVIEW_MESSAGES.description}
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Welcome back, {displayName}.
+      </p>
 
       <PwaInstallBanner />
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2Icon, PlusIcon, WorkflowIcon } from "lucide-react";
+import { Loader2Icon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -81,16 +81,6 @@ export function AutomationsHub({ automations }: AutomationsHubProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <WorkflowIcon className="size-6" />
-          {AUTOMATIONS_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {AUTOMATIONS_MESSAGES.pageDescription}
-        </p>
-      </div>
-
       <Card className="shadow-none">
         <CardHeader>
           <CardTitle>{AUTOMATIONS_MESSAGES.templatesTitle}</CardTitle>

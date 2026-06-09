@@ -31,14 +31,9 @@ export function IntegrationsIndex({ channelStatuses }: IntegrationsIndexProps) {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {INTEGRATIONS_MESSAGES.pageTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {INTEGRATIONS_MESSAGES.indexDescription}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {INTEGRATIONS_MESSAGES.indexDescription}
+        </p>
         <Button variant="outline" asChild>
           <Link href={DASHBOARD_ROUTES.marketplace}>
             <StoreIcon className="size-4" />

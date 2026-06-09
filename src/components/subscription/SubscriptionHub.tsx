@@ -84,15 +84,6 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {SUBSCRIPTION_MESSAGES.pageTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {SUBSCRIPTION_MESSAGES.pageDescription}
-        </p>
-      </div>
-
       {!data.stripeConfigured ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
           {SUBSCRIPTION_MESSAGES.stripeMissing}
