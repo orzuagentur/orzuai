@@ -5,6 +5,9 @@ import type { TestChannelAiReplyInput } from "@/types/channel-workspace.types";
 
 export async function testChannelAiReplyAction(
   input: TestChannelAiReplyInput,
-): Promise<{ success: true; reply: string } | { success: false; message: string }> {
+): Promise<
+  | { success: true; reply: string; matchedAgentName: string | null }
+  | { success: false; message: string }
+> {
   return testChannelAiReply(input);
 }

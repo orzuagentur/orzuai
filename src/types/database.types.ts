@@ -883,6 +883,9 @@ export type Database = {
           channels: MessagingChannel[];
           trigger_keywords: string[];
           enabled: boolean;
+          provider: string;
+          model: string;
+          language: string;
           created_at: string;
           updated_at: string;
         };
@@ -894,6 +897,9 @@ export type Database = {
           channels?: MessagingChannel[];
           trigger_keywords?: string[];
           enabled?: boolean;
+          provider?: string;
+          model?: string;
+          language?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -905,6 +911,9 @@ export type Database = {
           channels?: MessagingChannel[];
           trigger_keywords?: string[];
           enabled?: boolean;
+          provider?: string;
+          model?: string;
+          language?: string;
           created_at?: string;
           updated_at?: string;
         };

@@ -1,17 +1,22 @@
-import type { CreateAiAgentInput } from "@/types/ai-agent.types";
+export type AiAgentTemplateDraft = {
+  name: string;
+  systemPrompt: string;
+  triggerKeywords: string[];
+  enabled?: boolean;
+};
 
 export const AI_AGENT_TEMPLATES: Array<{
   id: string;
   label: string;
   description: string;
-  draft: Omit<CreateAiAgentInput, "channels"> & { channels?: CreateAiAgentInput["channels"] };
+  draft: AiAgentTemplateDraft;
 }> = [
   {
     id: "sales",
     label: "Sales agent",
     description: "Qualify leads and suggest next steps.",
     draft: {
-      name: "Sales agent (BANT)",
+      name: "Sales agent",
       systemPrompt:
         "You are a BANT sales assistant. Assess Budget, Authority, Need, and Timeline from each message. Qualify leads, answer product questions using the knowledge base, and suggest booking a call when intent is high. Route pricing questions to a human when budget is unclear.",
       triggerKeywords: ["price", "buy", "demo", "cost", "budget", "decision"],
@@ -42,4 +47,18 @@ export const AI_AGENT_TEMPLATES: Array<{
       enabled: true,
     },
   },
+  {
+    id: "custom",
+    label: "Custom agent",
+    description: "Write your own instructions from scratch.",
+    draft: {
+      name: "Custom agent",
+      systemPrompt:
+        "You are a helpful business assistant. Answer customer questions clearly and professionally using the knowledge base. Escalate to a human when the request is complex or sensitive.",
+      triggerKeywords: [],
+      enabled: true,
+    },
+  },
 ] as const;
+
+export type AiAgentRoleId = (typeof AI_AGENT_TEMPLATES)[number]["id"];

@@ -1,8 +1,70 @@
 export const AI_ASSISTANT_MESSAGES = {
-  pageTitle: "AI Assistant",
+  pageTitle: "AI Agents",
+  pageSubtitle: "Build agents, automate replies, and route by keywords.",
   pageDescription:
-    "Configure automated replies per channel. Choose a model, language, and instructions for WhatsApp, Instagram, and Telegram.",
+    "Create AI agents with custom prompts and keyword routing. Configure channel defaults and automation rules.",
   channelsTitle: "Channels",
+  searchPlaceholder: "Search agents…",
+  tabAgents: "Agents",
+  tabAutomation: "Automation",
+  tabChannels: "Channels",
+  newAgent: "New agent",
+  marketplaceTitle: "Agent marketplace",
+  marketplaceDescription:
+    "Choose a template by category. SMS and messaging agents use OpenAI by default; voice scripts use OpenAI; sales uses Claude; support uses Gemini.",
+  marketplaceConfigure: "Configure",
+  marketplaceBackToAgents: "Back to agents",
+  setupAgentTitle: "Configure agent",
+  setupAgentDescription:
+    "Name your agent, confirm channels, and adjust the AI model before going live.",
+  setupAgentBack: "Back to marketplace",
+  setupAgentVoiceHint:
+    "Voice agents use AI Voice in Integrations for calls. This agent handles related chat routing and scripts.",
+  setupAgentConnectVoice: "Open AI Voice setup",
+  createAgentTitle: "Create AI agent",
+  createAgentDescription:
+    "Give your agent a name, choose a role, and select where it should work.",
+  agentRole: "Agent role",
+  agentRoleHint: "The role sets the starting instructions. You can edit them after creation.",
+  createAgentSubmit: "Create agent",
+  createAgentCancel: "Cancel",
+  creatingAgent: "Creating your agent…",
+  creatingAgentHint: "Setting up instructions and channel routing.",
+  agentCreatedBannerTitle: "Agent created",
+  agentCreatedBannerDescription:
+    "Fine-tune instructions, keywords, and routing below. Enable the agent when you are ready to go live.",
+  configureAgentTitle: "Agent settings",
+  enableAgent: "Enable",
+  disableAgent: "Disable",
+  agentViewSubtitle: "Saved configuration for this agent.",
+  agentSavedSettingsTitle: "Saved settings",
+  agentSavedSettingsHint: "These are the current values stored for this agent.",
+  agentStatus: "Status",
+  agentDefaultRouting: "Default routing (no keywords)",
+  aiProviderLabel: "AI provider",
+  aiProviderReady: "API key configured",
+  aiProvidersNone: "No AI providers configured. Add API keys to your environment.",
+  aiProvidersConfigured: (count: number) =>
+    count === 1
+      ? "1 provider ready. Choose which one powers this agent."
+      : `${count} providers ready. Choose which one powers this agent.`,
+  aiProviderMissingEnv: (envKey: string) => `Add ${envKey} to enable`,
+  aiModelLabel: "AI model",
+  aiLanguageLabel: "Reply language",
+  sectionAiModel: "AI model & language",
+  sectionAiModelHint: "Choose which AI powers this agent's replies.",
+  editAgent: "Edit",
+  editAgentTitle: "Edit agent",
+  editCancel: "Cancel",
+  deleteAgent: "Delete",
+  sectionInstructions: "Instructions",
+  sectionRouting: "Channels & routing",
+  selectAgent: "Select an agent from the list or create a new one.",
+  noAgents: "No agents yet. Create your first agent for this channel.",
+  noAgentsFiltered: "No agents match your search.",
+  agentEnabled: "Active",
+  agentDisabled: "Paused",
+  agentUpdated: "AI agent updated.",
   globalTitle: "Defaults for all channels",
   globalDescription:
     "Apply the same model, language, and instructions to WhatsApp, Instagram, and Telegram at once. You can still customize each channel afterward.",
@@ -11,18 +73,26 @@ export const AI_ASSISTANT_MESSAGES = {
   channelNotConnected:
     "This channel is not connected yet. AI settings are saved, but auto-replies start after you connect the channel in Integrations.",
   goToIntegrations: "Connect channel",
-  agentBuilderTitle: "Custom AI agents",
+  agentBuilderTitle: "Agent editor",
   agentBuilderDescription:
-    "Build agents with prompts, channel targets, and keyword triggers. Use templates to get started fast.",
+    "Agents override the channel default prompt when keywords match. Leave keywords empty to use an agent as the channel default.",
   agentName: "Agent name",
   agentPrompt: "System prompt",
   agentChannels: "Active channels",
   agentTriggers: "Trigger keywords (comma-separated)",
+  agentTriggersHint:
+    "Leave empty to use this agent as the default for selected channels.",
   agentCreate: "Create agent",
+  agentSave: "Save changes",
   agentSaved: "AI agent saved.",
   agentDeleted: "AI agent deleted.",
   saveFailed: "Unable to save agent. Please try again.",
   deleteFailed: "Unable to delete agent. Please try again.",
+  testMatchTitle: "Routing preview",
+  testMatchAgent: (name: string) => `Matched agent: ${name}`,
+  testMatchFallback: "No agent match — channel default prompt will be used.",
+  testMessage: "Sample customer message",
+  testRun: "Preview routing",
   usageTitle: "AI usage limits",
   usageDescription:
     "Monthly AI reply quota for your subscription plan. Resets on the first day of each month.",
@@ -44,5 +114,9 @@ export const AI_ASSISTANT_MESSAGES = {
   followUpAgentSaved: "Follow-up agent settings saved.",
   followUpAgentStats: (count: number) =>
     count === 1 ? "1 follow-up sent so far." : `${count} follow-ups sent so far.`,
+  automationIntro:
+    "Business-wide automation rules that run alongside your AI agents on every channel.",
+  channelsIntro:
+    "Channel defaults apply when no agent matches. Model and language are shared per channel.",
   save: "Save",
 } as const;

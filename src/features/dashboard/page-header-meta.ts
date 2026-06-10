@@ -48,7 +48,7 @@ export function getDashboardPageHeaderMeta(
   if (pathname === DASHBOARD_ROUTES.aiAssistant) {
     return {
       title: AI_ASSISTANT_MESSAGES.pageTitle,
-      description: AI_ASSISTANT_MESSAGES.pageDescription,
+      description: AI_ASSISTANT_MESSAGES.pageSubtitle,
     };
   }
 

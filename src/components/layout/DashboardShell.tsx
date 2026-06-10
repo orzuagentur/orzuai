@@ -3,6 +3,7 @@
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-context";
+import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -22,6 +23,7 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
     <PushNotificationsProvider>
       <InboxChromeProvider>
         <ContactsChromeProvider>
+          <AiAssistantChromeProvider>
           <SidebarProvider>
             <AppSidebar userProfile={userProfile} />
             <SidebarInset>
@@ -31,6 +33,7 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
               </div>
             </SidebarInset>
           </SidebarProvider>
+          </AiAssistantChromeProvider>
         </ContactsChromeProvider>
       </InboxChromeProvider>
     </PushNotificationsProvider>

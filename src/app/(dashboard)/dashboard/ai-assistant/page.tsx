@@ -1,16 +1,21 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { AiAssistantHub } from "@/components/ai-assistant/AiAssistantHub";
+import { AiAgentsHub } from "@/components/ai-assistant/AiAgentsHub";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { isMessagingIntegrationChannel } from "@/features/integrations";
-import type { IntegrationChannelId } from "@/features/integrations";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { getAiAssistantPageData } from "@/services/ai-assistant.service";
 
 type AiAssistantPageProps = {
-  searchParams: Promise<{ channel?: string }>;
+  searchParams: Promise<{
+    channel?: string;
+    tab?: string;
+    agent?: string;
+    pick?: string;
+    q?: string;
+    setup?: string;
+    edit?: string;
+  }>;
 };
 
 export default function AiAssistantPage({ searchParams }: AiAssistantPageProps) {
@@ -22,20 +27,17 @@ export default function AiAssistantPage({ searchParams }: AiAssistantPageProps) 
 }
 
 async function AiAssistantPageContent({ searchParams }: AiAssistantPageProps) {
-  const { channel } = await searchParams;
-
-  if (
-    channel &&
-    !isMessagingIntegrationChannel(channel as IntegrationChannelId)
-  ) {
-    redirect(`${DASHBOARD_ROUTES.aiAssistant}?channel=whatsapp`);
-  }
-
-  const data = await getAiAssistantPageData(channel ?? "whatsapp");
+  const params = await searchParams;
+  const data = await getAiAssistantPageData(params);
 
   if (!data.hasBusiness) {
-    return <DashboardSetupPrompt title="AI Assistant" />;
+    return (
+      <DashboardSetupPrompt
+        title={AI_ASSISTANT_MESSAGES.pageTitle}
+        description={AI_ASSISTANT_MESSAGES.pageDescription}
+      />
+    );
   }
 
-  return <AiAssistantHub data={data} />;
+  return <AiAgentsHub data={data} />;
 }

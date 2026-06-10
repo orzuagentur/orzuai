@@ -12,6 +12,8 @@ import type {
   TeamAnalyticsMetrics,
 } from "./dashboard.types";
 import type { AiAgentItem } from "./ai-agent.types";
+import type { AiAssistantTab } from "@/utils/ai-assistant-url";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
@@ -106,6 +108,15 @@ export type AiAssistantPageData = {
   providerAvailability: AiProviderAvailability;
   defaultModel: string;
   activeChannel: MessagingChannel;
+  activeChannelFilter: MessagingChannel | null;
+  activeTab: AiAssistantTab;
+  activeAgentId: string | null;
+  isNewAgent: boolean;
+  activeAgentPick: string | null;
+  searchQuery: string;
+  showSetupBanner: boolean;
+  isEditingAgent: boolean;
+  visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   channels: AiAssistantChannelEntry[];
   agents: AiAgentItem[];

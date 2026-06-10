@@ -9,6 +9,7 @@ import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
+import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -227,7 +228,40 @@ export async function processChannelAutoReply(input: {
     });
   }
 
-  const provider = (aiSettings.provider ?? "gemini") as AiProvider;
+  const { data: agentRows } = await admin
+    .from("ai_agents")
+    .select(
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, updated_at",
+    )
+    .eq("business_id", businessId)
+    .eq("enabled", true);
+
+  const matchedAgent = resolveAgentMatch({
+    agents: (agentRows ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      systemPrompt: row.system_prompt,
+      channels: row.channels ?? [],
+      triggerKeywords: row.trigger_keywords ?? [],
+      enabled: row.enabled,
+      provider: row.provider ?? undefined,
+      model: row.model ?? undefined,
+      language: row.language ?? undefined,
+      updatedAt: row.updated_at,
+    })),
+    channel,
+    message: clientMessage,
+  });
+
+  const systemPrompt =
+    matchedAgent?.systemPrompt ?? aiSettings.system_prompt;
+  const provider = (
+    matchedAgent?.provider ??
+    aiSettings.provider ??
+    "gemini"
+  ) as AiProvider;
+  const model = matchedAgent?.model ?? aiSettings.model;
+  const language = matchedAgent?.language ?? aiSettings.language;
 
   const { data: history } = await admin
     .from("messages")
@@ -245,9 +279,9 @@ export async function processChannelAutoReply(input: {
     businessId,
     conversationId,
     provider,
-    model: aiSettings.model,
-    systemPrompt: aiSettings.system_prompt,
-    language: aiSettings.language,
+    model,
+    systemPrompt,
+    language,
     userMessage: clientMessage,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       title: entry.title,

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import { hasSupabaseEnv } from "@/lib/env";
+import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -39,6 +39,9 @@ function mapAiAgent(row: {
   channels: MessagingChannel[] | null;
   trigger_keywords: string[] | null;
   enabled: boolean;
+  provider?: string | null;
+  model?: string | null;
+  language?: string | null;
   created_at: string;
   updated_at: string;
 }): AiAgentItem {
@@ -49,6 +52,9 @@ function mapAiAgent(row: {
     channels: row.channels ?? [],
     triggerKeywords: row.trigger_keywords ?? [],
     enabled: row.enabled,
+    provider: row.provider ?? "gemini",
+    model: row.model ?? getDefaultGeminiModel(),
+    language: row.language ?? "English",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -65,7 +71,7 @@ export async function listAiAgents(): Promise<AiAgentItem[]> {
   const { data } = await supabase
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, created_at, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, created_at, updated_at",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -98,19 +104,57 @@ export async function createAiAgent(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("ai_agents").insert({
-    business_id: businessId,
-    name: parsed.data.name,
-    system_prompt: parsed.data.systemPrompt,
-    channels: parsed.data.channels,
-    trigger_keywords: parsed.data.triggerKeywords,
-    enabled: parsed.data.enabled,
-  });
+  const { data: created, error } = await supabase
+    .from("ai_agents")
+    .insert({
+      business_id: businessId,
+      name: parsed.data.name,
+      system_prompt: parsed.data.systemPrompt,
+      channels: parsed.data.channels,
+      trigger_keywords: parsed.data.triggerKeywords,
+      enabled: parsed.data.enabled,
+      provider: parsed.data.provider,
+      model: parsed.data.model ?? getDefaultGeminiModel(),
+      language: parsed.data.language ?? "English",
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return {
       success: false,
       error: { code: "CREATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  revalidateAgentPaths();
+  return { success: true, id: created.id };
+}
+
+export async function toggleAiAgentEnabled(input: {
+  id: string;
+  enabled: boolean;
+}): Promise<AiAgentActionResult> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: AI_ASSISTANT_MESSAGES.saveFailed },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ai_agents")
+    .update({ enabled: input.enabled })
+    .eq("id", input.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "UPDATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
     };
   }
 
@@ -151,6 +195,9 @@ export async function updateAiAgent(
       channels: parsed.data.channels,
       trigger_keywords: parsed.data.triggerKeywords,
       enabled: parsed.data.enabled,
+      provider: parsed.data.provider,
+      model: parsed.data.model,
+      language: parsed.data.language,
     })
     .eq("id", parsed.data.id)
     .eq("business_id", businessId);

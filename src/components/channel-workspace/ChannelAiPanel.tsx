@@ -49,6 +49,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
   const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt);
   const [testMessage, setTestMessage] = useState("");
   const [testReply, setTestReply] = useState<string | null>(null);
+  const [matchedAgentName, setMatchedAgentName] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
 
@@ -109,6 +110,7 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
 
       if (result.success) {
         setTestReply(result.reply);
+        setMatchedAgentName(result.matchedAgentName ?? null);
         return;
       }
 
@@ -279,6 +281,15 @@ export function ChannelAiPanel({ data }: ChannelAiPanelProps) {
               CHANNEL_WORKSPACE_MESSAGES.aiTestButton
             )}
           </Button>
+          {matchedAgentName ? (
+            <p className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.testMatchAgent(matchedAgentName)}
+            </p>
+          ) : testReply ? (
+            <p className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.testMatchFallback}
+            </p>
+          ) : null}
           {testReply ? (
             <div className="rounded-lg border bg-muted/30 p-4 text-sm whitespace-pre-wrap">
               {testReply}

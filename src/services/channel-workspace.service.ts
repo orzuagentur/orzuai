@@ -45,6 +45,7 @@ import {
   saveChannelAiSettingsSchema,
   testChannelAiReplySchema,
 } from "@/types/channel-workspace.types";
+import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
 import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
@@ -435,7 +436,10 @@ export async function saveChannelAiSettings(
 
 export async function testChannelAiReply(
   input: TestChannelAiReplyInput,
-): Promise<{ success: true; reply: string } | { success: false; message: string }> {
+): Promise<
+  | { success: true; reply: string; matchedAgentName: string | null }
+  | { success: false; message: string }
+> {
   const parsed = testChannelAiReplySchema.safeParse(input);
 
   if (!parsed.success) {
@@ -463,7 +467,38 @@ export async function testChannelAiReply(
     return { success: false, message: "Save AI settings for this channel first." };
   }
 
-  const provider = resolveStoredProvider(settings.provider);
+  const admin = createAdminClient();
+  const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
+
+  const { data: agentRows } = await admin
+    .from("ai_agents")
+    .select(
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, updated_at",
+    )
+    .eq("business_id", businessId)
+    .eq("enabled", true);
+
+  const { agent, systemPrompt } = resolveAgentSystemPrompt({
+    agents: (agentRows ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      systemPrompt: row.system_prompt,
+      channels: row.channels ?? [],
+      triggerKeywords: row.trigger_keywords ?? [],
+      enabled: row.enabled,
+      provider: row.provider ?? undefined,
+      model: row.model ?? undefined,
+      language: row.language ?? undefined,
+      updatedAt: row.updated_at,
+    })),
+    channel: parsed.data.channel,
+    message: parsed.data.testMessage,
+    fallbackPrompt: settings.system_prompt,
+  });
+
+  const provider = resolveStoredProvider(
+    agent?.provider ?? settings.provider,
+  );
 
   if (!isProviderConfigured(provider)) {
     return {
@@ -472,15 +507,12 @@ export async function testChannelAiReply(
     };
   }
 
-  const admin = createAdminClient();
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
-
   const reply = await generateAssistantReply({
     businessId,
     provider,
-    model: settings.model,
-    systemPrompt: settings.system_prompt,
-    language: settings.language,
+    model: agent?.model ?? settings.model,
+    systemPrompt,
+    language: agent?.language ?? settings.language,
     userMessage: parsed.data.testMessage,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       title: entry.title,
@@ -494,7 +526,11 @@ export async function testChannelAiReply(
     return { success: false, message: reply.error.message };
   }
 
-  return { success: true, reply: reply.data.text };
+  return {
+    success: true,
+    reply: reply.data.text,
+    matchedAgentName: agent?.name ?? null,
+  };
 }
 
 export async function getChannelAnalytics(

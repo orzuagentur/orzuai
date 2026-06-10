@@ -1,13 +1,18 @@
 "use client";
 
+import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
+
 import { Label } from "@/components/ui/label";
 import {
+  AI_PROVIDERS,
   AI_PROVIDER_LABELS,
   getDefaultModelForProvider,
   getModelsForProvider,
   type AiProvider,
 } from "@/lib/ai/constants";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { CHANNEL_WORKSPACE_MESSAGES } from "@/features/channel-workspace";
+import { cn } from "@/lib/utils";
 
 type ProviderAvailability = Record<AiProvider, boolean>;
 
@@ -21,6 +26,12 @@ type AiModelProviderSelectProps = {
   idPrefix?: string;
 };
 
+const PROVIDER_HINTS: Record<AiProvider, string> = {
+  gemini: "GEMINI_API_KEY",
+  openai: "OPENAI_API_KEY",
+  claude: "ANTHROPIC_API_KEY",
+};
+
 export function AiModelProviderSelect({
   provider,
   model,
@@ -32,8 +43,15 @@ export function AiModelProviderSelect({
 }: AiModelProviderSelectProps) {
   const modelOptions = getModelsForProvider(provider);
   const selectedModel = modelOptions.find((option) => option.id === model);
+  const configuredCount = AI_PROVIDERS.filter(
+    (value) => providerAvailability[value],
+  ).length;
 
   function handleProviderChange(nextProvider: AiProvider) {
+    if (!providerAvailability[nextProvider]) {
+      return;
+    }
+
     onProviderChange(nextProvider);
     onModelChange(getDefaultModelForProvider(nextProvider));
   }
@@ -41,23 +59,51 @@ export function AiModelProviderSelect({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-provider`}>AI provider</Label>
-        <select
-          id={`${idPrefix}-provider`}
-          className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={provider}
-          onChange={(event) =>
-            handleProviderChange(event.target.value as AiProvider)
-          }
-          disabled={disabled}
-        >
-          {(Object.keys(AI_PROVIDER_LABELS) as AiProvider[]).map((value) => (
-            <option key={value} value={value} disabled={!providerAvailability[value]}>
-              {AI_PROVIDER_LABELS[value]}
-              {!providerAvailability[value] ? " (not configured)" : ""}
-            </option>
-          ))}
-        </select>
+        <Label>{AI_ASSISTANT_MESSAGES.aiProviderLabel}</Label>
+        <p className="text-caption text-muted-foreground">
+          {configuredCount > 0
+            ? AI_ASSISTANT_MESSAGES.aiProvidersConfigured(configuredCount)
+            : AI_ASSISTANT_MESSAGES.aiProvidersNone}
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {AI_PROVIDERS.map((value) => {
+            const isConfigured = providerAvailability[value];
+            const isSelected = provider === value;
+
+            return (
+              <button
+                key={value}
+                type="button"
+                disabled={disabled || !isConfigured}
+                onClick={() => handleProviderChange(value)}
+                className={cn(
+                  "rounded-lg border px-3 py-3 text-left transition-colors",
+                  isSelected && isConfigured
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                    : isConfigured
+                      ? "hover:bg-muted/50"
+                      : "cursor-not-allowed border-dashed opacity-60",
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium">{AI_PROVIDER_LABELS[value]}</p>
+                  {isConfigured ? (
+                    <CheckCircle2Icon className="size-4 shrink-0 text-emerald-500" />
+                  ) : (
+                    <XCircleIcon className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {isConfigured
+                    ? AI_ASSISTANT_MESSAGES.aiProviderReady
+                    : AI_ASSISTANT_MESSAGES.aiProviderMissingEnv(
+                        PROVIDER_HINTS[value],
+                      )}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="space-y-2">

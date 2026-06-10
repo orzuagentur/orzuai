@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   MESSAGING_INTEGRATION_CHANNELS,
-  isMessagingIntegrationChannel,
+  getActiveMessagingChannelIds,
 } from "@/features/integrations";
-import type { IntegrationChannelId } from "@/features/integrations";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
+import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { getAiUsageSummary } from "@/services/ai-usage.service";
@@ -48,16 +48,17 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-export async function getAiAssistantPageData(
-  activeChannelParam?: string | null,
-): Promise<AiAssistantPageData> {
+export async function getAiAssistantPageData(input?: {
+  channel?: string;
+  tab?: string;
+  agent?: string;
+  pick?: string;
+  q?: string;
+  setup?: string;
+  edit?: string;
+}): Promise<AiAssistantPageData> {
   const defaultModel = getDefaultGeminiModel();
-  const channelParam = activeChannelParam as IntegrationChannelId | undefined;
-  const activeChannel: MessagingChannel =
-    channelParam && isMessagingIntegrationChannel(channelParam)
-      ? channelParam
-      : "whatsapp";
-
+  const parsed = parseAiAssistantSearchParams(input ?? {});
   const businessId = await getOwnedBusinessId();
 
   if (!businessId || !hasSupabaseEnv()) {
@@ -66,7 +67,16 @@ export async function getAiAssistantPageData(
       geminiConfigured: hasGeminiEnv(),
       providerAvailability: getProviderAvailability(),
       defaultModel,
-      activeChannel,
+      activeChannel: "whatsapp",
+      activeChannelFilter: parsed.activeChannel,
+      activeTab: parsed.activeTab,
+      activeAgentId: parsed.activeAgentId,
+      isNewAgent: parsed.isNewAgent,
+      activeAgentPick: parsed.activeAgentPick,
+      searchQuery: parsed.searchQuery,
+      showSetupBanner: parsed.showSetupBanner,
+      isEditingAgent: parsed.isEditingAgent,
+      visibleChannelIds: [],
       channelStatuses: {},
       channels: [],
       agents: [],
@@ -92,6 +102,13 @@ export async function getAiAssistantPageData(
       getFollowUpAgentSettings(businessId),
     ]);
 
+  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
+  const activeChannel: MessagingChannel =
+    parsed.activeChannel &&
+    visibleChannelIds.includes(parsed.activeChannel)
+      ? parsed.activeChannel
+      : visibleChannelIds[0] ?? "whatsapp";
+
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => ({
       channel,
@@ -109,6 +126,15 @@ export async function getAiAssistantPageData(
     providerAvailability: getProviderAvailability(),
     defaultModel,
     activeChannel,
+    activeChannelFilter: parsed.activeChannel,
+    activeTab: parsed.activeTab,
+    activeAgentId: parsed.activeAgentId,
+    isNewAgent: parsed.isNewAgent,
+    activeAgentPick: parsed.activeAgentPick,
+    searchQuery: parsed.searchQuery,
+    showSetupBanner: parsed.showSetupBanner,
+    isEditingAgent: parsed.isEditingAgent,
+    visibleChannelIds,
     channelStatuses,
     channels,
     agents,
