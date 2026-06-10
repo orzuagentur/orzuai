@@ -108,12 +108,18 @@ export function ChatList({
       {conversations.map((conversation) => {
         const isActive = conversation.id === activeConversationId;
         const needsAttention = isConversationNeedsAttention(conversation);
-        const isUnread = conversation.isUnread;
+        const isUnread =
+          conversation.unreadMessageCount > 0 || conversation.isUnread;
+        const unreadCount = conversation.unreadMessageCount;
 
         const rowClassName = cn(
           "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
           isActive &&
             (isInboxVariant ? "bg-muted/80" : "bg-primary/5"),
+          isInboxVariant &&
+            isUnread &&
+            !isActive &&
+            "border-l-[3px] border-l-primary bg-primary/5",
           !isInboxVariant &&
             needsAttention &&
             "border-l-2 border-l-amber-500 bg-amber-500/5",
@@ -144,7 +150,14 @@ export function ChatList({
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-start justify-between gap-2">
-                <p className="truncate font-medium">{conversation.contactName}</p>
+                <p
+                  className={cn(
+                    "truncate",
+                    isUnread && isInboxVariant ? "font-semibold" : "font-medium",
+                  )}
+                >
+                  {conversation.contactName}
+                </p>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatRelativeTime(
                     conversation.lastMessageAt ?? conversation.updatedAt,
@@ -196,9 +209,11 @@ export function ChatList({
             </div>
             {isInboxVariant && isUnread ? (
               <span
-                className="size-2.5 shrink-0 rounded-full bg-primary"
-                aria-label={CHAT_MESSAGES.unreadMessage}
-              />
+                className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground"
+                aria-label={`${CHAT_MESSAGES.unreadMessage} (${unreadCount})`}
+              >
+                {unreadCount > 99 ? "99+" : Math.max(unreadCount, 1)}
+              </span>
             ) : !isInboxVariant ? (
               <Badge
                 variant="outline"

@@ -8,6 +8,7 @@ import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { resolveAgentIconId } from "@/features/ai-assistant/agent-icons";
 import type {
   AiAgentActionResult,
   AiAgentItem,
@@ -42,6 +43,8 @@ function mapAiAgent(row: {
   provider?: string | null;
   model?: string | null;
   language?: string | null;
+  communication_style?: string | null;
+  icon?: string | null;
   created_at: string;
   updated_at: string;
 }): AiAgentItem {
@@ -55,6 +58,8 @@ function mapAiAgent(row: {
     provider: row.provider ?? "gemini",
     model: row.model ?? getDefaultGeminiModel(),
     language: row.language ?? "English",
+    communicationStyle: row.communication_style ?? "professional",
+    icon: resolveAgentIconId(row.icon),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -71,7 +76,7 @@ export async function listAiAgents(): Promise<AiAgentItem[]> {
   const { data } = await supabase
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, created_at, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, icon, created_at, updated_at",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -116,6 +121,8 @@ export async function createAiAgent(
       provider: parsed.data.provider,
       model: parsed.data.model ?? getDefaultGeminiModel(),
       language: parsed.data.language ?? "English",
+      communication_style: parsed.data.communicationStyle,
+      icon: parsed.data.icon,
     })
     .select("id")
     .single();
@@ -198,6 +205,8 @@ export async function updateAiAgent(
       provider: parsed.data.provider,
       model: parsed.data.model,
       language: parsed.data.language,
+      communication_style: parsed.data.communicationStyle,
+      icon: parsed.data.icon,
     })
     .eq("id", parsed.data.id)
     .eq("business_id", businessId);

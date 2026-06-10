@@ -167,7 +167,11 @@ export function useInboxListRealtime({
         if (result.success) {
           const item =
             selectedConversationIdRef.current === result.data.id
-              ? { ...result.data, isUnread: false }
+              ? {
+                  ...result.data,
+                  isUnread: false,
+                  unreadMessageCount: 0,
+                }
               : result.data;
 
           onConversationsChangeRef.current((current) =>

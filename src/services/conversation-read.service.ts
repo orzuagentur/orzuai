@@ -3,8 +3,10 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
 import type { MessagingChannel } from "@/types/database.types";
-import { isConversationUnread } from "@/utils/conversation-unread";
-import { buildLastMessagePreviewMap } from "@/utils/chat";
+import {
+  buildUnreadClientMessageCountMap,
+} from "@/utils/chat";
+import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
 export async function markConversationRead(
   businessId: string,
@@ -68,34 +70,33 @@ export async function getDashboardNavBadgeCounts(
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  const lastMessageMap = buildLastMessagePreviewMap(messages ?? []);
+  const lastReadAtByConversationId = new Map(
+    rows.map((row) => [row.id, row.last_read_at]),
+  );
+  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
+    messages ?? [],
+    lastReadAtByConversationId,
+  );
   const unreadContactIds = new Set<string>();
-  let inboxUnread = 0;
 
   for (const row of rows) {
-    const lastMessage = lastMessageMap.get(row.id);
+    const unreadMessageCount =
+      unreadMessageCountByConversationId.get(row.id) ?? 0;
 
-    const unread = isConversationUnread({
-      lastMessageSenderType: lastMessage?.senderType ?? null,
-      lastMessageAt: lastMessage?.createdAt ?? null,
-      lastReadAt: row.last_read_at,
-      status: row.status,
-    });
-
-    if (!unread) {
+    if (unreadMessageCount <= 0) {
       continue;
     }
 
-    inboxUnread += 1;
     unreadContactIds.add(row.contact_id);
 
     if (row.channel in empty.unreadByChannel) {
-      empty.unreadByChannel[row.channel as MessagingChannel] += 1;
+      empty.unreadByChannel[row.channel as MessagingChannel] +=
+        unreadMessageCount;
     }
   }
 
   return {
-    inboxUnread,
+    inboxUnread: countChannelsWithUnread(empty.unreadByChannel),
     crmUnread: unreadContactIds.size,
     unreadByChannel: empty.unreadByChannel,
   };

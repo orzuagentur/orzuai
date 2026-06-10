@@ -95,6 +95,7 @@ export function ChatsMonitorPanel({
     cannedResponses: activeCannedResponses,
     isLoadingConversation,
     appendMessage,
+    removeMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
@@ -544,6 +545,7 @@ export function ChatsMonitorPanel({
               appendMessage(message);
               fetchConversations(0, false, true);
             }}
+            onMessageRemoved={removeMessage}
             onContactDeleted={() => {
               handleConversationSelect(null);
               fetchConversations(0, false, true);

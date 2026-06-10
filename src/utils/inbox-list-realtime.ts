@@ -46,8 +46,7 @@ function buildPreviewFromMessage(content: string): string {
 function resolveUnreadFromMessage(input: {
   conversationId: string;
   selectedConversationId: string | null;
-  senderType: MessageSenderType;
-  createdAt: string;
+  lastClientMessageAt: string | null;
   status: ConversationStatus;
   lastReadAt: string | null;
 }): boolean {
@@ -56,8 +55,7 @@ function resolveUnreadFromMessage(input: {
   }
 
   return isConversationUnread({
-    lastMessageSenderType: input.senderType,
-    lastMessageAt: input.createdAt,
+    lastClientMessageAt: input.lastClientMessageAt,
     lastReadAt: input.lastReadAt,
     status: input.status,
   });
@@ -92,6 +90,21 @@ export function applyRealtimeMessageToList(
     options.lastReadAtByConversationId?.[existing.id] ??
     (options.selectedConversationId === existing.id ? message.created_at : null);
 
+  const lastClientMessageAt =
+    message.sender_type === "client"
+      ? message.created_at
+      : existing.lastClientMessageAt;
+  const isSelected = existing.id === options.selectedConversationId;
+  const isNewUnreadClientMessage =
+    message.sender_type === "client" &&
+    (!lastReadAt ||
+      new Date(message.created_at).getTime() > new Date(lastReadAt).getTime());
+  const unreadMessageCount = isSelected
+    ? 0
+    : isNewUnreadClientMessage
+      ? existing.unreadMessageCount + 1
+      : existing.unreadMessageCount;
+
   const updatedItem: ConversationListItem = {
     ...existing,
     channel: message.channel,
@@ -99,15 +112,18 @@ export function applyRealtimeMessageToList(
     lastMessageAt: message.created_at,
     lastMessageSenderType: message.sender_type,
     lastMessageAiGenerated: message.ai_generated,
+    lastClientMessageAt,
+    unreadMessageCount,
     updatedAt: message.created_at,
-    isUnread: resolveUnreadFromMessage({
-      conversationId: existing.id,
-      selectedConversationId: options.selectedConversationId,
-      senderType: message.sender_type,
-      createdAt: message.created_at,
-      status: existing.status,
-      lastReadAt,
-    }),
+    isUnread:
+      unreadMessageCount > 0 ||
+      resolveUnreadFromMessage({
+        conversationId: existing.id,
+        selectedConversationId: options.selectedConversationId,
+        lastClientMessageAt,
+        status: existing.status,
+        lastReadAt,
+      }),
   };
 
   const rest = conversations.filter(
@@ -145,17 +161,46 @@ export function applyRealtimeConversationUpdate(
     channel: row.channel,
     status: row.status,
     updatedAt: row.updated_at,
-    isUnread:
-      existing.lastMessageSenderType && existing.lastMessageAt
-        ? resolveUnreadFromMessage({
-            conversationId: row.id,
-            selectedConversationId: options.selectedConversationId,
-            senderType: existing.lastMessageSenderType,
-            createdAt: existing.lastMessageAt,
-            status: row.status,
-            lastReadAt: row.last_read_at,
-          })
-        : false,
+    unreadMessageCount: (() => {
+      if (row.id === options.selectedConversationId) {
+        return 0;
+      }
+
+      if (
+        existing.lastClientMessageAt &&
+        row.last_read_at &&
+        new Date(row.last_read_at).getTime() >=
+          new Date(existing.lastClientMessageAt).getTime()
+      ) {
+        return 0;
+      }
+
+      return existing.unreadMessageCount;
+    })(),
+    isUnread: (() => {
+      if (row.id === options.selectedConversationId) {
+        return false;
+      }
+
+      const unreadMessageCount =
+        existing.lastClientMessageAt &&
+        row.last_read_at &&
+        new Date(row.last_read_at).getTime() >=
+          new Date(existing.lastClientMessageAt).getTime()
+          ? 0
+          : existing.unreadMessageCount;
+
+      return (
+        unreadMessageCount > 0 ||
+        resolveUnreadFromMessage({
+          conversationId: row.id,
+          selectedConversationId: options.selectedConversationId,
+          lastClientMessageAt: existing.lastClientMessageAt,
+          status: row.status,
+          lastReadAt: row.last_read_at,
+        })
+      );
+    })(),
   };
 
   const rest = conversations.filter((conversation) => conversation.id !== row.id);

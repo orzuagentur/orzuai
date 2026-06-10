@@ -10,6 +10,10 @@ type RawMessageRow = {
   sender_type: MessageSenderType;
   content: string;
   ai_generated: boolean;
+  deleted_for_all_at?: string | null;
+  hidden_for_business?: boolean;
+  edited_at?: string | null;
+  is_edited?: boolean;
   created_at: string;
 };
 
@@ -46,7 +50,15 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
     content: row.content,
     aiGenerated: row.ai_generated,
     createdAt: row.created_at,
+    deletedForAllAt: row.deleted_for_all_at ?? null,
+    hiddenForBusiness: row.hidden_for_business ?? false,
+    editedAt: row.edited_at ?? null,
+    isEdited: row.is_edited ?? false,
   };
+}
+
+export function isChatMessageDeletedForAll(message: ChatMessageData): boolean {
+  return Boolean(message.deletedForAllAt);
 }
 
 export function resolveContactFromRow(
@@ -69,6 +81,95 @@ export function resolveContactFromRow(
   return contact;
 }
 
+export function buildConversationMessageMaps(
+  messages: Array<{
+    conversation_id: string;
+    content: string;
+    created_at: string;
+    sender_type: MessageSenderType;
+    ai_generated: boolean;
+  }>,
+): {
+  lastMessageByConversationId: Map<
+    string,
+    {
+      preview: string;
+      createdAt: string;
+      senderType: MessageSenderType;
+      aiGenerated: boolean;
+    }
+  >;
+  lastClientMessageAtByConversationId: Map<string, string>;
+} {
+  const lastMessageByConversationId = new Map<
+    string,
+    {
+      preview: string;
+      createdAt: string;
+      senderType: MessageSenderType;
+      aiGenerated: boolean;
+    }
+  >();
+  const lastClientMessageAtByConversationId = new Map<string, string>();
+
+  for (const message of messages) {
+    if (!lastMessageByConversationId.has(message.conversation_id)) {
+      lastMessageByConversationId.set(message.conversation_id, {
+        preview: truncatePreview(getMessagePreviewText(message.content)),
+        createdAt: message.created_at,
+        senderType: message.sender_type,
+        aiGenerated: message.ai_generated,
+      });
+    }
+
+    if (
+      message.sender_type === "client" &&
+      !lastClientMessageAtByConversationId.has(message.conversation_id)
+    ) {
+      lastClientMessageAtByConversationId.set(
+        message.conversation_id,
+        message.created_at,
+      );
+    }
+  }
+
+  return { lastMessageByConversationId, lastClientMessageAtByConversationId };
+}
+
+export function buildUnreadClientMessageCountMap(
+  messages: Array<{
+    conversation_id: string;
+    created_at: string;
+    sender_type: MessageSenderType;
+  }>,
+  lastReadAtByConversationId: Map<string, string | null>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const message of messages) {
+    if (message.sender_type !== "client") {
+      continue;
+    }
+
+    const lastReadAt =
+      lastReadAtByConversationId.get(message.conversation_id) ?? null;
+    const isUnread =
+      !lastReadAt ||
+      new Date(message.created_at).getTime() > new Date(lastReadAt).getTime();
+
+    if (!isUnread) {
+      continue;
+    }
+
+    counts.set(
+      message.conversation_id,
+      (counts.get(message.conversation_id) ?? 0) + 1,
+    );
+  }
+
+  return counts;
+}
+
 export function buildLastMessagePreviewMap(
   messages: Array<{
     conversation_id: string;
@@ -86,30 +187,7 @@ export function buildLastMessagePreviewMap(
     aiGenerated: boolean;
   }
 > {
-  const map = new Map<
-    string,
-    {
-      preview: string;
-      createdAt: string;
-      senderType: MessageSenderType;
-      aiGenerated: boolean;
-    }
-  >();
-
-  for (const message of messages) {
-    if (map.has(message.conversation_id)) {
-      continue;
-    }
-
-    map.set(message.conversation_id, {
-      preview: truncatePreview(getMessagePreviewText(message.content)),
-      createdAt: message.created_at,
-      senderType: message.sender_type,
-      aiGenerated: message.ai_generated,
-    });
-  }
-
-  return map;
+  return buildConversationMessageMaps(messages).lastMessageByConversationId;
 }
 
 function truncatePreview(content: string, maxLength = 80): string {
@@ -132,6 +210,8 @@ export function mapConversationListItem(
         aiGenerated: boolean;
       }
     | undefined,
+  lastClientMessageAt?: string | null,
+  unreadMessageCount = 0,
 ): ConversationListItem | null {
   const contact = resolveContactFromRow(row.contact);
 
@@ -153,6 +233,8 @@ export function mapConversationListItem(
     lastMessageAt: lastMessage?.createdAt ?? null,
     lastMessageSenderType: lastMessage?.senderType ?? null,
     lastMessageAiGenerated: lastMessage?.aiGenerated ?? false,
+    lastClientMessageAt: lastClientMessageAt ?? null,
+    unreadMessageCount,
     lastReadAt: row.last_read_at ?? null,
   });
 }

@@ -110,6 +110,19 @@ export function useInboxActiveConversation({
     });
   }, []);
 
+  const removeMessage = useCallback((messageId: string) => {
+    setConversation((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        messages: current.messages.filter((item) => item.id !== messageId),
+      };
+    });
+  }, []);
+
   const appendMessageRef = useRef(appendMessage);
   appendMessageRef.current = appendMessage;
 
@@ -177,6 +190,7 @@ export function useInboxActiveConversation({
     isLoadingConversation,
     refreshConversation,
     appendMessage,
+    removeMessage,
     isClientTyping,
   };
 }

@@ -1,9 +1,10 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { isAgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
 import type { MessagingChannel } from "@/types/database.types";
 
-export const AI_ASSISTANT_TABS = ["agents", "automation", "channels"] as const;
+export const AI_ASSISTANT_TABS = ["agents"] as const;
 
 export type AiAssistantTab = (typeof AI_ASSISTANT_TABS)[number];
 
@@ -11,10 +12,12 @@ export type AiAssistantUrlState = {
   channel?: MessagingChannel | null;
   tab?: AiAssistantTab;
   agent?: string | null;
-  pick?: string | null;
+  step?: 1 | 2 | 3 | null;
+  goal?: string | null;
   q?: string | null;
   setup?: boolean;
   edit?: boolean;
+  analytics?: boolean;
 };
 
 export function isAiAssistantTab(value: string): value is AiAssistantTab {
@@ -48,8 +51,12 @@ export function buildAiAssistantHref(state: AiAssistantUrlState = {}): string {
     params.set("agent", state.agent);
   }
 
-  if (state.pick?.trim()) {
-    params.set("pick", state.pick.trim());
+  if (state.step && state.step !== 1) {
+    params.set("step", String(state.step));
+  }
+
+  if (state.goal?.trim()) {
+    params.set("goal", state.goal.trim());
   }
 
   if (state.q?.trim()) {
@@ -64,6 +71,10 @@ export function buildAiAssistantHref(state: AiAssistantUrlState = {}): string {
     params.set("edit", "1");
   }
 
+  if (state.analytics) {
+    params.set("analytics", "1");
+  }
+
   const query = params.toString();
 
   return query
@@ -71,21 +82,42 @@ export function buildAiAssistantHref(state: AiAssistantUrlState = {}): string {
     : DASHBOARD_ROUTES.aiAssistant;
 }
 
+function parseCreateWizardStep(
+  value: string | undefined,
+  isNewAgent: boolean,
+): 1 | 2 | 3 {
+  if (!isNewAgent) {
+    return 1;
+  }
+
+  const parsed = Number(value);
+
+  if (parsed === 2 || parsed === 3) {
+    return parsed;
+  }
+
+  return 1;
+}
+
 export function parseAiAssistantSearchParams(input: {
   channel?: string;
   tab?: string;
   agent?: string;
-  pick?: string;
+  step?: string;
+  goal?: string;
   q?: string;
   setup?: string;
   edit?: string;
+  analytics?: string;
 }): {
   activeChannel: MessagingChannel | null;
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
-  activeAgentPick: string | null;
+  createWizardStep: 1 | 2 | 3;
+  createWizardGoal: string | null;
   isEditingAgent: boolean;
+  isViewingAnalytics: boolean;
   searchQuery: string;
   showSetupBanner: boolean;
 } {
@@ -94,17 +126,25 @@ export function parseAiAssistantSearchParams(input: {
   const isNewAgent = input.agent === "new";
   const activeAgentId =
     input.agent && input.agent !== "new" ? input.agent : null;
-  const activeAgentPick =
-    isNewAgent && input.pick?.trim() ? input.pick.trim() : null;
+  let createWizardStep = parseCreateWizardStep(input.step, isNewAgent);
+  const rawGoal = isNewAgent && input.goal?.trim() ? input.goal.trim() : null;
+  const createWizardGoal =
+    rawGoal && isAgentWizardGoalId(rawGoal) ? rawGoal : null;
+
+  if (createWizardStep > 1 && !createWizardGoal) {
+    createWizardStep = 1;
+  }
 
   return {
     activeChannel: parseMessagingChannel(input.channel),
     activeTab,
     activeAgentId,
     isNewAgent,
-    activeAgentPick,
+    createWizardStep,
+    createWizardGoal,
     searchQuery: input.q?.trim() ?? "",
     showSetupBanner: input.setup === "1",
-    isEditingAgent: input.edit === "1",
+    isEditingAgent: input.edit === "1" && input.analytics !== "1",
+    isViewingAnalytics: input.analytics === "1",
   };
 }

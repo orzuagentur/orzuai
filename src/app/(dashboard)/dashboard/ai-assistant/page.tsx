@@ -11,10 +11,12 @@ type AiAssistantPageProps = {
     channel?: string;
     tab?: string;
     agent?: string;
-    pick?: string;
+    step?: string;
+    goal?: string;
     q?: string;
     setup?: string;
     edit?: string;
+    analytics?: string;
   }>;
 };
 

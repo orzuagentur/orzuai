@@ -3,13 +3,13 @@
 import { FollowUpAgentPanel } from "@/components/ai-assistant/FollowUpAgentPanel";
 import { AiUsageLimitsPanel } from "@/components/ai-assistant/AiUsageLimitsPanel";
 import { SalesAgentPanel } from "@/components/ai-assistant/SalesAgentPanel";
-import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import type { AiAssistantPageData } from "@/types/channel-workspace.types";
+import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
+import type { AutomationsPageData } from "@/types/automations.types";
 
 type AiAutomationPanelProps = {
-  usage: AiAssistantPageData["usage"];
-  salesAgent: AiAssistantPageData["salesAgent"];
-  followUpAgent: AiAssistantPageData["followUpAgent"];
+  usage: AutomationsPageData["usage"];
+  salesAgent: AutomationsPageData["salesAgent"];
+  followUpAgent: AutomationsPageData["followUpAgent"];
 };
 
 export function AiAutomationPanel({
@@ -18,10 +18,15 @@ export function AiAutomationPanel({
   followUpAgent,
 }: AiAutomationPanelProps) {
   return (
-    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
-      <p className="text-sm text-muted-foreground">
-        {AI_ASSISTANT_MESSAGES.automationIntro}
-      </p>
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {AUTOMATIONS_MESSAGES.aiRulesTitle}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {AUTOMATIONS_MESSAGES.aiRulesIntro}
+        </p>
+      </div>
 
       <AiUsageLimitsPanel usage={usage} />
       <SalesAgentPanel settings={salesAgent} />

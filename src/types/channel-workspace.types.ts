@@ -14,8 +14,7 @@ import type {
 import type { AiAgentItem } from "./ai-agent.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
-import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
-import type { AiCostMetrics, AiUsageSummary, SalesAgentSettings } from "./ai-usage.types";
+import type { AiCostMetrics } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 
 export type { MessagingChannel };
@@ -112,17 +111,16 @@ export type AiAssistantPageData = {
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
-  activeAgentPick: string | null;
+  createWizardStep: 1 | 2 | 3;
+  createWizardGoal: string | null;
   searchQuery: string;
   showSetupBanner: boolean;
   isEditingAgent: boolean;
+  isViewingAnalytics: boolean;
   visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   channels: AiAssistantChannelEntry[];
   agents: AiAgentItem[];
-  usage: AiUsageSummary | null;
-  salesAgent: SalesAgentSettings;
-  followUpAgent: FollowUpAgentSettings;
 };
 
 export type ChannelAnalyticsActivityPoint = {

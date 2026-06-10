@@ -1,3 +1,4 @@
+import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import type { MessagingChannel } from "@/types/database.types";
 
 export type RoutableAiAgent = {
@@ -10,6 +11,7 @@ export type RoutableAiAgent = {
   provider?: string;
   model?: string;
   language?: string;
+  communicationStyle?: string;
   updatedAt?: string;
 };
 
@@ -109,6 +111,11 @@ export function resolveAgentSystemPrompt(input: {
 
   return {
     agent,
-    systemPrompt: agent?.systemPrompt ?? input.fallbackPrompt,
+    systemPrompt: agent
+      ? buildEffectiveAgentPrompt({
+          systemPrompt: agent.systemPrompt,
+          communicationStyle: agent.communicationStyle,
+        })
+      : input.fallbackPrompt,
   };
 }

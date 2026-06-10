@@ -11,10 +11,7 @@ import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-
 import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
-import { getAiUsageSummary } from "@/services/ai-usage.service";
 import { getProviderAvailability } from "@/services/llm.service";
-import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
-import { getSalesAgentSettings } from "@/services/sales-agent.service";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -52,10 +49,12 @@ export async function getAiAssistantPageData(input?: {
   channel?: string;
   tab?: string;
   agent?: string;
-  pick?: string;
+  step?: string;
+  goal?: string;
   q?: string;
   setup?: string;
   edit?: string;
+  analytics?: string;
 }): Promise<AiAssistantPageData> {
   const defaultModel = getDefaultGeminiModel();
   const parsed = parseAiAssistantSearchParams(input ?? {});
@@ -72,35 +71,23 @@ export async function getAiAssistantPageData(input?: {
       activeTab: parsed.activeTab,
       activeAgentId: parsed.activeAgentId,
       isNewAgent: parsed.isNewAgent,
-      activeAgentPick: parsed.activeAgentPick,
+      createWizardStep: parsed.createWizardStep,
+      createWizardGoal: parsed.createWizardGoal,
       searchQuery: parsed.searchQuery,
       showSetupBanner: parsed.showSetupBanner,
       isEditingAgent: parsed.isEditingAgent,
+      isViewingAnalytics: parsed.isViewingAnalytics,
       visibleChannelIds: [],
       channelStatuses: {},
       channels: [],
       agents: [],
-      usage: null,
-      salesAgent: {
-        salesAgentEnabled: false,
-        bantThreshold: 70,
-        autoQualifyPipeline: true,
-        autoTaskEnabled: false,
-        autoTaskThreshold: 75,
-        sentimentAnalysisEnabled: true,
-      },
-      followUpAgent: { enabled: true, sentCount: 0 },
     };
   }
 
-  const [channelStatuses, agents, usage, salesAgent, followUpAgent] =
-    await Promise.all([
-      getChannelConnectionStatuses(businessId),
-      listAiAgents(),
-      getAiUsageSummary(),
-      getSalesAgentSettings(businessId),
-      getFollowUpAgentSettings(businessId),
-    ]);
+  const [channelStatuses, agents] = await Promise.all([
+    getChannelConnectionStatuses(businessId),
+    listAiAgents(),
+  ]);
 
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const activeChannel: MessagingChannel =
@@ -130,17 +117,16 @@ export async function getAiAssistantPageData(input?: {
     activeTab: parsed.activeTab,
     activeAgentId: parsed.activeAgentId,
     isNewAgent: parsed.isNewAgent,
-    activeAgentPick: parsed.activeAgentPick,
+    createWizardStep: parsed.createWizardStep,
+    createWizardGoal: parsed.createWizardGoal,
     searchQuery: parsed.searchQuery,
     showSetupBanner: parsed.showSetupBanner,
     isEditingAgent: parsed.isEditingAgent,
+    isViewingAnalytics: parsed.isViewingAnalytics,
     visibleChannelIds,
     channelStatuses,
     channels,
     agents,
-    usage,
-    salesAgent,
-    followUpAgent,
   };
 }
 

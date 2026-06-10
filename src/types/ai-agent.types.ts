@@ -1,7 +1,20 @@
 import { z } from "zod";
 
+import {
+  AGENT_ICON_IDS,
+  DEFAULT_AGENT_ICON,
+  type AgentIconId,
+} from "@/features/ai-assistant/agent-icons";
+import type { CommunicationStyleId } from "@/features/ai-assistant/communication-styles";
 import { AI_PROVIDERS } from "@/lib/ai/constants";
 import type { MessagingChannel } from "./database.types";
+
+const communicationStyleSchema = z.enum([
+  "professional",
+  "friendly",
+  "concise",
+  "empathetic",
+] satisfies [CommunicationStyleId, ...CommunicationStyleId[]]);
 
 const messagingChannelSchema = z.enum([
   "whatsapp",
@@ -23,6 +36,8 @@ export const createAiAgentSchema = z.object({
   provider: z.enum(AI_PROVIDERS).default("gemini"),
   model: z.string().trim().min(1).max(100),
   language: z.string().trim().min(1).max(32),
+  communicationStyle: communicationStyleSchema.default("professional"),
+  icon: z.enum(AGENT_ICON_IDS).default(DEFAULT_AGENT_ICON),
 });
 
 export const updateAiAgentSchema = createAiAgentSchema.extend({
@@ -47,8 +62,40 @@ export type AiAgentItem = {
   provider: string;
   model: string;
   language: string;
+  communicationStyle: string;
+  icon: AgentIconId;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AiAgentChannelAnalytics = {
+  channel: MessagingChannel;
+  contactsServed: number;
+  aiReplies: number;
+  conversationsHandled: number;
+};
+
+export type AiAgentDailyReplyPoint = {
+  date: string;
+  count: number;
+};
+
+export type AiAgentAnalytics = {
+  agentId: string;
+  contactsServed: number;
+  conversationsHandled: number;
+  totalAiReplies: number;
+  aiRepliesLast7Days: number;
+  aiRepliesLast30Days: number;
+  clientMessagesInHandledConversations: number;
+  humanRepliesAfterAgent: number;
+  avgRepliesPerContact: number;
+  avgRepliesPerConversation: number;
+  lastReplyAt: string | null;
+  firstReplyAt: string | null;
+  trackingSince: string | null;
+  channelBreakdown: AiAgentChannelAnalytics[];
+  dailyReplies: AiAgentDailyReplyPoint[];
 };
 
 export type AiAgentActionResult =

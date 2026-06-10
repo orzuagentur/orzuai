@@ -7,6 +7,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
 import { useDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
+import { countChannelsWithUnread } from "@/utils/conversation-unread";
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +35,7 @@ function getNavBadgeCount(
   counts: ReturnType<typeof useDashboardNavBadges>["counts"],
 ): number {
   if (itemId === "chats") {
-    return counts.inboxUnread;
+    return countChannelsWithUnread(counts.unreadByChannel);
   }
 
   if (itemId === "contacts") {

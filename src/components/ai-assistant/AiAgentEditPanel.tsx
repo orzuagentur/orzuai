@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AgentConnectedChannelSelect } from "@/components/ai-assistant/AgentConnectedChannelSelect";
+import { AiAgentIconPicker } from "@/components/ai-assistant/AiAgentIconPicker";
+import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import { AiModelProviderSelect } from "@/components/ai-assistant/AiModelProviderSelect";
 import { AgentPowerToggle } from "@/components/ai-assistant/AgentPowerToggle";
 import { Button } from "@/components/ui/button";
@@ -13,9 +16,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toggleAiAgentEnabledAction } from "@/features/ai-assistant/actions/toggle-ai-agent-enabled";
 import { updateAiAgentAction } from "@/features/ai-assistant/actions/update-ai-agent";
+import { filterAgentChannelsToConnected } from "@/features/ai-assistant/connected-channels";
+import {
+  resolveAgentIconId,
+  type AgentIconId,
+} from "@/features/ai-assistant/agent-icons";
+import {
+  DEFAULT_COMMUNICATION_STYLE,
+  isCommunicationStyleId,
+  type CommunicationStyleId,
+} from "@/features/ai-assistant/communication-styles";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
-import { getChannelLabel } from "@/features/channel-workspace";
+import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import {
   resolveAiModel,
   type AiProvider,
@@ -36,6 +48,8 @@ type DraftState = {
   provider: AiProvider;
   model: string;
   language: string;
+  communicationStyle: CommunicationStyleId;
+  icon: AgentIconId;
 };
 
 type AiAgentEditPanelProps = {
@@ -44,23 +58,38 @@ type AiAgentEditPanelProps = {
   activeChannelFilter: MessagingChannel | null;
   searchQuery: string;
   allAgents: AiAgentItem[];
+  visibleChannelIds: MessagingChannel[];
+  channelStatuses: IntegrationChannelStatusMap;
   providerAvailability: AiProviderAvailability;
   onCancel: () => void;
   onBack?: () => void;
 };
 
-function buildDraft(agent: AiAgentItem): DraftState {
+function buildDraft(
+  agent: AiAgentItem,
+  channelStatuses: IntegrationChannelStatusMap,
+  visibleChannelIds: MessagingChannel[],
+): DraftState {
   const provider = (agent.provider as AiProvider) ?? "gemini";
+  const communicationStyle = isCommunicationStyleId(agent.communicationStyle)
+    ? agent.communicationStyle
+    : DEFAULT_COMMUNICATION_STYLE;
 
   return {
     name: agent.name,
     systemPrompt: agent.systemPrompt,
-    channels: agent.channels,
+    channels: filterAgentChannelsToConnected(
+      agent.channels,
+      channelStatuses,
+      visibleChannelIds,
+    ),
     triggerKeywords: agent.triggerKeywords.join(", "),
     enabled: agent.enabled,
     provider,
     model: resolveAiModel(provider, agent.model),
     language: agent.language,
+    communicationStyle,
+    icon: resolveAgentIconId(agent.icon),
   };
 }
 
@@ -70,19 +99,23 @@ export function AiAgentEditPanel({
   activeChannelFilter,
   searchQuery,
   allAgents,
+  visibleChannelIds,
+  channelStatuses,
   providerAvailability,
   onCancel,
   onBack,
 }: AiAgentEditPanelProps) {
   const router = useRouter();
-  const [draft, setDraft] = useState<DraftState>(() => buildDraft(agent));
+  const [draft, setDraft] = useState<DraftState>(() =>
+    buildDraft(agent, channelStatuses, visibleChannelIds),
+  );
   const [testMessage, setTestMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
-    setDraft(buildDraft(agent));
-  }, [agent]);
+    setDraft(buildDraft(agent, channelStatuses, visibleChannelIds));
+  }, [agent, channelStatuses, visibleChannelIds]);
 
   const previewChannel = activeChannelFilter ?? activeChannel;
   const previewAgent = useMemo(() => {
@@ -101,6 +134,8 @@ export function AiAgentEditPanel({
       provider: draft.provider,
       model: draft.model,
       language: draft.language,
+      communicationStyle: draft.communicationStyle,
+      icon: draft.icon,
     };
 
     const others = allAgents.filter((item) => item.id !== agent.id);
@@ -163,6 +198,8 @@ export function AiAgentEditPanel({
         provider: draft.provider,
         model: draft.model,
         language: draft.language,
+        communicationStyle: draft.communicationStyle,
+        icon: draft.icon,
       });
 
       if (!result.success) {
@@ -276,6 +313,12 @@ export function AiAgentEditPanel({
             />
           </div>
 
+          <AiAgentIconPicker
+            value={draft.icon}
+            disabled={isSaving}
+            onChange={(icon) => setDraft((value) => ({ ...value, icon }))}
+          />
+
           <div className="space-y-2">
             <Label htmlFor={`agent-${agent.id}-prompt`}>
               {AI_ASSISTANT_MESSAGES.agentPrompt}
@@ -300,24 +343,24 @@ export function AiAgentEditPanel({
             {AI_ASSISTANT_MESSAGES.sectionRouting}
           </h3>
 
-          <div className="space-y-2">
-            <Label>{AI_ASSISTANT_MESSAGES.agentChannels}</Label>
-            <div className="flex flex-wrap gap-2">
-              {MESSAGING_INTEGRATION_CHANNELS.map((channel) => (
-                <Button
-                  key={channel}
-                  type="button"
-                  size="sm"
-                  variant={
-                    draft.channels.includes(channel) ? "default" : "outline"
-                  }
-                  onClick={() => toggleChannel(channel)}
-                >
-                  {getChannelLabel(channel)}
-                </Button>
-              ))}
-            </div>
-          </div>
+          <AiCommunicationStyleSelect
+            value={draft.communicationStyle}
+            disabled={isSaving}
+            onChange={(value) =>
+              setDraft((current) => ({
+                ...current,
+                communicationStyle: value,
+              }))
+            }
+          />
+
+          <AgentConnectedChannelSelect
+            selectedChannels={draft.channels}
+            visibleChannelIds={visibleChannelIds}
+            channelStatuses={channelStatuses}
+            disabled={isSaving}
+            onToggle={toggleChannel}
+          />
 
           <div className="space-y-2">
             <Label htmlFor={`agent-${agent.id}-triggers`}>

@@ -51,7 +51,8 @@ import type {
   UpdateConversationStatusInput,
 } from "@/types/chat.types";
 import {
-  buildLastMessagePreviewMap,
+  buildConversationMessageMaps,
+  buildUnreadClientMessageCountMap,
   mapChatMessage,
   mapConversationListItem,
   resolveContactFromRow,
@@ -101,7 +102,7 @@ export async function listConversations(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
+      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -123,12 +124,25 @@ export async function listConversations(
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  const lastMessageMap = buildLastMessagePreviewMap(messages ?? []);
+  const { lastMessageByConversationId, lastClientMessageAtByConversationId } =
+    buildConversationMessageMaps(messages ?? []);
+  const lastReadAtByConversationId = new Map(
+    conversations.map((conversation) => [
+      conversation.id,
+      conversation.last_read_at ?? null,
+    ]),
+  );
+  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
+    messages ?? [],
+    lastReadAtByConversationId,
+  );
 
   return conversations.flatMap((conversation) => {
     const item = mapConversationListItem(
       conversation,
-      lastMessageMap.get(conversation.id),
+      lastMessageByConversationId.get(conversation.id),
+      lastClientMessageAtByConversationId.get(conversation.id) ?? null,
+      unreadMessageCountByConversationId.get(conversation.id) ?? 0,
     );
 
     return item ? [item] : [];
@@ -147,7 +161,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, internal_note, updated_at, contact:contacts(id, name, phone_number, is_favorite)",
+      "id, channel, status, internal_note, updated_at, last_read_at, contact:contacts(id, name, phone_number, is_favorite)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -166,9 +180,10 @@ export async function getConversationDetail(
   const { data: messages } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
     )
     .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false)
     .order("created_at", { ascending: true });
 
   return {
@@ -181,6 +196,7 @@ export async function getConversationDetail(
     status: conversation.status,
     internalNote: conversation.internal_note,
     updatedAt: conversation.updated_at,
+    lastReadAt: conversation.last_read_at ?? null,
     messages: (messages ?? []).map(mapChatMessage),
   };
 }

@@ -16,8 +16,8 @@ import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 export type AiAssistantChromeConfig = {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  activeTab: AiAssistantTab;
-  onTabChange: (tab: AiAssistantTab) => void;
+  activeTab?: AiAssistantTab;
+  onTabChange?: (tab: AiAssistantTab) => void;
   onNewAgent?: () => void;
   showSearch: boolean;
   showNewAgent: boolean;
@@ -102,9 +102,7 @@ export function useAiAssistantChromeRegistration(
   setChromeRef.current = context?.setChrome;
 
   const enabled =
-    config !== null &&
-    typeof config.onSearchChange === "function" &&
-    typeof config.onTabChange === "function";
+    config !== null && typeof config.onSearchChange === "function";
 
   const searchQuery = config?.searchQuery ?? "";
   const activeTab = config?.activeTab ?? "agents";
@@ -121,7 +119,7 @@ export function useAiAssistantChromeRegistration(
       return;
     }
 
-    if (!enabled || !onSearchChange || !onTabChange) {
+    if (!enabled || !onSearchChange) {
       setChrome(null);
       return;
     }
@@ -130,7 +128,7 @@ export function useAiAssistantChromeRegistration(
       searchQuery,
       onSearchChange,
       activeTab,
-      onTabChange,
+      ...(onTabChange ? { onTabChange } : {}),
       onNewAgent,
       showSearch,
       showNewAgent,

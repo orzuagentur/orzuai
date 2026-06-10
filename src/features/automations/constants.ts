@@ -48,7 +48,13 @@ export const AUTOMATION_TEMPLATES = [
 export const AUTOMATIONS_MESSAGES = {
   pageTitle: "Automations",
   pageDescription:
-    "Build workflows that react to messages, forms, and CRM events automatically.",
+    "AI sales rules, follow-ups, usage limits, and custom workflows for your business.",
+  aiRulesTitle: "AI automation rules",
+  aiRulesIntro:
+    "Business-wide AI rules that run on every channel alongside your agents in AI Assistant.",
+  workflowsTitle: "Custom workflows",
+  workflowsIntro:
+    "Trigger-based automations for messages, forms, and CRM events.",
   create: "Create automation",
   empty: "No automations yet. Start from a template or create your own.",
   enabled: "Enabled",

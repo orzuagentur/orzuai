@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { AiAgentChannelIconRow } from "@/components/ai-assistant/AiAgentChannelIconRow";
+import { AiAgentIcon } from "@/components/ai-assistant/AiAgentIcon";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import { getChannelLabel } from "@/features/channel-workspace";
 import { cn } from "@/lib/utils";
 import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -94,17 +94,20 @@ export function AiAgentListPanel({
                 isActive && "bg-primary/5",
               )}
             >
-              <span
-                className={cn(
-                  "mt-2 size-2.5 shrink-0 rounded-full",
-                  agent.enabled ? "bg-emerald-500" : "bg-neutral-900",
-                )}
-                title={
-                  agent.enabled
-                    ? AI_ASSISTANT_MESSAGES.agentEnabled
-                    : AI_ASSISTANT_MESSAGES.agentDisabled
-                }
-              />
+              <div className="relative shrink-0">
+                <AiAgentIcon iconId={agent.icon} size="md" />
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
+                    agent.enabled ? "bg-emerald-500" : "bg-neutral-900",
+                  )}
+                  title={
+                    agent.enabled
+                      ? AI_ASSISTANT_MESSAGES.agentEnabled
+                      : AI_ASSISTANT_MESSAGES.agentDisabled
+                  }
+                />
+              </div>
               <div className="min-w-0 flex-1 space-y-1.5">
                 <p className="truncate font-medium">{agent.name}</p>
                 <p className="text-caption line-clamp-1">
@@ -112,17 +115,7 @@ export function AiAgentListPanel({
                     ? agent.triggerKeywords.join(", ")
                     : AI_ASSISTANT_MESSAGES.agentTriggersHint}
                 </p>
-                <div className="flex flex-wrap gap-1">
-                  {agent.channels.map((channel) => (
-                    <Badge
-                      key={channel}
-                      variant="secondary"
-                      className="text-[10px]"
-                    >
-                      {getChannelLabel(channel)}
-                    </Badge>
-                  ))}
-                </div>
+                <AiAgentChannelIconRow channels={agent.channels} />
               </div>
             </Link>
           </li>

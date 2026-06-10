@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { AUTOMATION_ACTIONS, AUTOMATION_TRIGGERS } from "@/features/automations/constants";
+import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import type { AiUsageSummary, SalesAgentSettings } from "@/types/ai-usage.types";
 
 export const automationTriggerTypes = AUTOMATION_TRIGGERS.map((t) => t.id);
 export const automationActionTypes = AUTOMATION_ACTIONS.map((a) => a.id);
@@ -21,4 +23,12 @@ export type AutomationItem = {
   actionType: string;
   enabled: boolean;
   createdAt: string;
+};
+
+export type AutomationsPageData = {
+  hasBusiness: boolean;
+  automations: AutomationItem[];
+  usage: AiUsageSummary | null;
+  salesAgent: SalesAgentSettings;
+  followUpAgent: FollowUpAgentSettings;
 };

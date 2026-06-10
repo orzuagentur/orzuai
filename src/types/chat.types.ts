@@ -52,6 +52,10 @@ export const suggestConversationReplySchema = z.object({
   conversationId: z.string().uuid("Invalid conversation identifier."),
 });
 
+export const deleteChatMessageSchema = z.object({
+  messageId: z.string().uuid("Invalid message identifier."),
+});
+
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
 export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
 export type UpdateConversationStatusInput = z.infer<
@@ -63,6 +67,7 @@ export type UpdateConversationInternalNoteInput = z.infer<
 export type SuggestConversationReplyInput = z.infer<
   typeof suggestConversationReplySchema
 >;
+export type DeleteChatMessageInput = z.infer<typeof deleteChatMessageSchema>;
 
 export type ChatMessageData = {
   id: string;
@@ -72,6 +77,10 @@ export type ChatMessageData = {
   content: string;
   aiGenerated: boolean;
   createdAt: string;
+  deletedForAllAt: string | null;
+  hiddenForBusiness: boolean;
+  editedAt: string | null;
+  isEdited: boolean;
 };
 
 export type ConversationListItem = {
@@ -88,6 +97,8 @@ export type ConversationListItem = {
   lastMessageAt: string | null;
   lastMessageSenderType: MessageSenderType | null;
   lastMessageAiGenerated: boolean;
+  lastClientMessageAt: string | null;
+  unreadMessageCount: number;
   isUnread: boolean;
 };
 
@@ -101,6 +112,7 @@ export type ConversationDetail = {
   status: ConversationStatus;
   internalNote: string | null;
   updatedAt: string;
+  lastReadAt: string | null;
   messages: ChatMessageData[];
 };
 
@@ -175,5 +187,6 @@ export type ChatActionResult<T> =
   | { success: false; error: ChatActionError };
 
 export type SendChatMessageResult = ChatActionResult<{ message: ChatMessageData }>;
+export type DeleteChatMessageResult = ChatActionResult<{ messageId: string }>;
 export type ToggleChatAiResult = ChatActionResult<{ aiEnabled: boolean }>;
 export type SuggestConversationReplyResult = ChatActionResult<{ suggestion: string }>;

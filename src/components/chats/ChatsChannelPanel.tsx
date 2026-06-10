@@ -98,6 +98,7 @@ export function ChatsChannelPanel({
     cannedResponses,
     isLoadingConversation,
     appendMessage,
+    removeMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
@@ -380,6 +381,7 @@ export function ChatsChannelPanel({
               appendMessage(message);
               void refreshConversations();
             }}
+            onMessageRemoved={removeMessage}
             onContactDeleted={() => {
               handleConversationSelect(null);
               void refreshConversations();

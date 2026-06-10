@@ -4,20 +4,34 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   ArrowLeftIcon,
+  BarChart3Icon,
   CheckCircle2Icon,
+  Loader2Icon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AiAgentChannelIconRow } from "@/components/ai-assistant/AiAgentChannelIconRow";
+import { AiAgentIcon } from "@/components/ai-assistant/AiAgentIcon";
 import { AgentPowerToggle } from "@/components/ai-assistant/AgentPowerToggle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { deleteAiAgentAction } from "@/features/ai-assistant/actions/delete-ai-agent";
 import { toggleAiAgentEnabledAction } from "@/features/ai-assistant/actions/toggle-ai-agent-enabled";
+import { filterAgentChannelsToConnected } from "@/features/ai-assistant/connected-channels";
+import { getCommunicationStyleLabel } from "@/features/ai-assistant/communication-styles";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
+import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import { AI_PROVIDER_LABELS, type AiProvider } from "@/lib/ai/constants";
-import { getChannelLabel } from "@/features/channel-workspace";
+import { getAgentIconLabel } from "@/features/ai-assistant/agent-icons";
 import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
@@ -26,8 +40,11 @@ type AiAgentViewPanelProps = {
   agent: AiAgentItem;
   activeChannelFilter: MessagingChannel | null;
   searchQuery: string;
+  visibleChannelIds: MessagingChannel[];
+  channelStatuses: IntegrationChannelStatusMap;
   showSetupBanner: boolean;
   onEdit: () => void;
+  onOpenAnalytics: () => void;
   onBack?: () => void;
   onDismissSetupBanner: () => void;
 };
@@ -47,14 +64,18 @@ export function AiAgentViewPanel({
   agent,
   activeChannelFilter,
   searchQuery,
+  visibleChannelIds,
+  channelStatuses,
   showSetupBanner,
   onEdit,
+  onOpenAnalytics,
   onBack,
   onDismissSetupBanner,
 }: AiAgentViewPanelProps) {
   const router = useRouter();
   const [isToggling, setIsToggling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [enabled, setEnabled] = useState(agent.enabled);
 
   useEffect(() => {
@@ -93,6 +114,7 @@ export function AiAgentViewPanel({
         return;
       }
 
+      setDeleteOpen(false);
       toast.success(AI_ASSISTANT_MESSAGES.agentDeleted);
       router.push(
         buildAiAssistantHref({
@@ -109,6 +131,11 @@ export function AiAgentViewPanel({
 
   const providerLabel =
     AI_PROVIDER_LABELS[agent.provider as AiProvider] ?? agent.provider;
+  const visibleChannels = filterAgentChannelsToConnected(
+    agent.channels,
+    channelStatuses,
+    visibleChannelIds,
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -118,12 +145,27 @@ export function AiAgentViewPanel({
             <ArrowLeftIcon className="size-4" />
           </Button>
         ) : null}
+        <AiAgentIcon iconId={agent.icon} size="md" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-semibold">{agent.name}</p>
           <p className="text-caption text-muted-foreground">
             {AI_ASSISTANT_MESSAGES.agentViewSubtitle}
           </p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          aria-label={AI_ASSISTANT_MESSAGES.agentAnalytics}
+          title={AI_ASSISTANT_MESSAGES.agentAnalytics}
+          onClick={onOpenAnalytics}
+        >
+          <BarChart3Icon className="size-4" />
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={onEdit}>
+          <PencilIcon className="size-4" />
+          {AI_ASSISTANT_MESSAGES.editAgent}
+        </Button>
         <AgentPowerToggle
           enabled={enabled}
           disabled={isToggling}
@@ -164,6 +206,10 @@ export function AiAgentViewPanel({
 
           <SummaryRow label={AI_ASSISTANT_MESSAGES.agentName} value={agent.name} />
           <SummaryRow
+            label={AI_ASSISTANT_MESSAGES.agentIconLabel}
+            value={getAgentIconLabel(agent.icon)}
+          />
+          <SummaryRow
             label={AI_ASSISTANT_MESSAGES.agentStatus}
             value={
               enabled
@@ -181,9 +227,19 @@ export function AiAgentViewPanel({
             value={agent.language}
           />
           <SummaryRow
-            label={AI_ASSISTANT_MESSAGES.agentChannels}
-            value={agent.channels.map(getChannelLabel).join(", ")}
+            label={AI_ASSISTANT_MESSAGES.communicationStyleLabel}
+            value={getCommunicationStyleLabel(agent.communicationStyle)}
           />
+          <div className="flex flex-col gap-2 border-b py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.agentChannels}
+            </span>
+            {visibleChannels.length > 0 ? (
+              <AiAgentChannelIconRow channels={visibleChannels} size="md" />
+            ) : (
+              <span className="text-sm font-medium">—</span>
+            )}
+          </div>
           <SummaryRow
             label={AI_ASSISTANT_MESSAGES.agentTriggers}
             value={
@@ -203,30 +259,51 @@ export function AiAgentViewPanel({
           </p>
         </section>
 
-        <div className="flex flex-wrap gap-2">
-          {agent.channels.map((channel) => (
-            <Badge key={channel} variant="secondary">
-              {getChannelLabel(channel)}
-            </Badge>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 border-t pt-4">
-          <Button type="button" className="gap-2" onClick={onEdit}>
-            <PencilIcon className="size-4" />
-            {AI_ASSISTANT_MESSAGES.editAgent}
-          </Button>
+        <div className="border-t pt-4">
           <Button
             type="button"
             variant="outline"
-            disabled={isDeleting}
-            onClick={() => void handleDelete()}
+            className="gap-2 text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
           >
             <Trash2Icon className="size-4" />
             {AI_ASSISTANT_MESSAGES.deleteAgent}
           </Button>
         </div>
       </div>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{AI_ASSISTANT_MESSAGES.deleteAgentConfirmTitle}</DialogTitle>
+            <DialogDescription>
+              {AI_ASSISTANT_MESSAGES.deleteAgentConfirmDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setDeleteOpen(false)}
+            >
+              {AI_ASSISTANT_MESSAGES.deleteAgentConfirmCancel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => void handleDelete()}
+            >
+              {isDeleting ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                AI_ASSISTANT_MESSAGES.deleteAgent
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

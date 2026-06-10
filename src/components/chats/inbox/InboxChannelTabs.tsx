@@ -9,6 +9,7 @@ import type { ChatChannelId } from "@/features/chats";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
+import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
 export type InboxChannelTabId = ChatChannelId | "all" | "favorites";
 
@@ -28,10 +29,7 @@ export function InboxChannelTabs({
   const visibleChannels = CHAT_CHANNEL_LIST.filter((channel) =>
     visibleChannelIds.includes(channel.id),
   );
-  const totalUnread = Object.values(unreadByChannel).reduce(
-    (sum, count) => sum + (count ?? 0),
-    0,
-  );
+  const channelsWithUnread = countChannelsWithUnread(unreadByChannel);
 
   return (
     <div
@@ -43,7 +41,7 @@ export function InboxChannelTabs({
       <Link
         href={DASHBOARD_ROUTES.chats}
         title={CHAT_MESSAGES.viewAll}
-        aria-label={`${CHAT_MESSAGES.viewAll}${totalUnread > 0 ? ` (${totalUnread} unread)` : ""}`}
+        aria-label={`${CHAT_MESSAGES.viewAll}${channelsWithUnread > 0 ? ` (${channelsWithUnread} channels with unread)` : ""}`}
         className={cn(
           "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
           activeChannel === "all"
@@ -52,9 +50,9 @@ export function InboxChannelTabs({
         )}
       >
         <LayoutGridIcon className="size-5" />
-        {totalUnread > 0 ? (
+        {channelsWithUnread > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-            {totalUnread > 99 ? "99+" : totalUnread}
+            {channelsWithUnread > 9 ? "9+" : channelsWithUnread}
           </span>
         ) : null}
       </Link>

@@ -20,7 +20,7 @@ type AiAssistantChannelTabsProps = {
   activeAgentId: string | null;
   searchQuery: string;
   visibleChannelIds: MessagingChannel[];
-  aiEnabledByChannel: Partial<Record<MessagingChannel, boolean>>;
+  agentEnabledByChannel: Partial<Record<MessagingChannel, boolean>>;
   className?: string;
 };
 
@@ -30,7 +30,7 @@ export function AiAssistantChannelTabs({
   activeAgentId,
   searchQuery,
   visibleChannelIds,
-  aiEnabledByChannel,
+  agentEnabledByChannel,
   className,
 }: AiAssistantChannelTabsProps) {
   const visibleChannels = INTEGRATION_CHANNEL_LIST.filter(
@@ -75,7 +75,7 @@ export function AiAssistantChannelTabs({
       {visibleChannels.map((channel) => {
         const channelId = channel.id as MessagingChannel;
         const isActive = activeChannel === channelId;
-        const aiOn = aiEnabledByChannel[channelId];
+        const hasEnabledAgent = agentEnabledByChannel[channelId] ?? false;
 
         return (
           <Link
@@ -98,9 +98,17 @@ export function AiAssistantChannelTabs({
             >
               <ChannelBrandIcon channel={channelId} className="size-4" />
             </div>
-            {aiOn ? (
-              <span className="absolute top-1 right-1 size-2 rounded-full bg-emerald-500 ring-2 ring-background" />
-            ) : null}
+            <span
+              className={cn(
+                "absolute top-1 right-1 size-2 rounded-full ring-2 ring-background",
+                hasEnabledAgent ? "bg-emerald-500" : "bg-neutral-900",
+              )}
+              title={
+                hasEnabledAgent
+                  ? AI_ASSISTANT_MESSAGES.channelAgentActive
+                  : AI_ASSISTANT_MESSAGES.channelAgentInactive
+              }
+            />
           </Link>
         );
       })}

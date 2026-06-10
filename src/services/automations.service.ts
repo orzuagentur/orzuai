@@ -7,8 +7,15 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
+import { getAiUsageSummary } from "@/services/ai-usage.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import type { AutomationItem, SaveAutomationInput } from "@/types/automations.types";
+import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import { getSalesAgentSettings } from "@/services/sales-agent.service";
+import type {
+  AutomationItem,
+  AutomationsPageData,
+  SaveAutomationInput,
+} from "@/types/automations.types";
 import { saveAutomationSchema } from "@/types/automations.types";
 
 export async function listAutomations(
@@ -37,16 +44,35 @@ export async function listAutomations(
   );
 }
 
-export async function getAutomationsPageData() {
+export async function getAutomationsPageData(): Promise<AutomationsPageData> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
 
   if (!business) {
-    return { hasBusiness: false, automations: [] as AutomationItem[] };
+    return {
+      hasBusiness: false,
+      automations: [],
+      usage: null,
+      salesAgent: {
+        salesAgentEnabled: false,
+        bantThreshold: 70,
+        autoQualifyPipeline: true,
+        autoTaskEnabled: false,
+        autoTaskThreshold: 75,
+        sentimentAnalysisEnabled: true,
+      },
+      followUpAgent: { enabled: true, sentCount: 0 },
+    };
   }
 
-  const automations = await listAutomations(business.id);
-  return { hasBusiness: true, automations };
+  const [automations, usage, salesAgent, followUpAgent] = await Promise.all([
+    listAutomations(business.id),
+    getAiUsageSummary(),
+    getSalesAgentSettings(business.id),
+    getFollowUpAgentSettings(business.id),
+  ]);
+
+  return { hasBusiness: true, automations, usage, salesAgent, followUpAgent };
 }
 
 export async function createAutomation(
@@ -83,6 +109,7 @@ export async function createAutomation(
   }
 
   revalidatePath(DASHBOARD_ROUTES.automations);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
   return { success: true };
 }
 

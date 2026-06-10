@@ -473,7 +473,7 @@ export async function testChannelAiReply(
   const { data: agentRows } = await admin
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, updated_at",
     )
     .eq("business_id", businessId)
     .eq("enabled", true);
@@ -489,6 +489,7 @@ export async function testChannelAiReply(
       provider: row.provider ?? undefined,
       model: row.model ?? undefined,
       language: row.language ?? undefined,
+      communicationStyle: row.communication_style ?? undefined,
       updatedAt: row.updated_at,
     })),
     channel: parsed.data.channel,

@@ -793,6 +793,11 @@ export type Database = {
           sender_type: MessageSenderType;
           content: string;
           ai_generated: boolean;
+          ai_agent_id: string | null;
+          deleted_for_all_at: string | null;
+          hidden_for_business: boolean;
+          edited_at: string | null;
+          is_edited: boolean;
           created_at: string;
         };
         Insert: {
@@ -802,6 +807,11 @@ export type Database = {
           sender_type: MessageSenderType;
           content: string;
           ai_generated?: boolean;
+          ai_agent_id?: string | null;
+          deleted_for_all_at?: string | null;
+          hidden_for_business?: boolean;
+          edited_at?: string | null;
+          is_edited?: boolean;
           created_at?: string;
         };
         Update: {
@@ -811,6 +821,11 @@ export type Database = {
           sender_type?: MessageSenderType;
           content?: string;
           ai_generated?: boolean;
+          ai_agent_id?: string | null;
+          deleted_for_all_at?: string | null;
+          hidden_for_business?: boolean;
+          edited_at?: string | null;
+          is_edited?: boolean;
           created_at?: string;
         };
         Relationships: [
@@ -886,6 +901,8 @@ export type Database = {
           provider: string;
           model: string;
           language: string;
+          communication_style: string;
+          icon: string;
           created_at: string;
           updated_at: string;
         };
@@ -900,6 +917,8 @@ export type Database = {
           provider?: string;
           model?: string;
           language?: string;
+          communication_style?: string;
+          icon?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -914,6 +933,8 @@ export type Database = {
           provider?: string;
           model?: string;
           language?: string;
+          communication_style?: string;
+          icon?: string;
           created_at?: string;
           updated_at?: string;
         };

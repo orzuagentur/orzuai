@@ -44,6 +44,7 @@ import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
+import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
 
 type ChatLoadingPreview = {
   contactName: string;
@@ -65,6 +66,7 @@ type ChatWindowProps = {
   suggestReplyOpen?: boolean;
   onSuggestReplyOpenChange?: (open: boolean) => void;
   onMessageSent?: (message: ChatMessageData) => void;
+  onMessageRemoved?: (messageId: string) => void;
   onContactDeleted?: () => void;
   onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
   isClientTyping?: boolean;
@@ -101,6 +103,7 @@ export function ChatWindow({
   suggestReplyOpen: controlledSuggestOpen,
   onSuggestReplyOpenChange,
   onMessageSent,
+  onMessageRemoved,
   onContactDeleted,
   onContactFavoriteChange,
   isClientTyping = false,
@@ -115,6 +118,9 @@ export function ChatWindow({
   const suggestOpen = controlledSuggestOpen ?? internalSuggestOpen;
   const setSuggestOpen = onSuggestReplyOpenChange ?? setInternalSuggestOpen;
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const pinnedConversationIdRef = useRef<string | null>(null);
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
   const isInboxLayout = layout === "inbox";
@@ -166,8 +172,45 @@ export function ChatWindow({
   });
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.messages.length, isClientTyping]);
+    if (!conversation) {
+      pinnedConversationIdRef.current = null;
+      return;
+    }
+
+    const isOpeningChat =
+      pinnedConversationIdRef.current !== conversation.id;
+    pinnedConversationIdRef.current = conversation.id;
+
+    const firstUnreadIndex = findFirstUnreadClientMessageIndex(
+      conversation.messages,
+      conversation.lastReadAt ?? null,
+    );
+    const hasUnreadMessages = firstUnreadIndex >= 0;
+
+    const scrollToTarget = () => {
+      if (isOpeningChat && hasUnreadMessages && firstUnreadRef.current) {
+        firstUnreadRef.current.scrollIntoView({
+          behavior: "instant",
+          block: "start",
+        });
+        return;
+      }
+
+      const scrollContainer = scrollContainerRef.current;
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        return;
+      }
+
+      bottomRef.current?.scrollIntoView({
+        behavior: isOpeningChat ? "instant" : "smooth",
+        block: "end",
+      });
+    };
+
+    scrollToTarget();
+    requestAnimationFrame(scrollToTarget);
+  }, [conversation?.id, conversation?.messages.length, isClientTyping]);
 
   function handleRefresh() {
     router.refresh();
@@ -383,10 +426,14 @@ export function ChatWindow({
             <MessageHistory
               messages={conversation.messages}
               variant="inbox"
+              lastReadAt={conversation.lastReadAt}
               className="min-h-0 flex-1 overflow-y-auto"
+              scrollContainerRef={scrollContainerRef}
+              firstUnreadRef={firstUnreadRef}
               bottomRef={bottomRef}
               isClientTyping={isClientTyping}
               typingContactName={conversation.contactName}
+              onMessageRemoved={onMessageRemoved}
             />
 
             <InboxChatComposer
@@ -471,7 +518,11 @@ export function ChatWindow({
           initialNote={conversation.internalNote}
         />
 
-        <MessageHistory messages={conversation.messages} className="min-h-0 flex-1" />
+        <MessageHistory
+          messages={conversation.messages}
+          className="min-h-0 flex-1"
+          onMessageRemoved={onMessageRemoved}
+        />
 
         <div ref={bottomRef} />
 

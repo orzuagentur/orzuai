@@ -45,5 +45,12 @@ async function AutomationsPageContent() {
     );
   }
 
-  return <AutomationsHub automations={data.automations} />;
+  return (
+    <AutomationsHub
+      automations={data.automations}
+      usage={data.usage}
+      salesAgent={data.salesAgent}
+      followUpAgent={data.followUpAgent}
+    />
+  );
 }

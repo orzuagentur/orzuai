@@ -11,7 +11,8 @@ import { hasSupabaseEnv } from "@/lib/env";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
-  buildLastMessagePreviewMap,
+  buildConversationMessageMaps,
+  buildUnreadClientMessageCountMap,
   mapConversationListItem,
 } from "@/utils/chat";
 import { phoneDigitsOnly } from "@/utils/whatsapp";
@@ -171,10 +172,23 @@ async function mapConversationRows(
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  const lastMessageMap = buildLastMessagePreviewMap(messages ?? []);
+  const { lastMessageByConversationId, lastClientMessageAtByConversationId } =
+    buildConversationMessageMaps(messages ?? []);
+  const lastReadAtByConversationId = new Map(
+    rows.map((row) => [row.id, row.last_read_at]),
+  );
+  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
+    messages ?? [],
+    lastReadAtByConversationId,
+  );
 
   return rows.flatMap((row) => {
-    const item = mapConversationListItem(row, lastMessageMap.get(row.id));
+    const item = mapConversationListItem(
+      row,
+      lastMessageByConversationId.get(row.id),
+      lastClientMessageAtByConversationId.get(row.id) ?? null,
+      unreadMessageCountByConversationId.get(row.id) ?? 0,
+    );
     return item ? [item] : [];
   });
 }
