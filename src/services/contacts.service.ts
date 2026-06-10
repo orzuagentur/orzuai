@@ -710,7 +710,7 @@ export async function updateContact(
   const supabase = await createClient();
   const { data: existingContact } = await supabase
     .from("contacts")
-    .select("pipeline_stage, deal_value, expected_close_date")
+    .select("pipeline_stage, deal_value, expected_close_date, tags, name, channel")
     .eq("id", parsed.data.contactId)
     .eq("business_id", businessId)
     .maybeSingle();
@@ -752,6 +752,39 @@ export async function updateContact(
         ? parsed.data.expectedCloseDate?.trim() || null
         : (existingContact?.expected_close_date ?? null),
   });
+
+  const previousTags = new Set(
+    (existingContact?.tags ?? []).map((tag) => tag.toLowerCase()),
+  );
+  const addedTags = parsed.data.tags.filter(
+    (tag) => !previousTags.has(tag.toLowerCase()),
+  );
+
+  if (addedTags.length > 0) {
+    const { data: conversation } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("contact_id", parsed.data.contactId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { processTagAddedAutomations } = await import(
+      "@/services/automation-engine.service"
+    );
+
+    for (const addedTag of addedTags) {
+      await processTagAddedAutomations({
+        businessId,
+        contactId: parsed.data.contactId,
+        contactName: parsed.data.name.trim() || existingContact?.name || "Contact",
+        channel: existingContact?.channel ?? "whatsapp",
+        conversationId: conversation?.id ?? null,
+        addedTag,
+      });
+    }
+  }
 
   revalidateContactPaths();
   return { success: true };

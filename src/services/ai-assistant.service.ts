@@ -11,6 +11,11 @@ import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-
 import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
+import { mergeProviderAvailability } from "@/features/ai-assistant/provider-availability";
+import {
+  getBusinessPreferCustomerAiKeys,
+  listBusinessProviderCredentials,
+} from "@/services/business-ai-credentials.service";
 import { getProviderAvailability } from "@/services/llm.service";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -59,12 +64,16 @@ export async function getAiAssistantPageData(input?: {
   const defaultModel = getDefaultGeminiModel();
   const parsed = parseAiAssistantSearchParams(input ?? {});
   const businessId = await getOwnedBusinessId();
+  const platformProviderAvailability = getProviderAvailability();
 
   if (!businessId || !hasSupabaseEnv()) {
     return {
       hasBusiness: false,
       geminiConfigured: hasGeminiEnv(),
-      providerAvailability: getProviderAvailability(),
+      providerAvailability: platformProviderAvailability,
+      platformProviderAvailability,
+      businessProviderCredentials: [],
+      preferCustomerAiKeys: false,
       defaultModel,
       activeChannel: "whatsapp",
       activeChannelFilter: parsed.activeChannel,
@@ -84,10 +93,18 @@ export async function getAiAssistantPageData(input?: {
     };
   }
 
-  const [channelStatuses, agents] = await Promise.all([
-    getChannelConnectionStatuses(businessId),
-    listAiAgents(),
-  ]);
+  const [channelStatuses, agents, businessProviderCredentials, preferCustomerAiKeys] =
+    await Promise.all([
+      getChannelConnectionStatuses(businessId),
+      listAiAgents(),
+      listBusinessProviderCredentials(businessId),
+      getBusinessPreferCustomerAiKeys(businessId),
+    ]);
+
+  const providerAvailability = mergeProviderAvailability(
+    platformProviderAvailability,
+    businessProviderCredentials,
+  );
 
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const activeChannel: MessagingChannel =
@@ -110,7 +127,10 @@ export async function getAiAssistantPageData(input?: {
   return {
     hasBusiness: true,
     geminiConfigured: hasGeminiEnv(),
-    providerAvailability: getProviderAvailability(),
+    providerAvailability,
+    platformProviderAvailability,
+    businessProviderCredentials,
+    preferCustomerAiKeys,
     defaultModel,
     activeChannel,
     activeChannelFilter: parsed.activeChannel,

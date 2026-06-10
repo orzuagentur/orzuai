@@ -37,11 +37,12 @@ async function callClaudeMessages(input: {
   model: string;
   systemInstruction?: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
+  apiKey?: string;
 }): Promise<
   | { success: true; text: string; model: string; usage: ClaudeUsage }
   | { success: false; message: string }
 > {
-  const apiKey = getClaudeApiKey();
+  const apiKey = input.apiKey?.trim() || getClaudeApiKey();
 
   if (!apiKey) {
     return { success: false, message: "Anthropic API key missing." };
@@ -103,10 +104,12 @@ async function callClaudeMessages(input: {
   };
 }
 
+type ProviderInput<T> = T & { apiKey?: string };
+
 export async function generateClaudeText(
-  input: GenerateTextInput,
+  input: ProviderInput<GenerateTextInput>,
 ): Promise<GeminiServiceResult & { usage?: ClaudeUsage; provider?: AiProvider }> {
-  if (!hasClaudeEnv()) {
+  if (!hasClaudeEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -115,6 +118,7 @@ export async function generateClaudeText(
     model,
     systemInstruction: input.systemInstruction,
     messages: [{ role: "user", content: input.prompt }],
+    apiKey: input.apiKey,
   });
 
   if (!result.success) {
@@ -133,9 +137,9 @@ export async function generateClaudeText(
 }
 
 export async function generateClaudeAssistantReply(
-  input: GenerateAssistantReplyInput,
+  input: ProviderInput<GenerateAssistantReplyInput>,
 ): Promise<GeminiServiceResult & { usage?: ClaudeUsage; provider?: AiProvider }> {
-  if (!hasClaudeEnv()) {
+  if (!hasClaudeEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -153,7 +157,12 @@ export async function generateClaudeAssistantReply(
     })) ?? [];
 
   const messages = [...history, { role: "user" as const, content: input.userMessage }];
-  const result = await callClaudeMessages({ model, systemInstruction, messages });
+  const result = await callClaudeMessages({
+    model,
+    systemInstruction,
+    messages,
+    apiKey: input.apiKey,
+  });
 
   if (!result.success) {
     return {

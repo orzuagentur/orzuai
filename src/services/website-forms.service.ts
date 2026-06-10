@@ -567,6 +567,17 @@ export async function ingestWebsiteFormSubmission(
     content: body,
   });
 
+  const { processFormSubmitAutomations } = await import(
+    "@/services/automation-engine.service"
+  );
+  await processFormSubmitAutomations({
+    businessId,
+    conversationId,
+    contactId,
+    contactName: displayName,
+    message: body,
+  });
+
   await incrementMessagingAnalytics(admin, businessId, "website_forms", {
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,

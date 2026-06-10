@@ -123,10 +123,12 @@ function extractResponseText(text: string | undefined): GeminiServiceResult {
   };
 }
 
+type ProviderInput<T> = T & { apiKey?: string };
+
 export async function generateText(
-  input: GenerateTextInput,
+  input: ProviderInput<GenerateTextInput>,
 ): Promise<GeminiServiceResult> {
-  if (!hasGeminiEnv()) {
+  if (!hasGeminiEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -142,6 +144,7 @@ export async function generateText(
     const model = getGeminiModel({
       model: modelName,
       systemInstruction: parsed.data.systemInstruction,
+      apiKey: input.apiKey,
     });
 
     const result = await model.generateContent({
@@ -169,9 +172,9 @@ export async function generateText(
 }
 
 export async function generateAssistantReply(
-  input: GenerateAssistantReplyInput,
+  input: ProviderInput<GenerateAssistantReplyInput>,
 ): Promise<GeminiServiceResult> {
-  if (!hasGeminiEnv()) {
+  if (!hasGeminiEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -192,6 +195,7 @@ export async function generateAssistantReply(
     const model = getGeminiModel({
       model: modelName,
       systemInstruction,
+      apiKey: input.apiKey,
     });
 
     const history = mapConversationHistoryToGeminiContents(

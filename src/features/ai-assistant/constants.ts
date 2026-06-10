@@ -10,18 +10,51 @@ export const AI_ASSISTANT_MESSAGES = {
   tabAgents: "Agents",
   newAgent: "New agent",
   wizardTitle: "Create AI agent",
-  wizardSubtitle: "Set a goal, choose channels, and review before going live.",
+  wizardSubtitle:
+    "Set a goal, channels, AI model, then review before going live.",
   wizardStep1Title: "What should this agent do?",
   wizardStep1Description:
     "Pick the main job for this agent. You can fine-tune instructions on the last step.",
   wizardStep2Title: "Where should it work?",
   wizardStep2Description:
     "Select connected channels. Connect new ones in Integrations if needed.",
-  wizardStep3Title: "Review and create",
+  wizardStep3Title: "Choose AI model",
   wizardStep3Description:
+    "Use OrzuAI platform AI (included) or connect your own API key for custom models and cost tracking.",
+  wizardStep4Title: "Review and create",
+  wizardStep4Description:
     "Confirm the name, instructions, and routing. Enable when you are ready to go live.",
+  wizardBillingPlatformTitle: "OrzuAI Platform AI",
+  wizardBillingPlatformDescription: "Included in your plan. No API setup required.",
+  wizardBillingPlatformBadge: "Recommended",
+  wizardBillingPlatformPoint1: "Ready to use immediately",
+  wizardBillingPlatformPoint2: "No usage costs in Analytics",
+  wizardBillingOwnTitle: "Your API key",
+  wizardBillingOwnDescription:
+    "Connect OpenAI, Gemini, or Claude with your own credentials.",
+  wizardBillingOwnPoint1: "Use any supported model ID",
+  wizardBillingOwnPoint2: "AI costs tracked in Analytics",
+  wizardBillingOwnKeyHint:
+    "Your key is stored securely and used only for your business account.",
+  wizardBillingOwnKeyPending: "API key required on this step",
+  wizardStep3NoPlatform:
+    "Platform AI is not available in this environment. Connect your own API key to continue.",
+  wizardStep3PlatformProviderHint:
+    "Select a provider included with OrzuAI.",
+  wizardStep3OwnProviderHint:
+    "Choose a provider, then enter your API key below.",
+  wizardStep3SavingKey: "Saving API key…",
+  wizardSavedKeysTitle: "Your saved keys",
+  wizardSavedKeysHint: "Select a key you already added. Manage keys in Settings.",
+  wizardUseSavedKey: "Using saved key",
+  wizardReplaceSavedKey: "Replace key",
+  wizardUseForAllAgents: "Use for all agents",
+  wizardUseForAllAgentsHint:
+    "New agents will default to your API keys. You can change this in Settings.",
+  wizardAddNewKey: "Add a new API key",
   wizardBackToGoals: "Back to goals",
   wizardBackToChannels: "Back to channels",
+  wizardBackToModel: "Back to AI model",
   wizardContinue: "Continue",
   wizardCreateDraft: "Create as draft",
   wizardCreateAndEnable: "Create & enable",
@@ -63,6 +96,32 @@ export const AI_ASSISTANT_MESSAGES = {
       ? "1 provider ready. Choose which one powers this agent."
       : `${count} providers ready. Choose which one powers this agent.`,
   aiProviderMissingEnv: (envKey: string) => `Add ${envKey} to enable`,
+  aiProviderPlatformIncluded: "Included with OrzuAI",
+  aiProviderOwnKey: "Your API key",
+  aiProviderAddOwnKey: "Add your API key in agent settings",
+  aiCustomModelLabel: "Use custom model ID",
+  aiCustomModelHint:
+    "Enter any model ID supported by the provider (e.g. gpt-4.1-mini).",
+  aiCustomModelPlaceholder: "e.g. gpt-4o-mini",
+  aiCredentialsTitle: "Your AI API keys",
+  aiCredentialsDescription:
+    "Optional. Add your own keys to use custom models and see AI costs in Analytics.",
+  aiCredentialsKeyNameLabel: "Key name",
+  aiCredentialsKeyNamePlaceholder: "e.g. Production OpenAI",
+  aiCredentialsKeyNameRequired: "Enter a name for this API key.",
+  aiCredentialsKeyLabel: "API key",
+  aiCredentialsReplaceLabel: "Replace API key",
+  aiCredentialsKeyPlaceholder: "sk-…",
+  aiCredentialsKeyRequired: "Enter an API key.",
+  aiCredentialsSave: "Save key",
+  aiCredentialsUpdate: "Update key",
+  aiCredentialsRemove: "Remove key",
+  aiCredentialsSaved: "API key saved.",
+  aiCredentialsRemoved: "API key removed.",
+  aiCredentialsSaveFailed: "Unable to save API key.",
+  aiCredentialsRemoveFailed: "Unable to remove API key.",
+  aiCredentialsConfigured: (preview: string) => `Saved: ${preview}`,
+  aiCredentialsNotConfigured: "Not configured",
   aiModelLabel: "AI model",
   aiLanguageLabel: "Reply language",
   sectionAiModel: "AI model & language",
@@ -129,7 +188,15 @@ export const AI_ASSISTANT_MESSAGES = {
   agentChannels: "Active channels",
   agentTriggers: "Trigger keywords (comma-separated)",
   agentTriggersHint:
-    "Leave empty to use this agent as the default for selected channels.",
+    "Leave empty only if this agent is the main default for its channels. Each channel allows one default agent.",
+  agentDefaultBadge: "Default",
+  agentSpecialistBadge: "Specialist",
+  agentDefaultSummary: "Default · handles unmatched messages",
+  agentRoutingConflictTitle: "Routing conflict",
+  agentRoutingRuleHint:
+    "Each channel has one default agent (no keywords). Add more agents with trigger keywords for specialized replies.",
+  agentKeywordsRequiredHint:
+    "A default agent already exists on this channel. Add keywords to create a specialist agent.",
   agentCreate: "Create agent",
   agentSave: "Save changes",
   agentSaved: "AI agent saved.",

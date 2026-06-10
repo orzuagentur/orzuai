@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { OVERVIEW_MESSAGES } from "@/features/dashboard/constants";
+import { buildAnalyticsHref } from "@/utils/analytics-url";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
 import type { ChannelMetricSummary } from "@/types/dashboard.types";
 import { formatMetricValue } from "@/utils/dashboard";
@@ -49,7 +50,10 @@ export function MultiChannelMetricsPanel({
             return (
               <Link
                 key={entry.channel}
-                href={`${DASHBOARD_ROUTES.analytics}?channel=${entry.channel}`}
+                href={buildAnalyticsHref({
+                  tab: "channels",
+                  channel: entry.channel,
+                })}
                 className="rounded-lg border bg-muted/20 p-3 transition-colors hover:bg-muted/40"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">

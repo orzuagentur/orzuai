@@ -27,6 +27,21 @@ function formatUsd(value: number): string {
 }
 
 export function AiCostPanel({ metrics }: AiCostPanelProps) {
+  if (!metrics.hasCustomBilling) {
+    return (
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base">
+            {ANALYTICS_MESSAGES.aiCostPlatformIncludedTitle}
+          </CardTitle>
+          <CardDescription>
+            {ANALYTICS_MESSAGES.aiCostPlatformIncludedDescription}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Card className="shadow-none">
       <CardHeader>

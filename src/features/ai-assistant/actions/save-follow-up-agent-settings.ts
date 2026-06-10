@@ -1,10 +1,28 @@
 "use server";
 
-import { saveFollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import { z } from "zod";
+
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
+import { saveFollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
-export async function saveFollowUpAgentSettingsAction(enabled: boolean) {
+const saveFollowUpAgentSettingsSchema = z.object({
+  enabled: z.boolean(),
+  aiAgentId: z.string().uuid().nullable().optional(),
+});
+
+export async function saveFollowUpAgentSettingsAction(
+  input: z.infer<typeof saveFollowUpAgentSettingsSchema>,
+) {
+  const parsed = saveFollowUpAgentSettingsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid settings.",
+    };
+  }
+
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
 
@@ -12,5 +30,5 @@ export async function saveFollowUpAgentSettingsAction(enabled: boolean) {
     return { success: false, message: "Business not found." };
   }
 
-  return saveFollowUpAgentSettings(business.id, enabled);
+  return saveFollowUpAgentSettings(business.id, parsed.data);
 }

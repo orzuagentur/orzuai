@@ -69,3 +69,36 @@ export function resolveAiModel(
 export function isValidAiModel(provider: AiProvider, model: string): boolean {
   return getModelsForProvider(provider).some((option) => option.id === model);
 }
+
+export const CUSTOM_MODEL_OPTION_ID = "__custom__";
+
+export function resolveAgentModel(
+  provider: AiProvider,
+  model: string,
+  useCustomModel: boolean,
+): string {
+  const trimmed = model.trim();
+
+  if (useCustomModel && trimmed) {
+    return trimmed;
+  }
+
+  return resolveAiModel(provider, trimmed);
+}
+
+export function resolveLlmModel(
+  provider: AiProvider,
+  model: string | null | undefined,
+): string {
+  const trimmed = model?.trim();
+
+  if (!trimmed) {
+    return getDefaultModelForProvider(provider);
+  }
+
+  if (isValidAiModel(provider, trimmed)) {
+    return trimmed;
+  }
+
+  return trimmed;
+}

@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { AiAgentChannelIconRow } from "@/components/ai-assistant/AiAgentChannelIconRow";
 import { AiAgentIcon } from "@/components/ai-assistant/AiAgentIcon";
+import { Badge } from "@/components/ui/badge";
+import { isDefaultAgent } from "@/features/ai-assistant/agent-channel-routing";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { cn } from "@/lib/utils";
 import type { AiAgentItem } from "@/types/ai-agent.types";
@@ -109,11 +111,21 @@ export function AiAgentListPanel({
                 />
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
-                <p className="truncate font-medium">{agent.name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-medium">{agent.name}</p>
+                  <Badge
+                    variant={isDefaultAgent(agent.triggerKeywords) ? "default" : "secondary"}
+                    className="shrink-0 text-[10px]"
+                  >
+                    {isDefaultAgent(agent.triggerKeywords)
+                      ? AI_ASSISTANT_MESSAGES.agentDefaultBadge
+                      : AI_ASSISTANT_MESSAGES.agentSpecialistBadge}
+                  </Badge>
+                </div>
                 <p className="text-caption line-clamp-1">
                   {agent.triggerKeywords.length > 0
                     ? agent.triggerKeywords.join(", ")
-                    : AI_ASSISTANT_MESSAGES.agentTriggersHint}
+                    : AI_ASSISTANT_MESSAGES.agentDefaultSummary}
                 </p>
                 <AiAgentChannelIconRow channels={agent.channels} />
               </div>

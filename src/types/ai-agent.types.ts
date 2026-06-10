@@ -38,6 +38,7 @@ export const createAiAgentSchema = z.object({
   language: z.string().trim().min(1).max(32),
   communicationStyle: communicationStyleSchema.default("professional"),
   icon: z.enum(AGENT_ICON_IDS).default(DEFAULT_AGENT_ICON),
+  useCustomModel: z.boolean().default(false),
 });
 
 export const updateAiAgentSchema = createAiAgentSchema.extend({
@@ -64,6 +65,7 @@ export type AiAgentItem = {
   language: string;
   communicationStyle: string;
   icon: AgentIconId;
+  useCustomModel: boolean;
   createdAt: string;
   updatedAt: string;
 };

@@ -6,6 +6,7 @@ import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { AgentConnectedChannelSelect } from "@/components/ai-assistant/AgentConnectedChannelSelect";
+import { AgentRoutingConflictBanner } from "@/components/ai-assistant/AgentRoutingConflictBanner";
 import { AiAgentIconPicker } from "@/components/ai-assistant/AiAgentIconPicker";
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import { AiModelProviderSelect } from "@/components/ai-assistant/AiModelProviderSelect";
@@ -26,12 +27,17 @@ import {
   isCommunicationStyleId,
   type CommunicationStyleId,
 } from "@/features/ai-assistant/communication-styles";
+import {
+  findDefaultAgentConflicts,
+  parseTriggerKeywordsInput,
+} from "@/features/ai-assistant/agent-channel-routing";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import {
   resolveAiModel,
   type AiProvider,
 } from "@/lib/ai/constants";
+import type { BusinessProviderCredential } from "@/services/business-ai-credentials.service";
 import type { AiProviderAvailability } from "@/types/channel-workspace.types";
 import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -50,6 +56,7 @@ type DraftState = {
   language: string;
   communicationStyle: CommunicationStyleId;
   icon: AgentIconId;
+  useCustomModel: boolean;
 };
 
 type AiAgentEditPanelProps = {
@@ -61,6 +68,8 @@ type AiAgentEditPanelProps = {
   visibleChannelIds: MessagingChannel[];
   channelStatuses: IntegrationChannelStatusMap;
   providerAvailability: AiProviderAvailability;
+  platformProviderAvailability: AiProviderAvailability;
+  businessProviderCredentials: BusinessProviderCredential[];
   onCancel: () => void;
   onBack?: () => void;
 };
@@ -86,10 +95,13 @@ function buildDraft(
     triggerKeywords: agent.triggerKeywords.join(", "),
     enabled: agent.enabled,
     provider,
-    model: resolveAiModel(provider, agent.model),
+    model: agent.useCustomModel
+      ? agent.model
+      : resolveAiModel(provider, agent.model),
     language: agent.language,
     communicationStyle,
     icon: resolveAgentIconId(agent.icon),
+    useCustomModel: agent.useCustomModel,
   };
 }
 
@@ -102,6 +114,8 @@ export function AiAgentEditPanel({
   visibleChannelIds,
   channelStatuses,
   providerAvailability,
+  platformProviderAvailability,
+  businessProviderCredentials,
   onCancel,
   onBack,
 }: AiAgentEditPanelProps) {
@@ -116,6 +130,16 @@ export function AiAgentEditPanel({
   useEffect(() => {
     setDraft(buildDraft(agent, channelStatuses, visibleChannelIds));
   }, [agent, channelStatuses, visibleChannelIds]);
+
+  const routingConflicts = useMemo(
+    () =>
+      findDefaultAgentConflicts(allAgents, {
+        id: agent.id,
+        channels: draft.channels,
+        triggerKeywords: parseTriggerKeywordsInput(draft.triggerKeywords),
+      }),
+    [agent.id, allAgents, draft.channels, draft.triggerKeywords],
+  );
 
   const previewChannel = activeChannelFilter ?? activeChannel;
   const previewAgent = useMemo(() => {
@@ -136,6 +160,7 @@ export function AiAgentEditPanel({
       language: draft.language,
       communicationStyle: draft.communicationStyle,
       icon: draft.icon,
+      useCustomModel: draft.useCustomModel,
     };
 
     const others = allAgents.filter((item) => item.id !== agent.id);
@@ -200,6 +225,7 @@ export function AiAgentEditPanel({
         language: draft.language,
         communicationStyle: draft.communicationStyle,
         icon: draft.icon,
+        useCustomModel: draft.useCustomModel,
       });
 
       if (!result.success) {
@@ -263,12 +289,18 @@ export function AiAgentEditPanel({
             provider={draft.provider}
             model={draft.model}
             providerAvailability={providerAvailability}
+            platformAvailability={platformProviderAvailability}
+            businessCredentials={businessProviderCredentials}
+            useCustomModel={draft.useCustomModel}
             disabled={isSaving}
             onProviderChange={(provider) =>
               setDraft((value) => ({ ...value, provider }))
             }
             onModelChange={(model) =>
               setDraft((value) => ({ ...value, model }))
+            }
+            onUseCustomModelChange={(useCustomModel) =>
+              setDraft((value) => ({ ...value, useCustomModel }))
             }
           />
 
@@ -362,6 +394,8 @@ export function AiAgentEditPanel({
             onToggle={toggleChannel}
           />
 
+          <AgentRoutingConflictBanner conflicts={routingConflicts} />
+
           <div className="space-y-2">
             <Label htmlFor={`agent-${agent.id}-triggers`}>
               {AI_ASSISTANT_MESSAGES.agentTriggers}
@@ -408,7 +442,9 @@ export function AiAgentEditPanel({
               !draft.name.trim() ||
               !draft.systemPrompt.trim() ||
               draft.channels.length === 0 ||
-              !providerReady
+              !providerReady ||
+              (draft.useCustomModel && !draft.model.trim()) ||
+              routingConflicts.length > 0
             }
             onClick={() => void handleSave()}
           >

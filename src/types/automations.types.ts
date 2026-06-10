@@ -1,34 +1,47 @@
-import { z } from "zod";
-
-import { AUTOMATION_ACTIONS, AUTOMATION_TRIGGERS } from "@/features/automations/constants";
+import type { IntegrationChannelStatusMap } from "@/features/integrations";
+import type { AutomationRuleId } from "@/features/automations/rule-catalog";
+import type { AutomationWorkflowItem } from "@/features/automations/workflow-types";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import type { AutomationsTab } from "@/utils/automations-url";
+import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { AiUsageSummary, SalesAgentSettings } from "@/types/ai-usage.types";
+import type { MessagingChannel } from "@/types/database.types";
 
-export const automationTriggerTypes = AUTOMATION_TRIGGERS.map((t) => t.id);
-export const automationActionTypes = AUTOMATION_ACTIONS.map((a) => a.id);
+export type AutomationStats = {
+  followUpsSent: number;
+  qualifiedContacts: number;
+  crmTasksCreated: number;
+  activeRules: number;
+};
 
-export const saveAutomationSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  triggerType: z.enum(automationTriggerTypes as [string, ...string[]]),
-  actionType: z.enum(automationActionTypes as [string, ...string[]]),
-  enabled: z.boolean().optional().default(true),
-});
+export type AutomationActivityType =
+  | "follow_up_sent"
+  | "crm_task_created"
+  | "contact_qualified"
+  | "workflow_run";
 
-export type SaveAutomationInput = z.infer<typeof saveAutomationSchema>;
-
-export type AutomationItem = {
+export type AutomationActivityItem = {
   id: string;
-  name: string;
-  triggerType: string;
-  actionType: string;
-  enabled: boolean;
-  createdAt: string;
+  type: AutomationActivityType;
+  title: string;
+  detail?: string;
+  occurredAt: string;
 };
 
 export type AutomationsPageData = {
   hasBusiness: boolean;
-  automations: AutomationItem[];
+  activeTab: AutomationsTab;
+  activeRuleId: AutomationRuleId | null;
+  activeWorkflowId: string | null;
+  isNewWorkflow: boolean;
+  createWizardStep: 1 | 2 | 3;
   usage: AiUsageSummary | null;
   salesAgent: SalesAgentSettings;
   followUpAgent: FollowUpAgentSettings;
+  stats: AutomationStats;
+  activity: AutomationActivityItem[];
+  workflows: AutomationWorkflowItem[];
+  agents: AiAgentItem[];
+  channelStatuses: IntegrationChannelStatusMap;
+  visibleChannelIds: MessagingChannel[];
 };

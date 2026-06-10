@@ -1,12 +1,11 @@
 import "server-only";
 
 import { estimateTokensFromText } from "@/lib/ai/cost";
-import {
-  getDefaultModelForProvider,
-  resolveAiModel,
-  type AiProvider,
-} from "@/lib/ai/constants";
+import { resolveLlmModel, type AiProvider } from "@/lib/ai/constants";
 import { hasGeminiEnv } from "@/lib/env";
+import {
+  resolveBusinessLlmCredentials,
+} from "@/services/business-ai-credentials.service";
 import {
   generateClaudeAssistantReply,
   generateClaudeText,
@@ -41,11 +40,15 @@ export type LlmTrackingContext = {
 export type LlmAssistantInput = GenerateAssistantReplyInput &
   LlmTrackingContext & {
     provider?: AiProvider;
+    apiKey?: string;
+    billingSource?: "platform" | "customer";
   };
 
 export type LlmTextInput = GenerateTextInput &
   LlmTrackingContext & {
     provider?: AiProvider;
+    apiKey?: string;
+    billingSource?: "platform" | "customer";
   };
 
 export function getProviderAvailability() {
@@ -81,18 +84,45 @@ function resolveProvider(inputProvider?: AiProvider): AiProvider {
   return inputProvider ?? "gemini";
 }
 
+function isProviderReady(provider: AiProvider, apiKey?: string): boolean {
+  if (apiKey?.trim()) {
+    return true;
+  }
+
+  return isProviderConfigured(provider);
+}
+
 type GenerationWithUsage = GeminiServiceResult & {
   usage?: { inputTokens: number; outputTokens: number };
   provider?: AiProvider;
 };
 
+async function resolveGenerationContext(input: {
+  businessId?: string;
+  provider?: AiProvider;
+  model?: string;
+  apiKey?: string;
+  billingSource?: "platform" | "customer";
+}) {
+  const provider = resolveProvider(input.provider);
+  const credentials = await resolveBusinessLlmCredentials(
+    input.businessId,
+    provider,
+  );
+  const apiKey = input.apiKey ?? credentials.apiKey ?? undefined;
+  const billingSource = input.billingSource ?? credentials.billingSource;
+  const model = resolveLlmModel(provider, input.model);
+
+  return { provider, apiKey, billingSource, model };
+}
+
 export async function generateAssistantReply(
   input: LlmAssistantInput,
 ): Promise<GeminiServiceResult> {
-  const provider = resolveProvider(input.provider);
-  const model = resolveAiModel(provider, input.model ?? getDefaultModelForProvider(provider));
+  const { provider, apiKey, billingSource, model } =
+    await resolveGenerationContext(input);
 
-  if (!isProviderConfigured(provider)) {
+  if (!isProviderReady(provider, apiKey)) {
     return {
       success: false,
       error: {
@@ -102,7 +132,11 @@ export async function generateAssistantReply(
     };
   }
 
-  if (input.businessId && !input.skipUsageLimit) {
+  if (
+    input.businessId &&
+    !input.skipUsageLimit &&
+    billingSource === "platform"
+  ) {
     const allowed = await assertAiUsageAllowed(input.businessId);
 
     if (!allowed.allowed) {
@@ -119,11 +153,11 @@ export async function generateAssistantReply(
   let result: GenerationWithUsage;
 
   if (provider === "openai") {
-    result = await generateOpenAiAssistantReply({ ...input, model });
+    result = await generateOpenAiAssistantReply({ ...input, model, apiKey });
   } else if (provider === "claude") {
-    result = await generateClaudeAssistantReply({ ...input, model });
+    result = await generateClaudeAssistantReply({ ...input, model, apiKey });
   } else {
-    result = await generateGeminiAssistantReply({ ...input, model });
+    result = await generateGeminiAssistantReply({ ...input, model, apiKey });
     result.provider = "gemini";
   }
 
@@ -147,6 +181,7 @@ export async function generateAssistantReply(
         result.usage?.inputTokens ?? estimateTokensFromText(promptText),
       outputTokens:
         result.usage?.outputTokens ?? estimateTokensFromText(result.data.text),
+      billingSource,
     });
   }
 
@@ -156,10 +191,10 @@ export async function generateAssistantReply(
 export async function generateText(
   input: LlmTextInput,
 ): Promise<GeminiServiceResult> {
-  const provider = resolveProvider(input.provider);
-  const model = resolveAiModel(provider, input.model ?? getDefaultModelForProvider(provider));
+  const { provider, apiKey, billingSource, model } =
+    await resolveGenerationContext(input);
 
-  if (!isProviderConfigured(provider)) {
+  if (!isProviderReady(provider, apiKey)) {
     return {
       success: false,
       error: {
@@ -169,7 +204,11 @@ export async function generateText(
     };
   }
 
-  if (input.businessId && !input.skipUsageLimit) {
+  if (
+    input.businessId &&
+    !input.skipUsageLimit &&
+    billingSource === "platform"
+  ) {
     const allowed = await assertAiUsageAllowed(input.businessId);
 
     if (!allowed.allowed) {
@@ -186,11 +225,11 @@ export async function generateText(
   let result: GenerationWithUsage;
 
   if (provider === "openai") {
-    result = await generateOpenAiText({ ...input, model });
+    result = await generateOpenAiText({ ...input, model, apiKey });
   } else if (provider === "claude") {
-    result = await generateClaudeText({ ...input, model });
+    result = await generateClaudeText({ ...input, model, apiKey });
   } else {
-    result = await generateGeminiText({ ...input, model });
+    result = await generateGeminiText({ ...input, model, apiKey });
     result.provider = "gemini";
   }
 
@@ -212,6 +251,7 @@ export async function generateText(
         result.usage?.inputTokens ?? estimateTokensFromText(promptText),
       outputTokens:
         result.usage?.outputTokens ?? estimateTokensFromText(result.data.text),
+      billingSource,
     });
   }
 

@@ -6,8 +6,6 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   Loader2Icon,
   SparklesIcon,
   XIcon,
@@ -15,15 +13,21 @@ import {
 import { toast } from "sonner";
 
 import { AgentConnectedChannelSelect } from "@/components/ai-assistant/AgentConnectedChannelSelect";
+import { AgentRoutingConflictBanner } from "@/components/ai-assistant/AgentRoutingConflictBanner";
 import { AiAgentChannelIconRow } from "@/components/ai-assistant/AiAgentChannelIconRow";
 import { AiAgentIconPicker } from "@/components/ai-assistant/AiAgentIconPicker";
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
-import { AiModelProviderSelect } from "@/components/ai-assistant/AiModelProviderSelect";
+import {
+  AiWizardModelStep,
+  isWizardModelStepValid,
+  type WizardBillingMode,
+} from "@/components/ai-assistant/AiWizardModelStep";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createAiAgentAction } from "@/features/ai-assistant/actions/create-ai-agent";
+import { saveBusinessAiProviderKeyAction } from "@/features/ai-assistant/actions/save-business-ai-provider-key";
 import {
   AGENT_WIZARD_GOALS,
   AGENT_WIZARD_STEPS,
@@ -41,6 +45,10 @@ import {
   DEFAULT_AGENT_ICON,
   type AgentIconId,
 } from "@/features/ai-assistant/agent-icons";
+import {
+  findDefaultAgentConflicts,
+  parseTriggerKeywordsInput,
+} from "@/features/ai-assistant/agent-channel-routing";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import {
@@ -49,6 +57,7 @@ import {
 } from "@/lib/ai/constants";
 import { cn } from "@/lib/utils";
 import type { AiAgentItem } from "@/types/ai-agent.types";
+import type { BusinessProviderCredential } from "@/services/business-ai-credentials.service";
 import type {
   AiProviderAvailability,
   ChannelAiSettingsData,
@@ -58,7 +67,7 @@ import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiAgentCreateWizardProps = {
-  step: 1 | 2 | 3;
+  step: 1 | 2 | 3 | 4;
   goal: AgentWizardGoalId | null;
   activeChannel: MessagingChannel;
   activeChannelFilter: MessagingChannel | null;
@@ -67,7 +76,11 @@ type AiAgentCreateWizardProps = {
   channelStatuses: IntegrationChannelStatusMap;
   channelDefaults: ChannelAiSettingsData;
   providerAvailability: AiProviderAvailability;
-  onStepChange: (step: 1 | 2 | 3, goal?: AgentWizardGoalId | null) => void;
+  platformProviderAvailability: AiProviderAvailability;
+  businessProviderCredentials: BusinessProviderCredential[];
+  preferCustomerAiKeys: boolean;
+  allAgents: AiAgentItem[];
+  onStepChange: (step: 1 | 2 | 3 | 4, goal?: AgentWizardGoalId | null) => void;
   onCancel: () => void;
 };
 
@@ -76,8 +89,10 @@ type WizardDraft = {
   systemPrompt: string;
   triggerKeywords: string;
   channels: MessagingChannel[];
+  billingMode: WizardBillingMode;
   provider: AiProvider;
   model: string;
+  useCustomModel: boolean;
   communicationStyle: CommunicationStyleId;
   icon: AgentIconId;
 };
@@ -87,6 +102,28 @@ function defaultConnectedChannels(
   visibleChannelIds: MessagingChannel[],
 ): MessagingChannel[] {
   return getConnectedMessagingChannels(channelStatuses, visibleChannelIds);
+}
+
+function defaultBillingMode(
+  platformAvailability: AiProviderAvailability,
+  credentials: BusinessProviderCredential[],
+  preferCustomerAiKeys: boolean,
+): WizardBillingMode {
+  const hasSavedKeys = credentials.some((credential) => credential.configured);
+
+  if (preferCustomerAiKeys && hasSavedKeys) {
+    return "own_key";
+  }
+
+  return Object.values(platformAvailability).some(Boolean) ? "platform" : "own_key";
+}
+
+function defaultOwnKeyProvider(
+  credentials: BusinessProviderCredential[],
+): AiProvider {
+  return (
+    credentials.find((credential) => credential.configured)?.provider ?? "openai"
+  );
 }
 
 export function AiAgentCreateWizard({
@@ -99,6 +136,10 @@ export function AiAgentCreateWizard({
   channelStatuses,
   channelDefaults,
   providerAvailability,
+  platformProviderAvailability,
+  businessProviderCredentials,
+  preferCustomerAiKeys,
+  allAgents,
   onStepChange,
   onCancel,
 }: AiAgentCreateWizardProps) {
@@ -111,14 +152,31 @@ export function AiAgentCreateWizard({
     systemPrompt: "",
     triggerKeywords: "",
     channels: defaultConnectedChannels(channelStatuses, visibleChannelIds),
+    billingMode: defaultBillingMode(
+      platformProviderAvailability,
+      businessProviderCredentials,
+      preferCustomerAiKeys,
+    ),
     provider: "gemini",
     model: channelDefaults.model,
+    useCustomModel: false,
     communicationStyle: DEFAULT_COMMUNICATION_STYLE,
     icon: DEFAULT_AGENT_ICON,
   }));
-  const [showAdvancedAi, setShowAdvancedAi] = useState(false);
+  const [draftApiKey, setDraftApiKey] = useState("");
+  const [draftKeyName, setDraftKeyName] = useState("");
+  const [useForAllAgents, setUseForAllAgents] = useState(true);
+  const [isReplacingKey, setIsReplacingKey] = useState(false);
+  const [savedCredentials, setSavedCredentials] = useState(
+    businessProviderCredentials,
+  );
   const [testMessage, setTestMessage] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+
+  useEffect(() => {
+    setSavedCredentials(businessProviderCredentials);
+  }, [businessProviderCredentials]);
 
   useEffect(() => {
     if (!goalConfig || !goal) {
@@ -129,7 +187,18 @@ export function AiAgentCreateWizard({
       return;
     }
 
-    const ai = resolveGoalAiConfig(goalConfig, providerAvailability);
+    const billingMode = defaultBillingMode(
+      platformProviderAvailability,
+      businessProviderCredentials,
+      preferCustomerAiKeys,
+    );
+    const ownKeyProvider = defaultOwnKeyProvider(businessProviderCredentials);
+    const ai = resolveGoalAiConfig(
+      goalConfig,
+      billingMode === "platform"
+        ? platformProviderAvailability
+        : providerAvailability,
+    );
 
     initializedGoalRef.current = goal;
     setDraft({
@@ -137,14 +206,30 @@ export function AiAgentCreateWizard({
       systemPrompt: goalConfig.draft.systemPrompt,
       triggerKeywords: goalConfig.draft.triggerKeywords.join(", "),
       channels: defaultConnectedChannels(channelStatuses, visibleChannelIds),
-      provider: ai.provider,
+      billingMode,
+      provider:
+        billingMode === "own_key" && ownKeyProvider
+          ? ownKeyProvider
+          : ai.provider,
       model: ai.model,
+      useCustomModel: false,
       communicationStyle: DEFAULT_COMMUNICATION_STYLE,
       icon: goalConfig.iconId,
     });
-    setShowAdvancedAi(false);
+    setDraftApiKey("");
+    setUseForAllAgents(true);
+    setIsReplacingKey(false);
     setTestMessage("");
-  }, [channelStatuses, goal, goalConfig, providerAvailability, visibleChannelIds]);
+  }, [
+    businessProviderCredentials,
+    channelStatuses,
+    goal,
+    goalConfig,
+    platformProviderAvailability,
+    preferCustomerAiKeys,
+    providerAvailability,
+    visibleChannelIds,
+  ]);
 
   const previewChannel =
     draft.channels[0] ?? activeChannelFilter ?? activeChannel;
@@ -171,6 +256,7 @@ export function AiAgentCreateWizard({
       language: channelDefaults.language,
       communicationStyle: draft.communicationStyle,
       icon: draft.icon,
+      useCustomModel: draft.useCustomModel,
       createdAt: "",
       updatedAt: "",
     };
@@ -188,9 +274,29 @@ export function AiAgentCreateWizard({
     testMessage,
   ]);
 
-  const providerReady = providerAvailability[draft.provider];
+  const routingConflicts = useMemo(
+    () =>
+      findDefaultAgentConflicts(allAgents, {
+        channels: draft.channels,
+        triggerKeywords: parseTriggerKeywordsInput(draft.triggerKeywords),
+      }),
+    [allAgents, draft.channels, draft.triggerKeywords],
+  );
+
+  const modelStepValid = isWizardModelStepValid({
+    billingMode: draft.billingMode,
+    provider: draft.provider,
+    model: draft.model,
+    useCustomModel: draft.useCustomModel,
+    draftApiKey,
+    draftKeyName,
+    isReplacingKey,
+    platformAvailability: platformProviderAvailability,
+    businessCredentials: savedCredentials,
+  });
 
   const hasSelectedChannel = draft.channels.length > 0;
+  const isBusy = isCreating || isSavingKey;
 
   function updateDraft<K extends keyof WizardDraft>(
     key: K,
@@ -222,6 +328,89 @@ export function AiAgentCreateWizard({
     onStepChange(2, nextGoal);
   }
 
+  async function persistDraftApiKeyIfNeeded(): Promise<boolean> {
+    if (draft.billingMode !== "own_key") {
+      return true;
+    }
+
+    const trimmedKey = draftApiKey.trim();
+    const trimmedKeyName = draftKeyName.trim();
+    const hasSavedKey = savedCredentials.some(
+      (credential) =>
+        credential.provider === draft.provider && credential.configured,
+    );
+    const needsNewKey = !hasSavedKey || isReplacingKey;
+
+    if (!needsNewKey) {
+      return true;
+    }
+
+    if (!trimmedKey) {
+      toast.error(AI_ASSISTANT_MESSAGES.aiCredentialsKeyRequired);
+      return false;
+    }
+
+    if (!trimmedKeyName) {
+      toast.error(AI_ASSISTANT_MESSAGES.aiCredentialsKeyNameRequired);
+      return false;
+    }
+
+    setIsSavingKey(true);
+
+    try {
+      const result = await saveBusinessAiProviderKeyAction({
+        provider: draft.provider,
+        apiKey: trimmedKey,
+        keyName: trimmedKeyName,
+        useForAllAgents,
+      });
+
+      if (!result.success) {
+        toast.error(
+          result.message ?? AI_ASSISTANT_MESSAGES.aiCredentialsSaveFailed,
+        );
+        return false;
+      }
+
+      setSavedCredentials((current) =>
+        current.map((credential) =>
+          credential.provider === draft.provider
+            ? {
+                ...credential,
+                configured: true,
+                keyName: trimmedKeyName,
+                keyPreview: `${trimmedKey.slice(0, 4)}••••${trimmedKey.slice(-4)}`,
+              }
+            : credential,
+        ),
+      );
+      setDraftApiKey("");
+      setDraftKeyName("");
+      setIsReplacingKey(false);
+      return true;
+    } finally {
+      setIsSavingKey(false);
+    }
+  }
+
+  async function handleContinueFromModelStep() {
+    if (!modelStepValid) {
+      if (draft.billingMode === "own_key" && !draftApiKey.trim()) {
+        toast.error(AI_ASSISTANT_MESSAGES.aiCredentialsKeyRequired);
+      }
+
+      return;
+    }
+
+    const saved = await persistDraftApiKeyIfNeeded();
+
+    if (!saved) {
+      return;
+    }
+
+    onStepChange(4, goal);
+  }
+
   async function handleCreate(enableAfterCreate: boolean) {
     if (!goalConfig) {
       return;
@@ -239,14 +428,28 @@ export function AiAgentCreateWizard({
       return;
     }
 
-    if (!providerReady) {
+    if (!modelStepValid) {
       toast.error("Configure an AI provider before creating the agent.");
+      return;
+    }
+
+    if (routingConflicts.length > 0) {
+      toast.error(routingConflicts[0]?.existingAgentName
+        ? `A default agent already exists for this channel.`
+        : "Fix routing conflicts before creating the agent.");
       return;
     }
 
     setIsCreating(true);
 
     try {
+      const keySaved = await persistDraftApiKeyIfNeeded();
+
+      if (!keySaved) {
+        setIsCreating(false);
+        return;
+      }
+
       const result = await createAiAgentAction({
         name: trimmedName,
         systemPrompt: draft.systemPrompt.trim(),
@@ -261,6 +464,7 @@ export function AiAgentCreateWizard({
         language: channelDefaults.language,
         communicationStyle: draft.communicationStyle,
         icon: draft.icon,
+        useCustomModel: draft.useCustomModel,
       });
 
       if (!result.success) {
@@ -286,6 +490,12 @@ export function AiAgentCreateWizard({
       setIsCreating(false);
       toast.error(AI_ASSISTANT_MESSAGES.saveFailed);
     }
+  }
+
+  function billingModeLabel(): string {
+    return draft.billingMode === "platform"
+      ? AI_ASSISTANT_MESSAGES.wizardBillingPlatformTitle
+      : AI_ASSISTANT_MESSAGES.wizardBillingOwnTitle;
   }
 
   return (
@@ -314,7 +524,7 @@ export function AiAgentCreateWizard({
             variant="ghost"
             size="icon-sm"
             onClick={onCancel}
-            disabled={isCreating}
+            disabled={isBusy}
             aria-label={AI_ASSISTANT_MESSAGES.createAgentCancel}
           >
             <XIcon className="size-4" />
@@ -380,7 +590,7 @@ export function AiAgentCreateWizard({
                   <button
                     key={entry.id}
                     type="button"
-                    disabled={isCreating}
+                    disabled={isBusy}
                     onClick={() => handleSelectGoal(entry.id)}
                     className="group flex flex-col rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
                   >
@@ -423,20 +633,48 @@ export function AiAgentCreateWizard({
                 selectedChannels={draft.channels}
                 visibleChannelIds={visibleChannelIds}
                 channelStatuses={channelStatuses}
-                disabled={isCreating}
+                disabled={isBusy}
                 onToggle={toggleChannel}
               />
             </section>
           ) : null}
 
           {step === 3 && goalConfig ? (
+            <AiWizardModelStep
+              billingMode={draft.billingMode}
+              provider={draft.provider}
+              model={draft.model}
+              useCustomModel={draft.useCustomModel}
+              draftApiKey={draftApiKey}
+              draftKeyName={draftKeyName}
+              useForAllAgents={useForAllAgents}
+              isReplacingKey={isReplacingKey}
+              platformAvailability={platformProviderAvailability}
+              businessCredentials={savedCredentials}
+              disabled={isBusy}
+              onBillingModeChange={(billingMode) =>
+                updateDraft("billingMode", billingMode)
+              }
+              onProviderChange={(provider) => updateDraft("provider", provider)}
+              onModelChange={(model) => updateDraft("model", model)}
+              onUseCustomModelChange={(useCustomModel) =>
+                updateDraft("useCustomModel", useCustomModel)
+              }
+              onDraftApiKeyChange={setDraftApiKey}
+              onDraftKeyNameChange={setDraftKeyName}
+              onUseForAllAgentsChange={setUseForAllAgents}
+              onReplacingKeyChange={setIsReplacingKey}
+            />
+          ) : null}
+
+          {step === 4 && goalConfig ? (
             <section className="space-y-6">
               <div>
                 <h2 className="text-lg font-medium">
-                  {AI_ASSISTANT_MESSAGES.wizardStep3Title}
+                  {AI_ASSISTANT_MESSAGES.wizardStep4Title}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {AI_ASSISTANT_MESSAGES.wizardStep3Description}
+                  {AI_ASSISTANT_MESSAGES.wizardStep4Description}
                 </p>
               </div>
 
@@ -450,19 +688,19 @@ export function AiAgentCreateWizard({
                       id="wizard-agent-name"
                       value={draft.name}
                       onChange={(event) => updateDraft("name", event.target.value)}
-                      disabled={isCreating}
+                      disabled={isBusy}
                     />
                   </div>
 
                   <AiAgentIconPicker
                     value={draft.icon}
-                    disabled={isCreating}
+                    disabled={isBusy}
                     onChange={(icon) => updateDraft("icon", icon)}
                   />
 
                   <AiCommunicationStyleSelect
                     value={draft.communicationStyle}
-                    disabled={isCreating}
+                    disabled={isBusy}
                     onChange={(value) =>
                       updateDraft("communicationStyle", value)
                     }
@@ -479,9 +717,11 @@ export function AiAgentCreateWizard({
                         updateDraft("systemPrompt", event.target.value)
                       }
                       rows={6}
-                      disabled={isCreating}
+                      disabled={isBusy}
                     />
                   </div>
+
+                  <AgentRoutingConflictBanner conflicts={routingConflicts} />
 
                   <div className="space-y-2">
                     <Label htmlFor="wizard-agent-keywords">
@@ -494,48 +734,11 @@ export function AiAgentCreateWizard({
                         updateDraft("triggerKeywords", event.target.value)
                       }
                       placeholder="price, buy, demo"
-                      disabled={isCreating}
+                      disabled={isBusy}
                     />
                     <p className="text-caption text-muted-foreground">
                       {AI_ASSISTANT_MESSAGES.agentTriggersHint}
                     </p>
-                  </div>
-
-                  <div className="rounded-xl border">
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between px-4 py-3 text-left"
-                      onClick={() => setShowAdvancedAi((value) => !value)}
-                    >
-                      <div>
-                        <p className="text-sm font-medium">
-                          {AI_ASSISTANT_MESSAGES.wizardAdvancedAi}
-                        </p>
-                        <p className="text-caption text-muted-foreground">
-                          {AI_PROVIDER_LABELS[draft.provider]} · {draft.model}
-                        </p>
-                      </div>
-                      {showAdvancedAi ? (
-                        <ChevronUpIcon className="size-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDownIcon className="size-4 text-muted-foreground" />
-                      )}
-                    </button>
-                    {showAdvancedAi ? (
-                      <div className="border-t px-4 pb-4 pt-2">
-                        <AiModelProviderSelect
-                          idPrefix="wizard-agent"
-                          provider={draft.provider}
-                          model={draft.model}
-                          providerAvailability={providerAvailability}
-                          disabled={isCreating}
-                          onProviderChange={(value) =>
-                            updateDraft("provider", value)
-                          }
-                          onModelChange={(value) => updateDraft("model", value)}
-                        />
-                      </div>
-                    ) : null}
                   </div>
                 </div>
 
@@ -548,6 +751,18 @@ export function AiAgentCreateWizard({
                       <div className="flex justify-between gap-2">
                         <span className="text-muted-foreground">Goal</span>
                         <span className="font-medium">{goalConfig.label}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">AI</span>
+                        <span className="text-right font-medium">
+                          {billingModeLabel()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Model</span>
+                        <span className="text-right font-medium">
+                          {AI_PROVIDER_LABELS[draft.provider]} · {draft.model}
+                        </span>
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-muted-foreground">Style</span>
@@ -573,7 +788,7 @@ export function AiAgentCreateWizard({
                         value={testMessage}
                         onChange={(event) => setTestMessage(event.target.value)}
                         placeholder={AI_ASSISTANT_MESSAGES.testMessage}
-                        disabled={isCreating}
+                        disabled={isBusy}
                       />
                       <p className="text-caption text-muted-foreground">
                         {testMessage.trim()
@@ -589,13 +804,7 @@ export function AiAgentCreateWizard({
             </section>
           ) : null}
 
-          {step === 2 && !goalConfig ? (
-            <div className="text-center text-sm text-muted-foreground">
-              {AI_ASSISTANT_MESSAGES.wizardPickGoalFirst}
-            </div>
-          ) : null}
-
-          {step === 3 && !goalConfig ? (
+          {step > 1 && !goalConfig ? (
             <div className="text-center text-sm text-muted-foreground">
               {AI_ASSISTANT_MESSAGES.wizardPickGoalFirst}
             </div>
@@ -609,25 +818,34 @@ export function AiAgentCreateWizard({
             <Button
               type="button"
               variant="ghost"
-              disabled={isCreating}
-              onClick={() =>
-                onStepChange(
-                  step === 3 ? 2 : 1,
-                  step === 3 ? goal : null,
-                )
-              }
+              disabled={isBusy}
+              onClick={() => {
+                if (step === 2) {
+                  onStepChange(1, null);
+                  return;
+                }
+
+                if (step === 3) {
+                  onStepChange(2, goal);
+                  return;
+                }
+
+                onStepChange(3, goal);
+              }}
               className="gap-2"
             >
               <ArrowLeftIcon className="size-4" />
               {step === 2
                 ? AI_ASSISTANT_MESSAGES.wizardBackToGoals
-                : AI_ASSISTANT_MESSAGES.wizardBackToChannels}
+                : step === 3
+                  ? AI_ASSISTANT_MESSAGES.wizardBackToChannels
+                  : AI_ASSISTANT_MESSAGES.wizardBackToModel}
             </Button>
 
             {step === 2 ? (
               <Button
                 type="button"
-                disabled={isCreating || !hasSelectedChannel}
+                disabled={isBusy || !hasSelectedChannel}
                 onClick={() => onStepChange(3, goal)}
                 className="gap-2"
               >
@@ -637,15 +855,36 @@ export function AiAgentCreateWizard({
             ) : null}
 
             {step === 3 ? (
+              <Button
+                type="button"
+                disabled={isBusy || !modelStepValid}
+                onClick={() => void handleContinueFromModelStep()}
+                className="gap-2"
+              >
+                {isSavingKey ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" />
+                    {AI_ASSISTANT_MESSAGES.wizardStep3SavingKey}
+                  </>
+                ) : (
+                  <>
+                    {AI_ASSISTANT_MESSAGES.wizardContinue}
+                    <ArrowRightIcon className="size-4" />
+                  </>
+                )}
+              </Button>
+            ) : null}
+
+            {step === 4 ? (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   type="button"
                   variant="outline"
                   disabled={
-                    isCreating ||
+                    isBusy ||
                     !draft.name.trim() ||
                     draft.channels.length === 0 ||
-                    !providerReady
+                    routingConflicts.length > 0
                   }
                   onClick={() => void handleCreate(false)}
                 >
@@ -654,10 +893,10 @@ export function AiAgentCreateWizard({
                 <Button
                   type="button"
                   disabled={
-                    isCreating ||
+                    isBusy ||
                     !draft.name.trim() ||
                     draft.channels.length === 0 ||
-                    !providerReady
+                    routingConflicts.length > 0
                   }
                   onClick={() => void handleCreate(true)}
                   className="gap-2"

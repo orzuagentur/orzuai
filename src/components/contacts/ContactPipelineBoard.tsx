@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
@@ -60,11 +60,23 @@ export function ContactPipelineBoard({
   listData,
 }: ContactPipelineBoardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusStage = searchParams.get("stage");
   const [movingContactId, setMovingContactId] = useState<string | null>(null);
   const [draggedContactId, setDraggedContactId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<PipelineStage | null>(
     null,
   );
+
+  useEffect(() => {
+    if (!focusStage || !PIPELINE_STAGES.includes(focusStage as PipelineStage)) {
+      return;
+    }
+
+    document
+      .getElementById(`pipeline-stage-${focusStage}`)
+      ?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [focusStage]);
 
   const contactsById = useMemo(() => {
     const map = new Map<string, UnifiedContactItem>();
@@ -133,8 +145,10 @@ export function ContactPipelineBoard({
         {PIPELINE_STAGES.map((stage) => (
           <div
             key={stage}
+            id={`pipeline-stage-${stage}`}
             className={cn(
               "min-w-[220px] rounded-xl border bg-card lg:min-w-0",
+              focusStage === stage && "border-primary/50 ring-2 ring-primary/20",
               dropTargetStage === stage && "border-primary/50 ring-2 ring-primary/20",
             )}
             onDragOver={(event) => {

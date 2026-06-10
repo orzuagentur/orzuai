@@ -51,19 +51,24 @@ export function calculateConversionRate(
   return Math.round((aiResponses / totalMessages) * 1000) / 10;
 }
 
-export function buildLastSevenDaysActivity(
+export function buildPeriodActivity(
   timestamps: string[],
+  days: number,
 ): Array<{ label: string; value: number }> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const safeDays = Math.max(1, Math.min(days, 90));
 
-  const buckets = Array.from({ length: 7 }, (_, index) => {
+  const buckets = Array.from({ length: safeDays }, (_, index) => {
     const date = new Date(today);
-    date.setDate(today.getDate() - (6 - index));
+    date.setDate(today.getDate() - (safeDays - 1 - index));
 
     return {
       key: date.toISOString().slice(0, 10),
-      label: date.toLocaleDateString("en-US", { weekday: "short" }),
+      label:
+        safeDays <= 7
+          ? date.toLocaleDateString("en-US", { weekday: "short" })
+          : date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       value: 0,
     };
   });
@@ -80,6 +85,12 @@ export function buildLastSevenDaysActivity(
   }
 
   return buckets.map(({ label, value }) => ({ label, value }));
+}
+
+export function buildLastSevenDaysActivity(
+  timestamps: string[],
+): Array<{ label: string; value: number }> {
+  return buildPeriodActivity(timestamps, 7);
 }
 
 export function formatRelativeTime(isoDate: string): string {

@@ -9,18 +9,24 @@ import type { ActivityDataPoint } from "@/types/dashboard.types";
 
 type ActivityChartProps = {
   data: ActivityDataPoint[];
+  title?: string;
+  description?: string;
+  className?: string;
 };
 
-export function ActivityChart({ data }: ActivityChartProps) {
+export function ActivityChart({
+  data,
+  title = "Activity Chart",
+  description = "Message volume over the last 7 days.",
+  className,
+}: ActivityChartProps) {
   const maxValue = Math.max(...data.map((point) => point.value), 1);
 
   return (
-    <Card className="shadow-none">
+    <Card className={className ?? "shadow-none"}>
       <CardHeader>
-        <CardTitle>Activity Chart</CardTitle>
-        <CardDescription>
-          Message volume over the last 7 days.
-        </CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex h-48 items-end gap-2">

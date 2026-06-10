@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRightIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,6 +16,7 @@ import type { SentimentBreakdown } from "@/types/dashboard.types";
 
 type SentimentPanelProps = {
   breakdown: SentimentBreakdown;
+  negativeHref?: string | null;
 };
 
 const SENTIMENT_ITEMS = [
@@ -21,7 +26,10 @@ const SENTIMENT_ITEMS = [
   { key: "unknown" as const, labelKey: "sentimentUnknown" as const },
 ];
 
-export function SentimentPanel({ breakdown }: SentimentPanelProps) {
+export function SentimentPanel({
+  breakdown,
+  negativeHref,
+}: SentimentPanelProps) {
   const total =
     breakdown.positive +
     breakdown.neutral +
@@ -48,15 +56,31 @@ export function SentimentPanel({ breakdown }: SentimentPanelProps) {
             {SENTIMENT_ITEMS.map((item) => {
               const count = breakdown[item.key];
               const percent = Math.round((count / total) * 100);
+              const showLink =
+                item.key === "negative" && count > 0 && negativeHref;
 
               return (
                 <li
                   key={item.key}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                 >
                   <span>{ANALYTICS_MESSAGES[item.labelKey]}</span>
-                  <span className="tabular-nums text-muted-foreground">
+                  <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                     {count} ({percent}%)
+                    {showLink ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 px-2"
+                        asChild
+                      >
+                        <Link href={negativeHref}>
+                          {ANALYTICS_MESSAGES.viewContacts(count)}
+                          <ArrowRightIcon className="size-3.5" />
+                        </Link>
+                      </Button>
+                    ) : null}
                   </span>
                 </li>
               );

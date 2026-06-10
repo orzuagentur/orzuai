@@ -12,7 +12,7 @@ export type AiAssistantUrlState = {
   channel?: MessagingChannel | null;
   tab?: AiAssistantTab;
   agent?: string | null;
-  step?: 1 | 2 | 3 | null;
+  step?: 1 | 2 | 3 | 4 | null;
   goal?: string | null;
   q?: string | null;
   setup?: boolean;
@@ -85,14 +85,14 @@ export function buildAiAssistantHref(state: AiAssistantUrlState = {}): string {
 function parseCreateWizardStep(
   value: string | undefined,
   isNewAgent: boolean,
-): 1 | 2 | 3 {
+): 1 | 2 | 3 | 4 {
   if (!isNewAgent) {
     return 1;
   }
 
   const parsed = Number(value);
 
-  if (parsed === 2 || parsed === 3) {
+  if (parsed === 2 || parsed === 3 || parsed === 4) {
     return parsed;
   }
 
@@ -114,7 +114,7 @@ export function parseAiAssistantSearchParams(input: {
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
-  createWizardStep: 1 | 2 | 3;
+  createWizardStep: 1 | 2 | 3 | 4;
   createWizardGoal: string | null;
   isEditingAgent: boolean;
   isViewingAnalytics: boolean;

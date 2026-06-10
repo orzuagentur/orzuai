@@ -1,57 +1,46 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
-
-import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { hasSupabaseEnv } from "@/lib/env";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/services/auth.service";
+import { getActiveMessagingChannelIds } from "@/features/integrations";
+import { countActiveRules } from "@/features/automations/rule-catalog";
+import { listCustomAutomations } from "@/services/custom-automations.service";
+import { listAiAgents } from "@/services/ai-agents.service";
 import { getAiUsageSummary } from "@/services/ai-usage.service";
+import { requireUser } from "@/services/auth.service";
+import {
+  getAutomationActivity,
+  getAutomationStats,
+} from "@/services/automation-activity.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import { getSalesAgentSettings } from "@/services/sales-agent.service";
-import type {
-  AutomationItem,
-  AutomationsPageData,
-  SaveAutomationInput,
-} from "@/types/automations.types";
-import { saveAutomationSchema } from "@/types/automations.types";
+import type { AutomationsPageData } from "@/types/automations.types";
+import { parseAutomationsSearchParams } from "@/utils/automations-url";
 
-export async function listAutomations(
-  businessId: string,
-): Promise<AutomationItem[]> {
-  if (!hasSupabaseEnv()) {
-    return [];
-  }
-
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("automations")
-    .select("id, name, trigger_type, action_type, enabled, created_at")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false });
-
-  return (
-    data?.map((row) => ({
-      id: row.id,
-      name: row.name,
-      triggerType: row.trigger_type,
-      actionType: row.action_type,
-      enabled: row.enabled,
-      createdAt: row.created_at,
-    })) ?? []
-  );
-}
-
-export async function getAutomationsPageData(): Promise<AutomationsPageData> {
+export async function getAutomationsPageData(input?: {
+  tab?: string;
+  rule?: string;
+  workflow?: string;
+  step?: string;
+}): Promise<AutomationsPageData> {
+  const {
+    activeTab,
+    activeRuleId,
+    activeWorkflowId,
+    isNewWorkflow,
+    createWizardStep,
+  } = parseAutomationsSearchParams(input ?? {});
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
 
   if (!business) {
     return {
       hasBusiness: false,
-      automations: [],
+      activeTab,
+      activeRuleId,
+      activeWorkflowId: null,
+      isNewWorkflow: false,
+      createWizardStep: 1,
       usage: null,
       salesAgent: {
         salesAgentEnabled: false,
@@ -61,105 +50,60 @@ export async function getAutomationsPageData(): Promise<AutomationsPageData> {
         autoTaskThreshold: 75,
         sentimentAnalysisEnabled: true,
       },
-      followUpAgent: { enabled: true, sentCount: 0 },
+      followUpAgent: { enabled: true, sentCount: 0, aiAgentId: null },
+      stats: {
+        followUpsSent: 0,
+        qualifiedContacts: 0,
+        crmTasksCreated: 0,
+        activeRules: 0,
+      },
+      activity: [],
+      workflows: [],
+      agents: [],
+      channelStatuses: {},
+      visibleChannelIds: [],
     };
   }
 
-  const [automations, usage, salesAgent, followUpAgent] = await Promise.all([
-    listAutomations(business.id),
+  const [
+    usage,
+    salesAgent,
+    followUpAgent,
+    stats,
+    activity,
+    workflows,
+    agents,
+    channelStatuses,
+  ] = await Promise.all([
     getAiUsageSummary(),
     getSalesAgentSettings(business.id),
     getFollowUpAgentSettings(business.id),
+    getAutomationStats(business.id),
+    getAutomationActivity(business.id),
+    listCustomAutomations(business.id),
+    listAiAgents(),
+    getChannelConnectionStatuses(business.id),
   ]);
 
-  return { hasBusiness: true, automations, usage, salesAgent, followUpAgent };
-}
+  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
+  const builtinActive = countActiveRules(salesAgent, followUpAgent);
+  const customActive = workflows.filter((workflow) => workflow.enabled).length;
 
-export async function createAutomation(
-  input: SaveAutomationInput,
-): Promise<{ success: boolean; message?: string }> {
-  const parsed = saveAutomationSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      message: parsed.error.issues[0]?.message ?? "Invalid automation.",
-    };
-  }
-
-  const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
-
-  if (!business || !hasSupabaseEnv()) {
-    return { success: false, message: "Configuration missing." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("automations").insert({
-    business_id: business.id,
-    name: parsed.data.name,
-    trigger_type: parsed.data.triggerType,
-    action_type: parsed.data.actionType,
-    enabled: parsed.data.enabled ?? true,
-    config: {},
-  });
-
-  if (error) {
-    return { success: false, message: error.message };
-  }
-
-  revalidatePath(DASHBOARD_ROUTES.automations);
-  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
-  return { success: true };
-}
-
-export async function toggleAutomation(
-  automationId: string,
-  enabled: boolean,
-): Promise<{ success: boolean; message?: string }> {
-  const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
-
-  if (!business || !hasSupabaseEnv()) {
-    return { success: false, message: "Configuration missing." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("automations")
-    .update({ enabled })
-    .eq("id", automationId)
-    .eq("business_id", business.id);
-
-  if (error) {
-    return { success: false, message: error.message };
-  }
-
-  revalidatePath(DASHBOARD_ROUTES.automations);
-  return { success: true };
-}
-
-export async function deleteAutomation(
-  automationId: string,
-): Promise<{ success: boolean; message?: string }> {
-  const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
-
-  if (!business || !hasSupabaseEnv()) {
-    return { success: false, message: "Configuration missing." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("automations")
-    .delete()
-    .eq("id", automationId)
-    .eq("business_id", business.id);
-
-  if (error) {
-    return { success: false, message: error.message };
-  }
-
-  revalidatePath(DASHBOARD_ROUTES.automations);
-  return { success: true };
+  return {
+    hasBusiness: true,
+    activeTab,
+    activeRuleId,
+    activeWorkflowId,
+    isNewWorkflow,
+    createWizardStep,
+    usage,
+    salesAgent,
+    followUpAgent,
+    stats: { ...stats, activeRules: builtinActive + customActive },
+    activity,
+    workflows,
+    agents,
+    channelStatuses,
+    visibleChannelIds,
+  };
 }

@@ -12,7 +12,7 @@ import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
 } from "@/features/integrations/channel-status";
-import { resolveAiModel, type AiProvider } from "@/lib/ai/constants";
+import { resolveAgentModel, resolveAiModel, type AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { resolveGeminiModel } from "@/lib/gemini/constants";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -473,7 +473,7 @@ export async function testChannelAiReply(
   const { data: agentRows } = await admin
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
     )
     .eq("business_id", businessId)
     .eq("enabled", true);
@@ -488,6 +488,7 @@ export async function testChannelAiReply(
       enabled: row.enabled,
       provider: row.provider ?? undefined,
       model: row.model ?? undefined,
+      useCustomModel: row.use_custom_model ?? false,
       language: row.language ?? undefined,
       communicationStyle: row.communication_style ?? undefined,
       updatedAt: row.updated_at,
@@ -511,7 +512,13 @@ export async function testChannelAiReply(
   const reply = await generateAssistantReply({
     businessId,
     provider,
-    model: agent?.model ?? settings.model,
+    model: agent
+      ? resolveAgentModel(
+          provider,
+          agent.model ?? settings.model,
+          agent.useCustomModel ?? false,
+        )
+      : settings.model,
     systemPrompt,
     language: agent?.language ?? settings.language,
     userMessage: parsed.data.testMessage,

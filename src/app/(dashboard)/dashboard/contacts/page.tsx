@@ -19,6 +19,7 @@ type ContactsPageProps = {
     segment?: string;
     view?: string;
     contact?: string;
+    stage?: string;
     q?: string;
     page?: string;
   }>;

@@ -1,16 +1,24 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { AnalyticsHub } from "@/components/analytics/AnalyticsHub";
+import { AnalyticsCommandCenter } from "@/components/analytics/AnalyticsCommandCenter";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { isMessagingIntegrationChannel } from "@/features/integrations";
-import type { IntegrationChannelId } from "@/features/integrations";
+import { ANALYTICS_MESSAGES } from "@/features/analytics/constants";
+import {
+  isMessagingIntegrationChannel,
+  type IntegrationChannelId,
+} from "@/features/integrations";
 import { getAnalyticsPageData } from "@/services/analytics.service";
+import type { MessagingChannel } from "@/types/database.types";
+import { buildAnalyticsHref } from "@/utils/analytics-url";
 
 type AnalyticsPageProps = {
-  searchParams: Promise<{ channel?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    period?: string;
+    channel?: string;
+  }>;
 };
 
 export default function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
@@ -22,20 +30,35 @@ export default function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
 }
 
 async function AnalyticsPageContent({ searchParams }: AnalyticsPageProps) {
-  const { channel } = await searchParams;
+  const params = await searchParams;
 
   if (
-    channel &&
-    !isMessagingIntegrationChannel(channel as IntegrationChannelId)
+    params.channel &&
+    !isMessagingIntegrationChannel(params.channel as IntegrationChannelId)
   ) {
-    redirect(`${DASHBOARD_ROUTES.analytics}?channel=whatsapp`);
+    redirect(buildAnalyticsHref({ tab: "channels" }));
   }
 
-  const data = await getAnalyticsPageData(channel ?? "whatsapp");
+  if (params.channel && !params.tab) {
+    redirect(
+      buildAnalyticsHref({
+        tab: "channels",
+        channel: params.channel as MessagingChannel,
+        period: params.period === "30d" || params.period === "all" ? params.period : "7d",
+      }),
+    );
+  }
+
+  const data = await getAnalyticsPageData(params);
 
   if (!data.hasBusiness) {
-    return <DashboardSetupPrompt title="Analytics" />;
+    return (
+      <DashboardSetupPrompt
+        title={ANALYTICS_MESSAGES.pageTitle}
+        description={ANALYTICS_MESSAGES.pageDescription}
+      />
+    );
   }
 
-  return <AnalyticsHub data={data} />;
+  return <AnalyticsCommandCenter data={data} />;
 }

@@ -65,50 +65,114 @@ async function isChannelConnected(
   return channel === "website_forms";
 }
 
+type FollowUpAgentProfile = {
+  id: string;
+  systemPrompt: string;
+  provider?: string;
+  model?: string;
+  language?: string;
+};
+
+async function loadFollowUpAgentProfile(
+  admin: ReturnType<typeof createAdminClient>,
+  businessId: string,
+  aiAgentId: string | null,
+): Promise<FollowUpAgentProfile | null> {
+  if (!aiAgentId) {
+    return null;
+  }
+
+  const { data } = await admin
+    .from("ai_agents")
+    .select("id, system_prompt, provider, model, language, enabled")
+    .eq("id", aiAgentId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!data?.enabled) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    systemPrompt: data.system_prompt,
+    provider: data.provider ?? undefined,
+    model: data.model ?? undefined,
+    language: data.language ?? undefined,
+  };
+}
+
 async function generateFollowUpMessage(input: {
+  admin: ReturnType<typeof createAdminClient>;
   businessId: string;
   contactName: string;
   channel: MessagingChannel;
   lastOutboundContent: string;
   followUpDay: 1 | 2;
-}): Promise<string | null> {
-  if (!hasGeminiEnv()) {
-    return `Hi ${input.contactName}, just checking in — let us know if you still need help.`;
+  aiAgentId: string | null;
+}): Promise<{ content: string; aiAgentId: string | null } | null> {
+  const agent = await loadFollowUpAgentProfile(
+    input.admin,
+    input.businessId,
+    input.aiAgentId,
+  );
+
+  if (!hasGeminiEnv() && !agent) {
+    return {
+      content: `Hi ${input.contactName}, just checking in — let us know if you still need help.`,
+      aiAgentId: null,
+    };
   }
+
+  const systemInstruction = agent
+    ? [
+        agent.systemPrompt,
+        "Write a short follow-up message. Keep replies under 280 characters. No markdown.",
+      ].join("\n\n")
+    : "You write polite sales follow-up messages. Keep replies under 280 characters.";
 
   const result = await generateText({
     businessId: input.businessId,
+    provider: agent?.provider as "gemini" | "openai" | "claude" | undefined,
+    model: agent?.model,
     prompt: [
       `Write a short follow-up #${input.followUpDay} for ${input.channel}.`,
+      agent?.language ? `Reply language: ${agent.language}` : null,
       `Customer name: ${input.contactName}`,
       `Previous message we sent: ${input.lastOutboundContent}`,
       "Goal: gentle nudge, 1-2 sentences, no markdown.",
-    ].join("\n"),
-    systemInstruction:
-      "You write polite sales follow-up messages. Keep replies under 280 characters.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    systemInstruction,
   });
 
   if (!result.success) {
     return null;
   }
 
-  return result.data.text.trim().slice(0, 500);
+  return {
+    content: result.data.text.trim().slice(0, 500),
+    aiAgentId: agent?.id ?? null,
+  };
 }
 
 async function sendFollowUpOnChannel(input: {
   admin: ReturnType<typeof createAdminClient>;
   candidate: FollowUpCandidate;
   content: string;
+  aiAgentId?: string | null;
 }): Promise<boolean> {
-  const { admin, candidate, content } = input;
+  const { admin, candidate } = input;
 
   if (candidate.channel === "website_forms") {
     await insertChannelMessage(admin, {
       conversationId: candidate.conversationId,
       channel: candidate.channel,
       senderType: "ai",
-      content,
+      content: input.content,
       aiGenerated: true,
+      aiAgentId: input.aiAgentId ?? null,
     });
 
     await incrementMessagingAnalytics(admin, candidate.businessId, candidate.channel, {
@@ -149,7 +213,7 @@ async function sendFollowUpOnChannel(input: {
       whatsappConnection.meta_phone_number_id,
       whatsappConnection.meta_access_token,
       contact.phone_number.replace(/[^\d+]/g, ""),
-      content,
+      input.content,
     );
 
     if (!sendResult.success) {
@@ -160,14 +224,15 @@ async function sendFollowUpOnChannel(input: {
       conversationId: candidate.conversationId,
       channel: candidate.channel,
       senderType: "ai",
-      content,
+      content: input.content,
       aiGenerated: true,
+      aiAgentId: input.aiAgentId ?? null,
     });
   } else if (candidate.channel === "instagram") {
     const sendResult = await sendInstagramChatMessage(
       candidate.businessId,
       candidate.conversationId,
-      content,
+      input.content,
     );
 
     if (!sendResult.success) {
@@ -177,7 +242,7 @@ async function sendFollowUpOnChannel(input: {
     const sendResult = await sendTelegramChatMessage(
       candidate.businessId,
       candidate.conversationId,
-      content,
+      input.content,
     );
 
     if (!sendResult.success) {
@@ -316,25 +381,42 @@ export async function runDueConversationFollowUps(): Promise<{
 
   const admin = createAdminClient();
   const candidates = await listFollowUpCandidates(admin);
+  const followUpAgentByBusiness = new Map<string, string | null>();
   let sent = 0;
 
   for (const candidate of candidates) {
-    const content = await generateFollowUpMessage({
+    if (!followUpAgentByBusiness.has(candidate.businessId)) {
+      const { data: config } = await admin
+        .from("business_ai_config")
+        .select("follow_up_agent_id")
+        .eq("business_id", candidate.businessId)
+        .maybeSingle();
+
+      followUpAgentByBusiness.set(
+        candidate.businessId,
+        config?.follow_up_agent_id ?? null,
+      );
+    }
+
+    const generated = await generateFollowUpMessage({
+      admin,
       businessId: candidate.businessId,
       contactName: candidate.contactName,
       channel: candidate.channel,
       lastOutboundContent: candidate.lastOutboundContent,
       followUpDay: candidate.followUpDay,
+      aiAgentId: followUpAgentByBusiness.get(candidate.businessId) ?? null,
     });
 
-    if (!content) {
+    if (!generated) {
       continue;
     }
 
     const delivered = await sendFollowUpOnChannel({
       admin,
       candidate,
-      content,
+      content: generated.content,
+      aiAgentId: generated.aiAgentId,
     });
 
     if (!delivered) {

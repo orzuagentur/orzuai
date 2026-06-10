@@ -10,6 +10,7 @@ export type RoutableAiAgent = {
   enabled: boolean;
   provider?: string;
   model?: string;
+  useCustomModel?: boolean;
   language?: string;
   communicationStyle?: string;
   updatedAt?: string;

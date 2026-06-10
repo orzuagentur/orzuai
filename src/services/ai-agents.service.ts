@@ -3,6 +3,10 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import {
+  type RoutableAgentRef,
+  validateAgentChannelRouting,
+} from "@/features/ai-assistant/agent-channel-routing";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -45,6 +49,7 @@ function mapAiAgent(row: {
   language?: string | null;
   communication_style?: string | null;
   icon?: string | null;
+  use_custom_model?: boolean | null;
   created_at: string;
   updated_at: string;
 }): AiAgentItem {
@@ -60,6 +65,7 @@ function mapAiAgent(row: {
     language: row.language ?? "English",
     communicationStyle: row.communication_style ?? "professional",
     icon: resolveAgentIconId(row.icon),
+    useCustomModel: row.use_custom_model ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -76,12 +82,29 @@ export async function listAiAgents(): Promise<AiAgentItem[]> {
   const { data } = await supabase
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, icon, created_at, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, icon, use_custom_model, created_at, updated_at",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
 
   return (data ?? []).map(mapAiAgent);
+}
+
+async function loadRoutableAgentsForBusiness(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+): Promise<RoutableAgentRef[]> {
+  const { data } = await supabase
+    .from("ai_agents")
+    .select("id, name, channels, trigger_keywords")
+    .eq("business_id", businessId);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    channels: row.channels ?? [],
+    triggerKeywords: row.trigger_keywords ?? [],
+  }));
 }
 
 export async function createAiAgent(
@@ -109,6 +132,22 @@ export async function createAiAgent(
   }
 
   const supabase = await createClient();
+  const existingAgents = await loadRoutableAgentsForBusiness(supabase, businessId);
+  const routing = validateAgentChannelRouting(existingAgents, {
+    channels: parsed.data.channels,
+    triggerKeywords: parsed.data.triggerKeywords,
+  });
+
+  if (!routing.valid) {
+    return {
+      success: false,
+      error: {
+        code: "ROUTING_CONFLICT",
+        message: routing.message,
+      },
+    };
+  }
+
   const { data: created, error } = await supabase
     .from("ai_agents")
     .insert({
@@ -123,6 +162,7 @@ export async function createAiAgent(
       language: parsed.data.language ?? "English",
       communication_style: parsed.data.communicationStyle,
       icon: parsed.data.icon,
+      use_custom_model: parsed.data.useCustomModel,
     })
     .select("id")
     .single();
@@ -194,6 +234,23 @@ export async function updateAiAgent(
   }
 
   const supabase = await createClient();
+  const existingAgents = await loadRoutableAgentsForBusiness(supabase, businessId);
+  const routing = validateAgentChannelRouting(existingAgents, {
+    id: parsed.data.id,
+    channels: parsed.data.channels,
+    triggerKeywords: parsed.data.triggerKeywords,
+  });
+
+  if (!routing.valid) {
+    return {
+      success: false,
+      error: {
+        code: "ROUTING_CONFLICT",
+        message: routing.message,
+      },
+    };
+  }
+
   const { error } = await supabase
     .from("ai_agents")
     .update({
@@ -207,6 +264,7 @@ export async function updateAiAgent(
       language: parsed.data.language,
       communication_style: parsed.data.communicationStyle,
       icon: parsed.data.icon,
+      use_custom_model: parsed.data.useCustomModel,
     })
     .eq("id", parsed.data.id)
     .eq("business_id", businessId);

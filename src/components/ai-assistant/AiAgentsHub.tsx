@@ -116,7 +116,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
   }, [data, router]);
 
   const handleWizardStepChange = useCallback(
-    (step: 1 | 2 | 3, goal?: AgentWizardGoalId | null) => {
+    (step: 1 | 2 | 3 | 4, goal?: AgentWizardGoalId | null) => {
       router.push(
         buildHubHref(data, {
           agent: "new",
@@ -215,6 +215,10 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
             activeChannelEntry?.settings ?? data.channels[0]!.settings
           }
           providerAvailability={data.providerAvailability}
+          platformProviderAvailability={data.platformProviderAvailability}
+          businessProviderCredentials={data.businessProviderCredentials}
+          preferCustomerAiKeys={data.preferCustomerAiKeys}
+          allAgents={data.agents}
           onStepChange={handleWizardStepChange}
           onCancel={handleCancelCreate}
         />
@@ -280,6 +284,8 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
                 visibleChannelIds={data.visibleChannelIds}
                 channelStatuses={data.channelStatuses}
                 providerAvailability={data.providerAvailability}
+                platformProviderAvailability={data.platformProviderAvailability}
+                businessProviderCredentials={data.businessProviderCredentials}
                 onCancel={handleCancelEdit}
                 onBack={showEditorOnMobile ? clearAgentSelection : undefined}
               />

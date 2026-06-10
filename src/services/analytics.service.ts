@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  MESSAGING_INTEGRATION_CHANNELS,
-  isMessagingIntegrationChannel,
-} from "@/features/integrations";
-import type { IntegrationChannelId } from "@/features/integrations";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +13,6 @@ import {
 import type {
   AnalyticsPageData,
   AnalyticsTotals,
-  MessagingChannel,
 } from "@/types/channel-workspace.types";
 import { getAiCostMetrics } from "@/services/ai-usage.service";
 import type { AiCostMetrics } from "@/types/ai-usage.types";
@@ -37,9 +32,18 @@ import type {
 } from "@/types/dashboard.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
+  getAutomationOpsMetrics,
+  listAgentsAnalyticsRollup,
+} from "@/services/analytics-ai-ops.service";
+import {
+  buildAnalyticsAttentionFeed,
+  getAnalyticsPulseData,
+} from "@/services/analytics-pulse.service";
+import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
 } from "@/utils/dashboard";
+import { parseAnalyticsSearchParams } from "@/utils/analytics-url";
 
 const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
 
@@ -77,6 +81,7 @@ const EMPTY_AI_COST: AiCostMetrics = {
   monthReplies: 0,
   avgCostPerReplyUsd: 0,
   byProvider: [],
+  hasCustomBilling: false,
 };
 
 const SLA_TARGET_MINUTES = 60;
@@ -700,21 +705,38 @@ function buildTotals(
   );
 }
 
-export async function getAnalyticsPageData(
-  activeChannelParam?: string | null,
-): Promise<AnalyticsPageData> {
-  const channelParam = activeChannelParam as IntegrationChannelId | undefined;
-  const activeChannel: MessagingChannel =
-    channelParam && isMessagingIntegrationChannel(channelParam)
-      ? channelParam
-      : "whatsapp";
+const EMPTY_PULSE = {
+  kpis: [],
+  activity: buildLastSevenDaysActivity([]),
+  activityDays: 7,
+  attention: [],
+};
+
+const EMPTY_AUTOMATION_OPS = {
+  runsToday: 0,
+  runsLast30Days: 0,
+  successRatePercent: 0,
+  failedRunsLast30Days: 0,
+  topTriggers: [],
+};
+
+export async function getAnalyticsPageData(input?: {
+  tab?: string;
+  period?: string;
+  channel?: string;
+}): Promise<AnalyticsPageData> {
+  const { activeTab, activePeriod, activeChannelId } =
+    parseAnalyticsSearchParams(input ?? {});
 
   const businessId = await getOwnedBusinessId();
 
   if (!businessId || !hasSupabaseEnv()) {
     return {
       hasBusiness: false,
-      activeChannel,
+      activeTab,
+      activePeriod,
+      pulse: EMPTY_PULSE,
+      activeChannelId,
       channelStatuses: {},
       channels: [],
       totals: {
@@ -731,6 +753,8 @@ export async function getAnalyticsPageData(
       teamAnalytics: EMPTY_TEAM_ANALYTICS,
       revenue: EMPTY_REVENUE,
       sentiment: EMPTY_SENTIMENT,
+      agentsRollup: [],
+      automationOps: EMPTY_AUTOMATION_OPS,
     };
   }
 
@@ -744,6 +768,9 @@ export async function getAnalyticsPageData(
     teamAnalytics,
     revenue,
     sentiment,
+    pulseBase,
+    agentsRollup,
+    automationOps,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     getAiPerformanceMetrics(businessId),
@@ -754,7 +781,18 @@ export async function getAnalyticsPageData(
     getTeamAnalyticsMetrics(businessId),
     getRevenueMetrics(businessId),
     getSentimentBreakdown(businessId),
+    getAnalyticsPulseData(businessId, activePeriod),
+    listAgentsAnalyticsRollup(businessId),
+    getAutomationOpsMetrics(businessId),
   ]);
+
+  const attention = await buildAnalyticsAttentionFeed({
+    businessId,
+    channelStatuses,
+    teamAnalytics,
+    sentiment,
+    crmFunnel,
+  });
 
   const channels = await Promise.all(
     MESSAGING_CHANNELS.map(async (channel) => {
@@ -774,7 +812,10 @@ export async function getAnalyticsPageData(
 
   return {
     hasBusiness: true,
-    activeChannel,
+    activeTab,
+    activePeriod,
+    pulse: { ...pulseBase, attention },
+    activeChannelId,
     channelStatuses,
     channels,
     totals: buildTotals(channels),
@@ -786,5 +827,7 @@ export async function getAnalyticsPageData(
     teamAnalytics,
     revenue,
     sentiment,
+    agentsRollup,
+    automationOps,
   };
 }

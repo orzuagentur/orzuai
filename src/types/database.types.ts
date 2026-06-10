@@ -95,6 +95,7 @@ export type Database = {
           subscription_status: string;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
+          prefer_customer_ai_keys: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -112,6 +113,7 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -129,6 +131,7 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -903,6 +906,7 @@ export type Database = {
           language: string;
           communication_style: string;
           icon: string;
+          use_custom_model: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -919,6 +923,7 @@ export type Database = {
           language?: string;
           communication_style?: string;
           icon?: string;
+          use_custom_model?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -935,6 +940,7 @@ export type Database = {
           language?: string;
           communication_style?: string;
           icon?: string;
+          use_custom_model?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -995,6 +1001,41 @@ export type Database = {
           },
         ];
       };
+      business_ai_provider_keys: {
+        Row: {
+          business_id: string;
+          provider: string;
+          api_key: string;
+          key_name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          provider: string;
+          api_key: string;
+          key_name?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          provider?: string;
+          api_key?: string;
+          key_name?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_ai_provider_keys_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       ai_usage_logs: {
         Row: {
           id: string;
@@ -1005,6 +1046,7 @@ export type Database = {
           input_tokens: number;
           output_tokens: number;
           estimated_cost_usd: number;
+          billing_source: string;
           created_at: string;
         };
         Insert: {
@@ -1016,6 +1058,7 @@ export type Database = {
           input_tokens?: number;
           output_tokens?: number;
           estimated_cost_usd?: number;
+          billing_source?: string;
           created_at?: string;
         };
         Update: {
@@ -1027,6 +1070,7 @@ export type Database = {
           input_tokens?: number;
           output_tokens?: number;
           estimated_cost_usd?: number;
+          billing_source?: string;
           created_at?: string;
         };
         Relationships: [
@@ -1056,6 +1100,7 @@ export type Database = {
           auto_task_threshold: number;
           sentiment_analysis_enabled: boolean;
           follow_up_agent_enabled: boolean;
+          follow_up_agent_id: string | null;
           updated_at: string;
         };
         Insert: {
@@ -1067,6 +1112,7 @@ export type Database = {
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
+          follow_up_agent_id?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -1078,6 +1124,7 @@ export type Database = {
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
+          follow_up_agent_id?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -1118,6 +1165,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "channel_analytics_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      automation_runs: {
+        Row: {
+          id: string;
+          automation_id: string;
+          business_id: string;
+          conversation_id: string | null;
+          contact_id: string | null;
+          trigger_type: string;
+          action_type: string;
+          status: string;
+          detail: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          automation_id: string;
+          business_id: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          trigger_type: string;
+          action_type: string;
+          status?: string;
+          detail?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          automation_id?: string;
+          business_id?: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          trigger_type?: string;
+          action_type?: string;
+          status?: string;
+          detail?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey";
+            columns: ["automation_id"];
+            isOneToOne: false;
+            referencedRelation: "automations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_runs_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";

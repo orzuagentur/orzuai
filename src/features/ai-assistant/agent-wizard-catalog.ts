@@ -98,7 +98,8 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
 export const AGENT_WIZARD_STEPS = [
   { id: 1, label: "Goal" },
   { id: 2, label: "Channels" },
-  { id: 3, label: "Review" },
+  { id: 3, label: "AI model" },
+  { id: 4, label: "Review" },
 ] as const;
 
 export function isAgentWizardGoalId(value: string): value is AgentWizardGoalId {

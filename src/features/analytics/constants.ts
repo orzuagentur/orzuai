@@ -1,7 +1,119 @@
 export const ANALYTICS_MESSAGES = {
   pageTitle: "Analytics",
   pageDescription:
-    "Message volume, contacts, and AI performance for WhatsApp, Instagram, Telegram, and Website Forms.",
+    "See what changed, what needs attention, and where to act across channels, CRM, and AI.",
+  tabPulse: "Pulse",
+  tabChannels: "Channels",
+  tabSales: "Sales",
+  tabAiOps: "AI & Ops",
+  tabAsk: "Ask AI",
+  period7d: "7 days",
+  period30d: "30 days",
+  periodAll: "All time",
+  pulseTitle: "Business pulse",
+  pulseDescription:
+    "Key signals for the selected period — with changes vs the previous window.",
+  pulseNewContacts: "New contacts",
+  pulseAiReplyShare: "AI reply share",
+  pulseAvgFirstResponse: "Avg first response",
+  pulseQualified: "Qualified",
+  pulseWonRevenue: "Won revenue",
+  pulseDeltaVsPrevious: "vs previous period",
+  pulseDeltaUnavailable: "No comparison for all-time view",
+  pulseActivityTitle: "Message activity",
+  pulseActivityDescription: (days: number) =>
+    `Message volume over the last ${days} day${days === 1 ? "" : "s"}.`,
+  attentionTitle: "Needs attention",
+  attentionEmpty: "Nothing urgent right now. Keep an eye on Pulse after new activity.",
+  attentionOpenInbox: "Open Inbox",
+  attentionViewCrm: "View CRM",
+  attentionViewAutomations: "View Automations",
+  attentionConnectChannel: "Connect channel",
+  attentionSlaTitle: (percent: number) =>
+    `SLA compliance is ${percent}% — below target`,
+  attentionSlaDescription: (minutes: number) =>
+    `First replies should land within ${minutes} minutes.`,
+  attentionStaleNewTitle: (count: number) =>
+    `${count} contact${count === 1 ? "" : "s"} stuck in New for 7+ days`,
+  attentionStaleNewDescription:
+    "Review pipeline and follow up before leads go cold.",
+  attentionChannelDisconnected: (label: string) => `${label} is not connected`,
+  attentionAutomationsTitle: (count: number) =>
+    `${count} automation run${count === 1 ? "" : "s"} today`,
+  attentionNegativeSentimentTitle: (percent: number) =>
+    `${percent}% of analyzed contacts are negative`,
+  attentionNegativeSentimentDescription:
+    "Check unhappy conversations and adjust AI or team follow-up.",
+  attentionGettingStartedTitle: "Connect a channel to start tracking",
+  attentionGettingStartedDescription:
+    "Analytics fills in after your first messages and contacts arrive.",
+  comingSoonTitle: "Coming soon",
+  channelsPanelTitle: "Channel comparison",
+  channelsPanelDescription:
+    "Messages, contacts, and AI share per channel — select one for drill-down.",
+  channelsColumnChannel: "Channel",
+  channelsColumnMessages: "Messages",
+  channelsColumnContacts: "Contacts",
+  channelsColumnAiShare: "AI share",
+  channelsColumnStatus: "Status",
+  channelsStatusConnected: "Connected",
+  channelsStatusPending: "Pending",
+  channelsStatusDisconnected: "Not connected",
+  channelsSelectHint: "Select a channel",
+  channelsSelectDescription:
+    "Pick a channel on the left to see activity, recent messages, and inbox link.",
+  channelsDisconnectedTitle: (label: string) => `${label} is not connected`,
+  salesPanelTitle: "Sales story",
+  salesPanelDescription:
+    "From lead source to pipeline, revenue, and customer tone — with links into CRM.",
+  salesStepLeads: "1. Where leads come from",
+  salesStepFunnel: "2. Pipeline funnel",
+  salesStepRevenue: "3. Revenue",
+  salesStepSentiment: "4. Customer sentiment",
+  viewInCrm: "View in CRM",
+  viewContacts: (count: number) =>
+    `View ${count} contact${count === 1 ? "" : "s"}`,
+  viewChannelContacts: (count: number) =>
+    `View ${count} contact${count === 1 ? "" : "s"}`,
+  aiOpsPanelTitle: "AI & operations",
+  aiOpsPanelDescription:
+    "Team performance, AI spend, per-agent output, and custom automation runs in one place.",
+  aiOpsOperationsTitle: "Operations",
+  aiOpsOperationsDescription:
+    "AI vs human replies, SLA compliance, and response speed — without duplicate panels.",
+  aiOpsAgentsTitle: "AI agents",
+  aiOpsAgentsDescription:
+    "Rollup across all agents. Open any row for full per-agent analytics.",
+  aiOpsAgentsEmpty: "No AI agents yet. Create one in AI Agents to start tracking replies.",
+  aiOpsAgentsColumnName: "Agent",
+  aiOpsAgentsColumnStatus: "Status",
+  aiOpsAgentsColumnContacts: "Contacts",
+  aiOpsAgentsColumnReplies: "AI replies",
+  aiOpsAgentsColumnLast7d: "Last 7 days",
+  aiOpsAgentOn: "On",
+  aiOpsAgentOff: "Off",
+  aiOpsViewAgent: "Details",
+  aiOpsAutomationsTitle: "Custom automations",
+  aiOpsAutomationsDescription:
+    "Workflow runs from your custom automations over the last 30 days.",
+  aiOpsAutomationsEmpty:
+    "No workflow runs yet. Create a custom workflow in Automations.",
+  aiOpsRunsToday: "Runs today",
+  aiOpsRuns30d: "Runs (30 days)",
+  aiOpsSuccessRate: "Success rate",
+  aiOpsViewAutomations: "View Automations",
+  aiOpsFailedRuns: (count: number) =>
+    `${count} failed run${count === 1 ? "" : "s"} in the last 30 days`,
+  askPanelTitle: "Ask AI",
+  askPanelDescription:
+    "Ask questions about Pulse, channels, sales, AI performance, and automations.",
+  assistantEmptyHint: "Ask anything about your business metrics",
+  assistantAnalyzing: "Analyzing your data...",
+  assistantExampleAttention: "What needs my attention today?",
+  assistantExampleLeads: "Which channel brings the most leads?",
+  assistantExampleAiTeam: "How is AI performing vs my team?",
+  assistantExampleAutomations: "Are automations running successfully?",
+  assistantExampleFunnel: "Where are we losing leads in the funnel?",
   channelsTitle: "Channels",
   overviewTitle: "All channels",
   overviewDescription: "Combined metrics across every connected messaging channel.",
@@ -37,13 +149,17 @@ export const ANALYTICS_MESSAGES = {
   qualifiedToWon: "Qualified → Won",
   aiCostTitle: "AI cost dashboard",
   aiCostDescription:
-    "Estimated Gemini and multi-provider AI spend per business, tracked per reply.",
+    "Estimated spend from your own API keys, tracked per reply.",
+  aiCostPlatformIncludedTitle: "OrzuAI platform AI included",
+  aiCostPlatformIncludedDescription:
+    "Replies powered by OrzuAI are included in your plan. Add your own API keys in AI Agents settings to use custom models and track costs here.",
   aiCostMonth: "This month",
   aiCostPerReply: "Avg per reply",
-  aiCostEmpty: "No AI usage logged yet. Costs appear after the first AI reply.",
+  aiCostEmpty:
+    "No billable AI usage yet. Costs appear when agents use your own API keys.",
   assistantTitle: "AI Analytics Assistant",
   assistantDescription:
-    "Ask natural-language questions about conversions, channels, and AI performance.",
+    "Answers use live metrics from Pulse, Sales, AI & Ops, and Automations.",
   assistantPlaceholder: "e.g. Why did conversions drop this week?",
   assistantAsk: "Ask AI",
   teamTitle: "Team analytics",
@@ -55,7 +171,7 @@ export const ANALYTICS_MESSAGES = {
   pipelineValue: "Open pipeline",
   wonRevenue: "Won revenue",
   sentimentTitle: "Customer sentiment",
-  sentimentDescription: "AI-classified tone from recent inbound messages.",
+  sentimentDescription: "AI-classified tone stored on each contact profile.",
   sentimentPositive: "Positive",
   sentimentNeutral: "Neutral",
   sentimentNegative: "Negative",

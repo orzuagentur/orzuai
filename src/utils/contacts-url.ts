@@ -1,10 +1,11 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import type { ContactSegment } from "@/types/contact.types";
+import type { ContactSegment, PipelineStage } from "@/types/contact.types";
 
 export type ContactsUrlParams = {
   channel?: string | null;
   segment?: ContactSegment;
   view?: "list" | "pipeline";
+  stage?: PipelineStage | null;
   contact?: string | null;
   q?: string | null;
   page?: number;
@@ -23,6 +24,10 @@ export function buildContactsHref(params: ContactsUrlParams = {}): string {
 
   if (params.view === "pipeline") {
     search.set("view", "pipeline");
+  }
+
+  if (params.stage) {
+    search.set("stage", params.stage);
   }
 
   if (params.contact) {

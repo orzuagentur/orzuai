@@ -3,8 +3,9 @@ import "server-only";
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { AiProvider } from "@/lib/ai/constants";
+import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReply } from "@/services/llm.service";
+import { processInboundMessageAutomations } from "@/services/automation-engine.service";
 import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
@@ -203,11 +204,24 @@ export async function processChannelAutoReply(input: {
 
   const { data: conversation } = await admin
     .from("conversations")
-    .select("contact_id")
+    .select("contact_id, contact:contacts(name)")
     .eq("id", conversationId)
     .maybeSingle();
 
   if (conversation?.contact_id) {
+    const contact = Array.isArray(conversation.contact)
+      ? conversation.contact[0]
+      : conversation.contact;
+
+    await processInboundMessageAutomations({
+      admin,
+      businessId,
+      channel,
+      conversationId,
+      contactId: conversation.contact_id,
+      contactName: contact?.name ?? "Customer",
+      message: clientMessage,
+    });
     await analyzeAndStoreSentiment({
       admin,
       businessId,
@@ -233,7 +247,7 @@ export async function processChannelAutoReply(input: {
   const { data: agentRows } = await admin
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
     )
     .eq("business_id", businessId)
     .eq("enabled", true);
@@ -248,6 +262,7 @@ export async function processChannelAutoReply(input: {
       enabled: row.enabled,
       provider: row.provider ?? undefined,
       model: row.model ?? undefined,
+      useCustomModel: row.use_custom_model ?? false,
       language: row.language ?? undefined,
       communicationStyle: row.communication_style ?? undefined,
       updatedAt: row.updated_at,
@@ -261,7 +276,13 @@ export async function processChannelAutoReply(input: {
     aiSettings.provider ??
     "gemini"
   ) as AiProvider;
-  const model = matchedAgent?.model ?? aiSettings.model;
+  const model = matchedAgent
+    ? resolveAgentModel(
+        provider,
+        matchedAgent.model ?? aiSettings.model,
+        matchedAgent.useCustomModel ?? false,
+      )
+    : aiSettings.model;
   const language = matchedAgent?.language ?? aiSettings.language;
 
   const { data: history } = await admin

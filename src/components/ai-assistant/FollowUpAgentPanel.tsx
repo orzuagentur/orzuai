@@ -28,7 +28,7 @@ export function FollowUpAgentPanel({ settings }: FollowUpAgentPanelProps) {
     setIsSaving(true);
 
     try {
-      const result = await saveFollowUpAgentSettingsAction(enabled);
+      const result = await saveFollowUpAgentSettingsAction({ enabled });
 
       if (!result.success) {
         toast.error(result.message ?? AI_ASSISTANT_MESSAGES.saveFailed);

@@ -36,11 +36,12 @@ async function callOpenAiChat(input: {
   model: string;
   systemInstruction?: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
+  apiKey?: string;
 }): Promise<
   | { success: true; text: string; model: string; usage: OpenAiUsage }
   | { success: false; message: string }
 > {
-  const apiKey = getOpenAiApiKey();
+  const apiKey = input.apiKey?.trim() || getOpenAiApiKey();
 
   if (!apiKey) {
     return { success: false, message: "OpenAI API key missing." };
@@ -98,10 +99,12 @@ async function callOpenAiChat(input: {
   };
 }
 
+type ProviderInput<T> = T & { apiKey?: string };
+
 export async function generateOpenAiText(
-  input: GenerateTextInput,
+  input: ProviderInput<GenerateTextInput>,
 ): Promise<GeminiServiceResult & { usage?: OpenAiUsage; provider?: AiProvider }> {
-  if (!hasOpenAiEnv()) {
+  if (!hasOpenAiEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -110,6 +113,7 @@ export async function generateOpenAiText(
     model,
     systemInstruction: input.systemInstruction,
     messages: [{ role: "user", content: input.prompt }],
+    apiKey: input.apiKey,
   });
 
   if (!result.success) {
@@ -128,9 +132,9 @@ export async function generateOpenAiText(
 }
 
 export async function generateOpenAiAssistantReply(
-  input: GenerateAssistantReplyInput,
+  input: ProviderInput<GenerateAssistantReplyInput>,
 ): Promise<GeminiServiceResult & { usage?: OpenAiUsage; provider?: AiProvider }> {
-  if (!hasOpenAiEnv()) {
+  if (!hasOpenAiEnv() && !input.apiKey) {
     return missingConfigError();
   }
 
@@ -148,7 +152,12 @@ export async function generateOpenAiAssistantReply(
     })) ?? [];
 
   const messages = [...history, { role: "user" as const, content: input.userMessage }];
-  const result = await callOpenAiChat({ model, systemInstruction, messages });
+  const result = await callOpenAiChat({
+    model,
+    systemInstruction,
+    messages,
+    apiKey: input.apiKey,
+  });
 
   if (!result.success) {
     return {

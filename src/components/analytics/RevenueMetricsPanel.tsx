@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRightIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,22 +16,38 @@ import type { RevenueMetrics } from "@/types/dashboard.types";
 
 type RevenueMetricsPanelProps = {
   metrics: RevenueMetrics;
+  crmHref?: string | null;
 };
 
 function formatMoney(value: number): string {
   return `$${value.toLocaleString()}`;
 }
 
-export function RevenueMetricsPanel({ metrics }: RevenueMetricsPanelProps) {
+export function RevenueMetricsPanel({
+  metrics,
+  crmHref,
+}: RevenueMetricsPanelProps) {
   return (
     <Card className="shadow-none">
       <CardHeader>
-        <CardTitle className="text-base">
-          {ANALYTICS_MESSAGES.revenueTitle}
-        </CardTitle>
-        <CardDescription>
-          {ANALYTICS_MESSAGES.revenueDescription}
-        </CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">
+              {ANALYTICS_MESSAGES.revenueTitle}
+            </CardTitle>
+            <CardDescription>
+              {ANALYTICS_MESSAGES.revenueDescription}
+            </CardDescription>
+          </div>
+          {crmHref ? (
+            <Button type="button" variant="outline" size="sm" className="gap-1" asChild>
+              <Link href={crmHref}>
+                {ANALYTICS_MESSAGES.viewInCrm}
+                <ArrowRightIcon className="size-3.5" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">

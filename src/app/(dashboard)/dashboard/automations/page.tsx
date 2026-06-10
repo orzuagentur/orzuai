@@ -1,56 +1,40 @@
-import Link from "next/link";
 import { Suspense } from "react";
 
-import { AutomationsHub } from "@/components/automations/AutomationsHub";
+import { AutomationsCommandCenter } from "@/components/automations/AutomationsCommandCenter";
+import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import { getAutomationsPageData } from "@/services/automations.service";
 
-export default function AutomationsPage() {
+type AutomationsPageProps = {
+  searchParams: Promise<{
+    tab?: string;
+    rule?: string;
+    workflow?: string;
+    step?: string;
+  }>;
+};
+
+export default function AutomationsPage({ searchParams }: AutomationsPageProps) {
   return (
-    <Suspense fallback={<DashboardPageSkeleton cards={2} />}>
-      <AutomationsPageContent />
+    <Suspense fallback={<DashboardPageSkeleton />}>
+      <AutomationsPageContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function AutomationsPageContent() {
-  const data = await getAutomationsPageData();
+async function AutomationsPageContent({ searchParams }: AutomationsPageProps) {
+  const params = await searchParams;
+  const data = await getAutomationsPageData(params);
 
   if (!data.hasBusiness) {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <Card className="mx-auto max-w-2xl shadow-none">
-          <CardHeader>
-            <CardTitle>Set up your business</CardTitle>
-            <CardDescription>
-              Create your business profile before building automations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href={DASHBOARD_ROUTES.settings}>Go to settings</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardSetupPrompt
+        title={AUTOMATIONS_MESSAGES.pageTitle}
+        description={AUTOMATIONS_MESSAGES.pageDescription}
+      />
     );
   }
 
-  return (
-    <AutomationsHub
-      automations={data.automations}
-      usage={data.usage}
-      salesAgent={data.salesAgent}
-      followUpAgent={data.followUpAgent}
-    />
-  );
+  return <AutomationsCommandCenter data={data} />;
 }
