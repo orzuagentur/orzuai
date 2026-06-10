@@ -25,7 +25,10 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
+import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
+import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReply } from "@/services/llm.service";
+import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
@@ -391,6 +394,49 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
+  const { data: agentRows } = await admin
+    .from("ai_agents")
+    .select(
+      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
+    )
+    .eq("business_id", businessId)
+    .eq("enabled", true);
+
+  const matchedAgent = resolveAgentMatch({
+    agents: (agentRows ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      systemPrompt: row.system_prompt,
+      channels: row.channels ?? [],
+      triggerKeywords: row.trigger_keywords ?? [],
+      enabled: row.enabled,
+      provider: row.provider ?? undefined,
+      model: row.model ?? undefined,
+      useCustomModel: row.use_custom_model ?? false,
+      language: row.language ?? undefined,
+      communicationStyle: row.communication_style ?? undefined,
+      updatedAt: row.updated_at,
+    })),
+    channel: "website_forms",
+    message: clientMessage,
+  });
+
+  if (!matchedAgent) {
+    return;
+  }
+
+  const systemPrompt = buildEffectiveAgentPrompt({
+    systemPrompt: matchedAgent.systemPrompt,
+    communicationStyle: matchedAgent.communicationStyle,
+  });
+  const provider = (matchedAgent.provider ?? "gemini") as AiProvider;
+  const model = resolveAgentModel(
+    provider,
+    matchedAgent.model ?? aiSettings.model,
+    matchedAgent.useCustomModel ?? false,
+  );
+  const language = matchedAgent.language ?? aiSettings.language;
+
   const { data: history } = await admin
     .from("messages")
     .select("sender_type, content")
@@ -403,13 +449,10 @@ async function processWebsiteFormFollowUp(input: {
   const reply = await generateAssistantReply({
     businessId,
     conversationId,
-    provider:
-      aiSettings.provider === "openai" || aiSettings.provider === "claude"
-        ? aiSettings.provider
-        : "gemini",
-    model: aiSettings.model,
-    systemPrompt: aiSettings.system_prompt,
-    language: aiSettings.language,
+    provider,
+    model,
+    systemPrompt,
+    language,
     userMessage: clientMessage,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       title: entry.title,

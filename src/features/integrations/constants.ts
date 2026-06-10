@@ -152,7 +152,7 @@ export const INTEGRATIONS_MESSAGES = {
   sectionAiAssistant: "AI Assistant",
   sectionAnalytics: "Analytics",
   contactsHint: "Contacts received on this channel.",
-  aiHint: "Enable or disable AI auto-replies for this channel.",
+  aiHint: "Turn channel auto-replies on or off. Replies are sent only when a matching agent is enabled.",
   analyticsHint: "Messages, contacts, and AI metrics for this channel.",
   openGlobalContacts: "Open Contacts",
   openGlobalAi: "Open AI Assistant",

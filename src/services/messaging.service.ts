@@ -10,7 +10,8 @@ import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
-import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
+import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
+import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -252,38 +253,42 @@ export async function processChannelAutoReply(input: {
     .eq("business_id", businessId)
     .eq("enabled", true);
 
-  const { agent: matchedAgent, systemPrompt } = resolveAgentSystemPrompt({
-    agents: (agentRows ?? []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      systemPrompt: row.system_prompt,
-      channels: row.channels ?? [],
-      triggerKeywords: row.trigger_keywords ?? [],
-      enabled: row.enabled,
-      provider: row.provider ?? undefined,
-      model: row.model ?? undefined,
-      useCustomModel: row.use_custom_model ?? false,
-      language: row.language ?? undefined,
-      communicationStyle: row.communication_style ?? undefined,
-      updatedAt: row.updated_at,
-    })),
+  const routableAgents = (agentRows ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    systemPrompt: row.system_prompt,
+    channels: row.channels ?? [],
+    triggerKeywords: row.trigger_keywords ?? [],
+    enabled: row.enabled,
+    provider: row.provider ?? undefined,
+    model: row.model ?? undefined,
+    useCustomModel: row.use_custom_model ?? false,
+    language: row.language ?? undefined,
+    communicationStyle: row.communication_style ?? undefined,
+    updatedAt: row.updated_at,
+  }));
+
+  const matchedAgent = resolveAgentMatch({
+    agents: routableAgents,
     channel,
     message: clientMessage,
-    fallbackPrompt: aiSettings.system_prompt,
   });
-  const provider = (
-    matchedAgent?.provider ??
-    aiSettings.provider ??
-    "gemini"
-  ) as AiProvider;
-  const model = matchedAgent
-    ? resolveAgentModel(
-        provider,
-        matchedAgent.model ?? aiSettings.model,
-        matchedAgent.useCustomModel ?? false,
-      )
-    : aiSettings.model;
-  const language = matchedAgent?.language ?? aiSettings.language;
+
+  if (!matchedAgent) {
+    return;
+  }
+
+  const systemPrompt = buildEffectiveAgentPrompt({
+    systemPrompt: matchedAgent.systemPrompt,
+    communicationStyle: matchedAgent.communicationStyle,
+  });
+  const provider = (matchedAgent.provider ?? "gemini") as AiProvider;
+  const model = resolveAgentModel(
+    provider,
+    matchedAgent.model ?? aiSettings.model,
+    matchedAgent.useCustomModel ?? false,
+  );
+  const language = matchedAgent.language ?? aiSettings.language;
 
   const { data: history } = await admin
     .from("messages")
@@ -333,7 +338,7 @@ export async function processChannelAutoReply(input: {
     senderType: "ai",
     content: reply.data.text,
     aiGenerated: true,
-    aiAgentId: matchedAgent?.id ?? null,
+    aiAgentId: matchedAgent.id,
   });
 
   await incrementMessagingAnalytics(admin, businessId, channel, {

@@ -182,7 +182,7 @@ export const AI_ASSISTANT_MESSAGES = {
   goToIntegrations: "Connect channel",
   agentBuilderTitle: "Agent editor",
   agentBuilderDescription:
-    "Agents override the channel default prompt when keywords match. Leave keywords empty to use an agent as the channel default.",
+    "Auto-replies run only through enabled agents. Leave keywords empty for the channel default agent; add keywords for specialists.",
   agentName: "Agent name",
   agentPrompt: "System prompt",
   agentChannels: "Active channels",
@@ -205,7 +205,7 @@ export const AI_ASSISTANT_MESSAGES = {
   deleteFailed: "Unable to delete agent. Please try again.",
   testMatchTitle: "Routing preview",
   testMatchAgent: (name: string) => `Matched agent: ${name}`,
-  testMatchFallback: "No agent match — channel default prompt will be used.",
+  testMatchFallback: "No agent match — live chats will not get an AI reply.",
   testMessage: "Sample customer message",
   testRun: "Preview routing",
   usageTitle: "AI usage limits",

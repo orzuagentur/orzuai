@@ -12,6 +12,7 @@ import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { enableAiForChannels } from "@/services/channel-workspace.service";
 import { resolveAgentIconId } from "@/features/ai-assistant/agent-icons";
 import type {
   AiAgentActionResult,
@@ -174,6 +175,10 @@ export async function createAiAgent(
     };
   }
 
+  if (parsed.data.enabled) {
+    await enableAiForChannels(businessId, parsed.data.channels);
+  }
+
   revalidateAgentPaths();
   return { success: true, id: created.id };
 }
@@ -192,6 +197,20 @@ export async function toggleAiAgentEnabled(input: {
   }
 
   const supabase = await createClient();
+
+  if (input.enabled) {
+    const { data: agent } = await supabase
+      .from("ai_agents")
+      .select("channels")
+      .eq("id", input.id)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (agent?.channels?.length) {
+      await enableAiForChannels(businessId, agent.channels);
+    }
+  }
+
   const { error } = await supabase
     .from("ai_agents")
     .update({ enabled: input.enabled })
@@ -274,6 +293,10 @@ export async function updateAiAgent(
       success: false,
       error: { code: "UPDATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
     };
+  }
+
+  if (parsed.data.enabled) {
+    await enableAiForChannels(businessId, parsed.data.channels);
   }
 
   revalidateAgentPaths();

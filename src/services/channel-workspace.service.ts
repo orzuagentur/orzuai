@@ -51,21 +51,25 @@ import {
   calculateConversionRate,
 } from "@/utils/dashboard";
 
-export async function enableAiForChannelOnConnect(
+export async function enableAiForChannels(
   businessId: string,
-  channel: MessagingChannel,
+  channels: MessagingChannel[],
 ): Promise<void> {
-  if (!hasSupabaseEnv()) {
+  if (!hasSupabaseEnv() || channels.length === 0) {
     return;
   }
 
   const supabase = await createClient();
 
+  for (const channel of channels) {
+    await ensureChannelAiSettings(supabase, businessId, channel);
+  }
+
   await supabase
     .from("ai_settings")
     .update({ ai_enabled: true })
     .eq("business_id", businessId)
-    .eq("channel", channel);
+    .in("channel", channels);
 }
 
 function revalidateChannelWorkspacePaths(channel: MessagingChannel): void {
@@ -498,9 +502,15 @@ export async function testChannelAiReply(
     fallbackPrompt: settings.system_prompt,
   });
 
-  const provider = resolveStoredProvider(
-    agent?.provider ?? settings.provider,
-  );
+  if (!agent) {
+    return {
+      success: false,
+      message:
+        "No matching agent for this message. Create and enable an agent on this channel to send auto-replies.",
+    };
+  }
+
+  const provider = resolveStoredProvider(agent.provider ?? settings.provider);
 
   if (!isProviderConfigured(provider)) {
     return {
@@ -512,15 +522,13 @@ export async function testChannelAiReply(
   const reply = await generateAssistantReply({
     businessId,
     provider,
-    model: agent
-      ? resolveAgentModel(
-          provider,
-          agent.model ?? settings.model,
-          agent.useCustomModel ?? false,
-        )
-      : settings.model,
+    model: resolveAgentModel(
+      provider,
+      agent.model ?? settings.model,
+      agent.useCustomModel ?? false,
+    ),
     systemPrompt,
-    language: agent?.language ?? settings.language,
+    language: agent.language ?? settings.language,
     userMessage: parsed.data.testMessage,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       title: entry.title,
@@ -537,7 +545,7 @@ export async function testChannelAiReply(
   return {
     success: true,
     reply: reply.data.text,
-    matchedAgentName: agent?.name ?? null,
+    matchedAgentName: agent.name,
   };
 }
 

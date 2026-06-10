@@ -50,16 +50,17 @@ export async function getOnboardingProgress(
   }
 
   const supabase = await createClient();
-  const [channelStatuses, knowledgeResult, aiSettingsResult] = await Promise.all([
+  const [channelStatuses, knowledgeResult, agentsResult] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     supabase
       .from("knowledge_base")
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId),
     supabase
-      .from("ai_settings")
-      .select("channel, ai_enabled")
-      .eq("business_id", businessId),
+      .from("ai_agents")
+      .select("channels")
+      .eq("business_id", businessId)
+      .eq("enabled", true),
   ]);
 
   const connectedChannel = getFirstConnectedChannel(channelStatuses);
@@ -67,8 +68,8 @@ export async function getOnboardingProgress(
   const hasKnowledgeEntry = (knowledgeResult.count ?? 0) > 0;
   const hasAiEnabled =
     connectedChannel !== null &&
-    (aiSettingsResult.data?.some(
-      (row) => row.channel === connectedChannel && row.ai_enabled,
+    (agentsResult.data?.some((agent) =>
+      (agent.channels ?? []).includes(connectedChannel),
     ) ??
       false);
 

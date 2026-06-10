@@ -36,7 +36,7 @@ export function SetupChecklist({ progress }: SetupChecklistProps) {
       href: DASHBOARD_ROUTES.knowledgeBase,
     },
     {
-      label: "Enable AI auto-replies",
+      label: "Create an AI agent",
       done: progress.hasAiEnabled,
       href: progress.connectedChannel
         ? `${DASHBOARD_ROUTES.aiAssistant}?channel=${progress.connectedChannel}`

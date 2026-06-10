@@ -28,15 +28,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import {
-  saveChannelAiSettingsAction,
-  testChannelAiReplyAction,
-} from "@/features/channel-workspace";
+import { testChannelAiReplyAction } from "@/features/channel-workspace";
+import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 import {
   ONBOARDING_MESSAGES,
   ONBOARDING_STEPS,
 } from "@/features/onboarding/constants";
-import { resolveGeminiModel, type GeminiModelId } from "@/lib/gemini/constants";
 import { cn } from "@/lib/utils";
 import type { OnboardingProgress } from "@/services/onboarding.service";
 import type { BusinessProfileData } from "@/types/business.types";
@@ -70,40 +67,22 @@ export function OnboardingWizard({
   const [testMessage, setTestMessage] = useState("");
   const [testReply, setTestReply] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const [isEnablingAi, setIsEnablingAi] = useState(false);
-
   const activeStep = Math.min(
     5,
     Math.max(1, Number(searchParams.get("step")) || step),
   );
 
-  async function handleEnableAi() {
+  function handleOpenAiAssistant() {
     if (!aiSettings?.channel) {
       return;
     }
 
-    setIsEnablingAi(true);
-
-    try {
-      const result = await saveChannelAiSettingsAction({
+    router.push(
+      buildAiAssistantHref({
+        agent: "new",
         channel: aiSettings.channel,
-        aiEnabled: true,
-        provider: "gemini",
-        model: resolveGeminiModel(aiSettings.model) as GeminiModelId,
-        language: aiSettings.language,
-        systemPrompt: aiSettings.systemPrompt,
-      });
-
-      if (result.success) {
-        router.refresh();
-        goToStep(router, 5);
-        return;
-      }
-
-      toast.error(result.message ?? "Unable to enable AI.");
-    } finally {
-      setIsEnablingAi(false);
-    }
+      }),
+    );
   }
 
   async function handleTest() {
@@ -251,13 +230,10 @@ export function OnboardingWizard({
           <CardContent className="space-y-4">
             {progress.hasAiEnabled ? (
               <p className="text-sm text-muted-foreground">
-                AI auto-replies are already enabled for your connected channel.
+                Channel auto-replies are enabled. Make sure an agent is active on this channel.
               </p>
             ) : (
-              <Button type="button" disabled={isEnablingAi} onClick={handleEnableAi}>
-                {isEnablingAi ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : null}
+              <Button type="button" onClick={handleOpenAiAssistant}>
                 {ONBOARDING_MESSAGES.stepAiEnable}
               </Button>
             )}

@@ -14,10 +14,10 @@ export const ONBOARDING_MESSAGES = {
     "Optional: add FAQs, pricing, or hours so the AI can answer accurately.",
   stepKnowledgeSkip: "Skip for now",
   stepKnowledgeAdd: "Add first entry",
-  stepAiTitle: "Enable AI replies",
+  stepAiTitle: "Create an AI agent",
   stepAiDescription:
-    "Turn on automated replies for your connected channel.",
-  stepAiEnable: "Enable AI auto-replies",
+    "Auto-replies run only through enabled agents. Create one in AI Assistant to start replying on your connected channel.",
+  stepAiEnable: "Open AI Assistant",
   stepTestTitle: "Test your assistant",
   stepTestDescription:
     "Send a sample customer message and preview how the AI would respond.",
