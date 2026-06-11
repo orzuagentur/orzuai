@@ -8,6 +8,8 @@ import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard
 import { ContactProfileDrawer } from "@/components/contacts/ContactProfileDrawer";
 import { ContactRecordWorkspace } from "@/components/contacts/ContactRecordWorkspace";
 import { ContactsChannelTabs } from "@/components/contacts/ContactsChannelTabs";
+import { CrmEntityTabs } from "@/components/contacts/CrmEntityTabs";
+import { DealsWorkspace } from "@/components/contacts/DealsWorkspace";
 import { useContactsChromeRegistration } from "@/components/contacts/contacts-chrome-context";
 import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
 import { Button } from "@/components/ui/button";
@@ -16,22 +18,32 @@ import { cn } from "@/lib/utils";
 import type {
   ContactPipelinePageData,
   ContactSegment,
+  CrmEntityTab,
+  LeadSegment,
+  LeadsPageData,
   UnifiedContactsPageData,
 } from "@/types/contact.types";
+import { LEAD_PIPELINE_STAGES } from "@/types/contact.types";
+import type { CrmDealsPageData } from "@/types/crm-deal.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 
 type ContactRecordHubProps = {
-  listData: UnifiedContactsPageData;
+  activeTab: CrmEntityTab;
+  listData: UnifiedContactsPageData | null;
+  leadsData: LeadsPageData | null;
+  dealsData: CrmDealsPageData | null;
   pipelineData: ContactPipelinePageData | null;
+  leadsPipelineData: ContactPipelinePageData | null;
   visibleChannelIds: MessagingChannel[];
 };
 
-function buildHubHref(
+function buildContactsHubHref(
   data: UnifiedContactsPageData,
   overrides: Parameters<typeof buildContactsHref>[0] = {},
 ) {
   return buildContactsHref({
+    tab: "contacts",
     channel: data.activeChannelFilter,
     segment: data.activeSegment,
     view: data.activeView,
@@ -43,64 +55,119 @@ function buildHubHref(
   });
 }
 
+function buildLeadsHubHref(
+  data: LeadsPageData,
+  overrides: Parameters<typeof buildContactsHref>[0] = {},
+) {
+  return buildContactsHref({
+    tab: "leads",
+    channel: data.activeChannelFilter,
+    leadSegment: data.activeLeadSegment,
+    view: data.activeView,
+    contact: data.activeContactId,
+    profile: data.showProfilePanel,
+    q: data.searchQuery || null,
+    page: data.page,
+    ...overrides,
+  });
+}
+
 export function ContactRecordHub({
+  activeTab,
   listData,
+  leadsData,
+  dealsData,
   pipelineData,
+  leadsPipelineData,
   visibleChannelIds,
 }: ContactRecordHubProps) {
   const router = useRouter();
-  const [searchValue, setSearchValue] = useState(listData.searchQuery);
+  const currentListData =
+    activeTab === "leads" ? leadsData : listData;
+  const [searchValue, setSearchValue] = useState(
+    currentListData?.searchQuery ?? dealsData?.searchQuery ?? "",
+  );
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(listData.showProfilePanel);
-  const showRecordOnMobile = Boolean(listData.activeContactId);
+  const [profileOpen, setProfileOpen] = useState(
+    currentListData?.showProfilePanel ?? false,
+  );
+  const showRecordOnMobile = Boolean(currentListData?.activeContactId);
 
   useEffect(() => {
-    setProfileOpen(listData.showProfilePanel);
-  }, [listData.showProfilePanel]);
+    setProfileOpen(currentListData?.showProfilePanel ?? false);
+  }, [currentListData?.showProfilePanel]);
 
   useEffect(() => {
-    setSearchValue(listData.searchQuery);
-  }, [listData.searchQuery]);
+    setSearchValue(currentListData?.searchQuery ?? dealsData?.searchQuery ?? "");
+  }, [currentListData?.searchQuery, dealsData?.searchQuery]);
 
   useEffect(() => {
+    if (activeTab === "deals" || !currentListData) {
+      return;
+    }
+
     const trimmed = searchValue.trim();
 
-    if (trimmed === listData.searchQuery) {
+    if (trimmed === currentListData.searchQuery) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      router.replace(
-        buildHubHref(listData, {
-          q: trimmed || null,
-          page: 1,
-          contact: listData.activeContactId,
-          profile: listData.showProfilePanel,
-        }),
-      );
+      const href =
+        activeTab === "leads"
+          ? buildLeadsHubHref(currentListData as LeadsPageData, {
+              q: trimmed || null,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            })
+          : buildContactsHubHref(currentListData, {
+              q: trimmed || null,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            });
+
+      router.replace(href);
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [listData, router, searchValue]);
+  }, [activeTab, currentListData, router, searchValue]);
 
   const handleViewChange = useCallback(
     (view: "list" | "pipeline") => {
-      router.push(
-        buildHubHref(listData, {
-          view,
-          page: 1,
-          contact: listData.activeContactId,
-          profile: listData.showProfilePanel,
-        }),
-      );
+      if (!currentListData) {
+        return;
+      }
+
+      const href =
+        activeTab === "leads"
+          ? buildLeadsHubHref(currentListData as LeadsPageData, {
+              view,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            })
+          : buildContactsHubHref(currentListData, {
+              view,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            });
+
+      router.push(href);
     },
-    [listData, router],
+    [activeTab, currentListData, router],
   );
 
   const handleSegmentChange = useCallback(
     (segment: ContactSegment) => {
+      if (!listData) {
+        return;
+      }
+
       router.push(
-        buildHubHref(listData, {
+        buildContactsHubHref(listData, {
           segment,
           page: 1,
           contact: listData.activeContactId,
@@ -111,27 +178,75 @@ export function ContactRecordHub({
     [listData, router],
   );
 
-  useContactsChromeRegistration({
-    searchQuery: searchValue,
-    onSearchChange: setSearchValue,
-    activeView: listData.activeView,
-    onViewChange: handleViewChange,
-    activeSegment: listData.activeSegment,
-    onSegmentChange: handleSegmentChange,
-  });
+  const handleLeadSegmentChange = useCallback(
+    (leadSegment: LeadSegment) => {
+      if (!leadsData) {
+        return;
+      }
+
+      router.push(
+        buildLeadsHubHref(leadsData, {
+          leadSegment,
+          page: 1,
+          contact: leadsData.activeContactId,
+          profile: leadsData.showProfilePanel,
+        }),
+      );
+    },
+    [leadsData, router],
+  );
+
+  useContactsChromeRegistration(
+    activeTab === "deals"
+      ? null
+      : currentListData
+        ? {
+            activeTab,
+            searchQuery: searchValue,
+            onSearchChange: setSearchValue,
+            activeView: currentListData.activeView,
+            onViewChange: handleViewChange,
+            activeSegment:
+              activeTab === "contacts" ? listData?.activeSegment ?? "all" : "all",
+            onSegmentChange:
+              activeTab === "contacts" ? handleSegmentChange : undefined,
+            activeLeadSegment:
+              activeTab === "leads"
+                ? leadsData?.activeLeadSegment ?? "all_leads"
+                : undefined,
+            onLeadSegmentChange:
+              activeTab === "leads" ? handleLeadSegmentChange : undefined,
+          }
+        : null,
+  );
 
   function clearContactSelection() {
+    if (!currentListData) {
+      return;
+    }
+
     setMobileProfileOpen(false);
     setProfileOpen(false);
-    router.push(
-      buildHubHref(listData, {
-        contact: null,
-        profile: false,
-      }),
-    );
+
+    const href =
+      activeTab === "leads"
+        ? buildLeadsHubHref(currentListData as LeadsPageData, {
+            contact: null,
+            profile: false,
+          })
+        : buildContactsHubHref(currentListData, {
+            contact: null,
+            profile: false,
+          });
+
+    router.push(href);
   }
 
   function toggleProfilePanel() {
+    if (!currentListData?.activeContactId) {
+      return;
+    }
+
     const next = !profileOpen;
     setProfileOpen(next);
 
@@ -140,23 +255,54 @@ export function ContactRecordHub({
       return;
     }
 
-    router.replace(
-      buildHubHref(listData, {
-        contact: listData.activeContactId,
-        profile: next,
-      }),
+    const href =
+      activeTab === "leads"
+        ? buildLeadsHubHref(currentListData as LeadsPageData, {
+            contact: currentListData.activeContactId,
+            profile: next,
+          })
+        : buildContactsHubHref(currentListData, {
+            contact: currentListData.activeContactId,
+            profile: next,
+          });
+
+    router.replace(href);
+  }
+
+  if (activeTab === "deals" && dealsData) {
+    return (
+      <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+        <CrmEntityTabs
+          activeTab={activeTab}
+          listData={leadsData ?? listData}
+          dealsData={dealsData}
+        />
+        <DealsWorkspace dealsData={dealsData} />
+      </div>
     );
+  }
+
+  if (!currentListData) {
+    return null;
   }
 
   return (
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <CrmEntityTabs
+        activeTab={activeTab}
+        listData={activeTab === "leads" ? leadsData : listData}
+        dealsData={dealsData}
+      />
+
       <ContactsChannelTabs
-        activeChannel={listData.activeChannelFilter}
-        activeSegment={listData.activeSegment}
-        activeView={listData.activeView}
-        activeContactId={listData.activeContactId}
-        showProfilePanel={listData.showProfilePanel}
-        searchQuery={listData.searchQuery}
+        activeTab={activeTab}
+        activeChannel={currentListData.activeChannelFilter}
+        activeSegment={listData?.activeSegment ?? "all"}
+        activeLeadSegment={leadsData?.activeLeadSegment}
+        activeView={currentListData.activeView}
+        activeContactId={currentListData.activeContactId}
+        showProfilePanel={currentListData.showProfilePanel}
+        searchQuery={currentListData.searchQuery}
         visibleChannelIds={visibleChannelIds}
       />
 
@@ -173,32 +319,55 @@ export function ContactRecordHub({
           )}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            {listData.activeView === "pipeline" && pipelineData ? (
-              <ContactPipelineBoard
-                {...pipelineData}
-                activeContactId={listData.activeContactId}
-                listData={listData}
-              />
+            {currentListData.activeView === "pipeline" ? (
+              activeTab === "leads" && leadsPipelineData ? (
+                <ContactPipelineBoard
+                  {...leadsPipelineData}
+                  activeContactId={currentListData.activeContactId}
+                  listData={leadsData ?? undefined}
+                  stages={LEAD_PIPELINE_STAGES}
+                  tab="leads"
+                />
+              ) : pipelineData ? (
+                <ContactPipelineBoard
+                  {...pipelineData}
+                  activeContactId={currentListData.activeContactId}
+                  listData={listData ?? undefined}
+                  tab="contacts"
+                />
+              ) : null
             ) : (
-              <UnifiedContactsPanel {...listData} embedded />
+              <UnifiedContactsPanel
+                {...currentListData}
+                variant={activeTab === "leads" ? "leads" : "contacts"}
+                embedded
+              />
             )}
           </div>
 
-          {listData.activeView === "list" && listData.total > listData.pageSize ? (
+          {currentListData.activeView === "list" &&
+          currentListData.total > currentListData.pageSize ? (
             <div className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-2">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={listData.page <= 1}
-                asChild={listData.page > 1}
+                disabled={currentListData.page <= 1}
+                asChild={currentListData.page > 1}
               >
-                {listData.page > 1 ? (
+                {currentListData.page > 1 ? (
                   <Link
-                    href={buildHubHref(listData, {
-                      page: listData.page - 1,
-                      contact: listData.activeContactId,
-                    })}
+                    href={
+                      activeTab === "leads"
+                        ? buildLeadsHubHref(currentListData as LeadsPageData, {
+                            page: currentListData.page - 1,
+                            contact: currentListData.activeContactId,
+                          })
+                        : buildContactsHubHref(currentListData, {
+                            page: currentListData.page - 1,
+                            contact: currentListData.activeContactId,
+                          })
+                    }
                   >
                     {CONTACTS_MESSAGES.previousPage}
                   </Link>
@@ -207,21 +376,28 @@ export function ContactRecordHub({
                 )}
               </Button>
               <span className="text-caption text-muted-foreground">
-                {CONTACTS_MESSAGES.pageIndicator(listData.page)}
+                {CONTACTS_MESSAGES.pageIndicator(currentListData.page)}
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={!listData.hasMore}
-                asChild={listData.hasMore}
+                disabled={!currentListData.hasMore}
+                asChild={currentListData.hasMore}
               >
-                {listData.hasMore ? (
+                {currentListData.hasMore ? (
                   <Link
-                    href={buildHubHref(listData, {
-                      page: listData.page + 1,
-                      contact: listData.activeContactId,
-                    })}
+                    href={
+                      activeTab === "leads"
+                        ? buildLeadsHubHref(currentListData as LeadsPageData, {
+                            page: currentListData.page + 1,
+                            contact: currentListData.activeContactId,
+                          })
+                        : buildContactsHubHref(currentListData, {
+                            page: currentListData.page + 1,
+                            contact: currentListData.activeContactId,
+                          })
+                    }
                   >
                     {CONTACTS_MESSAGES.nextPage}
                   </Link>
@@ -240,7 +416,7 @@ export function ContactRecordHub({
           )}
         >
           <ContactRecordWorkspace
-            contactId={listData.activeContactId}
+            contactId={currentListData.activeContactId}
             profileOpen={profileOpen || mobileProfileOpen}
             onToggleProfile={toggleProfilePanel}
             onContactDeleted={clearContactSelection}
@@ -250,7 +426,7 @@ export function ContactRecordHub({
       </div>
 
       <ContactProfileDrawer
-        contactId={listData.activeContactId}
+        contactId={currentListData.activeContactId}
         open={mobileProfileOpen}
         onOpenChange={(open) => {
           setMobileProfileOpen(open);

@@ -113,9 +113,32 @@ export type ContactProfileData = {
   deals: CrmDealItem[];
 };
 
+export const CRM_ENTITY_TABS = ["contacts", "leads", "deals"] as const;
+
+export type CrmEntityTab = (typeof CRM_ENTITY_TABS)[number];
+
 export const CONTACT_SEGMENTS = ["all", "hot_leads", "no_reply_48h"] as const;
 
 export type ContactSegment = (typeof CONTACT_SEGMENTS)[number];
+
+export const LEAD_SEGMENTS = [
+  "all_leads",
+  "hot_leads",
+  "warm_leads",
+  "stale_leads",
+] as const;
+
+export type LeadSegment = (typeof LEAD_SEGMENTS)[number];
+
+export const LEAD_PIPELINE_STAGES = ["new", "qualified", "proposal"] as const;
+
+export type LeadPipelineStage = (typeof LEAD_PIPELINE_STAGES)[number];
+
+export const ACTIVE_LEAD_PIPELINE_STAGES: PipelineStage[] = [
+  "new",
+  "qualified",
+  "proposal",
+];
 
 export const updateContactPipelineStageSchema = z.object({
   contactId: z.string().uuid("Invalid contact identifier."),
@@ -135,6 +158,7 @@ export type UnifiedContactsPageData = {
   hasBusiness: boolean;
   contacts: UnifiedContactItem[];
   total: number;
+  activeTab: CrmEntityTab;
   activeChannelFilter: MessagingChannel | null;
   activeSegment: ContactSegment;
   activeView: "list" | "pipeline";
@@ -144,4 +168,8 @@ export type UnifiedContactsPageData = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+};
+
+export type LeadsPageData = UnifiedContactsPageData & {
+  activeLeadSegment: LeadSegment;
 };

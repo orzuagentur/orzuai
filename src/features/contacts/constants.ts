@@ -11,7 +11,10 @@ export const CONTACTS_PAGE_SIZE = 50;
 
 export const CONTACTS_MESSAGES = {
   pageTitle: "CRM",
-  pageSubtitle: "Contacts & pipeline",
+  pageSubtitle: "Contacts, leads & deals",
+  tabContacts: "Contacts",
+  tabLeads: "Leads",
+  tabDeals: "Deals",
   pageDescription:
     "All contacts across WhatsApp, Instagram, Telegram, and Website Forms.",
   filtersLabel: "Filters",
@@ -115,6 +118,23 @@ export const CONTACTS_MESSAGES = {
   segmentAll: "All contacts",
   segmentHotLeads: "Hot leads",
   segmentNoReply48h: "No reply 48h+",
+  segmentAllLeads: "All leads",
+  segmentWarmLeads: "Warm leads",
+  segmentStaleLeads: "Stale 48h+",
+  leadsEmptyTitle: "No active leads",
+  leadsEmptyDescription:
+    "Leads are contacts in New, Qualified, or Proposal stages.",
+  dealsEmptyTitle: "No deals yet",
+  dealsEmptyDescription: "Create a deal and link it to a contact.",
+  viewKanban: "Kanban",
+  dealsSearchPlaceholder: "Search deals or contacts…",
+  newDeal: "New deal",
+  selectContactForDeal: "Contact",
+  selectContactPlaceholder: "Search contacts…",
+  openContact: "Open contact",
+  dealDetailTitle: "Deal details",
+  dealsCount: (count: number) =>
+    count === 1 ? "1 deal" : `${count} deals`,
   viewList: "List",
   viewPipeline: "Pipeline",
   pipelineNew: "New",
@@ -169,6 +189,13 @@ export const CONTACT_SEGMENT_FILTERS = [
   { id: "all" as const, label: CONTACTS_MESSAGES.segmentAll },
   { id: "hot_leads" as const, label: CONTACTS_MESSAGES.segmentHotLeads },
   { id: "no_reply_48h" as const, label: CONTACTS_MESSAGES.segmentNoReply48h },
+] as const;
+
+export const LEAD_SEGMENT_FILTERS = [
+  { id: "all_leads" as const, label: CONTACTS_MESSAGES.segmentAllLeads },
+  { id: "hot_leads" as const, label: CONTACTS_MESSAGES.segmentHotLeads },
+  { id: "warm_leads" as const, label: CONTACTS_MESSAGES.segmentWarmLeads },
+  { id: "stale_leads" as const, label: CONTACTS_MESSAGES.segmentStaleLeads },
 ] as const;
 
 export const CONTACT_CHANNEL_FILTERS = [

@@ -1,5 +1,8 @@
 import "server-only";
 
+import { revalidatePath } from "next/cache";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { normalizeDealCurrency } from "@/lib/deal-currency";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -7,14 +10,19 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { PipelineStage } from "@/types/contact.types";
+import { CONTACTS_PAGE_SIZE } from "@/features/contacts/constants";
+import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
 import type {
   CreateCrmDealInput,
   CrmDealActionResult,
   CrmDealItem,
+  CrmDealListItem,
+  CrmDealsPageData,
   CrmDealStatus,
   DeleteCrmDealInput,
   UpdateCrmDealInput,
 } from "@/types/crm-deal.types";
+import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import {
   createCrmDealSchema,
   deleteCrmDealSchema,
@@ -37,6 +45,55 @@ function mapDealStatus(stage: PipelineStage): CrmDealStatus {
   }
 
   return "open";
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
+function isDealStatus(value: string | null | undefined): value is CrmDealStatus {
+  return value === "open" || value === "won" || value === "lost";
+}
+
+function isPipelineStage(value: string | null | undefined): value is PipelineStage {
+  return (
+    value === "new" ||
+    value === "qualified" ||
+    value === "proposal" ||
+    value === "won" ||
+    value === "lost"
+  );
+}
+
+function parseDealsPage(value: string | null | undefined): number {
+  const parsed = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function resolveContactFromDealRow(
+  contact:
+    | {
+        name: string;
+        phone_number: string;
+        channel: CrmDealListItem["contactChannel"];
+        avatar_url?: string | null;
+      }
+    | Array<{
+        name: string;
+        phone_number: string;
+        channel: CrmDealListItem["contactChannel"];
+        avatar_url?: string | null;
+      }>
+    | null,
+) {
+  if (!contact) {
+    return null;
+  }
+
+  return Array.isArray(contact) ? (contact[0] ?? null) : contact;
 }
 
 function mapCrmDeal(row: {
@@ -138,6 +195,239 @@ export async function syncContactToPrimaryDeal(
   });
 }
 
+type DealQueryRow = {
+  id: string;
+  contact_id: string;
+  title: string;
+  value: number | null;
+  currency?: string | null;
+  stage: string;
+  expected_close_date: string | null;
+  status: string;
+  is_primary: boolean;
+  notes: string | null;
+  created_at: string;
+  contact:
+    | {
+        name: string;
+        phone_number: string;
+        channel: CrmDealListItem["contactChannel"];
+        avatar_url?: string | null;
+      }
+    | Array<{
+        name: string;
+        phone_number: string;
+        channel: CrmDealListItem["contactChannel"];
+        avatar_url?: string | null;
+      }>
+    | null;
+};
+
+async function mapDealQueryRows(rows: DealQueryRow[]): Promise<CrmDealListItem[]> {
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
+    rows.map((row) => resolveContactFromDealRow(row.contact)?.avatar_url),
+  );
+
+  return rows.flatMap((row) => {
+    const contact = resolveContactFromDealRow(row.contact);
+
+    if (!contact) {
+      return [];
+    }
+
+    const deal = mapCrmDeal(row);
+
+    return [
+      {
+        ...deal,
+        contactName: contact.name,
+        contactPhone: contact.phone_number,
+        contactChannel: contact.channel,
+        contactAvatarUrl: resolveAvatarUrlFromMap(
+          contact.avatar_url,
+          avatarSignedUrlMap,
+        ),
+      },
+    ];
+  });
+}
+
+function buildDealsQuery(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  input: {
+    searchQuery: string;
+    stageFilter: PipelineStage | null;
+    statusFilter: CrmDealStatus | null;
+  },
+) {
+  let query = supabase
+    .from("crm_deals")
+    .select(
+      "id, contact_id, title, value, currency, stage, expected_close_date, status, is_primary, notes, created_at, contact:contacts(name, phone_number, channel, avatar_url)",
+      { count: "exact" },
+    )
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false });
+
+  if (input.stageFilter) {
+    query = query.eq("stage", input.stageFilter);
+  }
+
+  if (input.statusFilter) {
+    query = query.eq("status", input.statusFilter);
+  }
+
+  if (input.searchQuery) {
+    const pattern = `%${escapeIlikePattern(input.searchQuery)}%`;
+    query = query.or(`title.ilike.${pattern},notes.ilike.${pattern}`);
+  }
+
+  return query;
+}
+
+export type GetCrmDealsPageInput = {
+  q?: string | null;
+  page?: string | null;
+  view?: string | null;
+  stage?: string | null;
+  dealStatus?: string | null;
+  deal?: string | null;
+  contact?: string | null;
+  profile?: string | null;
+};
+
+async function resolveActiveDealId(
+  businessId: string,
+  dealId: string | null | undefined,
+): Promise<string | null> {
+  const candidate = dealId?.trim();
+
+  if (!candidate || !UUID_PATTERN.test(candidate)) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("crm_deals")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("id", candidate)
+    .maybeSingle();
+
+  return data?.id ?? null;
+}
+
+export async function getCrmDealsPageData(
+  input: GetCrmDealsPageInput = {},
+): Promise<CrmDealsPageData> {
+  const searchQuery = (input.q ?? "").trim();
+  const page = parseDealsPage(input.page);
+  const pageSize = CONTACTS_PAGE_SIZE;
+  const activeView = input.view === "list" ? "list" : "kanban";
+  const activeStageFilter = isPipelineStage(input.stage) ? input.stage : null;
+  const activeStatusFilter = isDealStatus(input.dealStatus)
+    ? input.dealStatus
+    : null;
+
+  const businessId = await getOwnedBusinessId();
+  const empty: CrmDealsPageData = {
+    hasBusiness: false,
+    deals: [],
+    kanbanDeals: [],
+    total: 0,
+    activeTab: "deals",
+    activeDealId: null,
+    activeContactId: null,
+    showProfilePanel: false,
+    searchQuery,
+    activeStageFilter,
+    activeStatusFilter,
+    activeView,
+    page,
+    pageSize,
+    hasMore: false,
+  };
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return empty;
+  }
+
+  const supabase = await createClient();
+  const activeDealId = await resolveActiveDealId(businessId, input.deal);
+  let activeContactId: string | null = null;
+
+  if (activeDealId) {
+    const { data: dealRow } = await supabase
+      .from("crm_deals")
+      .select("contact_id")
+      .eq("id", activeDealId)
+      .maybeSingle();
+
+    activeContactId = dealRow?.contact_id ?? null;
+  }
+
+  const contactCandidate = input.contact?.trim();
+  if (contactCandidate && UUID_PATTERN.test(contactCandidate)) {
+    const { data: contactRow } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("id", contactCandidate)
+      .maybeSingle();
+
+    if (contactRow?.id) {
+      activeContactId = contactRow.id;
+    }
+  }
+
+  const showProfilePanel =
+    input.profile === "1" && activeContactId !== null;
+
+  const filters = {
+    searchQuery,
+    stageFilter: activeStageFilter,
+    statusFilter: activeStatusFilter,
+  };
+
+  const { data: kanbanRows } = await buildDealsQuery(
+    supabase,
+    businessId,
+    filters,
+  ).limit(500);
+
+  const kanbanDeals = await mapDealQueryRows((kanbanRows ?? []) as DealQueryRow[]);
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data: listRows, count } = await buildDealsQuery(
+    supabase,
+    businessId,
+    filters,
+  ).range(from, to);
+
+  const deals = await mapDealQueryRows((listRows ?? []) as DealQueryRow[]);
+  const total = count ?? deals.length;
+
+  return {
+    hasBusiness: true,
+    deals,
+    kanbanDeals,
+    total,
+    activeTab: "deals",
+    activeDealId,
+    activeContactId,
+    showProfilePanel,
+    searchQuery,
+    activeStageFilter,
+    activeStatusFilter,
+    activeView,
+    page,
+    pageSize,
+    hasMore: from + deals.length < total,
+  };
+}
+
 export async function listCrmDealsForContact(
   contactId: string,
 ): Promise<CrmDealItem[]> {
@@ -224,6 +514,8 @@ export async function createCrmDeal(
   if (parsed.data.isPrimary) {
     await syncPrimaryDealToContact(parsed.data.contactId, businessId);
   }
+
+  revalidatePath(DASHBOARD_ROUTES.contacts);
 
   return { success: true, data: { dealId: data.id } };
 }
@@ -312,6 +604,8 @@ export async function updateCrmDeal(
     await syncPrimaryDealToContact(existing.contact_id, businessId);
   }
 
+  revalidatePath(DASHBOARD_ROUTES.contacts);
+
   return { success: true };
 }
 
@@ -352,6 +646,8 @@ export async function deleteCrmDeal(
       error: { code: "DELETE_FAILED", message: CONTACTS_MESSAGES.dealDeleteFailed },
     };
   }
+
+  revalidatePath(DASHBOARD_ROUTES.contacts);
 
   return { success: true };
 }

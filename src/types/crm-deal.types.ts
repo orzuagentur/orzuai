@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 import { DEAL_CURRENCIES } from "@/lib/deal-currency";
+import type { PipelineStage } from "./contact.types";
 import { PIPELINE_STAGES } from "./contact.types";
+import type { MessagingChannel } from "./database.types";
 
 const dealCurrencyCodes = DEAL_CURRENCIES.map((entry) => entry.code) as [
   string,
@@ -18,12 +20,44 @@ export type CrmDealItem = {
   title: string;
   value: number | null;
   currency: string;
-  stage: (typeof PIPELINE_STAGES)[number];
+  stage: PipelineStage;
   expectedCloseDate: string | null;
   status: CrmDealStatus;
   isPrimary: boolean;
   notes: string | null;
   createdAt: string;
+};
+
+export type CrmDealListItem = CrmDealItem & {
+  contactName: string;
+  contactPhone: string;
+  contactChannel: MessagingChannel;
+  contactAvatarUrl: string | null;
+};
+
+export type CrmDealsPageData = {
+  hasBusiness: boolean;
+  deals: CrmDealListItem[];
+  kanbanDeals: CrmDealListItem[];
+  total: number;
+  activeTab: "deals";
+  activeDealId: string | null;
+  activeContactId: string | null;
+  showProfilePanel: boolean;
+  searchQuery: string;
+  activeStageFilter: PipelineStage | null;
+  activeStatusFilter: CrmDealStatus | null;
+  activeView: "kanban" | "list";
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type ContactPickerItem = {
+  id: string;
+  name: string;
+  phone: string;
+  channel: MessagingChannel;
 };
 
 export const createCrmDealSchema = z.object({

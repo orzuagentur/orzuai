@@ -34,6 +34,8 @@ import type {
   ContactPipelinePageData,
   GenerateContactInsightsResult,
   ContactSegment,
+  LeadSegment,
+  LeadsPageData,
   PipelineStage,
   UnifiedContactItem,
   UnifiedContactsPageData,
@@ -43,10 +45,12 @@ import type {
 import {
   deleteContactSchema,
   generateContactInsightsSchema,
+  ACTIVE_LEAD_PIPELINE_STAGES,
   PIPELINE_STAGES,
   updateContactPipelineStageSchema,
   updateContactSchema,
 } from "@/types/contact.types";
+import type { ContactPickerItem } from "@/types/crm-deal.types";
 import type { MessagingChannel } from "@/types/database.types";
 
 async function getOwnedBusinessId(): Promise<string | null> {
@@ -157,6 +161,15 @@ function revalidateContactPaths(): void {
 
 function isContactSegment(value: string | null | undefined): value is ContactSegment {
   return value === "all" || value === "hot_leads" || value === "no_reply_48h";
+}
+
+function isLeadSegment(value: string | null | undefined): value is LeadSegment {
+  return (
+    value === "all_leads" ||
+    value === "hot_leads" ||
+    value === "warm_leads" ||
+    value === "stale_leads"
+  );
 }
 
 async function filterContactsBySegment(
@@ -403,6 +416,7 @@ export async function getUnifiedContacts(
       hasBusiness: false,
       contacts: [],
       total: 0,
+      activeTab: "contacts",
       activeChannelFilter,
       activeSegment,
       activeView,
@@ -442,6 +456,7 @@ export async function getUnifiedContacts(
       hasBusiness: true,
       contacts,
       total: filtered.length,
+      activeTab: "contacts",
       activeChannelFilter,
       activeSegment,
       activeView,
@@ -471,6 +486,7 @@ export async function getUnifiedContacts(
     hasBusiness: true,
     contacts,
     total,
+    activeTab: "contacts",
     activeChannelFilter,
     activeSegment,
     activeView,
@@ -481,6 +497,318 @@ export async function getUnifiedContacts(
     pageSize,
     hasMore: from + contacts.length < total,
   };
+}
+
+export type GetLeadsContactsInput = {
+  channel?: string | null;
+  leadSegment?: string | null;
+  view?: string | null;
+  q?: string | null;
+  page?: string | null;
+  contact?: string | null;
+  profile?: string | null;
+};
+
+function buildLeadsQuery(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  activeChannelFilter: MessagingChannel | null,
+  activeLeadSegment: LeadSegment,
+  searchQuery: string,
+) {
+  let query = supabase
+    .from("contacts")
+    .select(
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at, is_favorite, avatar_url, created_at",
+      { count: "exact" },
+    )
+    .eq("business_id", businessId)
+    .in("pipeline_stage", ACTIVE_LEAD_PIPELINE_STAGES)
+    .order("last_message_at", { ascending: false, nullsFirst: false });
+
+  if (activeChannelFilter) {
+    query = query.eq("channel", activeChannelFilter);
+  }
+
+  if (activeLeadSegment === "hot_leads") {
+    query = query.gte("lead_score", 70);
+  }
+
+  if (activeLeadSegment === "warm_leads") {
+    query = query.gte("lead_score", 40).lt("lead_score", 70);
+  }
+
+  if (searchQuery) {
+    const pattern = `%${escapeIlikePattern(searchQuery)}%`;
+    query = query.or(
+      `name.ilike.${pattern},phone_number.ilike.${pattern},email.ilike.${pattern}`,
+    );
+  }
+
+  return query;
+}
+
+async function filterLeadsByStaleSegment(
+  contacts: UnifiedContactItem[],
+  businessId: string,
+): Promise<UnifiedContactItem[]> {
+  const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+  const supabase = await createClient();
+  const contactIds = contacts.map((contact) => contact.id);
+
+  if (contactIds.length === 0) {
+    return [];
+  }
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id, contact_id")
+    .eq("business_id", businessId)
+    .in("contact_id", contactIds);
+
+  const conversationIds = (conversations ?? []).map(
+    (conversation) => conversation.id,
+  );
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("conversation_id, sender_type, created_at")
+    .in("conversation_id", conversationIds)
+    .eq("sender_type", "client")
+    .order("created_at", { ascending: false });
+
+  const lastClientMessageByConversationId = new Map<string, string>();
+
+  for (const message of messages ?? []) {
+    if (!lastClientMessageByConversationId.has(message.conversation_id)) {
+      lastClientMessageByConversationId.set(
+        message.conversation_id,
+        message.created_at,
+      );
+    }
+  }
+
+  const conversationByContactId = new Map(
+    (conversations ?? []).map((conversation) => [
+      conversation.contact_id,
+      conversation.id,
+    ]),
+  );
+
+  return contacts.filter((contact) => {
+    const conversationId = conversationByContactId.get(contact.id);
+
+    if (!conversationId) {
+      return false;
+    }
+
+    const lastClientMessageAt =
+      lastClientMessageByConversationId.get(conversationId);
+
+    if (!lastClientMessageAt) {
+      return false;
+    }
+
+    return new Date(lastClientMessageAt).getTime() < cutoff;
+  });
+}
+
+export async function getLeadsContacts(
+  input: GetLeadsContactsInput = {},
+): Promise<LeadsPageData> {
+  const activeChannelFilter =
+    input.channel && isMessagingChannel(input.channel) ? input.channel : null;
+  const activeLeadSegment = isLeadSegment(input.leadSegment)
+    ? input.leadSegment
+    : "all_leads";
+  const activeView = isContactsView(input.view) ? input.view : "list";
+  const searchQuery = (input.q ?? "").trim();
+  const page = parseContactsPage(input.page);
+  const pageSize = CONTACTS_PAGE_SIZE;
+
+  const businessId = await getOwnedBusinessId();
+  const empty: LeadsPageData = {
+    hasBusiness: false,
+    contacts: [],
+    total: 0,
+    activeTab: "leads",
+    activeChannelFilter,
+    activeLeadSegment,
+    activeSegment: "all",
+    activeView,
+    activeContactId: null,
+    showProfilePanel: false,
+    searchQuery,
+    page,
+    pageSize,
+    hasMore: false,
+  };
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return empty;
+  }
+
+  const supabase = await createClient();
+  const activeContactId = await resolveActiveContactId(businessId, input.contact);
+  const showProfilePanel =
+    input.profile === "1" && activeContactId !== null;
+
+  if (activeLeadSegment === "stale_leads") {
+    const { data } = await buildLeadsQuery(
+      supabase,
+      businessId,
+      activeChannelFilter,
+      "all_leads",
+      searchQuery,
+    ).limit(500);
+
+    const allContacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
+    const filtered = await filterLeadsByStaleSegment(allContacts, businessId);
+    const offset = (page - 1) * pageSize;
+    const contacts = filtered.slice(offset, offset + pageSize);
+
+    return {
+      hasBusiness: true,
+      contacts,
+      total: filtered.length,
+      activeTab: "leads",
+      activeChannelFilter,
+      activeLeadSegment,
+      activeSegment: "all",
+      activeView,
+      activeContactId,
+      showProfilePanel,
+      searchQuery,
+      page,
+      pageSize,
+      hasMore: offset + contacts.length < filtered.length,
+    };
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data, count } = await buildLeadsQuery(
+    supabase,
+    businessId,
+    activeChannelFilter,
+    activeLeadSegment,
+    searchQuery,
+  ).range(from, to);
+
+  const contacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
+  const total = count ?? contacts.length;
+
+  return {
+    hasBusiness: true,
+    contacts,
+    total,
+    activeTab: "leads",
+    activeChannelFilter,
+    activeLeadSegment,
+    activeSegment: "all",
+    activeView,
+    activeContactId,
+    showProfilePanel,
+    searchQuery,
+    page,
+    pageSize,
+    hasMore: from + contacts.length < total,
+  };
+}
+
+export async function getLeadsPipeline(
+  input: Pick<GetLeadsContactsInput, "channel" | "q" | "leadSegment"> = {},
+): Promise<ContactPipelinePageData> {
+  const activeChannelFilter =
+    input.channel && isMessagingChannel(input.channel) ? input.channel : null;
+  const activeLeadSegment = isLeadSegment(input.leadSegment)
+    ? input.leadSegment
+    : "all_leads";
+  const searchQuery = (input.q ?? "").trim();
+  const emptyColumns = ACTIVE_LEAD_PIPELINE_STAGES.reduce(
+    (acc, stage) => {
+      acc[stage] = [];
+      return acc;
+    },
+    {} as Record<PipelineStage, UnifiedContactItem[]>,
+  );
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return {
+      hasBusiness: false,
+      columns: emptyColumns,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data } = await buildLeadsQuery(
+    supabase,
+    businessId,
+    activeChannelFilter,
+    activeLeadSegment === "stale_leads" ? "all_leads" : activeLeadSegment,
+    searchQuery,
+  ).limit(500);
+
+  let contacts = await attachLastMessagePreviews((data ?? []) as ContactRow[]);
+
+  if (activeLeadSegment === "stale_leads") {
+    contacts = await filterLeadsByStaleSegment(contacts, businessId);
+  }
+
+  const columns = ACTIVE_LEAD_PIPELINE_STAGES.reduce(
+    (acc, stage) => {
+      acc[stage] = contacts.filter((contact) => contact.pipelineStage === stage);
+      return acc;
+    },
+    {} as Record<PipelineStage, UnifiedContactItem[]>,
+  );
+
+  return {
+    hasBusiness: true,
+    columns,
+  };
+}
+
+export async function searchContactsForPicker(
+  search: string,
+  limit = 20,
+): Promise<ContactPickerItem[]> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const searchQuery = search.trim();
+  let query = supabase
+    .from("contacts")
+    .select("id, name, phone_number, channel")
+    .eq("business_id", businessId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (searchQuery) {
+    const pattern = `%${escapeIlikePattern(searchQuery)}%`;
+    query = query.or(
+      `name.ilike.${pattern},phone_number.ilike.${pattern},email.ilike.${pattern}`,
+    );
+  }
+
+  const { data } = await query;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone_number,
+    channel: row.channel,
+  }));
 }
 
 export async function getContactPipeline(

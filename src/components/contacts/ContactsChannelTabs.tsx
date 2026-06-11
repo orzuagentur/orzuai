@@ -9,11 +9,13 @@ import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import { buildContactsHref } from "@/utils/contacts-url";
-import type { ContactSegment } from "@/types/contact.types";
+import type { ContactSegment, CrmEntityTab, LeadSegment } from "@/types/contact.types";
 
 type ContactsChannelTabsProps = {
+  activeTab?: CrmEntityTab;
   activeChannel: MessagingChannel | null;
   activeSegment: ContactSegment;
+  activeLeadSegment?: LeadSegment;
   activeView: "list" | "pipeline";
   activeContactId: string | null;
   showProfilePanel?: boolean;
@@ -23,8 +25,10 @@ type ContactsChannelTabsProps = {
 };
 
 export function ContactsChannelTabs({
+  activeTab = "contacts",
   activeChannel,
   activeSegment,
+  activeLeadSegment = "all_leads",
   activeView,
   activeContactId,
   showProfilePanel = false,
@@ -36,7 +40,21 @@ export function ContactsChannelTabs({
     (filter) => filter.id !== null && visibleChannelIds.includes(filter.id),
   );
   function hrefForChannel(channel: MessagingChannel | null) {
+    if (activeTab === "leads") {
+      return buildContactsHref({
+        tab: "leads",
+        channel,
+        leadSegment: activeLeadSegment,
+        view: activeView,
+        contact: activeContactId,
+        profile: showProfilePanel,
+        q: searchQuery || null,
+        page: 1,
+      });
+    }
+
     return buildContactsHref({
+      tab: "contacts",
       channel,
       segment: activeSegment,
       view: activeView,

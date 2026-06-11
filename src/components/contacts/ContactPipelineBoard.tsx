@@ -16,17 +16,21 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   ContactPipelinePageData,
+  CrmEntityTab,
+  LeadsPageData,
   PipelineStage,
   UnifiedContactItem,
   UnifiedContactsPageData,
 } from "@/types/contact.types";
-import { PIPELINE_STAGES } from "@/types/contact.types";
+import { LEAD_PIPELINE_STAGES, PIPELINE_STAGES } from "@/types/contact.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
 
 type ContactPipelineBoardProps = ContactPipelinePageData & {
   activeContactId?: string | null;
-  listData?: UnifiedContactsPageData;
+  listData?: UnifiedContactsPageData | LeadsPageData;
+  stages?: readonly PipelineStage[];
+  tab?: CrmEntityTab;
 };
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
@@ -40,10 +44,25 @@ const STAGE_LABELS: Record<PipelineStage, string> = {
 const DRAG_CONTACT_MIME = "application/x-orzuai-contact-id";
 
 function buildContactHref(
-  data: UnifiedContactsPageData,
+  data: UnifiedContactsPageData | LeadsPageData,
   contactId: string,
+  tab: CrmEntityTab,
 ): string {
+  if (tab === "leads" && "activeLeadSegment" in data) {
+    return buildContactsHref({
+      tab: "leads",
+      channel: data.activeChannelFilter,
+      leadSegment: data.activeLeadSegment,
+      view: "pipeline",
+      contact: contactId,
+      profile: data.showProfilePanel,
+      q: data.searchQuery || null,
+      page: data.page,
+    });
+  }
+
   return buildContactsHref({
+    tab: "contacts",
     channel: data.activeChannelFilter,
     segment: data.activeSegment,
     view: "pipeline",
@@ -59,6 +78,8 @@ export function ContactPipelineBoard({
   columns,
   activeContactId = null,
   listData,
+  stages = PIPELINE_STAGES,
+  tab = "contacts",
 }: ContactPipelineBoardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,7 +103,7 @@ export function ContactPipelineBoard({
   const contactsById = useMemo(() => {
     const map = new Map<string, UnifiedContactItem>();
 
-    for (const stage of PIPELINE_STAGES) {
+    for (const stage of stages) {
       for (const contact of columns[stage]) {
         map.set(contact.id, contact);
       }
@@ -142,8 +163,13 @@ export function ContactPipelineBoard({
 
   return (
     <div className="p-4">
-      <div className="grid gap-4 overflow-x-auto pb-2 lg:grid-cols-5">
-        {PIPELINE_STAGES.map((stage) => (
+      <div
+        className={cn(
+          "grid gap-4 overflow-x-auto pb-2",
+          stages.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-5",
+        )}
+      >
+        {stages.map((stage) => (
           <div
             key={stage}
             id={`pipeline-stage-${stage}`}
@@ -219,7 +245,7 @@ export function ContactPipelineBoard({
                   >
                     {listData ? (
                       <Link
-                        href={buildContactHref(listData, contact.id)}
+                        href={buildContactHref(listData, contact.id, tab)}
                         className="block w-full text-left"
                         draggable={false}
                         onClick={(event) => event.stopPropagation()}
@@ -240,11 +266,13 @@ export function ContactPipelineBoard({
                         );
                       }}
                     >
-                      {PIPELINE_STAGES.map((option) => (
-                        <option key={option} value={option}>
-                          {STAGE_LABELS[option]}
-                        </option>
-                      ))}
+                      {(tab === "leads" ? LEAD_PIPELINE_STAGES : PIPELINE_STAGES).map(
+                        (option) => (
+                          <option key={option} value={option}>
+                            {STAGE_LABELS[option]}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </li>
                 );

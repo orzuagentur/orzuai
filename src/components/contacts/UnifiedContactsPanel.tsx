@@ -14,20 +14,49 @@ import {
 } from "@/features/chats/channel-ui";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { cn } from "@/lib/utils";
-import type { UnifiedContactsPageData } from "@/types/contact.types";
+import type { LeadsPageData, UnifiedContactsPageData } from "@/types/contact.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
+import {
+  getLeadScoreBadgeClassName,
+  getLeadScoreLabel,
+} from "@/utils/lead-score";
+import { formatDealMoney } from "@/lib/deal-currency";
 
-type UnifiedContactsPanelProps = UnifiedContactsPageData & {
+type UnifiedContactsPanelProps = (UnifiedContactsPageData | LeadsPageData) & {
   embedded?: boolean;
+  variant?: "contacts" | "leads";
 };
 
+const STAGE_LABELS = {
+  new: CONTACTS_MESSAGES.pipelineNew,
+  qualified: CONTACTS_MESSAGES.pipelineQualified,
+  proposal: CONTACTS_MESSAGES.pipelineProposal,
+  won: CONTACTS_MESSAGES.pipelineWon,
+  lost: CONTACTS_MESSAGES.pipelineLost,
+} as const;
+
 function buildContactHref(
-  data: UnifiedContactsPageData,
+  data: UnifiedContactsPageData | LeadsPageData,
   contactId: string,
+  variant: "contacts" | "leads",
 ): string {
+  if (variant === "leads" && "activeLeadSegment" in data) {
+    return buildContactsHref({
+      tab: "leads",
+      channel: data.activeChannelFilter,
+      leadSegment: data.activeLeadSegment,
+      view: data.activeView,
+      contact: contactId,
+      profile: data.showProfilePanel,
+      q: data.searchQuery || null,
+      page: data.page,
+    });
+  }
+
   return buildContactsHref({
+    tab: "contacts",
     channel: data.activeChannelFilter,
     segment: data.activeSegment,
     view: data.activeView,
@@ -40,6 +69,7 @@ function buildContactHref(
 
 export function UnifiedContactsPanel({
   embedded = false,
+  variant = "contacts",
   ...listData
 }: UnifiedContactsPanelProps) {
   if (!listData.hasBusiness) {
@@ -57,12 +87,16 @@ export function UnifiedContactsPanel({
         title={
           isSearch
             ? CONTACTS_MESSAGES.searchEmptyTitle
-            : CONTACTS_MESSAGES.emptyTitle
+            : variant === "leads"
+              ? CONTACTS_MESSAGES.leadsEmptyTitle
+              : CONTACTS_MESSAGES.emptyTitle
         }
         description={
           isSearch
             ? CONTACTS_MESSAGES.searchEmptyDescription
-            : CONTACTS_MESSAGES.emptyDescription
+            : variant === "leads"
+              ? CONTACTS_MESSAGES.leadsEmptyDescription
+              : CONTACTS_MESSAGES.emptyDescription
         }
         actionLabel={isSearch ? undefined : CONTACTS_MESSAGES.emptyCta}
         actionHref={isSearch ? undefined : DASHBOARD_ROUTES.integrations}
@@ -78,7 +112,7 @@ export function UnifiedContactsPanel({
         return (
           <li key={contact.id}>
             <Link
-              href={buildContactHref(listData, contact.id)}
+              href={buildContactHref(listData, contact.id, variant)}
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
                 isSelected && "bg-primary/5",
@@ -97,9 +131,28 @@ export function UnifiedContactsPanel({
                   <p className="truncate font-medium">{contact.name}</p>
                 </div>
                 <p className="text-caption truncate text-muted-foreground">
-                  {contact.lastMessagePreview ??
-                    formatContactIdentifier(contact.identifier)}
+                  {variant === "leads" ? (
+                    <>
+                      {STAGE_LABELS[contact.pipelineStage]}
+                      {contact.dealValue !== null
+                        ? ` · ${formatDealMoney(contact.dealValue, "USD")}`
+                        : ""}
+                    </>
+                  ) : (
+                    contact.lastMessagePreview ??
+                    formatContactIdentifier(contact.identifier)
+                  )}
                 </p>
+                {variant === "leads" && contact.leadScore !== null ? (
+                  <span
+                    className={cn(
+                      "mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      getLeadScoreBadgeClassName(contact.leadScore),
+                    )}
+                  >
+                    {contact.leadScore} · {getLeadScoreLabel(contact.leadScore)}
+                  </span>
+                ) : null}
                 {contact.lastMessageAt ? (
                   <p className="text-caption text-muted-foreground/80">
                     {formatRelativeTime(contact.lastMessageAt)}

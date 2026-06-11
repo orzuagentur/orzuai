@@ -11,15 +11,22 @@ import {
   type ReactNode,
 } from "react";
 
-import type { ContactSegment } from "@/types/contact.types";
+import type { ContactSegment, CrmEntityTab, LeadSegment } from "@/types/contact.types";
 
 export type ContactsChromeConfig = {
+  activeTab: CrmEntityTab;
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  activeView: "list" | "pipeline";
-  onViewChange: (view: "list" | "pipeline") => void;
-  activeSegment: ContactSegment;
-  onSegmentChange: (segment: ContactSegment) => void;
+  searchPlaceholder?: string;
+  activeView?: "list" | "pipeline";
+  onViewChange?: (view: "list" | "pipeline") => void;
+  activeSegment?: ContactSegment;
+  onSegmentChange?: (segment: ContactSegment) => void;
+  activeLeadSegment?: LeadSegment;
+  onLeadSegmentChange?: (segment: LeadSegment) => void;
+  dealsView?: "kanban" | "list";
+  onDealsViewChange?: (view: "kanban" | "list") => void;
+  onNewDeal?: () => void;
 };
 
 type ContactsChromeContextValue = {
@@ -35,9 +42,13 @@ function chromePrimitivesEqual(
   b: ContactsChromeConfig,
 ): boolean {
   return (
+    a.activeTab === b.activeTab &&
     a.searchQuery === b.searchQuery &&
+    a.searchPlaceholder === b.searchPlaceholder &&
     a.activeView === b.activeView &&
-    a.activeSegment === b.activeSegment
+    a.activeSegment === b.activeSegment &&
+    a.activeLeadSegment === b.activeLeadSegment &&
+    a.dealsView === b.dealsView
   );
 }
 
@@ -61,7 +72,10 @@ export function ContactsChromeProvider({ children }: { children: ReactNode }) {
       if (
         prev.onSearchChange !== next.onSearchChange ||
         prev.onViewChange !== next.onViewChange ||
-        prev.onSegmentChange !== next.onSegmentChange
+        prev.onSegmentChange !== next.onSegmentChange ||
+        prev.onLeadSegmentChange !== next.onLeadSegmentChange ||
+        prev.onDealsViewChange !== next.onDealsViewChange ||
+        prev.onNewDeal !== next.onNewDeal
       ) {
         return next;
       }
@@ -95,18 +109,21 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
   const setChromeRef = useRef(context?.setChrome);
   setChromeRef.current = context?.setChrome;
 
-  const enabled =
-    config !== null &&
-    typeof config.onSearchChange === "function" &&
-    typeof config.onViewChange === "function" &&
-    typeof config.onSegmentChange === "function";
+  const enabled = config !== null && typeof config.onSearchChange === "function";
 
+  const activeTab = config?.activeTab ?? "contacts";
   const searchQuery = config?.searchQuery ?? "";
+  const searchPlaceholder = config?.searchPlaceholder;
   const activeView = config?.activeView ?? "list";
   const activeSegment = config?.activeSegment ?? "all";
+  const activeLeadSegment = config?.activeLeadSegment ?? "all_leads";
+  const dealsView = config?.dealsView ?? "kanban";
   const onSearchChange = config?.onSearchChange;
   const onViewChange = config?.onViewChange;
   const onSegmentChange = config?.onSegmentChange;
+  const onLeadSegmentChange = config?.onLeadSegmentChange;
+  const onDealsViewChange = config?.onDealsViewChange;
+  const onNewDeal = config?.onNewDeal;
 
   useEffect(() => {
     const setChrome = setChromeRef.current;
@@ -115,35 +132,44 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
       return;
     }
 
-    if (
-      !enabled ||
-      !onSearchChange ||
-      !onViewChange ||
-      !onSegmentChange
-    ) {
+    if (!enabled || !onSearchChange) {
       setChrome(null);
       return;
     }
 
     setChrome({
+      activeTab,
       searchQuery,
       onSearchChange,
+      searchPlaceholder,
       activeView,
       onViewChange,
       activeSegment,
       onSegmentChange,
+      activeLeadSegment,
+      onLeadSegmentChange,
+      dealsView,
+      onDealsViewChange,
+      onNewDeal,
     });
 
     return () => {
       setChrome(null);
     };
   }, [
-    enabled,
-    searchQuery,
-    activeView,
+    activeLeadSegment,
     activeSegment,
+    activeTab,
+    activeView,
+    dealsView,
+    enabled,
+    onDealsViewChange,
+    onLeadSegmentChange,
+    onNewDeal,
     onSearchChange,
-    onViewChange,
     onSegmentChange,
+    onViewChange,
+    searchPlaceholder,
+    searchQuery,
   ]);
 }
