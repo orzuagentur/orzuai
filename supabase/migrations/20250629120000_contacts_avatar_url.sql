@@ -1,0 +1,3 @@
+ALTER TABLE contacts
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+  ADD COLUMN IF NOT EXISTS avatar_synced_at TIMESTAMPTZ;

@@ -26,6 +26,7 @@ type UseInboxListRealtimeOptions = {
   channelFilter?: MessagingChannel;
   selectedConversationId: string | null;
   hasActiveFilters?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
   onConversationsChange: (
     updater: (current: ConversationListItem[]) => ConversationListItem[],
   ) => void;
@@ -42,9 +43,11 @@ export function useInboxListRealtime({
   hasActiveFilters = false,
   onConversationsChange,
   onNeedsAttentionChange,
+  onConnectionChange,
   onRefresh,
 }: UseInboxListRealtimeOptions) {
   const onConversationsChangeRef = useRef(onConversationsChange);
+  const onConnectionChangeRef = useRef(onConnectionChange);
   const onNeedsAttentionChangeRef = useRef(onNeedsAttentionChange);
   const onRefreshRef = useRef(onRefresh);
   const refreshTimeoutRef = useRef<number | null>(null);
@@ -53,6 +56,7 @@ export function useInboxListRealtime({
 
   onConversationsChangeRef.current = onConversationsChange;
   onNeedsAttentionChangeRef.current = onNeedsAttentionChange;
+  onConnectionChangeRef.current = onConnectionChange;
   onRefreshRef.current = onRefresh;
   selectedConversationIdRef.current = selectedConversationId;
   hasActiveFiltersRef.current = hasActiveFilters;
@@ -250,6 +254,8 @@ export function useInboxListRealtime({
           },
         )
         .subscribe((status) => {
+          onConnectionChangeRef.current?.(status === "SUBSCRIBED");
+
           if (
             process.env.NODE_ENV === "development" &&
             (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
@@ -261,6 +267,7 @@ export function useInboxListRealtime({
 
     return () => {
       cancelled = true;
+      onConnectionChangeRef.current?.(false);
 
       if (refreshTimeoutRef.current !== null) {
         window.clearTimeout(refreshTimeoutRef.current);

@@ -10,7 +10,11 @@ import { z } from "zod";
 
 export const conversationCrmAssistantSchema = z.object({
   conversationId: z.string().uuid("Invalid conversation identifier."),
+  generateLlmSuggestion: z.boolean().optional(),
 });
+
+const DEFAULT_SUGGESTED_ACTION =
+  "Review the latest customer message and reply with next steps.";
 
 export type ConversationCrmAssistantInput = z.infer<
   typeof conversationCrmAssistantSchema
@@ -92,10 +96,9 @@ export async function getConversationCrmAssistant(
     (message) => message.sender_type === "client",
   );
 
-  let suggestedAction =
-    "Review the latest customer message and reply with next steps.";
+  let suggestedAction = DEFAULT_SUGGESTED_ACTION;
 
-  if (hasGeminiEnv() && lastClientMessage) {
+  if (parsed.data.generateLlmSuggestion && hasGeminiEnv() && lastClientMessage) {
     const aiResult = await generateText({
       businessId: business.id,
       prompt: [

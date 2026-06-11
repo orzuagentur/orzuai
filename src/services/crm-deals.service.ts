@@ -1,9 +1,7 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
-
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { normalizeDealCurrency } from "@/lib/deal-currency";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -29,10 +27,6 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-function revalidateDealPaths(): void {
-  revalidatePath(DASHBOARD_ROUTES.contacts);
-}
-
 function mapDealStatus(stage: PipelineStage): CrmDealStatus {
   if (stage === "won") {
     return "won";
@@ -50,6 +44,7 @@ function mapCrmDeal(row: {
   contact_id: string;
   title: string;
   value: number | null;
+  currency?: string | null;
   stage: string;
   expected_close_date: string | null;
   status: string;
@@ -62,6 +57,7 @@ function mapCrmDeal(row: {
     contactId: row.contact_id,
     title: row.title,
     value: row.value,
+    currency: normalizeDealCurrency(row.currency),
     stage: row.stage as PipelineStage,
     expectedCloseDate: row.expected_close_date,
     status: row.status === "won" || row.status === "lost" ? row.status : "open",
@@ -155,7 +151,7 @@ export async function listCrmDealsForContact(
   const { data } = await supabase
     .from("crm_deals")
     .select(
-      "id, contact_id, title, value, stage, expected_close_date, status, is_primary, notes, created_at",
+      "id, contact_id, title, value, currency, stage, expected_close_date, status, is_primary, notes, created_at",
     )
     .eq("business_id", businessId)
     .eq("contact_id", contactId)
@@ -208,6 +204,7 @@ export async function createCrmDeal(
       contact_id: parsed.data.contactId,
       title: parsed.data.title.trim(),
       value: parsed.data.value ?? null,
+      currency: normalizeDealCurrency(parsed.data.currency),
       stage,
       expected_close_date: parsed.data.expectedCloseDate?.trim() || null,
       status: mapDealStatus(stage),
@@ -228,7 +225,6 @@ export async function createCrmDeal(
     await syncPrimaryDealToContact(parsed.data.contactId, businessId);
   }
 
-  revalidateDealPaths();
   return { success: true, data: { dealId: data.id } };
 }
 
@@ -286,6 +282,9 @@ export async function updateCrmDeal(
     .update({
       ...(parsed.data.title !== undefined ? { title: parsed.data.title.trim() } : {}),
       ...(parsed.data.value !== undefined ? { value: parsed.data.value } : {}),
+      ...(parsed.data.currency !== undefined
+        ? { currency: normalizeDealCurrency(parsed.data.currency) }
+        : {}),
       ...(stage !== undefined ? { stage } : {}),
       ...(parsed.data.expectedCloseDate !== undefined
         ? { expected_close_date: parsed.data.expectedCloseDate?.trim() || null }
@@ -313,7 +312,6 @@ export async function updateCrmDeal(
     await syncPrimaryDealToContact(existing.contact_id, businessId);
   }
 
-  revalidateDealPaths();
   return { success: true };
 }
 
@@ -355,6 +353,5 @@ export async function deleteCrmDeal(
     };
   }
 
-  revalidateDealPaths();
   return { success: true };
 }

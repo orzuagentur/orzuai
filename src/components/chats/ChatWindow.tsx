@@ -24,6 +24,7 @@ import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
 import { useAgentTypingIndicator } from "@/hooks/use-agent-typing-indicator";
 import { useSendChatMedia } from "@/hooks/use-send-chat-media";
+import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
 import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
@@ -70,6 +71,9 @@ type ChatWindowProps = {
   onContactDeleted?: () => void;
   onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
   isClientTyping?: boolean;
+  hasOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   className?: string;
 };
 
@@ -107,6 +111,9 @@ export function ChatWindow({
   onContactDeleted,
   onContactFavoriteChange,
   isClientTyping = false,
+  hasOlderMessages = false,
+  isLoadingOlderMessages = false,
+  onLoadOlderMessages,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -121,6 +128,7 @@ export function ChatWindow({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const pinnedConversationIdRef = useRef<string | null>(null);
+  const scrollHeightBeforeOlderLoadRef = useRef(0);
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
   const isInboxLayout = layout === "inbox";
@@ -172,6 +180,37 @@ export function ChatWindow({
   });
 
   useEffect(() => {
+    if (!isInboxLayout || !isLoadingOlderMessages) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer) {
+      scrollHeightBeforeOlderLoadRef.current = scrollContainer.scrollHeight;
+    }
+  }, [isInboxLayout, isLoadingOlderMessages]);
+
+  useEffect(() => {
+    if (!isInboxLayout || isLoadingOlderMessages) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer || scrollHeightBeforeOlderLoadRef.current <= 0) {
+      return;
+    }
+
+    const previousScrollHeight = scrollHeightBeforeOlderLoadRef.current;
+    scrollHeightBeforeOlderLoadRef.current = 0;
+    scrollContainer.scrollTop +=
+      scrollContainer.scrollHeight - previousScrollHeight;
+  }, [
+    conversation?.messages.length,
+    isInboxLayout,
+    isLoadingOlderMessages,
+  ]);
+
+  useEffect(() => {
     if (!conversation) {
       pinnedConversationIdRef.current = null;
       return;
@@ -210,7 +249,11 @@ export function ChatWindow({
 
     scrollToTarget();
     requestAnimationFrame(scrollToTarget);
-  }, [conversation?.id, conversation?.messages.length, isClientTyping]);
+  }, [
+    conversation?.id,
+    conversation?.messages.at(-1)?.id,
+    isClientTyping,
+  ]);
 
   function handleRefresh() {
     router.refresh();
@@ -331,6 +374,12 @@ export function ChatWindow({
       <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
         <div className="shrink-0 border-b bg-card px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-2">
+            <ContactAvatar
+              name={conversation.contactName}
+              avatarUrl={conversation.contactAvatarUrl}
+              className="size-10 shrink-0"
+              size="lg"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate font-medium">{conversation.contactName}</p>
@@ -434,6 +483,9 @@ export function ChatWindow({
               isClientTyping={isClientTyping}
               typingContactName={conversation.contactName}
               onMessageRemoved={onMessageRemoved}
+              hasOlderMessages={hasOlderMessages}
+              isLoadingOlderMessages={isLoadingOlderMessages}
+              onLoadOlderMessages={onLoadOlderMessages}
             />
 
             <InboxChatComposer
@@ -482,7 +534,14 @@ export function ChatWindow({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="shrink-0 border-b px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <ContactAvatar
+                name={conversation.contactName}
+                avatarUrl={conversation.contactAvatarUrl}
+                className="size-10 shrink-0"
+                size="lg"
+              />
+              <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{conversation.contactName}</p>
               <Badge
                 variant="outline"
@@ -494,6 +553,7 @@ export function ChatWindow({
                 />
                 {getChannelBadgeLabel(conversation.channel)}
               </Badge>
+              </div>
             </div>
             <ConversationStatusSelect
               conversationId={conversation.id}

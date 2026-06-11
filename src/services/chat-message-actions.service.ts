@@ -10,6 +10,7 @@ import type {
   DeleteChatMessageResult,
 } from "@/types/chat.types";
 import { deleteChatMessageSchema } from "@/types/chat.types";
+import { recomputeConversationLastMessageForBusiness } from "@/services/conversation-last-message.service";
 import { mapChatMessage } from "@/utils/chat";
 
 async function getOwnedBusinessId(): Promise<string | null> {
@@ -87,6 +88,15 @@ export async function deleteChatMessage(
       success: false,
       error: { code: "UPDATE_FAILED", message: CHAT_MESSAGES.messageDeleteFailed },
     };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (businessId) {
+    await recomputeConversationLastMessageForBusiness(
+      message.conversationId,
+      businessId,
+    );
   }
 
   return { success: true, data: { messageId: parsed.data.messageId } };

@@ -192,6 +192,37 @@ export async function getTelegramFile(
   return { success: true, file: result.result };
 }
 
+export async function getTelegramUserProfilePhotoFileId(
+  botToken: string,
+  userId: number,
+): Promise<{ success: true; fileId: string } | { success: false }> {
+  const result = await callTelegramApi<{
+    total_count: number;
+    photos: Array<Array<{ file_id: string }>>;
+  }>(botToken, "getUserProfilePhotos", {
+    user_id: userId,
+    limit: 1,
+  });
+
+  if (!result.success || result.result.total_count < 1) {
+    return { success: false };
+  }
+
+  const sizes = result.result.photos[0];
+
+  if (!sizes?.length) {
+    return { success: false };
+  }
+
+  const largest = sizes[sizes.length - 1];
+
+  if (!largest?.file_id) {
+    return { success: false };
+  }
+
+  return { success: true, fileId: largest.file_id };
+}
+
 export async function downloadTelegramFile(
   botToken: string,
   fileId: string,

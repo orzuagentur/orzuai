@@ -31,6 +31,12 @@ export function parseTelegramWebhookPayload(
   }
 
   const chatId = String(message.chat.id);
+  const telegramUserId = message.from?.id;
+
+  if (!telegramUserId) {
+    return [];
+  }
+
   const contactName = buildContactName(message.from ?? {});
 
   if (message.text?.trim()) {
@@ -38,6 +44,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "text",
         chatId,
+        telegramUserId,
         body: message.text.trim(),
         contactName,
       },
@@ -55,6 +62,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "media",
         chatId,
+        telegramUserId,
         contactName,
         fileId: largest.file_id,
         mediaKind: "image",
@@ -70,6 +78,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "media",
         chatId,
+        telegramUserId,
         contactName,
         fileId: message.voice.file_id,
         mediaKind: "audio",
@@ -85,6 +94,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "media",
         chatId,
+        telegramUserId,
         contactName,
         fileId: message.video.file_id,
         mediaKind: "video",
@@ -100,6 +110,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "media",
         chatId,
+        telegramUserId,
         contactName,
         fileId: message.audio.file_id,
         mediaKind: "audio",
@@ -115,6 +126,7 @@ export function parseTelegramWebhookPayload(
       {
         kind: "media",
         chatId,
+        telegramUserId,
         contactName,
         fileId: message.document.file_id,
         mediaKind: "document",

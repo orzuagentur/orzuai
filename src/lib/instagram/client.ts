@@ -154,6 +154,59 @@ type SendInstagramMessageResult =
   | { success: true; messageId: string }
   | { success: false; message: string };
 
+export type InstagramUserProfile = {
+  name?: string;
+  username?: string;
+  profilePicUrl?: string;
+};
+
+export async function fetchInstagramUserProfile(
+  userId: string,
+  accessToken: string,
+): Promise<
+  | { success: true; profile: InstagramUserProfile }
+  | { success: false; message: string }
+> {
+  const params = new URLSearchParams({
+    fields: "name,username,profile_pic",
+  });
+
+  const response = await fetch(
+    `${buildInstagramApiUrl(userId)}?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        name?: string;
+        username?: string;
+        profile_pic?: string;
+        error?: { message?: string };
+      }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message ||
+        "Unable to load Instagram user profile from Meta.",
+    };
+  }
+
+  return {
+    success: true,
+    profile: {
+      name: payload?.name,
+      username: payload?.username,
+      profilePicUrl: payload?.profile_pic,
+    },
+  };
+}
+
 type InstagramAttachmentType = "image" | "video" | "audio" | "file";
 
 function resolveInstagramAttachmentType(

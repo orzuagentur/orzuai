@@ -27,6 +27,11 @@ export type InboxRealtimeConversationRow = {
   status: ConversationStatus;
   updated_at: string;
   last_read_at: string | null;
+  last_message_preview?: string | null;
+  last_message_at?: string | null;
+  last_message_sender_type?: MessageSenderType | null;
+  last_message_ai_generated?: boolean | null;
+  last_client_message_at?: string | null;
 };
 
 function truncatePreview(content: string, maxLength = 80): string {
@@ -156,21 +161,37 @@ export function applyRealtimeConversationUpdate(
     return { items: conversations, found: false, updatedItem: null };
   }
 
+  const hasPreviewUpdate = Boolean(row.last_message_at && row.last_message_sender_type);
+  const lastClientMessageAt = hasPreviewUpdate
+    ? (row.last_client_message_at ?? existing.lastClientMessageAt)
+    : existing.lastClientMessageAt;
+
   const updatedItem: ConversationListItem = {
     ...existing,
     channel: row.channel,
     status: row.status,
     updatedAt: row.updated_at,
+    ...(hasPreviewUpdate
+      ? {
+          lastMessagePreview: row.last_message_preview ?? existing.lastMessagePreview,
+          lastMessageAt: row.last_message_at ?? existing.lastMessageAt,
+          lastMessageSenderType:
+            row.last_message_sender_type ?? existing.lastMessageSenderType,
+          lastMessageAiGenerated:
+            row.last_message_ai_generated ?? existing.lastMessageAiGenerated,
+          lastClientMessageAt,
+        }
+      : {}),
     unreadMessageCount: (() => {
       if (row.id === options.selectedConversationId) {
         return 0;
       }
 
       if (
-        existing.lastClientMessageAt &&
+        lastClientMessageAt &&
         row.last_read_at &&
         new Date(row.last_read_at).getTime() >=
-          new Date(existing.lastClientMessageAt).getTime()
+          new Date(lastClientMessageAt).getTime()
       ) {
         return 0;
       }
@@ -183,10 +204,10 @@ export function applyRealtimeConversationUpdate(
       }
 
       const unreadMessageCount =
-        existing.lastClientMessageAt &&
+        lastClientMessageAt &&
         row.last_read_at &&
         new Date(row.last_read_at).getTime() >=
-          new Date(existing.lastClientMessageAt).getTime()
+          new Date(lastClientMessageAt).getTime()
           ? 0
           : existing.unreadMessageCount;
 
@@ -195,7 +216,7 @@ export function applyRealtimeConversationUpdate(
         resolveUnreadFromMessage({
           conversationId: row.id,
           selectedConversationId: options.selectedConversationId,
-          lastClientMessageAt: existing.lastClientMessageAt,
+          lastClientMessageAt,
           status: row.status,
           lastReadAt: row.last_read_at,
         })

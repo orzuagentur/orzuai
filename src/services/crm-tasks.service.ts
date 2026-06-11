@@ -1,8 +1,5 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
-
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -25,10 +22,6 @@ async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
   return business?.id ?? null;
-}
-
-function revalidateTaskPaths(): void {
-  revalidatePath(DASHBOARD_ROUTES.contacts);
 }
 
 function mapCrmTask(row: {
@@ -108,7 +101,6 @@ export async function createCrmTask(
     };
   }
 
-  revalidateTaskPaths();
   return { success: true };
 }
 
@@ -150,7 +142,6 @@ export async function updateCrmTaskStatus(
     };
   }
 
-  revalidateTaskPaths();
   return { success: true };
 }
 
@@ -192,6 +183,5 @@ export async function deleteCrmTask(
     };
   }
 
-  revalidateTaskPaths();
   return { success: true };
 }

@@ -576,6 +576,8 @@ export type Database = {
           channel: MessagingChannel;
           last_message_at: string | null;
           is_favorite: boolean;
+          avatar_url: string | null;
+          avatar_synced_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -595,6 +597,8 @@ export type Database = {
           channel?: MessagingChannel;
           last_message_at?: string | null;
           is_favorite?: boolean;
+          avatar_url?: string | null;
+          avatar_synced_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -614,6 +618,8 @@ export type Database = {
           channel?: MessagingChannel;
           last_message_at?: string | null;
           is_favorite?: boolean;
+          avatar_url?: string | null;
+          avatar_synced_at?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -636,6 +642,11 @@ export type Database = {
           internal_note: string | null;
           assigned_to: string | null;
           last_read_at: string | null;
+          last_message_preview: string | null;
+          last_message_at: string | null;
+          last_message_sender_type: MessageSenderType | null;
+          last_message_ai_generated: boolean;
+          last_client_message_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -648,6 +659,11 @@ export type Database = {
           internal_note?: string | null;
           assigned_to?: string | null;
           last_read_at?: string | null;
+          last_message_preview?: string | null;
+          last_message_at?: string | null;
+          last_message_sender_type?: MessageSenderType | null;
+          last_message_ai_generated?: boolean;
+          last_client_message_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -660,6 +676,11 @@ export type Database = {
           internal_note?: string | null;
           assigned_to?: string | null;
           last_read_at?: string | null;
+          last_message_preview?: string | null;
+          last_message_at?: string | null;
+          last_message_sender_type?: MessageSenderType | null;
+          last_message_ai_generated?: boolean;
+          last_client_message_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -687,6 +708,7 @@ export type Database = {
           contact_id: string;
           title: string;
           value: number | null;
+          currency: string;
           stage: string;
           expected_close_date: string | null;
           status: string;
@@ -701,6 +723,7 @@ export type Database = {
           contact_id: string;
           title?: string;
           value?: number | null;
+          currency?: string;
           stage?: string;
           expected_close_date?: string | null;
           status?: string;
@@ -715,6 +738,7 @@ export type Database = {
           contact_id?: string;
           title?: string;
           value?: number | null;
+          currency?: string;
           stage?: string;
           expected_close_date?: string | null;
           status?: string;

@@ -8,6 +8,7 @@ import {
   CONTACTS_PAGE_SIZE,
 } from "@/features/contacts/constants";
 import { hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -17,6 +18,12 @@ import {
 } from "@/services/crm-deals.service";
 import { listCrmTasksForContact } from "@/services/crm-tasks.service";
 import { generateText, getProviderAvailability } from "@/services/llm.service";
+import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
+import {
+  parseAdditionalContacts,
+  type AdditionalContactEntry,
+} from "@/utils/contact-additional-contacts";
+import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import type {
   ContactActionResult,
   ContactCustomFields,
@@ -63,6 +70,9 @@ type ContactRow = {
   sentiment?: string | null;
   channel: MessagingChannel;
   last_message_at: string | null;
+  is_favorite?: boolean | null;
+  avatar_url?: string | null;
+  created_at?: string | null;
 };
 
 function parseCustomFields(
@@ -71,6 +81,10 @@ function parseCustomFields(
   if (!value || typeof value !== "object") {
     return {};
   }
+
+  const additionalContacts = parseAdditionalContacts(
+    "additionalContacts" in value ? value.additionalContacts : undefined,
+  );
 
   return {
     company:
@@ -85,6 +99,8 @@ function parseCustomFields(
       typeof value.location === "string" && value.location.trim().length > 0
         ? value.location.trim()
         : undefined,
+    additionalContacts:
+      additionalContacts.length > 0 ? additionalContacts : undefined,
   };
 }
 
@@ -105,6 +121,7 @@ function parsePipelineStage(value: string | null | undefined): PipelineStage {
 function mapContactRow(
   contact: ContactRow,
   lastMessagePreview: string | null = null,
+  avatarSignedUrl: string | null = null,
 ): UnifiedContactItem {
   return {
     id: contact.id,
@@ -128,6 +145,9 @@ function mapContactRow(
     channel: contact.channel,
     lastMessageAt: contact.last_message_at,
     lastMessagePreview,
+    isFavorite: contact.is_favorite ?? false,
+    avatarUrl: avatarSignedUrl,
+    createdAt: contact.created_at ?? new Date(0).toISOString(),
   };
 }
 
@@ -269,8 +289,16 @@ async function attachLastMessagePreviews(
     }
   }
 
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
+    contacts.map((contact) => contact.avatar_url),
+  );
+
   return contacts.map((contact) =>
-    mapContactRow(contact, previewByContactId.get(contact.id) ?? null),
+    mapContactRow(
+      contact,
+      previewByContactId.get(contact.id) ?? null,
+      resolveAvatarUrlFromMap(contact.avatar_url, avatarSignedUrlMap),
+    ),
   );
 }
 
@@ -297,6 +325,7 @@ export type GetUnifiedContactsInput = {
   q?: string | null;
   page?: string | null;
   contact?: string | null;
+  profile?: string | null;
 };
 
 async function resolveActiveContactId(
@@ -330,7 +359,7 @@ function buildContactsQuery(
   let query = supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at, is_favorite, avatar_url, created_at",
       {
         count: "exact",
       },
@@ -378,6 +407,7 @@ export async function getUnifiedContacts(
       activeSegment,
       activeView,
       activeContactId: null,
+      showProfilePanel: false,
       searchQuery,
       page,
       pageSize,
@@ -387,6 +417,8 @@ export async function getUnifiedContacts(
 
   const supabase = await createClient();
   const activeContactId = await resolveActiveContactId(businessId, input.contact);
+  const showProfilePanel =
+    input.profile === "1" && activeContactId !== null;
 
   if (activeSegment === "no_reply_48h") {
     const { data } = await buildContactsQuery(
@@ -414,6 +446,7 @@ export async function getUnifiedContacts(
       activeSegment,
       activeView,
       activeContactId,
+      showProfilePanel,
       searchQuery,
       page,
       pageSize,
@@ -442,6 +475,7 @@ export async function getUnifiedContacts(
     activeSegment,
     activeView,
     activeContactId,
+    showProfilePanel,
     searchQuery,
     page,
     pageSize,
@@ -571,7 +605,7 @@ export async function getContactProfile(
   const { data: contactRow } = await supabase
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at",
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at, is_favorite, avatar_url, created_at",
     )
     .eq("id", contactId)
     .eq("business_id", businessId)
@@ -590,7 +624,7 @@ export async function getContactProfile(
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, internal_note, updated_at")
+    .select("id, internal_note, updated_at, assigned_to")
     .eq("contact_id", contactId)
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false })
@@ -598,8 +632,25 @@ export async function getContactProfile(
     .maybeSingle();
 
   let timeline: ContactTimelineEntry[] = [];
+  let messageCount = 0;
+  let assignedToEmail: string | null = null;
+
+  if (conversation?.assigned_to && hasSupabaseEnv()) {
+    const admin = createAdminClient();
+    const { data: assignee } = await admin.auth.admin.getUserById(
+      conversation.assigned_to,
+    );
+    assignedToEmail = assignee.user?.email ?? null;
+  }
 
   if (conversation) {
+    const { count: totalMessages } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversation.id);
+
+    messageCount = totalMessages ?? 0;
+
     const { data: messages } = await supabase
       .from("messages")
       .select(
@@ -644,10 +695,72 @@ export async function getContactProfile(
   return {
     contact,
     conversationId: conversation?.id ?? null,
+    assignedToEmail,
+    messageCount,
     timeline,
     tasks,
     deals,
   };
+}
+
+export async function getContactForInboxSidebar(
+  contactId: string,
+): Promise<{
+  contact: UnifiedContactItem;
+  messageCount: number;
+  deals: Awaited<ReturnType<typeof listCrmDealsForContact>>;
+} | null> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data: contactRow } = await supabase
+    .from("contacts")
+    .select(
+      "id, name, phone_number, email, tags, custom_fields, lead_score, ai_summary, pipeline_stage, deal_value, expected_close_date, sentiment, channel, last_message_at, is_favorite, avatar_url, created_at",
+    )
+    .eq("id", contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!contactRow) {
+    return null;
+  }
+
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("contact_id", contactId)
+    .eq("business_id", businessId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let messageCount = 0;
+
+  if (conversation?.id) {
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversation.id);
+
+    messageCount = count ?? 0;
+  }
+
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls([
+    contactRow.avatar_url,
+  ]);
+  const contact = mapContactRow(
+    contactRow as ContactRow,
+    null,
+    resolveAvatarUrlFromMap(contactRow.avatar_url, avatarSignedUrlMap),
+  );
+  const deals = await listCrmDealsForContact(contactId);
+
+  return { contact, messageCount, deals };
 }
 
 export async function updateContact(
@@ -707,13 +820,33 @@ export async function updateContact(
     customFields.location = parsed.data.customFields.location.trim();
   }
 
+  if (parsed.data.customFields.additionalContacts) {
+    customFields.additionalContacts =
+      parsed.data.customFields.additionalContacts;
+  }
+
   const supabase = await createClient();
   const { data: existingContact } = await supabase
     .from("contacts")
-    .select("pipeline_stage, deal_value, expected_close_date, tags, name, channel")
+    .select(
+      "pipeline_stage, deal_value, expected_close_date, tags, name, channel, custom_fields",
+    )
     .eq("id", parsed.data.contactId)
     .eq("business_id", businessId)
     .maybeSingle();
+
+  const existingCustomFields = parseCustomFields(
+    existingContact?.custom_fields as ContactRow["custom_fields"],
+  );
+  const mergedCustomFields: ContactCustomFields = {
+    ...existingCustomFields,
+    ...customFields,
+  };
+
+  if (!parsed.data.customFields.additionalContacts) {
+    mergedCustomFields.additionalContacts =
+      existingCustomFields.additionalContacts;
+  }
 
   const { error } = await supabase
     .from("contacts")
@@ -721,7 +854,7 @@ export async function updateContact(
       name: parsed.data.name.trim(),
       email: email && email.length > 0 ? email : null,
       tags: parsed.data.tags,
-      custom_fields: customFields,
+      custom_fields: mergedCustomFields as unknown as Record<string, string>,
       deal_value: parsed.data.dealValue ?? null,
       expected_close_date: parsed.data.expectedCloseDate?.trim() || null,
       ...(parsed.data.pipelineStage
@@ -787,6 +920,80 @@ export async function updateContact(
   }
 
   revalidateContactPaths();
+  return { success: true };
+}
+
+export async function updateContactAdditionalContacts(
+  contactId: string,
+  additionalContacts: AdditionalContactEntry[],
+): Promise<ContactActionResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message: CONTACTS_MESSAGES.additionalContactSaveFailed,
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: CONTACTS_MESSAGES.additionalContactSaveFailed,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("custom_fields")
+    .eq("id", contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!existingContact) {
+    return {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: CONTACTS_MESSAGES.additionalContactSaveFailed,
+      },
+    };
+  }
+
+  const existingCustomFields = parseCustomFields(
+    existingContact.custom_fields as ContactRow["custom_fields"],
+  );
+  const mergedCustomFields: ContactCustomFields = {
+    ...existingCustomFields,
+    additionalContacts:
+      additionalContacts.length > 0 ? additionalContacts : undefined,
+  };
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      custom_fields: mergedCustomFields as unknown as Record<string, string>,
+    })
+    .eq("id", contactId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: "UPDATE_FAILED",
+        message: CONTACTS_MESSAGES.additionalContactSaveFailed,
+      },
+    };
+  }
+
   return { success: true };
 }
 

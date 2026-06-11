@@ -1,7 +1,8 @@
 import type { MessageSenderType, MessagingChannel } from "@/types/database.types";
 import type { ChatMessageData, ConversationListItem } from "@/types/chat.types";
 import { getMessagePreviewText } from "@/utils/chat-media";
-import { withConversationUnread } from "@/utils/conversation-unread";
+import { resolveDenormalizedLastMessage } from "@/utils/conversation-last-message";
+import { isConversationUnread, withConversationUnread } from "@/utils/conversation-unread";
 
 type RawMessageRow = {
   id: string;
@@ -23,6 +24,11 @@ type RawConversationRow = {
   status: ConversationListItem["status"];
   updated_at: string;
   last_read_at?: string | null;
+  last_message_preview?: string | null;
+  last_message_at?: string | null;
+  last_message_sender_type?: MessageSenderType | null;
+  last_message_ai_generated?: boolean | null;
+  last_client_message_at?: string | null;
   contact:
     | {
         id?: string;
@@ -30,6 +36,7 @@ type RawConversationRow = {
         phone_number: string;
         lead_score?: number | null;
         is_favorite?: boolean | null;
+        avatar_url?: string | null;
       }
     | Array<{
         id?: string;
@@ -37,6 +44,7 @@ type RawConversationRow = {
         phone_number: string;
         lead_score?: number | null;
         is_favorite?: boolean | null;
+        avatar_url?: string | null;
       }>
     | null;
 };
@@ -69,6 +77,7 @@ export function resolveContactFromRow(
   phone_number: string;
   lead_score?: number | null;
   is_favorite?: boolean | null;
+  avatar_url?: string | null;
 } | null {
   if (!contact) {
     return null;
@@ -212,6 +221,7 @@ export function mapConversationListItem(
     | undefined,
   lastClientMessageAt?: string | null,
   unreadMessageCount = 0,
+  contactAvatarUrl: string | null = null,
 ): ConversationListItem | null {
   const contact = resolveContactFromRow(row.contact);
 
@@ -219,22 +229,37 @@ export function mapConversationListItem(
     return null;
   }
 
+  const resolvedLastMessage = lastMessage ?? resolveDenormalizedLastMessage(row);
+  const resolvedLastClientMessageAt =
+    lastClientMessageAt ?? row.last_client_message_at ?? null;
+  const resolvedUnreadMessageCount =
+    unreadMessageCount > 0
+      ? unreadMessageCount
+      : isConversationUnread({
+          lastClientMessageAt: resolvedLastClientMessageAt,
+          lastReadAt: row.last_read_at ?? null,
+          status: row.status,
+        })
+        ? 1
+        : 0;
+
   return withConversationUnread({
     id: row.id,
     contactId: contact.id ?? "",
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    contactAvatarUrl,
     contactIsFavorite: contact.is_favorite ?? false,
     leadScore: contact.lead_score ?? null,
     channel: row.channel,
     status: row.status,
     updatedAt: row.updated_at,
-    lastMessagePreview: lastMessage?.preview ?? null,
-    lastMessageAt: lastMessage?.createdAt ?? null,
-    lastMessageSenderType: lastMessage?.senderType ?? null,
-    lastMessageAiGenerated: lastMessage?.aiGenerated ?? false,
-    lastClientMessageAt: lastClientMessageAt ?? null,
-    unreadMessageCount,
+    lastMessagePreview: resolvedLastMessage?.preview ?? null,
+    lastMessageAt: resolvedLastMessage?.createdAt ?? null,
+    lastMessageSenderType: resolvedLastMessage?.senderType ?? null,
+    lastMessageAiGenerated: resolvedLastMessage?.aiGenerated ?? false,
+    lastClientMessageAt: resolvedLastClientMessageAt,
+    unreadMessageCount: resolvedUnreadMessageCount,
     lastReadAt: row.last_read_at ?? null,
   });
 }

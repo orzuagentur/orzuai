@@ -99,12 +99,14 @@ export type TelegramInboundMessage =
   | {
       kind: "text";
       chatId: string;
+      telegramUserId: number;
       body: string;
       contactName: string;
     }
   | {
       kind: "media";
       chatId: string;
+      telegramUserId: number;
       contactName: string;
       fileId: string;
       mediaKind: "image" | "audio" | "document" | "video";

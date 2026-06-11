@@ -1,5 +1,7 @@
 import type { RefObject } from "react";
-import { SparklesIcon, UserRoundIcon } from "lucide-react";
+import { Loader2Icon, SparklesIcon, UserRoundIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
@@ -25,6 +27,9 @@ type MessageHistoryProps = {
   isClientTyping?: boolean;
   typingContactName?: string;
   onMessageRemoved?: (messageId: string) => void;
+  hasOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   className?: string;
 };
 
@@ -50,6 +55,9 @@ export function MessageHistory({
   isClientTyping = false,
   typingContactName = "Customer",
   onMessageRemoved,
+  hasOlderMessages = false,
+  isLoadingOlderMessages = false,
+  onLoadOlderMessages,
   className,
 }: MessageHistoryProps) {
   const isInbox = variant === "inbox";
@@ -82,6 +90,23 @@ export function MessageHistory({
         className,
       )}
     >
+      {hasOlderMessages && onLoadOlderMessages ? (
+        <div className="flex justify-center pb-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground"
+            disabled={isLoadingOlderMessages}
+            onClick={onLoadOlderMessages}
+          >
+            {isLoadingOlderMessages ? (
+              <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+            ) : null}
+            {CHAT_MESSAGES.loadOlderMessages}
+          </Button>
+        </div>
+      ) : null}
       {messages.map((message, index) => {
         const isOutgoing =
           message.senderType === "user" || message.senderType === "ai";

@@ -27,6 +27,7 @@ import {
   notifyClientTyping,
   resolveConversationIdForChannelSender,
 } from "@/services/conversation-typing.service";
+import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
@@ -509,6 +510,19 @@ async function ingestInstagramMessage(
 
   if (!contactId) {
     return;
+  }
+
+  if (connection.meta_access_token) {
+    void scheduleContactAvatarSync({
+      admin,
+      businessId,
+      contactId,
+      channel: "instagram",
+      instagram: {
+        accessToken: connection.meta_access_token,
+        userId: message.from,
+      },
+    });
   }
 
   const conversationId = await resolveInboundConversation(

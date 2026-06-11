@@ -17,6 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
@@ -324,6 +325,19 @@ async function ingestTelegramMessage(
 
   if (!contactId) {
     return;
+  }
+
+  if (connection.bot_token) {
+    void scheduleContactAvatarSync({
+      admin,
+      businessId,
+      contactId,
+      channel: "telegram",
+      telegram: {
+        botToken: connection.bot_token,
+        userId: message.telegramUserId,
+      },
+    });
   }
 
   const conversationId = await resolveInboundConversation(

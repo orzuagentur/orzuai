@@ -48,6 +48,7 @@ function buildContactHref(
     segment: data.activeSegment,
     view: "pipeline",
     contact: contactId,
+    profile: data.showProfilePanel,
     q: data.searchQuery || null,
     page: data.page,
   });

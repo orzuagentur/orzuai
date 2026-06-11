@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { StarIcon } from "lucide-react";
 
+import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -15,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { UnifiedContactsPageData } from "@/types/contact.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
+import { formatRelativeTime } from "@/utils/dashboard";
 
 type UnifiedContactsPanelProps = UnifiedContactsPageData & {
   embedded?: boolean;
@@ -29,6 +32,7 @@ function buildContactHref(
     segment: data.activeSegment,
     view: data.activeView,
     contact: contactId,
+    profile: data.showProfilePanel,
     q: data.searchQuery || null,
     page: data.page,
   });
@@ -80,11 +84,27 @@ export function UnifiedContactsPanel({
                 isSelected && "bg-primary/5",
               )}
             >
+              <ContactAvatar
+                name={contact.name}
+                avatarUrl={contact.avatarUrl}
+                className="size-10 shrink-0"
+              />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{contact.name}</p>
+                <div className="flex items-center gap-1.5">
+                  {contact.isFavorite ? (
+                    <StarIcon className="size-3 shrink-0 fill-amber-400 text-amber-400" />
+                  ) : null}
+                  <p className="truncate font-medium">{contact.name}</p>
+                </div>
                 <p className="text-caption truncate text-muted-foreground">
-                  {formatContactIdentifier(contact.identifier)}
+                  {contact.lastMessagePreview ??
+                    formatContactIdentifier(contact.identifier)}
                 </p>
+                {contact.lastMessageAt ? (
+                  <p className="text-caption text-muted-foreground/80">
+                    {formatRelativeTime(contact.lastMessageAt)}
+                  </p>
+                ) : null}
               </div>
               <Badge
                 variant="outline"

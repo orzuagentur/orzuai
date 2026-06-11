@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { additionalContactsSchema } from "@/utils/contact-additional-contacts";
+import type { AdditionalContactEntry } from "@/utils/contact-additional-contacts";
 import type { CrmDealItem } from "./crm-deal.types";
 import type { CrmTaskItem } from "./crm-task.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
@@ -8,6 +10,7 @@ export type ContactCustomFields = {
   company?: string;
   notes?: string;
   location?: string;
+  additionalContacts?: AdditionalContactEntry[];
 };
 
 export const PIPELINE_STAGES = [
@@ -36,6 +39,9 @@ export type UnifiedContactItem = {
   channel: MessagingChannel;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  isFavorite: boolean;
+  avatarUrl: string | null;
+  createdAt: string;
 };
 
 export type ContactActivityType = "message" | "internal_note";
@@ -59,6 +65,7 @@ export const updateContactSchema = z.object({
     company: z.string().trim().max(200).optional(),
     notes: z.string().trim().max(2000).optional(),
     location: z.string().trim().max(200).optional(),
+    additionalContacts: additionalContactsSchema.optional(),
   }),
   pipelineStage: z.enum(PIPELINE_STAGES).optional(),
   dealValue: z.number().min(0).max(999999999).optional().nullable(),
@@ -99,6 +106,8 @@ export type GenerateContactInsightsResult =
 export type ContactProfileData = {
   contact: UnifiedContactItem;
   conversationId: string | null;
+  assignedToEmail: string | null;
+  messageCount: number;
   timeline: ContactTimelineEntry[];
   tasks: CrmTaskItem[];
   deals: CrmDealItem[];
@@ -130,6 +139,7 @@ export type UnifiedContactsPageData = {
   activeSegment: ContactSegment;
   activeView: "list" | "pipeline";
   activeContactId: string | null;
+  showProfilePanel: boolean;
   searchQuery: string;
   page: number;
   pageSize: number;

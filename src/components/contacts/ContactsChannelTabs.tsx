@@ -16,6 +16,7 @@ type ContactsChannelTabsProps = {
   activeSegment: ContactSegment;
   activeView: "list" | "pipeline";
   activeContactId: string | null;
+  showProfilePanel?: boolean;
   searchQuery: string;
   visibleChannelIds: MessagingChannel[];
   className?: string;
@@ -26,6 +27,7 @@ export function ContactsChannelTabs({
   activeSegment,
   activeView,
   activeContactId,
+  showProfilePanel = false,
   searchQuery,
   visibleChannelIds,
   className,
@@ -39,6 +41,7 @@ export function ContactsChannelTabs({
       segment: activeSegment,
       view: activeView,
       contact: activeContactId,
+      profile: showProfilePanel,
       q: searchQuery || null,
       page: 1,
     });

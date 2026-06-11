@@ -8,13 +8,11 @@ import {
 } from "@/features/chats/constants";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
+import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
-import {
-  buildConversationMessageMaps,
-  buildUnreadClientMessageCountMap,
-  mapConversationListItem,
-} from "@/utils/chat";
+import { mapConversationListItem, resolveContactFromRow } from "@/utils/chat";
+import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import { phoneDigitsOnly } from "@/utils/whatsapp";
 import {
   isConversationNeedsAttention,
@@ -48,6 +46,11 @@ type RawConversationQueryRow = {
   status: ConversationListItem["status"];
   updated_at: string;
   last_read_at: string | null;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  last_message_sender_type: ConversationListItem["lastMessageSenderType"];
+  last_message_ai_generated: boolean;
+  last_client_message_at: string | null;
   contact:
     | {
         id: string;
@@ -55,6 +58,7 @@ type RawConversationQueryRow = {
         phone_number: string;
         lead_score?: number | null;
         is_favorite?: boolean | null;
+        avatar_url?: string | null;
       }
     | Array<{
         id: string;
@@ -62,6 +66,7 @@ type RawConversationQueryRow = {
         phone_number: string;
         lead_score?: number | null;
         is_favorite?: boolean | null;
+        avatar_url?: string | null;
       }>
     | null;
 };
@@ -157,6 +162,9 @@ async function findFavoriteContactIds(businessId: string): Promise<string[]> {
   return contacts?.map((contact) => contact.id) ?? [];
 }
 
+const CONVERSATION_LIST_SELECT =
+  "id, channel, status, updated_at, last_read_at, last_message_preview, last_message_at, last_message_sender_type, last_message_ai_generated, last_client_message_at, contact:contacts(id, name, phone_number, lead_score, is_favorite, avatar_url)";
+
 async function mapConversationRows(
   rows: RawConversationQueryRow[],
 ): Promise<ConversationListItem[]> {
@@ -164,30 +172,18 @@ async function mapConversationRows(
     return [];
   }
 
-  const supabase = await createClient();
-  const conversationIds = rows.map((row) => row.id);
-  const { data: messages } = await supabase
-    .from("messages")
-    .select("conversation_id, content, created_at, sender_type, ai_generated")
-    .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false });
-
-  const { lastMessageByConversationId, lastClientMessageAtByConversationId } =
-    buildConversationMessageMaps(messages ?? []);
-  const lastReadAtByConversationId = new Map(
-    rows.map((row) => [row.id, row.last_read_at]),
-  );
-  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
-    messages ?? [],
-    lastReadAtByConversationId,
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
+    rows.map((row) => resolveContactFromRow(row.contact)?.avatar_url),
   );
 
   return rows.flatMap((row) => {
+    const contact = resolveContactFromRow(row.contact);
     const item = mapConversationListItem(
       row,
-      lastMessageByConversationId.get(row.id),
-      lastClientMessageAtByConversationId.get(row.id) ?? null,
-      unreadMessageCountByConversationId.get(row.id) ?? 0,
+      undefined,
+      undefined,
+      0,
+      resolveAvatarUrlFromMap(contact?.avatar_url, avatarSignedUrlMap),
     );
     return item ? [item] : [];
   });
@@ -233,10 +229,7 @@ async function fetchConversationRows(
 
   let query = supabase
     .from("conversations")
-    .select(
-      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
-      { count: "exact" },
-    )
+    .select(CONVERSATION_LIST_SELECT, { count: "exact" })
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
 
@@ -414,9 +407,7 @@ export async function getConversationListItem(
   const supabase = await createClient();
   const { data } = await supabase
     .from("conversations")
-    .select(
-      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
-    )
+    .select(CONVERSATION_LIST_SELECT)
     .eq("id", conversationId)
     .eq("business_id", businessId)
     .maybeSingle();

@@ -2,17 +2,32 @@
 
 import { useEffect, useRef } from "react";
 
-export const INBOX_LIST_POLL_INTERVAL_MS = 15_000;
+export const INBOX_LIST_POLL_INTERVAL_MS = 60_000;
+export const INBOX_LIST_POLL_FALLBACK_INTERVAL_MS = 120_000;
+
+type UseInboxListPollingOptions = {
+  enabled?: boolean;
+  intervalMs?: number;
+};
 
 export function useInboxListPolling(
   onPoll: () => void | Promise<void>,
-  intervalMs = INBOX_LIST_POLL_INTERVAL_MS,
+  options: UseInboxListPollingOptions | number = {},
 ) {
+  const resolvedOptions =
+    typeof options === "number" ? { intervalMs: options } : options;
+  const enabled = resolvedOptions.enabled ?? true;
+  const intervalMs =
+    resolvedOptions.intervalMs ?? INBOX_LIST_POLL_INTERVAL_MS;
   const onPollRef = useRef(onPoll);
   const isPollingRef = useRef(false);
   onPollRef.current = onPoll;
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const tick = async () => {
       if (
         document.visibilityState !== "visible" ||
@@ -37,5 +52,5 @@ export function useInboxListPolling(
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [intervalMs]);
+  }, [enabled, intervalMs]);
 }

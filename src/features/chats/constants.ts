@@ -167,6 +167,8 @@ export const CHAT_MESSAGES = {
   crmAssistantTitle: "CRM assistant",
   crmAssistantLoading: "Loading CRM insights…",
   crmSuggestedAction: "Suggested action",
+  suggestNextAction: "Suggest next action",
+  loadOlderMessages: "Load older messages",
   favoritesTabLabel: "Favorite contacts",
   favoritesEmptyTitle: "No favorite contacts yet",
   favoritesEmptyDescription:
@@ -190,3 +192,4 @@ export type ChatInboxQuickView =
 
 export const HIGH_INTENT_LEAD_SCORE = 70;
 export const INBOX_PAGE_SIZE = 50;
+export const CONVERSATION_MESSAGES_PAGE_SIZE = 80;

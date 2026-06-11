@@ -1,5 +1,6 @@
 "use client";
 
+import { LocationAutocomplete } from "@/components/contacts/LocationAutocomplete";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,16 +74,13 @@ export function ContactCrmFieldsForm({
             onChange={(event) => onChange("company", event.target.value)}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-location`}>
-            {CONTACTS_MESSAGES.locationLabel}
-          </Label>
-          <Input
-            id={`${idPrefix}-location`}
-            value={values.location}
-            onChange={(event) => onChange("location", event.target.value)}
-          />
-        </div>
+        <LocationAutocomplete
+          id={`${idPrefix}-location`}
+          label={CONTACTS_MESSAGES.locationLabel}
+          value={values.location}
+          onChange={(value) => onChange("location", value)}
+          placeholder={CONTACTS_MESSAGES.locationSearchPlaceholder}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-pipeline-stage`}>
@@ -92,7 +90,7 @@ export function ContactCrmFieldsForm({
           id={`${idPrefix}-pipeline-stage`}
           value={values.pipelineStage}
           onChange={(event) => onChange("pipelineStage", event.target.value)}
-          className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
+          className="border-input bg-background text-foreground ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
         >
           {PIPELINE_STAGES.map((stage) => (
             <option key={stage} value={stage}>

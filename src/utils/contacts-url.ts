@@ -7,6 +7,7 @@ export type ContactsUrlParams = {
   view?: "list" | "pipeline";
   stage?: PipelineStage | null;
   contact?: string | null;
+  profile?: boolean;
   q?: string | null;
   page?: number;
 };
@@ -32,6 +33,10 @@ export function buildContactsHref(params: ContactsUrlParams = {}): string {
 
   if (params.contact) {
     search.set("contact", params.contact);
+  }
+
+  if (params.profile) {
+    search.set("profile", "1");
   }
 
   const query = params.q?.trim();

@@ -3,7 +3,10 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
-import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  CHAT_MESSAGES,
+  CONVERSATION_MESSAGES_PAGE_SIZE,
+} from "@/features/chats/constants";
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +28,7 @@ import { getChannelConnectionStatuses } from "@/services/channel-workspace.servi
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
 import { markConversationRead } from "@/services/conversation-read.service";
 import type {
   ChatMonitorChannelStats,
@@ -51,12 +55,11 @@ import type {
   UpdateConversationStatusInput,
 } from "@/types/chat.types";
 import {
-  buildConversationMessageMaps,
-  buildUnreadClientMessageCountMap,
   mapChatMessage,
   mapConversationListItem,
   resolveContactFromRow,
 } from "@/utils/chat";
+import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import { listConversationsPage } from "@/services/chat-inbox-query.service";
 
 function missingConfigError(): {
@@ -102,7 +105,7 @@ export async function listConversations(
   let query = supabase
     .from("conversations")
     .select(
-      "id, channel, status, updated_at, last_read_at, contact:contacts(id, name, phone_number, lead_score, is_favorite)",
+      "id, channel, status, updated_at, last_read_at, last_message_preview, last_message_at, last_message_sender_type, last_message_ai_generated, last_client_message_at, contact:contacts(id, name, phone_number, lead_score, is_favorite, avatar_url)",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -117,32 +120,21 @@ export async function listConversations(
     return [];
   }
 
-  const conversationIds = conversations.map((conversation) => conversation.id);
-  const { data: messages } = await supabase
-    .from("messages")
-    .select("conversation_id, content, created_at, sender_type, ai_generated")
-    .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false });
-
-  const { lastMessageByConversationId, lastClientMessageAtByConversationId } =
-    buildConversationMessageMaps(messages ?? []);
-  const lastReadAtByConversationId = new Map(
-    conversations.map((conversation) => [
-      conversation.id,
-      conversation.last_read_at ?? null,
-    ]),
-  );
-  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
-    messages ?? [],
-    lastReadAtByConversationId,
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
+    conversations.map((conversation) => {
+      const contact = resolveContactFromRow(conversation.contact);
+      return contact?.avatar_url;
+    }),
   );
 
   return conversations.flatMap((conversation) => {
+    const contact = resolveContactFromRow(conversation.contact);
     const item = mapConversationListItem(
       conversation,
-      lastMessageByConversationId.get(conversation.id),
-      lastClientMessageAtByConversationId.get(conversation.id) ?? null,
-      unreadMessageCountByConversationId.get(conversation.id) ?? 0,
+      undefined,
+      undefined,
+      0,
+      resolveAvatarUrlFromMap(contact?.avatar_url, avatarSignedUrlMap),
     );
 
     return item ? [item] : [];
@@ -161,7 +153,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, internal_note, updated_at, last_read_at, contact:contacts(id, name, phone_number, is_favorite)",
+      "id, channel, status, internal_note, updated_at, last_read_at, contact:contacts(id, name, phone_number, is_favorite, avatar_url)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -177,6 +169,12 @@ export async function getConversationDetail(
     return null;
   }
 
+  const { count: totalMessageCount } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false);
+
   const { data: messages } = await supabase
     .from("messages")
     .select(
@@ -184,7 +182,19 @@ export async function getConversationDetail(
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false })
+    .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
+
+  const orderedMessages = (messages ?? []).slice().reverse();
+  const totalCount = totalMessageCount ?? orderedMessages.length;
+
+  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls([
+    contact.avatar_url,
+  ]);
+  const contactAvatarUrl = resolveAvatarUrlFromMap(
+    contact.avatar_url,
+    avatarSignedUrlMap,
+  );
 
   return {
     id: conversation.id,
@@ -192,12 +202,58 @@ export async function getConversationDetail(
     contactIsFavorite: contact.is_favorite ?? false,
     contactName: contact.name ?? contact.phone_number,
     contactPhone: contact.phone_number,
+    contactAvatarUrl,
     channel: conversation.channel,
     status: conversation.status,
     internalNote: conversation.internal_note,
     updatedAt: conversation.updated_at,
     lastReadAt: conversation.last_read_at ?? null,
-    messages: (messages ?? []).map(mapChatMessage),
+    messages: orderedMessages.map(mapChatMessage),
+    hasOlderMessages: totalCount > orderedMessages.length,
+    totalMessageCount: totalCount,
+  };
+}
+
+export async function getOlderConversationMessages(
+  conversationId: string,
+  businessId: string,
+  beforeCreatedAt: string,
+): Promise<{
+  messages: ReturnType<typeof mapChatMessage>[];
+  hasMore: boolean;
+} | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!conversation) {
+    return null;
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+    )
+    .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false)
+    .lt("created_at", beforeCreatedAt)
+    .order("created_at", { ascending: false })
+    .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
+
+  const orderedMessages = (messages ?? []).slice().reverse();
+
+  return {
+    messages: orderedMessages.map(mapChatMessage),
+    hasMore: orderedMessages.length >= CONVERSATION_MESSAGES_PAGE_SIZE,
   };
 }
 
@@ -567,8 +623,8 @@ export async function getChatsChannelPageData(
     };
   }
 
-  const [conversations, channelConnected, cannedResponses] = await Promise.all([
-    listConversations(business.id, channel),
+  const [conversationsPage, channelConnected, cannedResponses] = await Promise.all([
+    listConversationsPage(business.id, { channel, limit: 100, offset: 0 }),
     isChatChannelConnected(business.id, channel),
     listCannedResponses(channel),
   ]);
@@ -580,9 +636,102 @@ export async function getChatsChannelPageData(
     channel,
     channelConnected,
     aiEnabled,
-    conversations,
+    conversations: conversationsPage.items,
     activeConversation: null,
     cannedResponses,
+  };
+}
+
+export async function getChatsFavoritesPageData(): Promise<ChatsMonitorPageData> {
+  const monitor = await getChatsMonitorData();
+
+  if (!monitor.hasBusiness) {
+    return {
+      ...monitor,
+      conversations: [],
+      conversationsTotalCount: 0,
+      conversationsHasMore: false,
+      needsAttentionConversations: [],
+      activeConversation: null,
+      activeChannelConnected: false,
+      activeAiEnabled: null,
+      activeCannedResponses: [],
+    };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return {
+      ...monitor,
+      conversations: [],
+      conversationsTotalCount: 0,
+      conversationsHasMore: false,
+      needsAttentionConversations: [],
+      activeConversation: null,
+      activeChannelConnected: false,
+      activeAiEnabled: null,
+      activeCannedResponses: [],
+    };
+  }
+
+  const page = await listConversationsPage(business.id, {
+    view: "favorites",
+    limit: 50,
+    offset: 0,
+  });
+
+  return {
+    ...monitor,
+    conversations: page.items,
+    conversationsTotalCount: page.totalCount,
+    conversationsHasMore: page.hasMore,
+    needsAttentionConversations: [],
+    activeConversation: null,
+    activeChannelConnected: false,
+    activeAiEnabled: null,
+    activeCannedResponses: [],
+  };
+}
+
+export async function resolveInboxActiveConversationContext(
+  conversationId: string | undefined,
+): Promise<{
+  activeConversation: ConversationDetail | null;
+  activeChannelConnected: boolean;
+  activeAiEnabled: boolean | null;
+  activeCannedResponses: Awaited<ReturnType<typeof listCannedResponses>>;
+}> {
+  const empty = {
+    activeConversation: null,
+    activeChannelConnected: false,
+    activeAiEnabled: null,
+    activeCannedResponses: [] as Awaited<ReturnType<typeof listCannedResponses>>,
+  };
+
+  if (!conversationId || !hasSupabaseEnv()) {
+    return empty;
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return empty;
+  }
+
+  const context = await getActiveConversationContext(conversationId, business.id);
+
+  if (!context) {
+    return empty;
+  }
+
+  return {
+    activeConversation: context.conversation,
+    activeChannelConnected: context.channelConnected,
+    activeAiEnabled: context.aiEnabled,
+    activeCannedResponses: context.cannedResponses,
   };
 }
 

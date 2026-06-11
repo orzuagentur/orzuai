@@ -19,6 +19,7 @@ type ContactsPageProps = {
     segment?: string;
     view?: string;
     contact?: string;
+    profile?: string;
     stage?: string;
     q?: string;
     page?: string;
@@ -34,12 +35,14 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
 }
 
 async function ContactsPageContent({ searchParams }: ContactsPageProps) {
-  const { channel, segment, view, contact, q, page } = await searchParams;
+  const { channel, segment, view, contact, profile, q, page } =
+    await searchParams;
   const listData = await getUnifiedContacts({
     channel,
     segment,
     view,
     contact,
+    profile,
     q,
     page,
   });

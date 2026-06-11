@@ -32,7 +32,10 @@ import { fetchChatsMonitorInitialAction } from "@/features/chats/actions/fetch-c
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
-import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
+import {
+  INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
+  useInboxListPolling,
+} from "@/hooks/use-inbox-list-polling";
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import type {
   ChatInboxFilter,
@@ -61,6 +64,10 @@ export function ChatsMonitorPanel({
   conversationsTotalCount: initialTotalCount,
   conversationsHasMore: initialHasMore,
   needsAttentionConversations: initialNeedsAttention,
+  activeConversation: initialActiveConversation = null,
+  activeChannelConnected: initialActiveChannelConnected,
+  activeAiEnabled: initialActiveAiEnabled,
+  activeCannedResponses: initialActiveCannedResponses,
   favoritesOnly = false,
 }: ChatsMonitorPanelProps = {}) {
   const usesClientBootstrap = initialConversations === undefined;
@@ -85,6 +92,7 @@ export function ChatsMonitorPanel({
   const [isInitialLoading, setIsInitialLoading] = useState(
     usesClientBootstrap && !favoritesOnly,
   );
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const {
     selectedConversationId,
@@ -94,16 +102,18 @@ export function ChatsMonitorPanel({
     aiEnabled: activeAiEnabled,
     cannedResponses: activeCannedResponses,
     isLoadingConversation,
+    isLoadingOlderMessages,
+    loadOlderMessages,
     appendMessage,
     removeMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
     initialConversationId,
-    initialConversation: null,
-    initialChannelConnected: false,
-    initialAiEnabled: null,
-    initialCannedResponses: [],
+    initialConversation: initialActiveConversation,
+    initialChannelConnected: initialActiveChannelConnected ?? false,
+    initialAiEnabled: initialActiveAiEnabled ?? null,
+    initialCannedResponses: initialActiveCannedResponses ?? [],
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,7 +126,7 @@ export function ChatsMonitorPanel({
   const [isFetching, startFetching] = useTransition();
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
-  const skipInitialFetchRef = useRef(usesClientBootstrap);
+  const skipInitialFetchRef = useRef(!usesClientBootstrap);
 
   const needsAttentionIds = useMemo(
     () => new Set(needsAttentionConversations.map((item) => item.id)),
@@ -348,16 +358,25 @@ export function ChatsMonitorPanel({
     enabled: hasBusiness && !isInitialLoading,
     selectedConversationId,
     hasActiveFilters: hasActiveListFilters,
+    onConnectionChange: setRealtimeConnected,
     onConversationsChange: setConversations,
     onNeedsAttentionChange: setNeedsAttentionConversations,
     onRefresh: () => fetchConversations(0, false, true),
   });
 
-  useInboxListPolling(() => {
-    if (!isInitialLoading) {
-      fetchConversations(0, false, true);
-    }
-  });
+  useInboxListPolling(
+    () => {
+      if (!isInitialLoading) {
+        fetchConversations(0, false, true);
+      }
+    },
+    {
+      enabled: hasBusiness && !isInitialLoading,
+      intervalMs: realtimeConnected
+        ? INBOX_LIST_POLL_FALLBACK_INTERVAL_MS
+        : undefined,
+    },
+  );
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -526,6 +545,11 @@ export function ChatsMonitorPanel({
             channel={activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp"}
             cannedResponses={activeCannedResponses}
             isLoadingConversation={isLoadingConversation}
+            hasOlderMessages={activeConversation?.hasOlderMessages ?? false}
+            isLoadingOlderMessages={isLoadingOlderMessages}
+            onLoadOlderMessages={() => {
+              void loadOlderMessages();
+            }}
             loadingPreview={
               selectedListItem
                 ? {

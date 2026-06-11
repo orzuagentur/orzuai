@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
+import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
-import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
-
-const ACTIVE_CONVERSATION_POLL_MS = 8_000;
 
 type UseInboxActiveConversationOptions = {
   initialConversationId: string | null;
@@ -39,7 +37,15 @@ export function useInboxActiveConversation({
     initialCannedResponses,
   );
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const requestIdRef = useRef(0);
+  const skipInitialLoadRef = useRef(
+    Boolean(
+      initialConversation &&
+        initialConversationId &&
+        initialConversation.id === initialConversationId,
+    ),
+  );
   const selectedConversationIdRef = useRef(selectedConversationId);
   selectedConversationIdRef.current = selectedConversationId;
 
@@ -49,6 +55,7 @@ export function useInboxActiveConversation({
     setAiEnabled(null);
     setCannedResponses([]);
     setIsLoadingConversation(false);
+    setIsLoadingOlderMessages(false);
   }, []);
 
   const loadConversation = useCallback(
@@ -92,6 +99,44 @@ export function useInboxActiveConversation({
     [loadConversation, selectedConversationId],
   );
 
+  const loadOlderMessages = useCallback(async () => {
+    if (!conversation?.hasOlderMessages || conversation.messages.length === 0) {
+      return;
+    }
+
+    setIsLoadingOlderMessages(true);
+
+    try {
+      const result = await fetchOlderConversationMessagesAction({
+        conversationId: conversation.id,
+        beforeCreatedAt: conversation.messages[0]!.createdAt,
+      });
+
+      if (!result.success) {
+        return;
+      }
+
+      setConversation((current) => {
+        if (!current || current.id !== conversation.id) {
+          return current;
+        }
+
+        const existingIds = new Set(current.messages.map((message) => message.id));
+        const olderMessages = result.data.messages.filter(
+          (message) => !existingIds.has(message.id),
+        );
+
+        return {
+          ...current,
+          messages: [...olderMessages, ...current.messages],
+          hasOlderMessages: result.data.hasMore,
+        };
+      });
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  }, [conversation]);
+
   const appendMessage = useCallback((message: ChatMessageData) => {
     setConversation((current) => {
       if (!current || current.id !== message.conversationId) {
@@ -105,6 +150,7 @@ export function useInboxActiveConversation({
       return {
         ...current,
         messages: [...current.messages, message],
+        totalMessageCount: current.totalMessageCount + 1,
         updatedAt: message.createdAt,
       };
     });
@@ -119,6 +165,7 @@ export function useInboxActiveConversation({
       return {
         ...current,
         messages: current.messages.filter((item) => item.id !== messageId),
+        totalMessageCount: Math.max(0, current.totalMessageCount - 1),
       };
     });
   }, []);
@@ -167,18 +214,13 @@ export function useInboxActiveConversation({
       return;
     }
 
-    void loadConversation(selectedConversationId);
-  }, [clearConversation, loadConversation, selectedConversationId]);
-
-  useInboxListPolling(() => {
-    const conversationId = selectedConversationIdRef.current;
-
-    if (!conversationId) {
+    if (skipInitialLoadRef.current) {
+      skipInitialLoadRef.current = false;
       return;
     }
 
-    void loadConversation(conversationId, true);
-  }, ACTIVE_CONVERSATION_POLL_MS);
+    void loadConversation(selectedConversationId);
+  }, [clearConversation, loadConversation, selectedConversationId]);
 
   return {
     selectedConversationId,
@@ -188,6 +230,8 @@ export function useInboxActiveConversation({
     aiEnabled,
     cannedResponses,
     isLoadingConversation,
+    isLoadingOlderMessages,
+    loadOlderMessages,
     refreshConversation,
     appendMessage,
     removeMessage,

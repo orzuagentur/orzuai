@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard";
-import { ContactRecordPanel } from "@/components/contacts/ContactRecordPanel";
+import { ContactProfileDrawer } from "@/components/contacts/ContactProfileDrawer";
+import { ContactRecordWorkspace } from "@/components/contacts/ContactRecordWorkspace";
 import { ContactsChannelTabs } from "@/components/contacts/ContactsChannelTabs";
 import { useContactsChromeRegistration } from "@/components/contacts/contacts-chrome-context";
 import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
@@ -35,6 +36,7 @@ function buildHubHref(
     segment: data.activeSegment,
     view: data.activeView,
     contact: data.activeContactId,
+    profile: data.showProfilePanel,
     q: data.searchQuery || null,
     page: data.page,
     ...overrides,
@@ -48,7 +50,13 @@ export function ContactRecordHub({
 }: ContactRecordHubProps) {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState(listData.searchQuery);
+  const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(listData.showProfilePanel);
   const showRecordOnMobile = Boolean(listData.activeContactId);
+
+  useEffect(() => {
+    setProfileOpen(listData.showProfilePanel);
+  }, [listData.showProfilePanel]);
 
   useEffect(() => {
     setSearchValue(listData.searchQuery);
@@ -67,6 +75,7 @@ export function ContactRecordHub({
           q: trimmed || null,
           page: 1,
           contact: listData.activeContactId,
+          profile: listData.showProfilePanel,
         }),
       );
     }, 300);
@@ -81,6 +90,7 @@ export function ContactRecordHub({
           view,
           page: 1,
           contact: listData.activeContactId,
+          profile: listData.showProfilePanel,
         }),
       );
     },
@@ -94,6 +104,7 @@ export function ContactRecordHub({
           segment,
           page: 1,
           contact: listData.activeContactId,
+          profile: listData.showProfilePanel,
         }),
       );
     },
@@ -110,9 +121,29 @@ export function ContactRecordHub({
   });
 
   function clearContactSelection() {
+    setMobileProfileOpen(false);
+    setProfileOpen(false);
     router.push(
       buildHubHref(listData, {
         contact: null,
+        profile: false,
+      }),
+    );
+  }
+
+  function toggleProfilePanel() {
+    const next = !profileOpen;
+    setProfileOpen(next);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      setMobileProfileOpen(next);
+      return;
+    }
+
+    router.replace(
+      buildHubHref(listData, {
+        contact: listData.activeContactId,
+        profile: next,
       }),
     );
   }
@@ -124,6 +155,7 @@ export function ContactRecordHub({
         activeSegment={listData.activeSegment}
         activeView={listData.activeView}
         activeContactId={listData.activeContactId}
+        showProfilePanel={listData.showProfilePanel}
         searchQuery={listData.searchQuery}
         visibleChannelIds={visibleChannelIds}
       />
@@ -207,13 +239,28 @@ export function ContactRecordHub({
             showRecordOnMobile ? "flex" : "hidden lg:flex",
           )}
         >
-          <ContactRecordPanel
+          <ContactRecordWorkspace
             contactId={listData.activeContactId}
+            profileOpen={profileOpen || mobileProfileOpen}
+            onToggleProfile={toggleProfilePanel}
             onContactDeleted={clearContactSelection}
             onBack={showRecordOnMobile ? clearContactSelection : undefined}
           />
         </main>
       </div>
+
+      <ContactProfileDrawer
+        contactId={listData.activeContactId}
+        open={mobileProfileOpen}
+        onOpenChange={(open) => {
+          setMobileProfileOpen(open);
+
+          if (!open) {
+            setProfileOpen(false);
+          }
+        }}
+        onContactDeleted={clearContactSelection}
+      />
     </div>
   );
 }

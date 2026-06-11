@@ -8,7 +8,10 @@ import { ArrowLeftIcon } from "lucide-react";
 import { fetchChatsChannelInitialAction } from "@/features/chats/actions/fetch-chats-channel-initial";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
-import { useInboxListPolling } from "@/hooks/use-inbox-list-polling";
+import {
+  INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
+  useInboxListPolling,
+} from "@/hooks/use-inbox-list-polling";
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
@@ -33,6 +36,7 @@ import { sortConversations } from "@/utils/chat-inbox-priority";
 import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
+  ChatsMonitorPageData,
   ConversationListItem,
 } from "@/types/chat.types";
 import type { CannedResponseItem } from "@/types/canned-response.types";
@@ -45,9 +49,15 @@ import {
 type ChatsChannelPanelProps = {
   channelId: ChatChannelId;
 } & Partial<
-  ChatsChannelPageData & {
-    channelStats: ChatMonitorChannelStats[];
-  }
+  ChatsChannelPageData &
+    Pick<
+      ChatsMonitorPageData,
+      | "activeChannelConnected"
+      | "activeAiEnabled"
+      | "activeCannedResponses"
+    > & {
+      channelStats: ChatMonitorChannelStats[];
+    }
 >;
 
 export function ChatsChannelPanel({
@@ -59,6 +69,10 @@ export function ChatsChannelPanel({
   aiEnabled: initialAiEnabled,
   conversations: initialConversations,
   cannedResponses: initialCannedResponses,
+  activeConversation: initialActiveConversation = null,
+  activeChannelConnected: initialActiveChannelConnected,
+  activeAiEnabled: initialActiveAiEnabled,
+  activeCannedResponses: initialActiveCannedResponses,
 }: ChatsChannelPanelProps) {
   const usesClientBootstrap = initialConversations === undefined;
   const searchParams = useSearchParams();
@@ -88,6 +102,7 @@ export function ChatsChannelPanel({
     CannedResponseItem[]
   >(initialCannedResponses ?? []);
   const [isInitialLoading, setIsInitialLoading] = useState(usesClientBootstrap);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const {
     selectedConversationId,
@@ -97,16 +112,20 @@ export function ChatsChannelPanel({
     aiEnabled,
     cannedResponses,
     isLoadingConversation,
+    isLoadingOlderMessages,
+    loadOlderMessages,
     appendMessage,
     removeMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
     initialConversationId,
-    initialConversation: null,
-    initialChannelConnected: channelConnected,
-    initialAiEnabled: channelAiEnabled,
-    initialCannedResponses: bootstrapCannedResponses,
+    initialConversation: initialActiveConversation,
+    initialChannelConnected:
+      initialActiveChannelConnected ?? channelConnected,
+    initialAiEnabled: initialActiveAiEnabled ?? channelAiEnabled,
+    initialCannedResponses:
+      initialActiveCannedResponses ?? bootstrapCannedResponses,
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -194,17 +213,26 @@ export function ChatsChannelPanel({
     channelFilter: channelId,
     selectedConversationId,
     hasActiveFilters: hasActiveListFilters,
+    onConnectionChange: setRealtimeConnected,
     onConversationsChange: setConversations,
     onRefresh: () => {
       void refreshConversations();
     },
   });
 
-  useInboxListPolling(() => {
-    if (!isInitialLoading) {
-      void refreshConversations();
-    }
-  });
+  useInboxListPolling(
+    () => {
+      if (!isInitialLoading) {
+        void refreshConversations();
+      }
+    },
+    {
+      enabled: hasBusiness && !isInitialLoading,
+      intervalMs: realtimeConnected
+        ? INBOX_LIST_POLL_FALLBACK_INTERVAL_MS
+        : undefined,
+    },
+  );
 
   const unreadByChannel = useMemo(
     () => countUnreadByChannel(conversations),
@@ -362,6 +390,11 @@ export function ChatsChannelPanel({
             channel={channel}
             cannedResponses={cannedResponses}
             isLoadingConversation={isLoadingConversation}
+            hasOlderMessages={activeConversation?.hasOlderMessages ?? false}
+            isLoadingOlderMessages={isLoadingOlderMessages}
+            onLoadOlderMessages={() => {
+              void loadOlderMessages();
+            }}
             loadingPreview={
               selectedListItem
                 ? {

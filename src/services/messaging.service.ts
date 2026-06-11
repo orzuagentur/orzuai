@@ -9,6 +9,7 @@ import { processInboundMessageAutomations } from "@/services/automation-engine.s
 import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
+import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveAgentMatch } from "@/utils/ai-agent-routing";
@@ -31,13 +32,29 @@ export async function insertChannelMessage(
   admin: MessagingDbClient,
   input: ChannelMessageInsert,
 ): Promise<void> {
-  await admin.from("messages").insert({
-    conversation_id: input.conversationId,
-    channel: input.channel,
-    sender_type: input.senderType,
+  const { data: inserted, error } = await admin
+    .from("messages")
+    .insert({
+      conversation_id: input.conversationId,
+      channel: input.channel,
+      sender_type: input.senderType,
+      content: input.content,
+      ai_generated: input.aiGenerated ?? false,
+      ai_agent_id: input.aiAgentId ?? null,
+    })
+    .select("created_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  await updateConversationLastMessageFromInsert(admin, {
+    conversationId: input.conversationId,
     content: input.content,
-    ai_generated: input.aiGenerated ?? false,
-    ai_agent_id: input.aiAgentId ?? null,
+    senderType: input.senderType,
+    aiGenerated: input.aiGenerated,
+    createdAt: inserted.created_at,
   });
 }
 

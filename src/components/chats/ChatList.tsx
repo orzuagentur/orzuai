@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -127,8 +128,13 @@ export function ChatList({
 
         const rowContent = (
           <>
-            <div className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-              {conversation.contactName.slice(0, 2).toUpperCase()}
+            <div className="relative shrink-0">
+              <ContactAvatar
+                name={conversation.contactName}
+                avatarUrl={conversation.contactAvatarUrl}
+                className="size-11"
+                size="lg"
+              />
               {isInboxVariant ? (
                 <span
                   className={cn(

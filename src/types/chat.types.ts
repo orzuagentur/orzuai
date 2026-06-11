@@ -88,6 +88,7 @@ export type ConversationListItem = {
   contactId: string;
   contactName: string;
   contactPhone: string;
+  contactAvatarUrl: string | null;
   contactIsFavorite: boolean;
   leadScore: number | null;
   channel: MessagingChannel;
@@ -108,12 +109,15 @@ export type ConversationDetail = {
   contactIsFavorite: boolean;
   contactName: string;
   contactPhone: string;
+  contactAvatarUrl: string | null;
   channel: MessagingChannel;
   status: ConversationStatus;
   internalNote: string | null;
   updatedAt: string;
   lastReadAt: string | null;
   messages: ChatMessageData[];
+  hasOlderMessages: boolean;
+  totalMessageCount: number;
 };
 
 export type ChatChannelConnectionMap = Record<MessagingChannel, boolean>;
