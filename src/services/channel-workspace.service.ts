@@ -7,7 +7,7 @@ import {
   DEFAULT_AI_LANGUAGE,
   DEFAULT_AI_SYSTEM_PROMPT,
 } from "@/features/business/constants";
-import type { IntegrationChannelId } from "@/features/integrations";
+import type { IntegrationChannelId, MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
@@ -37,7 +37,6 @@ import type {
   ChannelAnalyticsData,
   ChannelContactsData,
   ChannelWorkspaceSummary,
-  MessagingChannel,
   SaveChannelAiSettingsInput,
   TestChannelAiReplyInput,
 } from "@/types/channel-workspace.types";
@@ -53,7 +52,7 @@ import {
 
 export async function enableAiForChannels(
   businessId: string,
-  channels: MessagingChannel[],
+  channels: MessagingIntegrationChannelId[],
 ): Promise<void> {
   if (!hasSupabaseEnv() || channels.length === 0) {
     return;
@@ -72,7 +71,7 @@ export async function enableAiForChannels(
     .in("channel", channels);
 }
 
-function revalidateChannelWorkspacePaths(channel: MessagingChannel): void {
+function revalidateChannelWorkspacePaths(channel: MessagingIntegrationChannelId): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
   revalidatePath(DASHBOARD_ROUTES.analytics);
   revalidatePath(DASHBOARD_ROUTES.onboarding);
@@ -91,7 +90,7 @@ async function getOwnedBusinessId(): Promise<string | null> {
 async function ensureChannelAiSettings(
   supabase: Awaited<ReturnType<typeof createClient>>,
   businessId: string,
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ) {
   const { data } = await supabase
     .from("ai_settings")
@@ -126,7 +125,7 @@ function resolveStoredProvider(value: string | null | undefined): AiProvider {
 async function syncStoredModelIfNeeded(
   supabase: Awaited<ReturnType<typeof createClient>>,
   businessId: string,
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
   storedModel: string | null | undefined,
 ): Promise<string> {
   const resolved = resolveGeminiModel(storedModel);
@@ -144,7 +143,7 @@ async function syncStoredModelIfNeeded(
 
 export async function getChannelAiSettingsForBusiness(
   businessId: string,
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
   isChannelConnected: boolean,
 ): Promise<ChannelAiSettingsData> {
   const defaultModel = getDefaultGeminiModel();
@@ -208,7 +207,7 @@ export async function getChannelAiSettingsForBusiness(
 
 export async function syncChannelAnalytics(
   businessId: string,
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): Promise<{
   totalMessages: number;
   totalContacts: number;
@@ -292,7 +291,7 @@ export async function getChannelConnectionStatuses(businessId: string) {
 
 export async function getChannelWorkspaceSummary(
   businessId: string,
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): Promise<ChannelWorkspaceSummary> {
   if (!hasSupabaseEnv()) {
     return { contactsCount: 0, aiEnabled: false, totalMessages: 0 };
@@ -323,7 +322,7 @@ export async function getChannelWorkspaceSummary(
 }
 
 export async function getChannelContacts(
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): Promise<ChannelContactsData> {
   const businessId = await getOwnedBusinessId();
 
@@ -360,7 +359,7 @@ export async function getChannelContacts(
 }
 
 export async function getChannelAiSettings(
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): Promise<ChannelAiSettingsData> {
   const businessId = await getOwnedBusinessId();
 
@@ -550,7 +549,7 @@ export async function testChannelAiReply(
 }
 
 export async function getChannelAnalytics(
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): Promise<ChannelAnalyticsData> {
   const businessId = await getOwnedBusinessId();
 
@@ -638,7 +637,7 @@ export async function getChannelAnalytics(
 }
 
 function emptyChannelAnalytics(
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
 ): ChannelAnalyticsData {
   return {
     hasBusiness: false,
@@ -663,7 +662,7 @@ export async function isChannelWorkspaceReady(
 }
 
 export async function updateChannelAiEnabled(
-  channel: MessagingChannel,
+  channel: MessagingIntegrationChannelId,
   enabled: boolean,
 ): Promise<{ success: boolean; message?: string }> {
   const businessId = await getOwnedBusinessId();

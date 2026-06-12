@@ -8,6 +8,10 @@ export type ChatMediaPayload = {
   mimeType: string;
   /** Storage object path inside chat-attachments bucket */
   path?: string;
+  /** JPEG thumbnail path for image previews */
+  thumbPath?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
   /** Legacy field — public URL stored before path-based storage */
   url?: string;
   sizeBytes?: number;
@@ -263,6 +267,9 @@ export function buildMediaPayloadFromUpload(input: {
   path: string;
   sizeBytes: number;
   legacyUrl?: string;
+  thumbPath?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
 }): ChatMediaPayload {
   return {
     kind: input.kind,
@@ -271,5 +278,8 @@ export function buildMediaPayloadFromUpload(input: {
     path: input.path,
     sizeBytes: input.sizeBytes,
     url: input.legacyUrl,
+    thumbPath: input.thumbPath,
+    thumbWidth: input.thumbWidth,
+    thumbHeight: input.thumbHeight,
   };
 }

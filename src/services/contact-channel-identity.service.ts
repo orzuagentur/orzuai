@@ -98,6 +98,23 @@ export async function findContactForChannelWithIdentities(
     return null;
   }
 
+  if (channel === "email") {
+    const email = toChannelExternalId(channel, identifier);
+
+    const { data } = await admin
+      .from("contacts")
+      .select("id")
+      .eq("business_id", businessId)
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (data?.id) {
+      return { id: data.id };
+    }
+
+    return null;
+  }
+
   const legacyPhone = toLegacyContactPhoneNumber(
     channel,
     toChannelExternalId(channel, identifier),

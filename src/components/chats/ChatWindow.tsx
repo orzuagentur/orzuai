@@ -46,6 +46,7 @@ import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { cacheChatMessageMediaUrl } from "@/utils/cache-chat-media-url";
+import { isChatScrollPinnedToBottom } from "@/utils/chat-scroll";
 import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
 import {
   createOptimisticChatMessage,
@@ -235,6 +236,15 @@ export function ChatWindow({
       }
 
       const scrollContainer = scrollContainerRef.current;
+
+      if (
+        !isOpeningChat &&
+        scrollContainer &&
+        !isChatScrollPinnedToBottom(scrollContainer)
+      ) {
+        return;
+      }
+
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
         return;

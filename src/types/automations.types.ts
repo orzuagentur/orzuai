@@ -5,7 +5,7 @@ import type { FollowUpAgentSettings } from "@/services/follow-up-settings.servic
 import type { AutomationsTab } from "@/utils/automations-url";
 import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { AiUsageSummary, SalesAgentSettings } from "@/types/ai-usage.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 export type AutomationStats = {
   followUpsSent: number;
@@ -43,5 +43,5 @@ export type AutomationsPageData = {
   workflows: AutomationWorkflowItem[];
   agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
 };

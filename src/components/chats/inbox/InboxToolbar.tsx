@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CHAT_MESSAGES, type ChatInboxFilter } from "@/features/chats/constants";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
 import { cn } from "@/lib/utils";
 import type { InboxChromeConfig } from "@/components/chats/inbox/inbox-chrome-context";
@@ -73,7 +74,7 @@ export function InboxToolbar({
         className="h-8 gap-1 px-2 sm:px-2.5"
         disabled={!canToggleAi || isAiLoading}
         onClick={() => {
-          if (!aiChannel) {
+          if (!aiChannel || !isInboxMessagingChannel(aiChannel)) {
             return;
           }
 

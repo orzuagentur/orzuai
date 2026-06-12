@@ -62,17 +62,17 @@ import type {
   AiProviderAvailability,
   ChannelAiSettingsData,
 } from "@/types/channel-workspace.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiAgentCreateWizardProps = {
   step: 1 | 2 | 3 | 4;
   goal: AgentWizardGoalId | null;
-  activeChannel: MessagingChannel;
-  activeChannelFilter: MessagingChannel | null;
+  activeChannel: MessagingIntegrationChannelId;
+  activeChannelFilter: MessagingIntegrationChannelId | null;
   searchQuery: string;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   channelDefaults: ChannelAiSettingsData;
   providerAvailability: AiProviderAvailability;
@@ -88,7 +88,7 @@ type WizardDraft = {
   name: string;
   systemPrompt: string;
   triggerKeywords: string;
-  channels: MessagingChannel[];
+  channels: MessagingIntegrationChannelId[];
   billingMode: WizardBillingMode;
   provider: AiProvider;
   model: string;
@@ -99,8 +99,8 @@ type WizardDraft = {
 
 function defaultConnectedChannels(
   channelStatuses: IntegrationChannelStatusMap,
-  visibleChannelIds: MessagingChannel[],
-): MessagingChannel[] {
+  visibleChannelIds: MessagingIntegrationChannelId[],
+): MessagingIntegrationChannelId[] {
   return getConnectedMessagingChannels(channelStatuses, visibleChannelIds);
 }
 
@@ -305,7 +305,7 @@ export function AiAgentCreateWizard({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleChannel(channel: MessagingChannel) {
+  function toggleChannel(channel: MessagingIntegrationChannelId) {
     setDraft((current) => {
       const hasChannel = current.channels.includes(channel);
 

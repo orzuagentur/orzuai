@@ -1,13 +1,16 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deliverChannelMediaMessage } from "@/services/channels/deliver-media";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
+import { downloadChatAttachmentBuffer } from "@/services/chat-attachment-storage.service";
 import {
   incrementMessagingAnalytics,
   recordMessageDeliveryFailure,
   recordMessageDeliverySuccess,
 } from "@/services/messaging.service";
+import { parseMediaMessage } from "@/utils/chat-media";
 
 const BATCH_SIZE = 25;
 
@@ -71,13 +74,49 @@ export async function processPendingMessageDeliveries(): Promise<{
       continue;
     }
 
-    const result = await deliverChannelTextMessage({
-      admin,
-      businessId: delivery.business_id,
-      channel: delivery.channel,
-      recipientId,
-      content: message.content,
-    });
+    const { media } = parseMediaMessage(message.content);
+    let result: Awaited<ReturnType<typeof deliverChannelTextMessage>>;
+
+    if (media?.path) {
+      const { data: attachment } = await admin
+        .from("message_attachments")
+        .select("storage_path, mime_type, file_name, kind")
+        .eq("message_id", message.id)
+        .maybeSingle();
+
+      const storagePath = attachment?.storage_path ?? media.path;
+      const buffer = await downloadChatAttachmentBuffer(storagePath);
+
+      if (!buffer) {
+        await recordMessageDeliveryFailure(admin, {
+          messageId: message.id,
+          errorMessage: "Media file unavailable.",
+        });
+        failed += 1;
+        continue;
+      }
+
+      result = await deliverChannelMediaMessage({
+        admin,
+        businessId: delivery.business_id,
+        channel: delivery.channel,
+        recipientId,
+        content: message.content,
+        buffer,
+        fileName: attachment?.file_name ?? media.fileName,
+        mimeType: attachment?.mime_type ?? media.mimeType,
+        mediaKind: attachment?.kind ?? media.kind,
+        storagePath,
+      });
+    } else {
+      result = await deliverChannelTextMessage({
+        admin,
+        businessId: delivery.business_id,
+        channel: delivery.channel,
+        recipientId,
+        content: message.content,
+      });
+    }
 
     if (result.success) {
       await recordMessageDeliverySuccess(admin, {

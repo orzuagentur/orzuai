@@ -6,6 +6,8 @@ const registeredChannels = new Set<MessagingChannel>([
   "telegram",
   "instagram",
   "website_forms",
+  "email",
+  "facebook_messenger",
 ]);
 
 export function isRegisteredMessagingChannel(

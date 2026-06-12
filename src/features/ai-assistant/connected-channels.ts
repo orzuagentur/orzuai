@@ -3,12 +3,12 @@ import {
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 export function getConnectedMessagingChannels(
   channelStatuses: IntegrationChannelStatusMap,
-  visibleChannelIds: MessagingChannel[],
-): MessagingChannel[] {
+  visibleChannelIds: MessagingIntegrationChannelId[],
+): MessagingIntegrationChannelId[] {
   return MESSAGING_INTEGRATION_CHANNELS.filter(
     (channel) =>
       visibleChannelIds.includes(channel) &&
@@ -17,10 +17,10 @@ export function getConnectedMessagingChannels(
 }
 
 export function filterAgentChannelsToConnected(
-  channels: MessagingChannel[],
+  channels: MessagingIntegrationChannelId[],
   channelStatuses: IntegrationChannelStatusMap,
-  visibleChannelIds: MessagingChannel[],
-): MessagingChannel[] {
+  visibleChannelIds: MessagingIntegrationChannelId[],
+): MessagingIntegrationChannelId[] {
   const connected = new Set(
     getConnectedMessagingChannels(channelStatuses, visibleChannelIds),
   );

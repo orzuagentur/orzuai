@@ -7,6 +7,8 @@ import {
   MESSAGING_INTEGRATION_CHANNELS,
   getActiveMessagingChannelIds,
 } from "@/features/integrations";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
@@ -29,7 +31,6 @@ import {
 import type {
   AiAssistantPageData,
   ApplyGlobalAiDefaultsInput,
-  MessagingChannel,
 } from "@/types/channel-workspace.types";
 import { applyGlobalAiDefaultsSchema } from "@/types/channel-workspace.types";
 
@@ -76,7 +77,10 @@ export async function getAiAssistantPageData(input?: {
       preferCustomerAiKeys: false,
       defaultModel,
       activeChannel: "whatsapp",
-      activeChannelFilter: parsed.activeChannel,
+      activeChannelFilter:
+        parsed.activeChannel && isInboxMessagingChannel(parsed.activeChannel)
+          ? parsed.activeChannel
+          : null,
       activeTab: parsed.activeTab,
       activeAgentId: parsed.activeAgentId,
       isNewAgent: parsed.isNewAgent,
@@ -107,8 +111,9 @@ export async function getAiAssistantPageData(input?: {
   );
 
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
-  const activeChannel: MessagingChannel =
+  const activeChannel: MessagingIntegrationChannelId =
     parsed.activeChannel &&
+    isInboxMessagingChannel(parsed.activeChannel) &&
     visibleChannelIds.includes(parsed.activeChannel)
       ? parsed.activeChannel
       : visibleChannelIds[0] ?? "whatsapp";
@@ -133,7 +138,10 @@ export async function getAiAssistantPageData(input?: {
     preferCustomerAiKeys,
     defaultModel,
     activeChannel,
-    activeChannelFilter: parsed.activeChannel,
+    activeChannelFilter:
+      parsed.activeChannel && isInboxMessagingChannel(parsed.activeChannel)
+        ? parsed.activeChannel
+        : null,
     activeTab: parsed.activeTab,
     activeAgentId: parsed.activeAgentId,
     isNewAgent: parsed.isNewAgent,

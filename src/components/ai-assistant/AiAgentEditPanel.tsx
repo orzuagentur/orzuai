@@ -40,7 +40,7 @@ import {
 import type { BusinessProviderCredential } from "@/services/business-ai-credentials.service";
 import type { AiProviderAvailability } from "@/types/channel-workspace.types";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 import { resolveAgentMatch } from "@/utils/ai-agent-routing";
@@ -48,7 +48,7 @@ import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 type DraftState = {
   name: string;
   systemPrompt: string;
-  channels: MessagingChannel[];
+  channels: MessagingIntegrationChannelId[];
   triggerKeywords: string;
   enabled: boolean;
   provider: AiProvider;
@@ -61,11 +61,11 @@ type DraftState = {
 
 type AiAgentEditPanelProps = {
   agent: AiAgentItem;
-  activeChannel: MessagingChannel;
-  activeChannelFilter: MessagingChannel | null;
+  activeChannel: MessagingIntegrationChannelId;
+  activeChannelFilter: MessagingIntegrationChannelId | null;
   searchQuery: string;
   allAgents: AiAgentItem[];
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   providerAvailability: AiProviderAvailability;
   platformProviderAvailability: AiProviderAvailability;
@@ -77,7 +77,7 @@ type AiAgentEditPanelProps = {
 function buildDraft(
   agent: AiAgentItem,
   channelStatuses: IntegrationChannelStatusMap,
-  visibleChannelIds: MessagingChannel[],
+  visibleChannelIds: MessagingIntegrationChannelId[],
 ): DraftState {
   const provider = (agent.provider as AiProvider) ?? "gemini";
   const communicationStyle = isCommunicationStyleId(agent.communicationStyle)
@@ -172,7 +172,7 @@ export function AiAgentEditPanel({
     });
   }, [agent, allAgents, draft, previewChannel, testMessage]);
 
-  function toggleChannel(channel: MessagingChannel) {
+  function toggleChannel(channel: MessagingIntegrationChannelId) {
     setDraft((value) => {
       const hasChannel = value.channels.includes(channel);
 

@@ -27,6 +27,7 @@ import {
   updateAiAgentSchema,
 } from "@/types/ai-agent.types";
 import type { MessagingChannel } from "@/types/database.types";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
@@ -58,7 +59,7 @@ function mapAiAgent(row: {
     id: row.id,
     name: row.name,
     systemPrompt: row.system_prompt,
-    channels: row.channels ?? [],
+    channels: (row.channels ?? []).filter(isInboxMessagingChannel),
     triggerKeywords: row.trigger_keywords ?? [],
     enabled: row.enabled,
     provider: row.provider ?? "gemini",
@@ -103,7 +104,7 @@ async function loadRoutableAgentsForBusiness(
   return (data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
-    channels: row.channels ?? [],
+    channels: (row.channels ?? []).filter(isInboxMessagingChannel),
     triggerKeywords: row.trigger_keywords ?? [],
   }));
 }
@@ -207,7 +208,10 @@ export async function toggleAiAgentEnabled(input: {
       .maybeSingle();
 
     if (agent?.channels?.length) {
-      await enableAiForChannels(businessId, agent.channels);
+      await enableAiForChannels(
+        businessId,
+        agent.channels.filter(isInboxMessagingChannel),
+      );
     }
   }
 

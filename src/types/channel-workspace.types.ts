@@ -77,7 +77,7 @@ export type ChannelContactItem = {
 
 export type ChannelContactsData = {
   hasBusiness: boolean;
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   contacts: ChannelContactItem[];
   total: number;
 };
@@ -90,7 +90,7 @@ export type AiProviderAvailability = {
 
 export type ChannelAiSettingsData = {
   hasBusiness: boolean;
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   aiEnabled: boolean;
   provider: string;
   model: string;
@@ -104,7 +104,7 @@ export type ChannelAiSettingsData = {
 };
 
 export type AiAssistantChannelEntry = {
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   settings: ChannelAiSettingsData;
 };
 
@@ -116,8 +116,8 @@ export type AiAssistantPageData = {
   businessProviderCredentials: BusinessProviderCredential[];
   preferCustomerAiKeys: boolean;
   defaultModel: string;
-  activeChannel: MessagingChannel;
-  activeChannelFilter: MessagingChannel | null;
+  activeChannel: MessagingIntegrationChannelId;
+  activeChannelFilter: MessagingIntegrationChannelId | null;
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
@@ -148,7 +148,7 @@ export type ChannelRecentMessage = {
 
 export type ChannelAnalyticsData = {
   hasBusiness: boolean;
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   totalMessages: number;
   totalContacts: number;
   aiReplies: number;
@@ -160,7 +160,7 @@ export type ChannelAnalyticsData = {
 };
 
 export type AnalyticsChannelEntry = {
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   analytics: ChannelAnalyticsData;
   isChannelConnected: boolean;
 };

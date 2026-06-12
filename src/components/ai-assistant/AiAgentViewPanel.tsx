@@ -33,14 +33,14 @@ import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import { AI_PROVIDER_LABELS, type AiProvider } from "@/lib/ai/constants";
 import { getAgentIconLabel } from "@/features/ai-assistant/agent-icons";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiAgentViewPanelProps = {
   agent: AiAgentItem;
-  activeChannelFilter: MessagingChannel | null;
+  activeChannelFilter: MessagingIntegrationChannelId | null;
   searchQuery: string;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   showSetupBanner: boolean;
   onEdit: () => void;

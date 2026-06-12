@@ -1,24 +1,51 @@
 import "server-only";
 
-import { sendInstagramTextMessage } from "@/lib/instagram/client";
-import { sendTelegramTextMessage } from "@/lib/telegram/client";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
-import { deliverEmailTextMessage, deliverFacebookMessengerTextMessage } from "@/services/channels/deliver-email";
+import { sendInstagramMediaMessage } from "@/lib/instagram/client";
+import { sendTelegramMediaMessage } from "@/lib/telegram/client";
+import {
+  sendWhatsAppMediaMessage,
+  uploadWhatsAppMedia,
+} from "@/lib/whatsapp/client";
+import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-storage.service";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { parseMediaMessage, type ChatMediaKind } from "@/utils/chat-media";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-export async function deliverChannelTextMessage(input: {
+export type ChannelMediaDeliveryInput = {
   admin: MessagingDbClient;
   businessId: string;
   channel: MessagingChannel;
   recipientId: string;
   content: string;
-}): Promise<ChannelTextDeliveryResult> {
-  if (input.channel === "website_forms") {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  mediaKind: ChatMediaKind;
+  storagePath: string;
+};
+
+function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
+  return new Blob([new Uint8Array(buffer)], { type: mimeType });
+}
+
+export async function deliverChannelMediaMessage(
+  input: ChannelMediaDeliveryInput,
+): Promise<ChannelTextDeliveryResult> {
+  const { text: caption } = parseMediaMessage(input.content);
+  const blob = bufferToBlob(input.buffer, input.mimeType);
+
+  if (input.channel === "website_forms" || input.channel === "email") {
     return { success: true };
+  }
+
+  if (input.channel === "facebook_messenger") {
+    return {
+      success: false,
+      error: "Facebook Messenger media is not connected yet.",
+    };
   }
 
   if (input.channel === "whatsapp") {
@@ -33,11 +60,28 @@ export async function deliverChannelTextMessage(input: {
       return { success: false, error: "WhatsApp is not connected." };
     }
 
-    const sendResult = await sendWhatsAppTextMessage(
+    const uploadResult = await uploadWhatsAppMedia(
       connection.meta_phone_number_id,
       connection.meta_access_token,
-      input.recipientId.replace(/^\+/, ""),
-      input.content,
+      blob,
+      input.mimeType,
+      input.fileName,
+    );
+
+    if (!uploadResult.success) {
+      return { success: false, error: uploadResult.message };
+    }
+
+    const sendResult = await sendWhatsAppMediaMessage(
+      connection.meta_phone_number_id,
+      connection.meta_access_token,
+      input.recipientId,
+      input.mediaKind,
+      uploadResult.mediaId,
+      {
+        caption: caption || undefined,
+        filename: input.fileName,
+      },
     );
 
     if (!sendResult.success) {
@@ -59,10 +103,13 @@ export async function deliverChannelTextMessage(input: {
       return { success: false, error: "Telegram is not connected." };
     }
 
-    const sendResult = await sendTelegramTextMessage(
+    const sendResult = await sendTelegramMediaMessage(
       connection.bot_token,
       input.recipientId,
-      input.content,
+      blob,
+      input.fileName,
+      input.mimeType,
+      { caption: caption || undefined },
     );
 
     if (!sendResult.success) {
@@ -75,20 +122,30 @@ export async function deliverChannelTextMessage(input: {
   if (input.channel === "instagram") {
     const { data: connection } = await input.admin
       .from("instagram_connections")
-      .select("meta_access_token, meta_page_id")
+      .select("meta_page_id, meta_access_token")
       .eq("business_id", input.businessId)
       .eq("instagram_status", "connected")
       .maybeSingle();
 
-    if (!connection?.meta_access_token || !connection.meta_page_id) {
+    if (!connection?.meta_page_id || !connection.meta_access_token) {
       return { success: false, error: "Instagram is not connected." };
     }
 
-    const sendResult = await sendInstagramTextMessage(
+    const instagramMediaUrl = await getChatAttachmentSignedUrl(
+      input.storagePath,
+      3600,
+    );
+
+    if (!instagramMediaUrl) {
+      return { success: false, error: "Unable to sign media URL." };
+    }
+
+    const sendResult = await sendInstagramMediaMessage(
       connection.meta_page_id,
       connection.meta_access_token,
       input.recipientId,
-      input.content,
+      input.mediaKind,
+      instagramMediaUrl,
     );
 
     if (!sendResult.success) {
@@ -96,19 +153,6 @@ export async function deliverChannelTextMessage(input: {
     }
 
     return { success: true, providerMessageId: sendResult.messageId };
-  }
-
-  if (input.channel === "email") {
-    return deliverEmailTextMessage({
-      admin: input.admin,
-      recipientEmail: input.recipientId,
-      subject: "Message from your business",
-      content: input.content,
-    });
-  }
-
-  if (input.channel === "facebook_messenger") {
-    return deliverFacebookMessengerTextMessage();
   }
 
   return { success: false, error: `Unsupported channel: ${input.channel}` };

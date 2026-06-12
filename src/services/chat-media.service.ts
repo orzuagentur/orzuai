@@ -6,15 +6,8 @@ import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { MAX_CHAT_ATTACHMENT_BYTES } from "@/features/chats/chat-attachments";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
-import { sendInstagramMediaMessage } from "@/lib/instagram/client";
-import { sendTelegramMediaMessage } from "@/lib/telegram/client";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { hasSupabaseEnv } from "@/lib/env";
-import {
-  sendWhatsAppMediaMessage,
-  uploadWhatsAppMedia,
-} from "@/lib/whatsapp/client";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import {
@@ -22,10 +15,10 @@ import {
   uploadChatAttachmentFile,
 } from "@/services/chat-attachment-storage.service";
 import {
-  incrementMessagingAnalytics,
+  createOutboundMessageDelivery,
   insertChannelMessage,
-  markOutboundMessageFailed,
 } from "@/services/messaging.service";
+import { processPendingMessageDeliveries } from "@/services/message-delivery.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import type { SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -34,7 +27,6 @@ import {
   buildMediaPayloadFromUpload,
   encodeMediaMessage,
   resolveMediaKind,
-  type ChatMediaKind,
 } from "@/utils/chat-media";
 
 type SendChatMediaInput = {
@@ -119,6 +111,10 @@ async function isChannelConnected(
     return data?.connection_status === "connected";
   }
 
+  if (channel === "email") {
+    return hasResendEnv();
+  }
+
   return false;
 }
 
@@ -135,155 +131,15 @@ function channelNotConnectedMessage(channel: MessagingChannel): string {
     return CHAT_MESSAGES.websiteFormsNotConnected;
   }
 
+  if (channel === "email") {
+    return CHAT_MESSAGES.contactEmailUnavailable;
+  }
+
+  if (channel === "facebook_messenger") {
+    return CHAT_MESSAGES.genericError;
+  }
+
   return CHAT_MESSAGES.whatsappNotConnected;
-}
-
-function resolveRecipientId(
-  channel: MessagingChannel,
-  phoneNumber: string,
-): string | null {
-  if (channel === "whatsapp") {
-    return phoneNumber.replace(/^\+/, "");
-  }
-
-  if (channel === "telegram") {
-    return phoneNumber.replace(/^tg:/, "") || null;
-  }
-
-  if (channel === "instagram") {
-    return phoneNumber.replace(/^ig:/, "") || null;
-  }
-
-  return null;
-}
-
-async function sendMediaToChannel(input: {
-  channel: MessagingChannel;
-  businessId: string;
-  recipientId: string;
-  file: File;
-  mimeType: string;
-  mediaKind: ChatMediaKind;
-  caption: string;
-  publicUrl: string;
-  storagePath: string;
-}): Promise<{ success: true } | { success: false; message: string }> {
-  const supabase = await createClient();
-
-  if (input.channel === "website_forms") {
-    return { success: true };
-  }
-
-  if (input.channel === "whatsapp") {
-    const { data: connection } = await supabase
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", input.businessId)
-      .eq("whatsapp_status", "connected")
-      .maybeSingle();
-
-    if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
-      return { success: false, message: CHAT_MESSAGES.whatsappNotConnected };
-    }
-
-    const uploadResult = await uploadWhatsAppMedia(
-      connection.meta_phone_number_id,
-      connection.meta_access_token,
-      input.file,
-      input.mimeType,
-      input.file.name,
-    );
-
-    if (!uploadResult.success) {
-      return { success: false, message: uploadResult.message };
-    }
-
-    const sendResult = await sendWhatsAppMediaMessage(
-      connection.meta_phone_number_id,
-      connection.meta_access_token,
-      input.recipientId,
-      input.mediaKind,
-      uploadResult.mediaId,
-      {
-        caption: input.caption || undefined,
-        filename: input.file.name,
-      },
-    );
-
-    if (!sendResult.success) {
-      return { success: false, message: sendResult.message };
-    }
-
-    return { success: true };
-  }
-
-  if (input.channel === "telegram") {
-    const { data: connection } = await supabase
-      .from("telegram_connections")
-      .select("bot_token")
-      .eq("business_id", input.businessId)
-      .eq("telegram_status", "connected")
-      .maybeSingle();
-
-    if (!connection?.bot_token) {
-      return { success: false, message: CHAT_MESSAGES.telegramNotConnected };
-    }
-
-    const sendResult = await sendTelegramMediaMessage(
-      connection.bot_token,
-      input.recipientId,
-      input.file,
-      input.file.name,
-      input.mimeType,
-      { caption: input.caption || undefined },
-    );
-
-    if (!sendResult.success) {
-      return { success: false, message: sendResult.message };
-    }
-
-    return { success: true };
-  }
-
-  if (input.channel === "instagram") {
-    const { data: connection } = await supabase
-      .from("instagram_connections")
-      .select("meta_page_id, meta_access_token")
-      .eq("business_id", input.businessId)
-      .eq("instagram_status", "connected")
-      .maybeSingle();
-
-    if (!connection?.meta_page_id || !connection.meta_access_token) {
-      return { success: false, message: CHAT_MESSAGES.instagramNotConnected };
-    }
-
-    const instagramMediaUrl =
-      input.publicUrl ||
-      (await getChatAttachmentSignedUrl(input.storagePath, 3600));
-
-    if (!instagramMediaUrl) {
-      return { success: false, message: CHAT_MESSAGES.mediaSendFailed };
-    }
-
-    const sendResult = await sendInstagramMediaMessage(
-      connection.meta_page_id,
-      connection.meta_access_token,
-      input.recipientId,
-      input.mediaKind,
-      instagramMediaUrl,
-    );
-
-    if (!sendResult.success) {
-      return { success: false, message: sendResult.message };
-    }
-
-    return { success: true };
-  }
-
-  return {
-    success: false,
-    message: CHAT_MESSAGES.mediaNotSupportedForChannel,
-  };
 }
 
 export async function sendChatMedia(
@@ -371,39 +227,8 @@ export async function sendChatMedia(
     };
   }
 
-  const recipientId = resolveRecipientId(
-    conversation.channel,
-    contact.phone_number,
-  );
-
-  if (!recipientId && conversation.channel !== "website_forms") {
-    return {
-      success: false,
-      error: {
-        code: "NOT_FOUND",
-        message: CHAT_MESSAGES.genericError,
-      },
-    };
-  }
-
   const mimeType = file.type || "application/octet-stream";
   const mediaKind = resolveMediaKind(mimeType);
-  const canSendToChannelInParallel =
-    Boolean(recipientId) && conversation.channel !== "instagram";
-
-  const channelSendPromise = canSendToChannelInParallel
-    ? sendMediaToChannel({
-        channel: conversation.channel,
-        businessId,
-        recipientId: recipientId!,
-        file,
-        mimeType,
-        mediaKind,
-        caption,
-        publicUrl: "",
-        storagePath: "",
-      })
-    : null;
 
   const stored = await uploadChatAttachmentFile(
     businessId,
@@ -421,17 +246,19 @@ export async function sendChatMedia(
     };
   }
 
-  const content = encodeMediaMessage(
-    buildMediaPayloadFromUpload({
-      kind: mediaKind,
-      fileName: file.name,
-      mimeType,
-      path: stored.path,
-      sizeBytes: stored.sizeBytes,
-      legacyUrl: stored.url,
-    }),
-    caption,
-  );
+  const mediaPayload = buildMediaPayloadFromUpload({
+    kind: mediaKind,
+    fileName: file.name,
+    mimeType,
+    path: stored.path,
+    sizeBytes: stored.sizeBytes,
+    legacyUrl: stored.url,
+    thumbPath: stored.thumbnailPath,
+    thumbWidth: stored.thumbWidth,
+    thumbHeight: stored.thumbHeight,
+  });
+
+  const content = encodeMediaMessage(mediaPayload, caption);
 
   const insertedMessage = await insertChannelMessage(supabase, {
     conversationId,
@@ -443,14 +270,13 @@ export async function sendChatMedia(
   await createReadyMessageAttachment(supabase, {
     messageId: insertedMessage.id,
     businessId,
-    media: buildMediaPayloadFromUpload({
-      kind: mediaKind,
-      fileName: file.name,
-      mimeType,
-      path: stored.path,
-      sizeBytes: stored.sizeBytes,
-      legacyUrl: stored.url,
-    }),
+    media: mediaPayload,
+  });
+
+  await createOutboundMessageDelivery(supabase, {
+    messageId: insertedMessage.id,
+    businessId,
+    channel: conversation.channel,
   });
 
   const now = new Date().toISOString();
@@ -471,60 +297,9 @@ export async function sendChatMedia(
     ...contactUpdates,
   ]);
 
-  if (recipientId) {
-    if (channelSendPromise) {
-      void channelSendPromise
-        .then(async (sendResult) => {
-          if (!sendResult.success) {
-            await markOutboundMessageFailed(supabase, insertedMessage.id);
-            return;
-          }
-
-          await incrementMessagingAnalytics(
-            createAdminClient(),
-            businessId,
-            conversation.channel,
-            {
-              totalMessages: 1,
-            },
-          );
-        })
-        .catch((error) => {
-          console.error("[chat-media] outbound delivery failed", error);
-        });
-    } else {
-      const instagramSignedUrl = await getChatAttachmentSignedUrl(
-        stored.path,
-        3600,
-      );
-
-      void deliverOutboundChatMedia({
-        supabase,
-        businessId,
-        conversationId,
-        channel: conversation.channel,
-        messageId: insertedMessage.id,
-        recipientId,
-        file,
-        mimeType,
-        mediaKind,
-        caption,
-        publicUrl: instagramSignedUrl ?? stored.url,
-        storagePath: stored.path,
-      }).catch((error) => {
-        console.error("[chat-media] outbound delivery failed", error);
-      });
-    }
-  } else {
-    await incrementMessagingAnalytics(
-      createAdminClient(),
-      businessId,
-      conversation.channel,
-      {
-        totalMessages: 1,
-      },
-    );
-  }
+  void processPendingMessageDeliveries().catch((error) => {
+    console.error("[chat-media] outbound delivery worker failed", error);
+  });
 
   revalidateChatPaths(conversation.channel);
 
@@ -537,45 +312,4 @@ export async function sendChatMedia(
       mediaSignedUrl: mediaSignedUrl ?? undefined,
     },
   };
-}
-
-async function deliverOutboundChatMedia(input: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  businessId: string;
-  conversationId: string;
-  channel: MessagingChannel;
-  messageId: string;
-  recipientId: string;
-  file: File;
-  mimeType: string;
-  mediaKind: ChatMediaKind;
-  caption: string;
-  publicUrl: string;
-  storagePath: string;
-}): Promise<void> {
-  const sendResult = await sendMediaToChannel({
-    channel: input.channel,
-    businessId: input.businessId,
-    recipientId: input.recipientId,
-    file: input.file,
-    mimeType: input.mimeType,
-    mediaKind: input.mediaKind,
-    caption: input.caption,
-    publicUrl: input.publicUrl,
-    storagePath: input.storagePath,
-  });
-
-  if (!sendResult.success) {
-    await markOutboundMessageFailed(input.supabase, input.messageId);
-    return;
-  }
-
-  await incrementMessagingAnalytics(
-    createAdminClient(),
-    input.businessId,
-    input.channel,
-    {
-      totalMessages: 1,
-    },
-  );
 }

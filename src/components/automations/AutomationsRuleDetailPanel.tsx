@@ -23,7 +23,7 @@ import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
 type AutomationsRuleDetailPanelProps = {
@@ -32,7 +32,7 @@ type AutomationsRuleDetailPanelProps = {
   followUpAgent: FollowUpAgentSettings;
   agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   onBack?: () => void;
 };
 

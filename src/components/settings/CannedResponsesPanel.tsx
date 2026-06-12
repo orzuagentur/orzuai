@@ -23,7 +23,7 @@ import { updateCannedResponseAction } from "@/features/canned-responses/actions/
 import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { CannedResponseItem } from "@/types/canned-response.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 type CannedResponsesPanelProps = {
   initialResponses: CannedResponseItem[];
@@ -33,7 +33,7 @@ type DraftState = {
   id?: string;
   title: string;
   content: string;
-  channel: MessagingChannel | "";
+  channel: MessagingIntegrationChannelId | "";
 };
 
 const EMPTY_DRAFT: DraftState = {

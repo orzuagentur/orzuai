@@ -17,6 +17,7 @@ import type {
   AutomationConfig,
   AutomationTriggerType,
 } from "@/features/automations/workflow-types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 
@@ -50,7 +51,7 @@ function matchesChannel(config: AutomationConfig, channel: MessagingChannel): bo
     return true;
   }
 
-  return config.channels.includes(channel);
+  return config.channels.includes(channel as MessagingIntegrationChannelId);
 }
 
 function matchesTagTrigger(config: AutomationConfig, addedTag?: string): boolean {

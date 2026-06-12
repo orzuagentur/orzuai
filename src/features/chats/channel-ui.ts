@@ -36,6 +36,14 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
     return "Telegram";
   }
 
+  if (channel === "email") {
+    return "Email";
+  }
+
+  if (channel === "facebook_messenger") {
+    return "Messenger";
+  }
+
   return "Website";
 }
 

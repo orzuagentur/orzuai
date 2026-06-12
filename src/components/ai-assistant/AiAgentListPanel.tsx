@@ -9,12 +9,12 @@ import { isDefaultAgent } from "@/features/ai-assistant/agent-channel-routing";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { cn } from "@/lib/utils";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiAgentListPanelProps = {
   agents: AiAgentItem[];
-  activeChannelFilter: MessagingChannel | null;
+  activeChannelFilter: MessagingIntegrationChannelId | null;
   activeAgentId: string | null;
   isNewAgent: boolean;
   searchQuery: string;
@@ -40,7 +40,7 @@ function matchesSearch(agent: AiAgentItem, query: string): boolean {
 
 function matchesChannel(
   agent: AiAgentItem,
-  channel: MessagingChannel | null,
+  channel: MessagingIntegrationChannelId | null,
 ): boolean {
   if (!channel) {
     return true;

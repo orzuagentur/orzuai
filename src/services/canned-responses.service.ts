@@ -20,7 +20,9 @@ import {
   deleteCannedResponseSchema,
   updateCannedResponseSchema,
 } from "@/types/canned-response.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { MessagingChannel } from "@/types/database.types";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
@@ -45,14 +47,15 @@ function mapCannedResponse(row: {
     id: row.id,
     title: row.title,
     content: row.content,
-    channel: row.channel,
+    channel:
+      row.channel && isInboxMessagingChannel(row.channel) ? row.channel : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 export async function listCannedResponses(
-  channel?: MessagingChannel,
+  channel?: MessagingIntegrationChannelId,
 ): Promise<CannedResponseItem[]> {
   const businessId = await getOwnedBusinessId();
 

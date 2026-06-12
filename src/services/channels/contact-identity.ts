@@ -19,6 +19,14 @@ export function toChannelExternalId(
     return trimmed.replace(/^ig:/, "");
   }
 
+  if (channel === "email") {
+    return trimmed.toLowerCase();
+  }
+
+  if (channel === "facebook_messenger") {
+    return trimmed.replace(/^fb:/, "");
+  }
+
   return trimmed;
 }
 
@@ -32,6 +40,14 @@ export function toLegacyContactPhoneNumber(
 
   if (channel === "instagram") {
     return externalId.startsWith("ig:") ? externalId : `ig:${externalId}`;
+  }
+
+  if (channel === "email") {
+    return externalId;
+  }
+
+  if (channel === "facebook_messenger") {
+    return externalId.startsWith("fb:") ? externalId : `fb:${externalId}`;
   }
 
   return externalId;

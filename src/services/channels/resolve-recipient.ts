@@ -16,7 +16,7 @@ export async function resolveChannelRecipient(
 ): Promise<string | null> {
   const { data: conversation } = await admin
     .from("conversations")
-    .select("contact_id, contact:contacts(phone_number)")
+    .select("contact_id, contact:contacts(phone_number, email)")
     .eq("id", input.conversationId)
     .eq("business_id", input.businessId)
     .maybeSingle();
@@ -24,6 +24,20 @@ export async function resolveChannelRecipient(
   const contact = Array.isArray(conversation?.contact)
     ? conversation.contact[0]
     : conversation?.contact;
+
+  if (input.channel === "email") {
+    const email = contact?.email?.trim().toLowerCase();
+
+    if (email) {
+      return email;
+    }
+
+    if (contact?.phone_number?.includes("@")) {
+      return toChannelExternalId("email", contact.phone_number);
+    }
+
+    return null;
+  }
 
   if (!contact?.phone_number) {
     return null;

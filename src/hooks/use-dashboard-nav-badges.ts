@@ -9,16 +9,12 @@ import {
   waitForSupabaseRealtime,
 } from "@/lib/supabase/realtime-auth";
 import type { DashboardNavBadgeCounts } from "@/services/conversation-read.service";
+import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
 const DEFAULT_COUNTS: DashboardNavBadgeCounts = {
   inboxUnread: 0,
   crmUnread: 0,
-  unreadByChannel: {
-    whatsapp: 0,
-    telegram: 0,
-    instagram: 0,
-    website_forms: 0,
-  },
+  unreadByChannel: createEmptyUnreadByChannel(),
 };
 
 const POLL_MS = 60_000;

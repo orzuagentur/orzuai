@@ -37,7 +37,7 @@ import type {
   AutomationStats,
   AutomationsPageData,
 } from "@/types/automations.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationsOverviewPanelProps = {
@@ -45,7 +45,7 @@ type AutomationsOverviewPanelProps = {
   salesAgent: AutomationsPageData["salesAgent"];
   followUpAgent: AutomationsPageData["followUpAgent"];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
 };
 
 function StatCard({

@@ -136,6 +136,7 @@ function ChatMediaImage({
   caption,
   isOutgoing,
   resolvedUrl,
+  previewUrl,
   isLoading,
   hasError,
 }: {
@@ -143,15 +144,20 @@ function ChatMediaImage({
   caption?: string;
   isOutgoing?: boolean;
   resolvedUrl: string | null;
+  previewUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const previewUrl =
+  const displayUrl =
+    previewUrl ??
+    resolvedUrl ??
+    (media.url?.startsWith("blob:") ? media.url : null);
+  const fullUrl =
     resolvedUrl ??
     (media.url?.startsWith("blob:") ? media.url : null);
 
-  if (isLoading && !previewUrl) {
+  if (isLoading && !displayUrl) {
     return (
       <div className="space-y-1">
         <MediaLoadingPlaceholder className="max-w-[min(280px,100%)]" />
@@ -160,7 +166,7 @@ function ChatMediaImage({
     );
   }
 
-  if (hasError || !previewUrl) {
+  if (hasError || !displayUrl) {
     return (
       <div className="space-y-1">
         <MediaErrorPlaceholder fileName={media.fileName} />
@@ -180,7 +186,7 @@ function ChatMediaImage({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={previewUrl}
+            src={displayUrl}
             alt={media.fileName}
             className={cn(
               "max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95",
@@ -196,7 +202,7 @@ function ChatMediaImage({
         {!isLoading ? (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <MediaDownloadButton
-              url={previewUrl}
+              url={fullUrl ?? displayUrl}
               fileName={media.fileName}
               isOutgoing={isOutgoing}
               className="bg-black/55 text-white hover:bg-black/70"
@@ -213,7 +219,7 @@ function ChatMediaImage({
           <DialogTitle className="sr-only">{media.fileName}</DialogTitle>
           <div className="absolute top-2 right-2 z-10 flex gap-1">
             <MediaDownloadButton
-              url={previewUrl}
+              url={fullUrl ?? displayUrl}
               fileName={media.fileName}
               className="bg-white/10 text-white hover:bg-white/20"
             />
@@ -230,7 +236,7 @@ function ChatMediaImage({
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={previewUrl}
+            src={fullUrl ?? displayUrl}
             alt={media.fileName}
             className="max-h-[88vh] max-w-full object-contain"
           />
@@ -411,8 +417,18 @@ export function ChatMediaMessage({
   isOutgoing = false,
 }: ChatMediaMessageProps) {
   const { url, isLoading, error } = useChatMediaUrl(media, { messageId });
+  const previewMedia = media.thumbPath
+    ? { ...media, path: media.thumbPath }
+    : media;
+  const {
+    url: previewResolvedUrl,
+    isLoading: isPreviewLoading,
+    error: previewError,
+  } = useChatMediaUrl(previewMedia, {
+    messageId: media.thumbPath ? `${messageId}:thumb` : messageId,
+  });
   const isHydrating = isMediaPendingHydration(media);
-  const showLoading = isLoading || isHydrating;
+  const showLoading = isLoading || isPreviewLoading || isHydrating;
 
   if (!isHydrating && !media.path && !media.url) {
     return (
@@ -428,8 +444,9 @@ export function ChatMediaMessage({
     caption,
     isOutgoing,
     resolvedUrl: url,
+    previewUrl: media.thumbPath ? previewResolvedUrl : url,
     isLoading: showLoading,
-    hasError: error && !isHydrating,
+    hasError: (error || previewError) && !isHydrating,
   };
 
   if (media.kind === "image") {

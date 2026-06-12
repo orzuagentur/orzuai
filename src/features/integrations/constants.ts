@@ -8,6 +8,7 @@ import {
   WhatsAppIcon,
 } from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import type { MessagingChannel } from "@/types/database.types";
 
 export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -31,6 +32,12 @@ export type IntegrationChannelId = (typeof INTEGRATION_CHANNELS)[number];
 
 export function isMessagingIntegrationChannel(
   channel: IntegrationChannelId,
+): channel is MessagingIntegrationChannelId {
+  return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
+}
+
+export function isInboxMessagingChannel(
+  channel: MessagingChannel,
 ): channel is MessagingIntegrationChannelId {
   return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
 }

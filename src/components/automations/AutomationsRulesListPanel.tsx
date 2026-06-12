@@ -19,7 +19,7 @@ import {
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import { cn } from "@/lib/utils";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import type { AutomationsTab } from "@/utils/automations-url";
 import { buildAutomationsHref } from "@/utils/automations-url";
@@ -32,7 +32,7 @@ type AutomationsRulesListPanelProps = {
   followUpAgent: FollowUpAgentSettings;
   workflows: AutomationWorkflowItem[];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
 };
 
 export function AutomationsRulesListPanel({

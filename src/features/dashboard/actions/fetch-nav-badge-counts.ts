@@ -4,6 +4,7 @@ import { getAccessibleBusiness } from "@/services/business-access.service";
 import { getDashboardNavBadgeCounts } from "@/services/conversation-read.service";
 import { requireUser } from "@/services/auth.service";
 import { hasSupabaseEnv } from "@/lib/env";
+import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
 export async function fetchNavBadgeCountsAction() {
   if (!hasSupabaseEnv()) {
@@ -12,12 +13,7 @@ export async function fetchNavBadgeCountsAction() {
       data: {
         inboxUnread: 0,
         crmUnread: 0,
-        unreadByChannel: {
-          whatsapp: 0,
-          telegram: 0,
-          instagram: 0,
-          website_forms: 0,
-        },
+        unreadByChannel: createEmptyUnreadByChannel(),
       },
     };
   }
@@ -31,12 +27,7 @@ export async function fetchNavBadgeCountsAction() {
       data: {
         inboxUnread: 0,
         crmUnread: 0,
-        unreadByChannel: {
-          whatsapp: 0,
-          telegram: 0,
-          instagram: 0,
-          website_forms: 0,
-        },
+        unreadByChannel: createEmptyUnreadByChannel(),
       },
     };
   }

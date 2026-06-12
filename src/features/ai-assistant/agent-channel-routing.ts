@@ -1,6 +1,6 @@
 import { INTEGRATION_CHANNEL_LIST } from "@/features/integrations/constants";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
 
 export type RoutableAgentRef = Pick<
   AiAgentItem,
@@ -8,7 +8,7 @@ export type RoutableAgentRef = Pick<
 >;
 
 export type DefaultAgentConflict = {
-  channel: MessagingChannel;
+  channel: MessagingIntegrationChannelId;
   existingAgentId: string;
   existingAgentName: string;
 };
@@ -21,7 +21,7 @@ export function isSpecialistAgent(triggerKeywords: string[]): boolean {
   return triggerKeywords.length > 0;
 }
 
-export function getChannelLabel(channel: MessagingChannel): string {
+export function getChannelLabel(channel: MessagingIntegrationChannelId): string {
   return (
     INTEGRATION_CHANNEL_LIST.find((entry) => entry.id === channel)?.label ??
     channel
@@ -39,7 +39,7 @@ export function findDefaultAgentConflicts(
   agents: RoutableAgentRef[],
   candidate: {
     id?: string;
-    channels: MessagingChannel[];
+    channels: MessagingIntegrationChannelId[];
     triggerKeywords: string[];
   },
 ): DefaultAgentConflict[] {
@@ -95,7 +95,7 @@ export function validateAgentChannelRouting(
   agents: RoutableAgentRef[],
   candidate: {
     id?: string;
-    channels: MessagingChannel[];
+    channels: MessagingIntegrationChannelId[];
     triggerKeywords: string[];
   },
 ): { valid: boolean; conflicts: DefaultAgentConflict[]; message: string } {

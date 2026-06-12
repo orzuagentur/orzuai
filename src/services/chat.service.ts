@@ -27,6 +27,7 @@ import {
   getActiveMessagingChannelIds,
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
@@ -81,7 +82,7 @@ function missingConfigError(): {
 
 function revalidateChatPaths(channel?: DbMessagingChannel): void {
   revalidatePath(DASHBOARD_ROUTES.chats);
-  if (channel) {
+  if (channel && (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)) {
     revalidatePath(`${DASHBOARD_ROUTES.chats}/${channel}`);
   }
   for (const ch of MESSAGING_INTEGRATION_CHANNELS) {
@@ -479,7 +480,11 @@ export async function getActiveConversationContext(
   const [channelConnected, aiEnabled, cannedResponses] = await Promise.all([
     isChatChannelConnected(businessId, conversation.channel),
     getAiEnabledForChannel(businessId, conversation.channel),
-    listCannedResponses(conversation.channel),
+    listCannedResponses(
+      isInboxMessagingChannel(conversation.channel)
+        ? conversation.channel
+        : undefined,
+    ),
     markConversationRead(businessId, conversationId, user.id),
   ]);
 
@@ -764,7 +769,9 @@ export async function getChatsChannelPageData(
   const [conversationsPage, channelConnected, cannedResponses] = await Promise.all([
     listConversationsPage(business.id, { channel, limit: 100, offset: 0 }),
     isChatChannelConnected(business.id, channel),
-    listCannedResponses(channel),
+    listCannedResponses(
+      isInboxMessagingChannel(channel) ? channel : undefined,
+    ),
   ]);
 
   const aiEnabled = await getAiEnabledForChannel(business.id, channel);

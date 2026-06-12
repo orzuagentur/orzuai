@@ -34,14 +34,14 @@ const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
 };
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationCreateWizardProps = {
   step: 1 | 2 | 3;
   agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   onStepChange: (step: 1 | 2 | 3) => void;
   onCancel: () => void;
 };
@@ -59,14 +59,14 @@ export function AutomationCreateWizard({
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState<AutomationTriggerType>("new_message");
   const [actionType, setActionType] = useState<AutomationActionType>("create_task");
-  const [channels, setChannels] = useState<MessagingChannel[]>([]);
+  const [channels, setChannels] = useState<MessagingIntegrationChannelId[]>([]);
   const [aiAgentId, setAiAgentId] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string>("qualified");
   const [taskTitle, setTaskTitle] = useState("");
   const [tagName, setTagName] = useState("");
   const [notifyTitle, setNotifyTitle] = useState("");
 
-  function toggleChannel(channel: MessagingChannel) {
+  function toggleChannel(channel: MessagingIntegrationChannelId) {
     setChannels((current) =>
       current.includes(channel)
         ? current.filter((item) => item !== channel)

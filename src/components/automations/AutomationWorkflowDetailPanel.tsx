@@ -19,14 +19,14 @@ import {
 } from "@/features/automations/workflow-types";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import type { AiAgentItem } from "@/types/ai-agent.types";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationWorkflowDetailPanelProps = {
   workflow: AutomationWorkflowItem;
   agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   onBack?: () => void;
 };
 

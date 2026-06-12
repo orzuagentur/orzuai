@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { MessagingChannel } from "./database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 const messagingChannelSchema = z.enum([
   "whatsapp",
@@ -35,7 +35,7 @@ export type CannedResponseItem = {
   id: string;
   title: string;
   content: string;
-  channel: MessagingChannel | null;
+  channel: MessagingIntegrationChannelId | null;
   createdAt: string;
   updatedAt: string;
 };

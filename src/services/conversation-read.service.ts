@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
 import type { MessagingChannel } from "@/types/database.types";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
+import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
 export async function markConversationRead(
   businessId: string,
@@ -49,12 +50,7 @@ export async function getDashboardNavBadgeCounts(
   const empty: DashboardNavBadgeCounts = {
     inboxUnread: 0,
     crmUnread: 0,
-    unreadByChannel: {
-      whatsapp: 0,
-      telegram: 0,
-      instagram: 0,
-      website_forms: 0,
-    },
+    unreadByChannel: createEmptyUnreadByChannel(),
   };
 
   if (!hasSupabaseEnv()) {

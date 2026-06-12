@@ -5,6 +5,7 @@ import { BotIcon, Loader2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
 import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -48,6 +49,10 @@ export function ChatAiStatus({ channel, aiEnabled, onToggle }: ChatAiStatusProps
             size="sm"
             disabled={isLoading}
             onClick={() => {
+              if (!isInboxMessagingChannel(channel)) {
+                return;
+              }
+
               void toggleAi({ enabled: !isEnabled, channel });
             }}
           >

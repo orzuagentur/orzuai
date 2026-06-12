@@ -15,6 +15,14 @@ function toAttachmentKind(kind: ChatMediaKind): MessageAttachmentKind {
   return kind;
 }
 
+function attachmentThumbnailFields(media: ChatMediaPayload) {
+  return {
+    thumbnail_path: media.thumbPath ?? null,
+    thumb_width: media.thumbWidth ?? null,
+    thumb_height: media.thumbHeight ?? null,
+  };
+}
+
 export async function createPendingMessageAttachment(
   admin: MessagingDbClient,
   input: {
@@ -42,6 +50,7 @@ export async function createPendingMessageAttachment(
       duration_sec: media.durationSec ?? null,
       provider_media_id: input.providerMediaId ?? null,
       status: media.path ? "ready" : "pending",
+      ...attachmentThumbnailFields(media),
     },
     { onConflict: "message_id" },
   );
@@ -68,6 +77,7 @@ export async function markMessageAttachmentReady(
       size_bytes: input.media.sizeBytes ?? null,
       duration_sec: input.media.durationSec ?? null,
       status: "ready",
+      ...attachmentThumbnailFields(input.media),
     })
     .eq("message_id", input.messageId);
 
@@ -95,6 +105,7 @@ export async function createReadyMessageAttachment(
       size_bytes: input.media.sizeBytes ?? null,
       duration_sec: input.media.durationSec ?? null,
       status: "ready",
+      ...attachmentThumbnailFields(input.media),
     },
     { onConflict: "message_id" },
   );

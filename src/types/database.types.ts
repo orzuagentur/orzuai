@@ -34,7 +34,9 @@ export type MessagingChannel =
   | "whatsapp"
   | "instagram"
   | "telegram"
-  | "website_forms";
+  | "website_forms"
+  | "facebook_messenger"
+  | "email";
 
 export type ConversationStatus =
   | "open"
@@ -1063,6 +1065,9 @@ export type Database = {
           duration_sec: number | null;
           provider_media_id: string | null;
           status: MessageAttachmentStatus;
+          thumbnail_path: string | null;
+          thumb_width: number | null;
+          thumb_height: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -1078,6 +1083,9 @@ export type Database = {
           duration_sec?: number | null;
           provider_media_id?: string | null;
           status?: MessageAttachmentStatus;
+          thumbnail_path?: string | null;
+          thumb_width?: number | null;
+          thumb_height?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1092,6 +1100,9 @@ export type Database = {
           size_bytes?: number | null;
           duration_sec?: number | null;
           provider_media_id?: string | null;
+          thumbnail_path?: string | null;
+          thumb_width?: number | null;
+          thumb_height?: number | null;
           status?: MessageAttachmentStatus;
           created_at?: string;
           updated_at?: string;

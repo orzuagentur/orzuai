@@ -9,11 +9,11 @@ import { getChannelLabel } from "@/features/channel-workspace";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import { cn } from "@/lib/utils";
-import type { MessagingChannel } from "@/types/database.types";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 type AutomationsChannelBadgeRowProps = {
   channelStatuses: IntegrationChannelStatusMap;
-  visibleChannelIds: MessagingChannel[];
+  visibleChannelIds: MessagingIntegrationChannelId[];
   className?: string;
   size?: "sm" | "md";
 };

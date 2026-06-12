@@ -7,6 +7,7 @@ import {
 } from "@/features/ai-assistant/agent-icons";
 import type { CommunicationStyleId } from "@/features/ai-assistant/communication-styles";
 import { AI_PROVIDERS } from "@/lib/ai/constants";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { MessagingChannel } from "./database.types";
 
 const communicationStyleSchema = z.enum([
@@ -57,7 +58,7 @@ export type AiAgentItem = {
   id: string;
   name: string;
   systemPrompt: string;
-  channels: MessagingChannel[];
+  channels: MessagingIntegrationChannelId[];
   triggerKeywords: string[];
   enabled: boolean;
   provider: string;
