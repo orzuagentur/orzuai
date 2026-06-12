@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-export const INBOX_LIST_POLL_INTERVAL_MS = 60_000;
+export const INBOX_LIST_POLL_INTERVAL_MS = 30_000;
 export const INBOX_LIST_POLL_FALLBACK_INTERVAL_MS = 120_000;
 
 type UseInboxListPollingOptions = {

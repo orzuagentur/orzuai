@@ -34,7 +34,7 @@ import {
   incrementMessagingAnalytics,
   insertChannelMessage,
   listKnowledgeEntriesForBusiness,
-  processChannelAutoReply,
+  scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WebsiteFormConnection } from "@/types/database.types";
@@ -372,7 +372,7 @@ async function processWebsiteFormFollowUp(input: {
     input;
 
   if (!connection.auto_follow_up_enabled || connection.follow_up_channel === "none") {
-    await processChannelAutoReply({
+    scheduleChannelAutoReply({
       admin,
       businessId,
       channel: "website_forms",

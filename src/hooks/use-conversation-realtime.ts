@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import {
   bindSupabaseRealtimeAuthRefresh,
-  ensureSupabaseRealtimeAuth,
+  waitForSupabaseRealtime,
 } from "@/lib/supabase/realtime-auth";
 import {
   CONVERSATION_TYPING_EVENT,
@@ -21,6 +21,8 @@ const CLIENT_TYPING_TIMEOUT_MS = 4_000;
 type UseConversationRealtimeOptions = {
   conversationId: string | null;
   onMessage?: (message: ChatMessageData) => void;
+  onMessageUpdated?: (message: ChatMessageData) => void;
+  onMessageHidden?: (messageId: string) => void;
 };
 
 type RealtimeMessageRow = {
@@ -31,16 +33,41 @@ type RealtimeMessageRow = {
   content: string;
   ai_generated: boolean;
   created_at: string;
+  deleted_for_all_at?: string | null;
+  hidden_for_business?: boolean;
+  edited_at?: string | null;
+  is_edited?: boolean;
 };
 
 export function useConversationRealtime({
   conversationId,
   onMessage,
+  onMessageUpdated,
+  onMessageHidden,
 }: UseConversationRealtimeOptions) {
   const [isClientTyping, setIsClientTyping] = useState(false);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
   const onMessageRef = useRef(onMessage);
+  const onMessageUpdatedRef = useRef(onMessageUpdated);
+  const onMessageHiddenRef = useRef(onMessageHidden);
   const typingTimeoutRef = useRef<number | null>(null);
   onMessageRef.current = onMessage;
+  onMessageUpdatedRef.current = onMessageUpdated;
+  onMessageHiddenRef.current = onMessageHidden;
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        setReconnectNonce((current) => current + 1);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!conversationId) {
@@ -74,7 +101,7 @@ export function useConversationRealtime({
     };
 
     void (async () => {
-      const authed = await ensureSupabaseRealtimeAuth(supabase);
+      const authed = await waitForSupabaseRealtime(supabase);
 
       if (cancelled) {
         return;
@@ -109,6 +136,11 @@ export function useConversationRealtime({
           },
           (payload) => {
             const row = payload.new as RealtimeMessageRow;
+
+            if (row.hidden_for_business) {
+              return;
+            }
+
             const message = mapChatMessage(row);
             onMessageRef.current?.(message);
 
@@ -116,6 +148,25 @@ export function useConversationRealtime({
               clearTypingTimeout();
               setIsClientTyping(false);
             }
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            const row = payload.new as RealtimeMessageRow;
+
+            if (row.hidden_for_business) {
+              onMessageHiddenRef.current?.(row.id);
+              return;
+            }
+
+            onMessageUpdatedRef.current?.(mapChatMessage(row));
           },
         )
         .on(
@@ -160,7 +211,7 @@ export function useConversationRealtime({
         void supabase.removeChannel(channel);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, reconnectNonce]);
 
   return { isClientTyping };
 }

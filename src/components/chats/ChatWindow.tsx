@@ -46,6 +46,11 @@ import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
+import {
+  createOptimisticChatMessage,
+  createOptimisticMediaChatMessage,
+  createOptimisticMessageId,
+} from "@/utils/optimistic-chat-message";
 
 type ChatLoadingPreview = {
   contactName: string;
@@ -66,7 +71,9 @@ type ChatWindowProps = {
   onDraftChange?: (value: string) => void;
   suggestReplyOpen?: boolean;
   onSuggestReplyOpenChange?: (open: boolean) => void;
-  onMessageSent?: (message: ChatMessageData) => void;
+  onOptimisticMessage?: (message: ChatMessageData) => void;
+  onMessageSent?: (message: ChatMessageData, pendingId?: string) => void;
+  onSendFailed?: (pendingId: string) => void;
   onMessageRemoved?: (messageId: string) => void;
   onContactDeleted?: () => void;
   onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
@@ -106,7 +113,9 @@ export function ChatWindow({
   onDraftChange,
   suggestReplyOpen: controlledSuggestOpen,
   onSuggestReplyOpenChange,
+  onOptimisticMessage,
   onMessageSent,
+  onSendFailed,
   onMessageRemoved,
   onContactDeleted,
   onContactFavoriteChange,
@@ -150,14 +159,9 @@ export function ChatWindow({
 
   const { sendMessage, isLoading } = useSendChatMessage({
     onSuccess: (result) => {
-      setDraft("");
-
-      if (result.success && result.data?.message) {
-        onMessageSent?.(result.data.message);
-        return;
+      if (!result.success) {
+        router.refresh();
       }
-
-      router.refresh();
     },
   });
 
@@ -171,13 +175,7 @@ export function ChatWindow({
       Boolean(conversation),
   });
 
-  const { sendMedia, isLoading: isSendingMedia } = useSendChatMedia({
-    onSuccess: (result) => {
-      if (result.success && result.data?.message) {
-        onMessageSent?.(result.data.message);
-      }
-    },
-  });
+  const { sendMedia, isLoading: isSendingMedia } = useSendChatMedia();
 
   useEffect(() => {
     if (!isInboxLayout || !isLoadingOlderMessages) {
@@ -345,28 +343,47 @@ export function ChatWindow({
     );
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function sendReplyMessage() {
     if (!conversation || !draft.trim() || composerTab !== "reply") {
       return;
     }
 
-    await sendMessage({
-      conversationId: conversation.id,
-      content: draft,
-    });
+    const content = draft.trim();
+    const pendingId = createOptimisticMessageId();
+
+    onOptimisticMessage?.(
+      createOptimisticChatMessage({
+        id: pendingId,
+        conversationId: conversation.id,
+        channel: conversation.channel,
+        content,
+      }),
+    );
+    setDraft("");
+
+    void (async () => {
+      const result = await sendMessage({
+        conversationId: conversation.id,
+        content,
+      });
+
+      if (result.success && result.data?.message) {
+        onMessageSent?.(result.data.message, pendingId);
+        return;
+      }
+
+      onSendFailed?.(pendingId);
+      setDraft(content);
+    })();
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await sendReplyMessage();
   }
 
   async function handleInboxSend() {
-    if (!conversation || !draft.trim() || composerTab !== "reply") {
-      return;
-    }
-
-    await sendMessage({
-      conversationId: conversation.id,
-      content: draft,
-    });
+    await sendReplyMessage();
   }
 
   if (isInboxLayout) {
@@ -506,14 +523,35 @@ export function ChatWindow({
                 void handleInboxSend();
               }}
               onOpenAiSuggest={() => setSuggestOpen(true)}
-              onSendMedia={async (file, caption) => {
-                const result = await sendMedia(
-                  conversation.id,
-                  file,
-                  caption,
+              onSendMedia={(file, caption) => {
+                const pendingId = createOptimisticMessageId();
+
+                onOptimisticMessage?.(
+                  createOptimisticMediaChatMessage({
+                    id: pendingId,
+                    conversationId: conversation.id,
+                    channel: conversation.channel,
+                    file,
+                    caption,
+                  }),
                 );
 
-                return result.success;
+                void (async () => {
+                  const result = await sendMedia(
+                    conversation.id,
+                    file,
+                    caption,
+                  );
+
+                  if (result.success && result.data?.message) {
+                    onMessageSent?.(result.data.message, pendingId);
+                    return;
+                  }
+
+                  onSendFailed?.(pendingId);
+                })();
+
+                return true;
               }}
             />
           </div>

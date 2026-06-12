@@ -15,6 +15,7 @@ import { generateAssistantReply } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
+  markOutboundMessageFailed,
   listKnowledgeEntriesForBusiness,
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
@@ -255,6 +256,108 @@ export async function getOlderConversationMessages(
     messages: orderedMessages.map(mapChatMessage),
     hasMore: orderedMessages.length >= CONVERSATION_MESSAGES_PAGE_SIZE,
   };
+}
+
+async function deliverWhatsAppOutboundText(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  businessId: string;
+  messageId: string;
+  phoneNumberId: string;
+  accessToken: string;
+  recipientPhone: string;
+  content: string;
+  channel: DbMessagingChannel;
+}): Promise<void> {
+  const sendResult = await sendWhatsAppTextMessage(
+    input.phoneNumberId,
+    input.accessToken,
+    input.recipientPhone,
+    input.content,
+  );
+
+  if (!sendResult.success) {
+    await markOutboundMessageFailed(input.supabase, input.messageId);
+    return;
+  }
+
+  await incrementMessagingAnalytics(
+    createAdminClient(),
+    input.businessId,
+    input.channel,
+    {
+      totalMessages: 1,
+    },
+  );
+}
+
+export async function getConversationMessagesTail(
+  conversationId: string,
+  businessId: string,
+  limit = 20,
+): Promise<ReturnType<typeof mapChatMessage>[] | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!conversation) {
+    return null;
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+    )
+    .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const orderedMessages = (messages ?? []).slice().reverse();
+
+  return orderedMessages.map(mapChatMessage);
+}
+
+export async function getNewConversationMessages(
+  conversationId: string,
+  businessId: string,
+  afterCreatedAt: string,
+): Promise<ReturnType<typeof mapChatMessage>[] | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!conversation) {
+    return null;
+  }
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+    )
+    .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false)
+    .gt("created_at", afterCreatedAt)
+    .order("created_at", { ascending: true });
+
+  return (messages ?? []).map(mapChatMessage);
 }
 
 async function isWhatsAppConnected(businessId: string): Promise<boolean> {
@@ -936,22 +1039,52 @@ export async function sendChatMessage(
       };
     }
 
-    const sendResult = await sendWhatsAppTextMessage(
-      connection.meta_phone_number_id,
-      connection.meta_access_token,
-      contact.phone_number.replace(/^\+/, ""),
-      parsed.data.content,
-    );
+    const insertedMessage = await insertChannelMessage(supabase, {
+      conversationId: parsed.data.conversationId,
+      channel: conversation.channel,
+      senderType: "user",
+      content: parsed.data.content,
+    });
 
-    if (!sendResult.success) {
-      return {
-        success: false,
-        error: {
-          code: "SEND_FAILED",
-          message: sendResult.message,
-        },
-      };
-    }
+    const now = new Date().toISOString();
+    const contactUpdates = contact.id
+      ? [
+          supabase
+            .from("contacts")
+            .update({ last_message_at: now })
+            .eq("id", contact.id),
+        ]
+      : [];
+
+    await Promise.all([
+      supabase
+        .from("conversations")
+        .update({ updated_at: now })
+        .eq("id", parsed.data.conversationId),
+      ...contactUpdates,
+    ]);
+
+    void deliverWhatsAppOutboundText({
+      supabase,
+      businessId,
+      messageId: insertedMessage.id,
+      phoneNumberId: connection.meta_phone_number_id,
+      accessToken: connection.meta_access_token,
+      recipientPhone: contact.phone_number.replace(/^\+/, ""),
+      content: parsed.data.content,
+      channel: conversation.channel,
+    }).catch((error) => {
+      console.error("[whatsapp] outbound delivery failed", error);
+    });
+
+    revalidateChatPaths(conversation.channel);
+
+    return {
+      success: true,
+      data: {
+        message: mapChatMessage(insertedMessage),
+      },
+    };
   }
 
   const now = new Date().toISOString();

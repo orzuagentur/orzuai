@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import {
   bindSupabaseRealtimeAuthRefresh,
-  ensureSupabaseRealtimeAuth,
+  waitForSupabaseRealtime,
 } from "@/lib/supabase/realtime-auth";
 
-const BOOTSTRAP_CHANNEL = "orzu-realtime-bootstrap";
-
 /**
- * Warms up the authenticated Realtime WebSocket before inbox subscriptions.
- * Fixes first-load subscriptions connecting as anon (no RLS events).
+ * Warms up authenticated Realtime before inbox subscriptions mount.
  */
 export function useSupabaseRealtimeBootstrap() {
+  const [isReady, setIsReady] = useState(false);
+
   useEffect(() => {
     const supabase = createClientIfConfigured();
 
@@ -25,29 +24,36 @@ export function useSupabaseRealtimeBootstrap() {
     let unbindAuthRefresh: (() => void) | null = null;
     let cancelled = false;
 
-    void (async () => {
-      const authed = await ensureSupabaseRealtimeAuth(supabase);
+    const prepare = async () => {
+      const authed = await waitForSupabaseRealtime(supabase);
 
       if (cancelled) {
         return;
       }
 
-      if (authed) {
+      setIsReady(authed);
+
+      if (authed && !unbindAuthRefresh) {
         unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
       }
+    };
 
-      const channel = supabase.channel(BOOTSTRAP_CHANNEL);
+    void prepare();
 
-      channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          void supabase.removeChannel(channel);
-        }
-      });
-    })();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void prepare();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
       unbindAuthRefresh?.();
     };
   }, []);
+
+  return { isReady };
 }

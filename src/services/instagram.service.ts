@@ -33,7 +33,8 @@ import {
   findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  processChannelAutoReply,
+  markOutboundMessageFailed,
+  scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { InstagramConnection } from "@/types/database.types";
@@ -53,6 +54,7 @@ import {
 } from "@/types/instagram.types";
 import {
   downloadAndStoreUrlInboundMedia,
+  scheduleInboundMediaHydration,
 } from "@/services/inbound-media.service";
 import {
   buildInboundMediaFallbackContent,
@@ -536,42 +538,46 @@ async function ingestInstagramMessage(
     return;
   }
 
-  let content =
-    message.kind === "text"
-      ? message.body
-      : null;
+  let content: string | null = null;
 
-  if (message.kind === "media") {
-    content = await downloadAndStoreUrlInboundMedia({
-      sourceUrl: message.sourceUrl,
-      businessId,
-      conversationId,
-      kind: message.mediaKind,
-      fileName: message.fileName,
-      mimeType: message.mimeType,
-      caption: message.caption,
-      accessToken: connection.meta_access_token ?? undefined,
-    });
-
-    if (!content) {
-      content = buildInboundMediaFallbackContent(
-        message.mediaKind,
-        message.caption,
-        message.fileName,
-      );
-    }
+  if (message.kind === "text") {
+    content = message.body;
+  } else if (message.kind === "media") {
+    content = buildInboundMediaFallbackContent(
+      message.mediaKind,
+      message.caption,
+      message.fileName,
+    );
   }
 
   if (!content) {
     return;
   }
 
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "instagram",
     senderType: "client",
     content,
   });
+
+  if (message.kind === "media") {
+    scheduleInboundMediaHydration({
+      admin,
+      messageId: insertedMessage.id,
+      resolveContent: () =>
+        downloadAndStoreUrlInboundMedia({
+          sourceUrl: message.sourceUrl,
+          businessId,
+          conversationId,
+          kind: message.mediaKind,
+          fileName: message.fileName,
+          mimeType: message.mimeType,
+          caption: message.caption,
+          accessToken: connection.meta_access_token ?? undefined,
+        }),
+    });
+  }
 
   await incrementMessagingAnalytics(admin, businessId, "instagram", {
     totalMessages: 1,
@@ -593,7 +599,7 @@ async function ingestInstagramMessage(
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await processChannelAutoReply({
+  scheduleChannelAutoReply({
     admin,
     businessId,
     channel: "instagram",
@@ -730,27 +736,50 @@ export async function sendInstagramChatMessage(
     return { success: false, message: INSTAGRAM_MESSAGES.notConfigured };
   }
 
-  const sendResult = await sendInstagramTextMessage(
-    connection.meta_page_id,
-    connection.meta_access_token,
-    recipientId,
-    content,
-  );
-
-  if (!sendResult.success) {
-    return { success: false, message: sendResult.message };
-  }
-
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "instagram",
     senderType: "user",
     content,
   });
 
-  await incrementMessagingAnalytics(admin, businessId, "instagram", {
-    totalMessages: 1,
+  void deliverInstagramOutboundText({
+    admin,
+    messageId: insertedMessage.id,
+    pageId: connection.meta_page_id,
+    accessToken: connection.meta_access_token,
+    recipientId,
+    content,
+    businessId,
+  }).catch((error) => {
+    console.error("[instagram] outbound delivery failed", error);
   });
 
   return { success: true };
+}
+
+async function deliverInstagramOutboundText(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  messageId: string;
+  pageId: string;
+  accessToken: string;
+  recipientId: string;
+  content: string;
+  businessId: string;
+}): Promise<void> {
+  const sendResult = await sendInstagramTextMessage(
+    input.pageId,
+    input.accessToken,
+    input.recipientId,
+    input.content,
+  );
+
+  if (!sendResult.success) {
+    await markOutboundMessageFailed(input.admin, input.messageId);
+    return;
+  }
+
+  await incrementMessagingAnalytics(input.admin, input.businessId, "instagram", {
+    totalMessages: 1,
+  });
 }

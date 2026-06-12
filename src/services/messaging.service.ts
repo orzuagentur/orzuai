@@ -28,10 +28,20 @@ export type ChannelMessageInsert = {
   aiAgentId?: string | null;
 };
 
+export type InsertedChannelMessageRow = {
+  id: string;
+  conversation_id: string;
+  channel: MessagingChannel;
+  sender_type: MessageSenderType;
+  content: string;
+  ai_generated: boolean;
+  created_at: string;
+};
+
 export async function insertChannelMessage(
   admin: MessagingDbClient,
   input: ChannelMessageInsert,
-): Promise<void> {
+): Promise<InsertedChannelMessageRow> {
   const { data: inserted, error } = await admin
     .from("messages")
     .insert({
@@ -42,7 +52,9 @@ export async function insertChannelMessage(
       ai_generated: input.aiGenerated ?? false,
       ai_agent_id: input.aiAgentId ?? null,
     })
-    .select("created_at")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+    )
     .single();
 
   if (error) {
@@ -56,6 +68,35 @@ export async function insertChannelMessage(
     aiGenerated: input.aiGenerated,
     createdAt: inserted.created_at,
   });
+
+  return inserted;
+}
+
+export async function markOutboundMessageFailed(
+  admin: MessagingDbClient,
+  messageId: string,
+): Promise<void> {
+  await admin
+    .from("messages")
+    .update({ hidden_for_business: true })
+    .eq("id", messageId);
+}
+
+export async function updateChannelMessageContent(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    content: string;
+  },
+): Promise<void> {
+  const { error } = await admin
+    .from("messages")
+    .update({ content: input.content })
+    .eq("id", input.messageId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function findContactForChannel(
@@ -361,5 +402,13 @@ export async function processChannelAutoReply(input: {
   await incrementMessagingAnalytics(admin, businessId, channel, {
     totalMessages: 1,
     aiReplies: 1,
+  });
+}
+
+export function scheduleChannelAutoReply(
+  input: Parameters<typeof processChannelAutoReply>[0],
+): void {
+  void processChannelAutoReply(input).catch((error) => {
+    console.error("[auto-reply] failed", error);
   });
 }

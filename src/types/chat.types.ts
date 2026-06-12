@@ -81,6 +81,8 @@ export type ChatMessageData = {
   hiddenForBusiness: boolean;
   editedAt: string | null;
   isEdited: boolean;
+  /** Client-only optimistic outbound message before server confirms. */
+  isPending?: boolean;
 };
 
 export type ConversationListItem = {

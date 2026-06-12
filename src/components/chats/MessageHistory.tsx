@@ -1,7 +1,8 @@
 import type { RefObject } from "react";
-import { Loader2Icon, SparklesIcon, UserRoundIcon } from "lucide-react";
+import { Clock3Icon, Loader2Icon, SparklesIcon, UserRoundIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { RelativeTime } from "@/components/ui/relative-time";
 
 import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
@@ -10,7 +11,6 @@ import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage } from "@/utils/chat-media";
-import { formatRelativeTime } from "@/utils/dashboard";
 import { isChatMessageDeletedForAll } from "@/utils/chat";
 import {
   findFirstUnreadClientMessageIndex,
@@ -62,6 +62,8 @@ export function MessageHistory({
 }: MessageHistoryProps) {
   const isInbox = variant === "inbox";
   const showMessageActions = Boolean(onMessageRemoved);
+  const canShowMessageActions = (message: ChatMessageData) =>
+    showMessageActions && !message.isPending;
   const firstUnreadIndex = findFirstUnreadClientMessageIndex(
     messages,
     lastReadAt,
@@ -138,7 +140,7 @@ export function MessageHistory({
                 isOutgoing ? "justify-end" : "justify-start",
               )}
             >
-              {showMessageActions && !isOutgoing ? (
+              {canShowMessageActions(message) && !isOutgoing ? (
                 <ChatMessageActionsMenu
                   message={message}
                   isOutgoing={isOutgoing}
@@ -149,6 +151,7 @@ export function MessageHistory({
                 className={cn(
                   "max-w-[min(85%,28rem)] min-w-0 shrink rounded-lg text-sm shadow-sm",
                   media ? "px-1.5 py-1.5" : "px-3 py-2",
+                  message.isPending && "opacity-80",
                   isDeleted
                     ? "border border-dashed bg-muted/40 text-muted-foreground"
                     : isOutgoing
@@ -198,7 +201,7 @@ export function MessageHistory({
                 )}
                 <p
                   className={cn(
-                    "mt-1 text-right text-[10px]",
+                    "mt-1 flex items-center justify-end gap-1 text-[10px]",
                     isOutgoing
                       ? isInbox
                         ? "text-emerald-100"
@@ -206,10 +209,17 @@ export function MessageHistory({
                       : "text-muted-foreground",
                   )}
                 >
-                  {formatRelativeTime(message.createdAt)}
+                  {message.isPending ? (
+                    <Clock3Icon className="size-3 shrink-0" aria-hidden />
+                  ) : null}
+                  {message.isPending ? (
+                    CHAT_MESSAGES.messageSending
+                  ) : (
+                    <RelativeTime value={message.createdAt} />
+                  )}
                 </p>
               </div>
-              {showMessageActions && isOutgoing ? (
+              {canShowMessageActions(message) && isOutgoing ? (
                 <ChatMessageActionsMenu
                   message={message}
                   isOutgoing={isOutgoing}

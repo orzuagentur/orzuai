@@ -3,6 +3,9 @@ import "server-only";
 import { downloadTelegramFile } from "@/lib/telegram/client";
 import { downloadWhatsAppMedia } from "@/lib/whatsapp/client";
 import { uploadChatAttachmentBuffer } from "@/services/chat-attachment-storage.service";
+import { updateChannelMessageContent } from "@/services/messaging.service";
+import type { Database } from "@/types/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildMediaPayloadFromUpload,
   encodeMediaMessage,
@@ -152,5 +155,28 @@ export async function downloadAndStoreUrlInboundMedia(input: {
     mimeType,
     fileName,
     caption: input.caption,
+  });
+}
+
+type InboundMediaDbClient = SupabaseClient<Database>;
+
+export function scheduleInboundMediaHydration(input: {
+  admin: InboundMediaDbClient;
+  messageId: string;
+  resolveContent: () => Promise<string | null>;
+}): void {
+  void (async () => {
+    const content = await input.resolveContent();
+
+    if (!content) {
+      return;
+    }
+
+    await updateChannelMessageContent(input.admin, {
+      messageId: input.messageId,
+      content,
+    });
+  })().catch((error) => {
+    console.error("[inbound-media] hydration failed", error);
   });
 }

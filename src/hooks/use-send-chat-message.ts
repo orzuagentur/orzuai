@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { sendChatMessageAction } from "@/features/chats/actions/send-chat-message";
@@ -15,32 +15,24 @@ type UseSendChatMessageOptions = {
 };
 
 export function useSendChatMessage({ onSuccess }: UseSendChatMessageOptions = {}) {
-  const [isLoading, setIsLoading] = useState(false);
-
   const sendMessage = useCallback(
     async (input: SendChatMessageInput): Promise<SendChatMessageResult> => {
-      setIsLoading(true);
+      const result = await sendChatMessageAction(input);
 
-      try {
-        const result = await sendChatMessageAction(input);
-
-        if (result.success) {
-          toast.success(CHAT_MESSAGES.sendSuccess);
-          onSuccess?.(result);
-          return result;
-        }
-
-        toast.error(result.error.message);
+      if (result.success) {
+        toast.success(CHAT_MESSAGES.sendSuccess);
+        onSuccess?.(result);
         return result;
-      } finally {
-        setIsLoading(false);
       }
+
+      toast.error(result.error.message);
+      return result;
     },
     [onSuccess],
   );
 
   return {
     sendMessage,
-    isLoading,
+    isLoading: false,
   };
 }

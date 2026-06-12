@@ -21,7 +21,7 @@ import { isConversationNeedsAttention } from "@/utils/chat-inbox-priority";
 import type { ChatChannelId } from "@/features/chats";
 import type { ConversationListItem } from "@/types/chat.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
-import { formatRelativeTime } from "@/utils/dashboard";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 import { HIGH_INTENT_LEAD_SCORE } from "@/features/chats/constants";
 
@@ -165,9 +165,11 @@ export function ChatList({
                   {conversation.contactName}
                 </p>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatRelativeTime(
-                    conversation.lastMessageAt ?? conversation.updatedAt,
-                  )}
+                  <RelativeTime
+                    value={
+                      conversation.lastMessageAt ?? conversation.updatedAt
+                    }
+                  />
                 </span>
               </div>
               {conversation.lastMessagePreview ? (

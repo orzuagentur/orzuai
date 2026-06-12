@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
+import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
+import { revokeOptimisticMediaContent } from "@/utils/optimistic-chat-message";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 
@@ -147,10 +149,25 @@ export function useInboxActiveConversation({
         return current;
       }
 
+      const withoutMatchingPending =
+        message.senderType === "user"
+          ? current.messages.filter(
+              (item) =>
+                !(
+                  item.isPending &&
+                  item.senderType === "user" &&
+                  item.content === message.content
+                ),
+            )
+          : current.messages;
+      const removedPendingCount =
+        current.messages.length - withoutMatchingPending.length;
+
       return {
         ...current,
-        messages: [...current.messages, message],
-        totalMessageCount: current.totalMessageCount + 1,
+        messages: [...withoutMatchingPending, message],
+        totalMessageCount:
+          current.totalMessageCount - removedPendingCount + 1,
         updatedAt: message.createdAt,
       };
     });
@@ -162,6 +179,14 @@ export function useInboxActiveConversation({
         return current;
       }
 
+      const removedMessage = current.messages.find((item) => item.id === messageId);
+
+      if (!removedMessage) {
+        return current;
+      }
+
+      revokeOptimisticMediaContent(removedMessage.content);
+
       return {
         ...current,
         messages: current.messages.filter((item) => item.id !== messageId),
@@ -170,13 +195,135 @@ export function useInboxActiveConversation({
     });
   }, []);
 
+  const reconcileMessage = useCallback(
+    (pendingId: string, message: ChatMessageData) => {
+      setConversation((current) => {
+        if (!current || current.id !== message.conversationId) {
+          return current;
+        }
+
+        const pendingMessage = current.messages.find(
+          (item) => item.id === pendingId,
+        );
+        const withoutPending = current.messages.filter(
+          (item) => item.id !== pendingId,
+        );
+        const hasReal = withoutPending.some((item) => item.id === message.id);
+
+        if (pendingMessage) {
+          revokeOptimisticMediaContent(pendingMessage.content);
+        }
+
+        if (hasReal) {
+          if (withoutPending.length === current.messages.length) {
+            return current;
+          }
+
+          return {
+            ...current,
+            messages: withoutPending,
+            totalMessageCount: Math.max(
+              0,
+              current.totalMessageCount -
+                (current.messages.length - withoutPending.length),
+            ),
+          };
+        }
+
+        const hadPending = current.messages.some((item) => item.id === pendingId);
+
+        return {
+          ...current,
+          messages: [...withoutPending, message],
+          totalMessageCount: hadPending
+            ? current.totalMessageCount
+            : current.totalMessageCount + 1,
+          updatedAt: message.createdAt,
+        };
+      });
+    },
+    [],
+  );
+
+  const updateMessage = useCallback((message: ChatMessageData) => {
+    setConversation((current) => {
+      if (!current || current.id !== message.conversationId) {
+        return current;
+      }
+
+      const index = current.messages.findIndex((item) => item.id === message.id);
+
+      if (index === -1) {
+        if (current.messages.some((item) => item.id === message.id)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          messages: [...current.messages, message],
+          totalMessageCount: current.totalMessageCount + 1,
+          updatedAt: message.editedAt ?? message.createdAt,
+        };
+      }
+
+      if (current.messages[index]?.content === message.content) {
+        return current;
+      }
+
+      const messages = [...current.messages];
+      messages[index] = message;
+
+      return {
+        ...current,
+        messages,
+        updatedAt: message.editedAt ?? message.createdAt,
+      };
+    });
+  }, []);
+
   const appendMessageRef = useRef(appendMessage);
+  const updateMessageRef = useRef(updateMessage);
+  const removeMessageRef = useRef(removeMessage);
   appendMessageRef.current = appendMessage;
+  updateMessageRef.current = updateMessage;
+  removeMessageRef.current = removeMessage;
 
   const { isClientTyping } = useConversationRealtime({
     conversationId: selectedConversationId,
     onMessage: (message) => {
       appendMessageRef.current(message);
+    },
+    onMessageUpdated: (message) => {
+      updateMessageRef.current(message);
+    },
+    onMessageHidden: (messageId) => {
+      removeMessageRef.current(messageId);
+    },
+  });
+
+  const latestMessageAt = useMemo(() => {
+    if (!conversation) {
+      return null;
+    }
+
+    return (
+      conversation.messages.at(-1)?.createdAt ?? "1970-01-01T00:00:00.000Z"
+    );
+  }, [conversation]);
+
+  useActiveConversationPolling({
+    conversationId: selectedConversationId,
+    latestMessageAt,
+    enabled: Boolean(selectedConversationId && conversation),
+    onNewMessages: (messages) => {
+      for (const message of messages) {
+        appendMessageRef.current(message);
+      }
+    },
+    onSyncMessages: (messages) => {
+      for (const message of messages) {
+        updateMessageRef.current(message);
+      }
     },
   });
 
@@ -235,6 +382,8 @@ export function useInboxActiveConversation({
     refreshConversation,
     appendMessage,
     removeMessage,
+    reconcileMessage,
+    updateMessage,
     isClientTyping,
   };
 }

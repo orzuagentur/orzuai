@@ -26,6 +26,13 @@ export function useChatMediaUrl(media: ChatMediaPayload): UseChatMediaUrlResult 
       setIsLoading(true);
       setError(false);
 
+      if (media.url?.startsWith("blob:")) {
+        setUrl(media.url);
+        setError(false);
+        setIsLoading(false);
+        return;
+      }
+
       if (!storagePath && !media.url) {
         setUrl(null);
         setIsLoading(false);

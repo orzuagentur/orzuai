@@ -34,6 +34,7 @@ import { CHAT_MESSAGES } from "@/features/chats";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import {
   INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
+  INBOX_LIST_POLL_INTERVAL_MS,
   useInboxListPolling,
 } from "@/hooks/use-inbox-list-polling";
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
@@ -106,6 +107,7 @@ export function ChatsMonitorPanel({
     loadOlderMessages,
     appendMessage,
     removeMessage,
+    reconcileMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
@@ -373,8 +375,8 @@ export function ChatsMonitorPanel({
     {
       enabled: hasBusiness && !isInitialLoading,
       intervalMs: realtimeConnected
-        ? INBOX_LIST_POLL_FALLBACK_INTERVAL_MS
-        : undefined,
+        ? INBOX_LIST_POLL_INTERVAL_MS
+        : INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
     },
   );
 
@@ -565,10 +567,16 @@ export function ChatsMonitorPanel({
             className="min-h-0 min-w-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
-            onMessageSent={(message) => {
+            onOptimisticMessage={appendMessage}
+            onMessageSent={(message, pendingId) => {
+              if (pendingId) {
+                reconcileMessage(pendingId, message);
+                return;
+              }
+
               appendMessage(message);
-              fetchConversations(0, false, true);
             }}
+            onSendFailed={removeMessage}
             onMessageRemoved={removeMessage}
             onContactDeleted={() => {
               handleConversationSelect(null);

@@ -23,7 +23,8 @@ import {
   findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  processChannelAutoReply,
+  markOutboundMessageFailed,
+  scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
@@ -37,6 +38,7 @@ import type {
 import { telegramConnectSchema } from "@/types/telegram.types";
 import {
   downloadAndStoreTelegramInboundMedia,
+  scheduleInboundMediaHydration,
 } from "@/services/inbound-media.service";
 import {
   buildInboundMediaFallbackContent,
@@ -351,44 +353,81 @@ async function ingestTelegramMessage(
     return;
   }
 
-  let content =
-    message.kind === "text"
-      ? message.body
-      : null;
+  let content: string | null = null;
 
-  if (message.kind === "media") {
-    if (connection.bot_token) {
-      content = await downloadAndStoreTelegramInboundMedia({
-        botToken: connection.bot_token,
-        fileId: message.fileId,
-        businessId,
-        conversationId,
-        kind: message.mediaKind,
-        fileName: message.fileName,
-        mimeType: message.mimeType,
-        caption: message.caption,
-      });
-    }
-
-    if (!content) {
-      content = buildInboundMediaFallbackContent(
-        message.mediaKind,
-        message.caption,
-        message.fileName,
-      );
-    }
+  if (message.kind === "text") {
+    content = message.body;
+  } else if (message.kind === "media") {
+    content = buildInboundMediaFallbackContent(
+      message.mediaKind,
+      message.caption,
+      message.fileName,
+    );
   }
 
   if (!content) {
     return;
   }
 
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "telegram",
     senderType: "client",
     content,
   });
+
+  if (message.kind === "media" && connection.bot_token) {
+    scheduleInboundMediaHydration({
+      admin,
+      messageId: insertedMessage.id,
+      resolveContent: () =>
+        downloadAndStoreTelegramInboundMedia({
+          botToken: connection.bot_token!,
+          fileId: message.fileId,
+          businessId,
+          conversationId,
+          kind: message.mediaKind,
+          fileName: message.fileName,
+          mimeType: message.mimeType,
+          caption: message.caption,
+        }),
+    });
+  }
+
+  void completeInboundTelegramMessage({
+    admin,
+    businessId,
+    connection,
+    conversationId,
+    contactId,
+    createdContact,
+    content,
+    message,
+  }).catch((error) => {
+    console.error("[telegram] post-insert failed", error);
+  });
+}
+
+async function completeInboundTelegramMessage(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  businessId: string;
+  connection: TelegramConnection;
+  conversationId: string;
+  contactId: string;
+  createdContact: boolean;
+  content: string;
+  message: TelegramInboundMessage;
+}): Promise<void> {
+  const {
+    admin,
+    businessId,
+    connection,
+    conversationId,
+    contactId,
+    createdContact,
+    content,
+    message,
+  } = input;
 
   await incrementMessagingAnalytics(admin, businessId, "telegram", {
     totalMessages: 1,
@@ -410,7 +449,7 @@ async function ingestTelegramMessage(
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await processChannelAutoReply({
+  scheduleChannelAutoReply({
     admin,
     businessId,
     channel: "telegram",
@@ -466,7 +505,9 @@ export async function processTelegramWebhook(
   }
 
   if (processed > 0) {
-    revalidateTelegramPaths();
+    queueMicrotask(() => {
+      revalidateTelegramPaths();
+    });
   }
 
   return { processed };
@@ -512,26 +553,47 @@ export async function sendTelegramChatMessage(
     return { success: false, message: TELEGRAM_MESSAGES.notConfigured };
   }
 
-  const sendResult = await sendTelegramTextMessage(
-    connection.bot_token,
-    chatId,
-    content,
-  );
-
-  if (!sendResult.success) {
-    return { success: false, message: sendResult.message };
-  }
-
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "telegram",
     senderType: "user",
     content,
   });
 
-  await incrementMessagingAnalytics(admin, businessId, "telegram", {
-    totalMessages: 1,
+  void deliverTelegramOutboundText({
+    admin,
+    messageId: insertedMessage.id,
+    botToken: connection.bot_token,
+    chatId,
+    content,
+    businessId,
+  }).catch((error) => {
+    console.error("[telegram] outbound delivery failed", error);
   });
 
   return { success: true };
+}
+
+async function deliverTelegramOutboundText(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  messageId: string;
+  botToken: string;
+  chatId: string;
+  content: string;
+  businessId: string;
+}): Promise<void> {
+  const sendResult = await sendTelegramTextMessage(
+    input.botToken,
+    input.chatId,
+    input.content,
+  );
+
+  if (!sendResult.success) {
+    await markOutboundMessageFailed(input.admin, input.messageId);
+    return;
+  }
+
+  await incrementMessagingAnalytics(input.admin, input.businessId, "telegram", {
+    totalMessages: 1,
+  });
 }

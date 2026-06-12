@@ -31,6 +31,7 @@ export const CHAT_MESSAGES = {
   websiteFormsNotConnected:
     "Enable Website Forms in Integrations to receive leads here.",
   sendSuccess: "Message sent successfully.",
+  messageSending: "Sending…",
   sendFailed: "Unable to send message. Please try again.",
   aiEnabledSuccess: "AI auto-replies enabled.",
   aiDisabledSuccess: "AI auto-replies disabled.",

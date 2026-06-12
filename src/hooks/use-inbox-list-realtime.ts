@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { fetchConversationListItemAction } from "@/features/chats/actions/fetch-conversation-list-item";
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import {
   bindSupabaseRealtimeAuthRefresh,
-  ensureSupabaseRealtimeAuth,
+  waitForSupabaseRealtime,
 } from "@/lib/supabase/realtime-auth";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -60,6 +60,21 @@ export function useInboxListRealtime({
   onRefreshRef.current = onRefresh;
   selectedConversationIdRef.current = selectedConversationId;
   hasActiveFiltersRef.current = hasActiveFilters;
+  const [reconnectNonce, setReconnectNonce] = useState(0);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        setReconnectNonce((current) => current + 1);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
@@ -193,7 +208,7 @@ export function useInboxListRealtime({
     };
 
     void (async () => {
-      const authed = await ensureSupabaseRealtimeAuth(supabase);
+      const authed = await waitForSupabaseRealtime(supabase);
 
       if (cancelled) {
         return;
@@ -279,5 +294,5 @@ export function useInboxListRealtime({
         void supabase.removeChannel(channel);
       }
     };
-  }, [channelFilter, enabled]);
+  }, [channelFilter, enabled, reconnectNonce]);
 }

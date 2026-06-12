@@ -28,7 +28,7 @@ import {
   findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  processChannelAutoReply,
+  scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WhatsappConnection } from "@/types/database.types";
@@ -49,6 +49,7 @@ import {
 } from "@/types/whatsapp.types";
 import {
   downloadAndStoreWhatsAppInboundMedia,
+  scheduleInboundMediaHydration,
 } from "@/services/inbound-media.service";
 import {
   buildInboundMediaFallbackContent,
@@ -613,44 +614,84 @@ async function ingestIncomingMessage(
     return;
   }
 
-  let content =
-    message.kind === "text"
-      ? message.body
-      : null;
+  let content: string | null = null;
 
-  if (message.kind === "media") {
-    if (connection.meta_access_token) {
-      content = await downloadAndStoreWhatsAppInboundMedia({
-        accessToken: connection.meta_access_token,
-        mediaId: message.mediaId,
-        businessId,
-        conversationId,
-        kind: message.mediaKind,
-        fileName: message.fileName,
-        mimeType: message.mimeType,
-        caption: message.caption,
-      });
-    }
-
-    if (!content) {
-      content = buildInboundMediaFallbackContent(
-        message.mediaKind,
-        message.caption,
-        message.fileName,
-      );
-    }
+  if (message.kind === "text") {
+    content = message.body;
+  } else if (message.kind === "media") {
+    content = buildInboundMediaFallbackContent(
+      message.mediaKind,
+      message.caption,
+      message.fileName,
+    );
   }
 
   if (!content) {
     return;
   }
 
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "whatsapp",
     senderType: "client",
     content,
   });
+
+  if (message.kind === "media" && connection.meta_access_token) {
+    scheduleInboundMediaHydration({
+      admin,
+      messageId: insertedMessage.id,
+      resolveContent: () =>
+        downloadAndStoreWhatsAppInboundMedia({
+          accessToken: connection.meta_access_token!,
+          mediaId: message.mediaId,
+          businessId,
+          conversationId,
+          kind: message.mediaKind,
+          fileName: message.fileName,
+          mimeType: message.mimeType,
+          caption: message.caption,
+        }),
+    });
+  }
+
+  void completeInboundWhatsAppMessage({
+    admin,
+    businessId,
+    connection,
+    conversationId,
+    contactId,
+    createdContact,
+    content,
+    message,
+    normalizedPhone,
+  }).catch((error) => {
+    console.error("[whatsapp] post-insert failed", error);
+  });
+}
+
+async function completeInboundWhatsAppMessage(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  businessId: string;
+  connection: WhatsappConnection;
+  conversationId: string;
+  contactId: string;
+  createdContact: boolean;
+  content: string;
+  message: WhatsAppWebhookMessage;
+  normalizedPhone: string;
+}): Promise<void> {
+  const {
+    admin,
+    businessId,
+    connection,
+    conversationId,
+    contactId,
+    createdContact,
+    content,
+    message,
+    normalizedPhone,
+  } = input;
 
   await incrementMessagingAnalytics(admin, businessId, "whatsapp", {
     totalMessages: 1,
@@ -672,7 +713,7 @@ async function ingestIncomingMessage(
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await processChannelAutoReply({
+  scheduleChannelAutoReply({
     admin,
     businessId,
     channel: "whatsapp",
@@ -729,8 +770,10 @@ export async function processWhatsAppWebhook(
   }
 
   if (processed > 0) {
-    revalidateWhatsAppPaths();
-    revalidatePath(APP_ROUTES.dashboard);
+    queueMicrotask(() => {
+      revalidateWhatsAppPaths();
+      revalidatePath(APP_ROUTES.dashboard);
+    });
   }
 
   return { processed };

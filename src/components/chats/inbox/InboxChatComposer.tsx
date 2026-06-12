@@ -132,7 +132,7 @@ export function InboxChatComposer({
     useState<PendingAttachment | null>(null);
   const [mediaCaption, setMediaCaption] = useState("");
   const mediaSupported = supportsMediaChannel(channel);
-  const isBusy = isSending || isSendingMedia;
+  const isBusy = isSending;
   const hasPendingAttachment = pendingAttachment !== null;
 
   const clearPendingAttachment = useCallback(() => {
@@ -332,19 +332,16 @@ export function InboxChatComposer({
     void startVoiceRecording();
   }
 
-  async function handleSendPendingAttachment() {
+  function handleSendPendingAttachment() {
     if (!pendingAttachment || !onSendMedia) {
       return;
     }
 
-    const success = await onSendMedia(
-      pendingAttachment.file,
-      mediaCaption.trim() || undefined,
-    );
+    const file = pendingAttachment.file;
+    const caption = mediaCaption.trim() || undefined;
 
-    if (success) {
-      clearPendingAttachment();
-    }
+    clearPendingAttachment();
+    void onSendMedia(file, caption);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {

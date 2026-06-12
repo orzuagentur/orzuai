@@ -21,7 +21,11 @@ import {
   getChatAttachmentSignedUrl,
   uploadChatAttachmentFile,
 } from "@/services/chat-attachment-storage.service";
-import { incrementMessagingAnalytics, insertChannelMessage } from "@/services/messaging.service";
+import {
+  incrementMessagingAnalytics,
+  insertChannelMessage,
+  markOutboundMessageFailed,
+} from "@/services/messaging.service";
 import type { SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { mapChatMessage, resolveContactFromRow } from "@/utils/chat";
@@ -383,7 +387,28 @@ export async function sendChatMedia(
 
   const mimeType = file.type || "application/octet-stream";
   const mediaKind = resolveMediaKind(mimeType);
-  const stored = await uploadChatAttachmentFile(businessId, conversationId, file);
+  const canSendToChannelInParallel =
+    Boolean(recipientId) && conversation.channel !== "instagram";
+
+  const channelSendPromise = canSendToChannelInParallel
+    ? sendMediaToChannel({
+        channel: conversation.channel,
+        businessId,
+        recipientId: recipientId!,
+        file,
+        mimeType,
+        mediaKind,
+        caption,
+        publicUrl: "",
+        storagePath: "",
+      })
+    : null;
+
+  const stored = await uploadChatAttachmentFile(
+    businessId,
+    conversationId,
+    file,
+  );
 
   if (!stored?.url) {
     return {
@@ -393,35 +418,6 @@ export async function sendChatMedia(
         message: CHAT_MESSAGES.mediaSendFailed,
       },
     };
-  }
-
-  if (recipientId) {
-    const instagramSignedUrl = await getChatAttachmentSignedUrl(
-      stored.path,
-      3600,
-    );
-
-    const sendResult = await sendMediaToChannel({
-      channel: conversation.channel,
-      businessId,
-      recipientId,
-      file,
-      mimeType,
-      mediaKind,
-      caption,
-      publicUrl: instagramSignedUrl ?? stored.url,
-      storagePath: stored.path,
-    });
-
-    if (!sendResult.success) {
-      return {
-        success: false,
-        error: {
-          code: "SEND_FAILED",
-          message: sendResult.message,
-        },
-      };
-    }
   }
 
   const content = encodeMediaMessage(
@@ -436,32 +432,12 @@ export async function sendChatMedia(
     caption,
   );
 
-  await insertChannelMessage(supabase, {
+  const insertedMessage = await insertChannelMessage(supabase, {
     conversationId,
     channel: conversation.channel,
     senderType: "user",
     content,
   });
-
-  const { data: insertedMessage } = await supabase
-    .from("messages")
-    .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
-    )
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!insertedMessage) {
-    return {
-      success: false,
-      error: {
-        code: "SEND_FAILED",
-        message: CHAT_MESSAGES.sendFailed,
-      },
-    };
-  }
 
   const now = new Date().toISOString();
   const contactUpdates = contact.id
@@ -479,10 +455,62 @@ export async function sendChatMedia(
       .update({ updated_at: now })
       .eq("id", conversationId),
     ...contactUpdates,
-    incrementMessagingAnalytics(createAdminClient(), businessId, conversation.channel, {
-      totalMessages: 1,
-    }),
   ]);
+
+  if (recipientId) {
+    if (channelSendPromise) {
+      void channelSendPromise
+        .then(async (sendResult) => {
+          if (!sendResult.success) {
+            await markOutboundMessageFailed(supabase, insertedMessage.id);
+            return;
+          }
+
+          await incrementMessagingAnalytics(
+            createAdminClient(),
+            businessId,
+            conversation.channel,
+            {
+              totalMessages: 1,
+            },
+          );
+        })
+        .catch((error) => {
+          console.error("[chat-media] outbound delivery failed", error);
+        });
+    } else {
+      const instagramSignedUrl = await getChatAttachmentSignedUrl(
+        stored.path,
+        3600,
+      );
+
+      void deliverOutboundChatMedia({
+        supabase,
+        businessId,
+        conversationId,
+        channel: conversation.channel,
+        messageId: insertedMessage.id,
+        recipientId,
+        file,
+        mimeType,
+        mediaKind,
+        caption,
+        publicUrl: instagramSignedUrl ?? stored.url,
+        storagePath: stored.path,
+      }).catch((error) => {
+        console.error("[chat-media] outbound delivery failed", error);
+      });
+    }
+  } else {
+    await incrementMessagingAnalytics(
+      createAdminClient(),
+      businessId,
+      conversation.channel,
+      {
+        totalMessages: 1,
+      },
+    );
+  }
 
   revalidateChatPaths(conversation.channel);
 
@@ -492,4 +520,45 @@ export async function sendChatMedia(
       message: mapChatMessage(insertedMessage),
     },
   };
+}
+
+async function deliverOutboundChatMedia(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  messageId: string;
+  recipientId: string;
+  file: File;
+  mimeType: string;
+  mediaKind: ChatMediaKind;
+  caption: string;
+  publicUrl: string;
+  storagePath: string;
+}): Promise<void> {
+  const sendResult = await sendMediaToChannel({
+    channel: input.channel,
+    businessId: input.businessId,
+    recipientId: input.recipientId,
+    file: input.file,
+    mimeType: input.mimeType,
+    mediaKind: input.mediaKind,
+    caption: input.caption,
+    publicUrl: input.publicUrl,
+    storagePath: input.storagePath,
+  });
+
+  if (!sendResult.success) {
+    await markOutboundMessageFailed(input.supabase, input.messageId);
+    return;
+  }
+
+  await incrementMessagingAnalytics(
+    createAdminClient(),
+    input.businessId,
+    input.channel,
+    {
+      totalMessages: 1,
+    },
+  );
 }
