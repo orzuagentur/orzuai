@@ -3,14 +3,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
 import type { MessagingChannel } from "@/types/database.types";
-import {
-  buildUnreadClientMessageCountMap,
-} from "@/utils/chat";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
 export async function markConversationRead(
   businessId: string,
   conversationId: string,
+  userId: string,
 ): Promise<void> {
   if (!hasSupabaseEnv()) {
     return;
@@ -19,11 +17,23 @@ export async function markConversationRead(
   const supabase = await createClient();
   const now = new Date().toISOString();
 
-  await supabase
-    .from("conversations")
-    .update({ last_read_at: now })
-    .eq("id", conversationId)
-    .eq("business_id", businessId);
+  await Promise.all([
+    supabase
+      .from("conversations")
+      .update({ last_read_at: now, unread_count: 0 })
+      .eq("id", conversationId)
+      .eq("business_id", businessId),
+    supabase.from("conversation_reads").upsert(
+      {
+        business_id: businessId,
+        conversation_id: conversationId,
+        user_id: userId,
+        last_read_at: now,
+        unread_count: 0,
+      },
+      { onConflict: "conversation_id,user_id" },
+    ),
+  ]);
 }
 
 export type DashboardNavBadgeCounts = {
@@ -34,6 +44,7 @@ export type DashboardNavBadgeCounts = {
 
 export async function getDashboardNavBadgeCounts(
   businessId: string,
+  userId: string,
 ): Promise<DashboardNavBadgeCounts> {
   const empty: DashboardNavBadgeCounts = {
     inboxUnread: 0,
@@ -52,45 +63,42 @@ export async function getDashboardNavBadgeCounts(
 
   const supabase = await createClient();
   const { data: rows } = await supabase
-    .from("conversations")
-    .select("id, channel, status, last_read_at, contact_id")
+    .from("conversation_reads")
+    .select("conversation_id, unread_count, conversation:conversations(channel, contact_id, status)")
     .eq("business_id", businessId)
-    .in("status", ["open", "active", "pending"])
-    .order("updated_at", { ascending: false })
-    .limit(500);
+    .eq("user_id", userId)
+    .gt("unread_count", 0);
 
   if (!rows?.length) {
     return empty;
   }
 
-  const conversationIds = rows.map((row) => row.id);
-  const { data: messages } = await supabase
-    .from("messages")
-    .select("conversation_id, content, created_at, sender_type, ai_generated")
-    .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false });
-
-  const lastReadAtByConversationId = new Map(
-    rows.map((row) => [row.id, row.last_read_at]),
-  );
-  const unreadMessageCountByConversationId = buildUnreadClientMessageCountMap(
-    messages ?? [],
-    lastReadAtByConversationId,
-  );
   const unreadContactIds = new Set<string>();
 
   for (const row of rows) {
-    const unreadMessageCount =
-      unreadMessageCountByConversationId.get(row.id) ?? 0;
+    const conversation = Array.isArray(row.conversation)
+      ? row.conversation[0]
+      : row.conversation;
+
+    if (
+      !conversation ||
+      !["open", "active", "pending"].includes(conversation.status)
+    ) {
+      continue;
+    }
+
+    const unreadMessageCount = row.unread_count ?? 0;
 
     if (unreadMessageCount <= 0) {
       continue;
     }
 
-    unreadContactIds.add(row.contact_id);
+    if (conversation.contact_id) {
+      unreadContactIds.add(conversation.contact_id);
+    }
 
-    if (row.channel in empty.unreadByChannel) {
-      empty.unreadByChannel[row.channel as MessagingChannel] +=
+    if (conversation.channel in empty.unreadByChannel) {
+      empty.unreadByChannel[conversation.channel as MessagingChannel] +=
         unreadMessageCount;
     }
   }

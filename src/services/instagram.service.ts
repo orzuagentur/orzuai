@@ -28,12 +28,17 @@ import {
   resolveConversationIdForChannelSender,
 } from "@/services/conversation-typing.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
+import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
+  findMessageByExternalId,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  markOutboundMessageFailed,
+  createOutboundMessageDelivery,
+  recordMessageDeliveryFailure,
+  recordMessageDeliverySuccess,
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
@@ -514,6 +519,14 @@ async function ingestInstagramMessage(
     return;
   }
 
+  await syncContactChannelIdentity(admin, {
+    businessId,
+    contactId,
+    channel: "instagram",
+    identifier,
+    displayLabel: message.contactName,
+  });
+
   if (connection.meta_access_token) {
     void scheduleContactAvatarSync({
       admin,
@@ -554,12 +567,33 @@ async function ingestInstagramMessage(
     return;
   }
 
+  if (message.messageId) {
+    const existing = await findMessageByExternalId(
+      admin,
+      "instagram",
+      message.messageId,
+    );
+
+    if (existing) {
+      return;
+    }
+  }
+
   const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "instagram",
     senderType: "client",
     content,
+    externalMessageId: message.messageId,
   });
+
+  if (message.kind === "media") {
+    await createPendingMessageAttachment(admin, {
+      messageId: insertedMessage.id,
+      businessId,
+      content,
+    });
+  }
 
   if (message.kind === "media") {
     scheduleInboundMediaHydration({
@@ -743,6 +777,12 @@ export async function sendInstagramChatMessage(
     content,
   });
 
+  await createOutboundMessageDelivery(admin, {
+    messageId: insertedMessage.id,
+    businessId,
+    channel: "instagram",
+  });
+
   void deliverInstagramOutboundText({
     admin,
     messageId: insertedMessage.id,
@@ -775,9 +815,17 @@ async function deliverInstagramOutboundText(input: {
   );
 
   if (!sendResult.success) {
-    await markOutboundMessageFailed(input.admin, input.messageId);
+    await recordMessageDeliveryFailure(input.admin, {
+      messageId: input.messageId,
+      errorMessage: sendResult.message,
+    });
     return;
   }
+
+  await recordMessageDeliverySuccess(input.admin, {
+    messageId: input.messageId,
+    providerMessageId: sendResult.messageId,
+  });
 
   await incrementMessagingAnalytics(input.admin, input.businessId, "instagram", {
     totalMessages: 1,

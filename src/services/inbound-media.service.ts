@@ -3,12 +3,14 @@ import "server-only";
 import { downloadTelegramFile } from "@/lib/telegram/client";
 import { downloadWhatsAppMedia } from "@/lib/whatsapp/client";
 import { uploadChatAttachmentBuffer } from "@/services/chat-attachment-storage.service";
+import { markMessageAttachmentReady } from "@/services/message-attachment.service";
 import { updateChannelMessageContent } from "@/services/messaging.service";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildMediaPayloadFromUpload,
   encodeMediaMessage,
+  parseMediaMessage,
   resolveMediaKind,
   type ChatMediaKind,
 } from "@/utils/chat-media";
@@ -176,6 +178,15 @@ export function scheduleInboundMediaHydration(input: {
       messageId: input.messageId,
       content,
     });
+
+    const { media } = parseMediaMessage(content);
+
+    if (media) {
+      await markMessageAttachmentReady(input.admin, {
+        messageId: input.messageId,
+        media,
+      });
+    }
   })().catch((error) => {
     console.error("[inbound-media] hydration failed", error);
   });

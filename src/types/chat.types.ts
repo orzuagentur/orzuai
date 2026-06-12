@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CannedResponseItem } from "./canned-response.types";
 import type {
   ConversationStatus,
+  MessageDeliveryStatus,
   MessageSenderType,
   MessagingChannel,
 } from "./database.types";
@@ -83,6 +84,10 @@ export type ChatMessageData = {
   isEdited: boolean;
   /** Client-only optimistic outbound message before server confirms. */
   isPending?: boolean;
+  /** Outbound delivery state from message_deliveries (user messages only). */
+  deliveryStatus?: MessageDeliveryStatus | null;
+  /** Inbound/outbound media still hydrating in storage. */
+  attachmentPending?: boolean;
 };
 
 export type ConversationListItem = {
@@ -135,6 +140,7 @@ export type ChatMonitorChannelStats = {
 
 export type ChatsMonitorData = {
   hasBusiness: boolean;
+  businessId: string | null;
   channels: ChatMonitorChannelStats[];
   visibleChannelIds: MessagingChannel[];
   totalConversations: number;
@@ -155,6 +161,7 @@ export type ChatsMonitorPageData = ChatsMonitorData & {
 
 export type ChatsChannelPageData = {
   hasBusiness: boolean;
+  businessId: string | null;
   channel: MessagingChannel;
   channelConnected: boolean;
   aiEnabled: boolean | null;
@@ -192,7 +199,11 @@ export type ChatActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: ChatActionError };
 
-export type SendChatMessageResult = ChatActionResult<{ message: ChatMessageData }>;
+export type SendChatMessageResult = ChatActionResult<{
+  message: ChatMessageData;
+  /** Present for outbound media sends — avoids a second signed-URL round trip. */
+  mediaSignedUrl?: string;
+}>;
 export type DeleteChatMessageResult = ChatActionResult<{ messageId: string }>;
 export type ToggleChatAiResult = ChatActionResult<{ aiEnabled: boolean }>;
 export type SuggestConversationReplyResult = ChatActionResult<{ suggestion: string }>;

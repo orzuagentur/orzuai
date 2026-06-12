@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getInstagramVerifyToken,
   verifyInstagramWebhookSignature,
 } from "@/lib/instagram/client";
-import { processInstagramWebhook } from "@/services/instagram.service";
+import {
+  buildWebhookIdempotencyKey,
+  enqueueInboundWebhook,
+} from "@/services/webhook-queue.service";
 import type { InstagramWebhookPayload } from "@/types/instagram.types";
 
 export async function GET(request: NextRequest) {
@@ -43,10 +47,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const result = await processInstagramWebhook(payload);
+  const admin = createAdminClient();
+  const idempotencyKey = buildWebhookIdempotencyKey("instagram", rawBody);
+  const result = await enqueueInboundWebhook(admin, {
+    channel: "instagram",
+    idempotencyKey,
+    payload,
+  });
 
   return NextResponse.json({
     success: true,
-    processed: result.processed,
+    queued: result.queued,
+    duplicate: result.duplicate,
   });
 }

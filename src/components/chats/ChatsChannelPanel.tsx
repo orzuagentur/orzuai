@@ -7,6 +7,10 @@ import { ArrowLeftIcon } from "lucide-react";
 
 import { fetchChatsChannelInitialAction } from "@/features/chats/actions/fetch-chats-channel-initial";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
+import {
+  getCachedConversationList,
+  setCachedConversationList,
+} from "@/lib/client-cache/inbox-messenger-cache";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import {
   INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
@@ -64,6 +68,7 @@ type ChatsChannelPanelProps = {
 export function ChatsChannelPanel({
   channelId,
   hasBusiness: initialHasBusiness,
+  businessId: initialBusinessId = null,
   channel: initialChannel,
   channelStats: initialChannelStats,
   channelConnected: initialChannelConnected,
@@ -78,8 +83,16 @@ export function ChatsChannelPanel({
   const usesClientBootstrap = initialConversations === undefined;
   const searchParams = useSearchParams();
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
+  const cachedList = getCachedConversationList({
+    scope: "channel",
+    channel: channelId,
+  });
+  const hasWarmList =
+    (Array.isArray(initialConversations) ? initialConversations.length : 0) > 0 ||
+    (cachedList?.items.length ?? 0) > 0;
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
+  const [businessId, setBusinessId] = useState<string | null>(initialBusinessId);
   const [channel, setChannel] = useState<MessagingChannel>(
     initialChannel ?? channelId,
   );
@@ -97,12 +110,17 @@ export function ChatsChannelPanel({
     initialAiEnabled ?? null,
   );
   const [conversations, setConversations] = useState<ConversationListItem[]>(
-    initialConversations ?? [],
+    () =>
+      Array.isArray(initialConversations) && initialConversations.length > 0
+        ? initialConversations
+        : (cachedList?.items ?? initialConversations ?? []),
   );
   const [bootstrapCannedResponses, setBootstrapCannedResponses] = useState<
     CannedResponseItem[]
   >(initialCannedResponses ?? []);
-  const [isInitialLoading, setIsInitialLoading] = useState(usesClientBootstrap);
+  const [isInitialLoading, setIsInitialLoading] = useState(
+    usesClientBootstrap && !hasWarmList,
+  );
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const {
@@ -136,6 +154,17 @@ export function ChatsChannelPanel({
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
 
   useEffect(() => {
+    if (conversations.length === 0) {
+      return;
+    }
+
+    setCachedConversationList(
+      { scope: "channel", channel: channelId },
+      { items: conversations },
+    );
+  }, [channelId, conversations]);
+
+  useEffect(() => {
     if (!usesClientBootstrap) {
       return;
     }
@@ -154,6 +183,7 @@ export function ChatsChannelPanel({
 
       const data = result.data;
       setHasBusiness(data.hasBusiness);
+      setBusinessId(data.businessId ?? null);
       setChannel(data.channel);
       setChannelStats(data.channelStats);
       setChannelConnected(data.channelConnected);
@@ -174,6 +204,7 @@ export function ChatsChannelPanel({
     }
 
     setHasBusiness(initialHasBusiness ?? true);
+    setBusinessId(initialBusinessId);
     setChannel(initialChannel ?? channelId);
     setChannelStats(initialChannelStats ?? []);
     setChannelConnected(initialChannelConnected ?? false);
@@ -212,6 +243,7 @@ export function ChatsChannelPanel({
 
   useInboxListRealtime({
     enabled: hasBusiness && !isInitialLoading,
+    businessId,
     channelFilter: channelId,
     selectedConversationId,
     hasActiveFilters: hasActiveListFilters,

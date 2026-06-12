@@ -14,6 +14,10 @@ export type ChatMediaUrlResult =
   | { success: true; url: string }
   | { success: false; error: { code: string; message: string } };
 
+export type ChatMediaUrlsBatchResult =
+  | { success: true; urls: Record<string, string> }
+  | { success: false; error: { code: string; message: string } };
+
 function resolvePath(input: {
   path?: string;
   url?: string;
@@ -78,6 +82,59 @@ export async function resolveChatMediaUrl(input: {
   }
 
   return { success: true, url: signedUrl };
+}
+
+export async function resolveChatMediaUrlsBatch(
+  paths: string[],
+): Promise<ChatMediaUrlsBatchResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: CHAT_MESSAGES.genericError },
+    };
+  }
+
+  const uniquePaths = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+
+  if (uniquePaths.length === 0) {
+    return { success: true, urls: {} };
+  }
+
+  const businessId = uniquePaths[0]!.split("/")[0];
+
+  if (!businessId || uniquePaths.some((path) => path.split("/")[0] !== businessId)) {
+    return {
+      success: false,
+      error: { code: "FORBIDDEN", message: CHAT_MESSAGES.genericError },
+    };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business || business.id !== businessId) {
+    return {
+      success: false,
+      error: { code: "FORBIDDEN", message: CHAT_MESSAGES.genericError },
+    };
+  }
+
+  const entries = await Promise.all(
+    uniquePaths.map(async (path) => {
+      const signedUrl = await getChatAttachmentSignedUrl(path);
+      return signedUrl ? ([path, signedUrl] as const) : null;
+    }),
+  );
+
+  const urls: Record<string, string> = {};
+
+  for (const entry of entries) {
+    if (entry) {
+      urls[entry[0]] = entry[1];
+    }
+  }
+
+  return { success: true, urls };
 }
 
 export async function resolveChatMediaPayloadUrl(

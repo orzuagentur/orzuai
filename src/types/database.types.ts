@@ -46,6 +46,14 @@ export type ConversationStatus =
   | "closed";
 
 export type MessageSenderType = "user" | "client" | "ai";
+export type MessageDeliveryStatus =
+  | "pending"
+  | "sent"
+  | "delivered"
+  | "failed";
+export type MessageAttachmentKind = "image" | "audio" | "video" | "document";
+export type MessageAttachmentStatus = "pending" | "ready" | "failed";
+export type WebhookQueueStatus = "pending" | "processing" | "completed" | "failed";
 
 export type Database = {
   public: {
@@ -632,6 +640,54 @@ export type Database = {
           },
         ];
       };
+      contact_channel_identities: {
+        Row: {
+          id: string;
+          business_id: string;
+          contact_id: string;
+          channel: MessagingChannel;
+          external_id: string;
+          display_label: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          contact_id: string;
+          channel: MessagingChannel;
+          external_id: string;
+          display_label?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          contact_id?: string;
+          channel?: MessagingChannel;
+          external_id?: string;
+          display_label?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_channel_identities_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_channel_identities_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conversations: {
         Row: {
           id: string;
@@ -647,6 +703,9 @@ export type Database = {
           last_message_sender_type: MessageSenderType | null;
           last_message_ai_generated: boolean;
           last_client_message_at: string | null;
+          unread_count: number;
+          last_sync_message_at: string | null;
+          last_sync_message_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -664,6 +723,9 @@ export type Database = {
           last_message_sender_type?: MessageSenderType | null;
           last_message_ai_generated?: boolean;
           last_client_message_at?: string | null;
+          unread_count?: number;
+          last_sync_message_at?: string | null;
+          last_sync_message_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -681,6 +743,9 @@ export type Database = {
           last_message_sender_type?: MessageSenderType | null;
           last_message_ai_generated?: boolean;
           last_client_message_at?: string | null;
+          unread_count?: number;
+          last_sync_message_at?: string | null;
+          last_sync_message_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -697,6 +762,54 @@ export type Database = {
             columns: ["contact_id"];
             isOneToOne: false;
             referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversation_reads: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          user_id: string;
+          last_read_at: string | null;
+          unread_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          user_id: string;
+          last_read_at?: string | null;
+          unread_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          user_id?: string;
+          last_read_at?: string | null;
+          unread_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
             referencedColumns: ["id"];
           },
         ];
@@ -825,6 +938,8 @@ export type Database = {
           hidden_for_business: boolean;
           edited_at: string | null;
           is_edited: boolean;
+          external_message_id: string | null;
+          business_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -839,6 +954,8 @@ export type Database = {
           hidden_for_business?: boolean;
           edited_at?: string | null;
           is_edited?: boolean;
+          external_message_id?: string | null;
+          business_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -853,6 +970,8 @@ export type Database = {
           hidden_for_business?: boolean;
           edited_at?: string | null;
           is_edited?: boolean;
+          external_message_id?: string | null;
+          business_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -864,6 +983,204 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      message_deliveries: {
+        Row: {
+          id: string;
+          message_id: string;
+          business_id: string;
+          channel: MessagingChannel;
+          status: MessageDeliveryStatus;
+          attempt_count: number;
+          max_attempts: number;
+          next_attempt_at: string;
+          last_error: string | null;
+          provider_message_id: string | null;
+          sent_at: string | null;
+          failed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          business_id: string;
+          channel: MessagingChannel;
+          status?: MessageDeliveryStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          provider_message_id?: string | null;
+          sent_at?: string | null;
+          failed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          business_id?: string;
+          channel?: MessagingChannel;
+          status?: MessageDeliveryStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          provider_message_id?: string | null;
+          sent_at?: string | null;
+          failed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "message_deliveries_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: true;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_deliveries_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      message_attachments: {
+        Row: {
+          id: string;
+          message_id: string;
+          business_id: string;
+          kind: MessageAttachmentKind;
+          mime_type: string;
+          file_name: string;
+          storage_path: string | null;
+          size_bytes: number | null;
+          duration_sec: number | null;
+          provider_media_id: string | null;
+          status: MessageAttachmentStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          business_id: string;
+          kind: MessageAttachmentKind;
+          mime_type?: string;
+          file_name?: string;
+          storage_path?: string | null;
+          size_bytes?: number | null;
+          duration_sec?: number | null;
+          provider_media_id?: string | null;
+          status?: MessageAttachmentStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          business_id?: string;
+          kind?: MessageAttachmentKind;
+          mime_type?: string;
+          file_name?: string;
+          storage_path?: string | null;
+          size_bytes?: number | null;
+          duration_sec?: number | null;
+          provider_media_id?: string | null;
+          status?: MessageAttachmentStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "message_attachments_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: true;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_attachments_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      inbound_webhook_queue: {
+        Row: {
+          id: string;
+          channel: MessagingChannel;
+          idempotency_key: string;
+          payload: Record<string, unknown>;
+          metadata: Record<string, unknown>;
+          status: WebhookQueueStatus;
+          attempt_count: number;
+          max_attempts: number;
+          next_attempt_at: string;
+          last_error: string | null;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          channel: MessagingChannel;
+          idempotency_key: string;
+          payload: Record<string, unknown>;
+          metadata?: Record<string, unknown>;
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          channel?: MessagingChannel;
+          idempotency_key?: string;
+          payload?: Record<string, unknown>;
+          metadata?: Record<string, unknown>;
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      media_signed_url_cache: {
+        Row: {
+          storage_path: string;
+          signed_url: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          storage_path: string;
+          signed_url: string;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          storage_path?: string;
+          signed_url?: string;
+          expires_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       push_subscriptions: {
         Row: {
@@ -1603,6 +1920,10 @@ export type Database = {
       messaging_channel: MessagingChannel;
       conversation_status: ConversationStatus;
       message_sender_type: MessageSenderType;
+      message_delivery_status: MessageDeliveryStatus;
+      message_attachment_kind: MessageAttachmentKind;
+      message_attachment_status: MessageAttachmentStatus;
+      webhook_queue_status: WebhookQueueStatus;
     };
     CompositeTypes: Record<string, never>;
   };

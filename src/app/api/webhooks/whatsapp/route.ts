@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppVerifyToken, verifyWhatsAppWebhookSignature } from "@/lib/whatsapp/client";
-import { processWhatsAppWebhook } from "@/services/whatsapp.service";
+import {
+  buildWebhookIdempotencyKey,
+  enqueueInboundWebhook,
+} from "@/services/webhook-queue.service";
 import type { WhatsAppWebhookPayload } from "@/types/whatsapp.types";
 
 export async function GET(request: NextRequest) {
@@ -40,10 +44,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const result = await processWhatsAppWebhook(payload);
+  const admin = createAdminClient();
+  const idempotencyKey = buildWebhookIdempotencyKey("whatsapp", rawBody);
+  const result = await enqueueInboundWebhook(admin, {
+    channel: "whatsapp",
+    idempotencyKey,
+    payload,
+  });
 
   return NextResponse.json({
     success: true,
-    processed: result.processed,
+    queued: result.queued,
+    duplicate: result.duplicate,
   });
 }

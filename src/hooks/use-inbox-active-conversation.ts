@@ -6,7 +6,18 @@ import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-co
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
 import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
+import {
+  getCachedMediaUrl,
+  isConversationDetailFresh,
+  peekCachedConversationDetail,
+  setCachedConversationDetail,
+} from "@/lib/client-cache/inbox-messenger-cache";
 import { revokeOptimisticMediaContent } from "@/utils/optimistic-chat-message";
+import {
+  buildMediaUrlCacheKey,
+  encodeMediaMessage,
+  parseMediaMessage,
+} from "@/utils/chat-media";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 
@@ -18,6 +29,49 @@ type UseInboxActiveConversationOptions = {
   initialCannedResponses: CannedResponseItem[];
 };
 
+function resolveConversationBootstrap(
+  options: UseInboxActiveConversationOptions,
+) {
+  const hasSsrConversation = Boolean(
+    options.initialConversation &&
+      options.initialConversationId &&
+      options.initialConversation.id === options.initialConversationId,
+  );
+
+  const cachedDetail =
+    !hasSsrConversation && options.initialConversationId
+      ? peekCachedConversationDetail(options.initialConversationId)
+      : null;
+
+  if (hasSsrConversation && options.initialConversation) {
+    return {
+      conversation: options.initialConversation,
+      channelConnected: options.initialChannelConnected,
+      aiEnabled: options.initialAiEnabled,
+      cannedResponses: options.initialCannedResponses,
+      skipInitialLoad: true,
+    };
+  }
+
+  if (cachedDetail) {
+    return {
+      conversation: cachedDetail.conversation,
+      channelConnected: cachedDetail.channelConnected,
+      aiEnabled: cachedDetail.aiEnabled,
+      cannedResponses: cachedDetail.cannedResponses,
+      skipInitialLoad: true,
+    };
+  }
+
+  return {
+    conversation: options.initialConversation,
+    channelConnected: options.initialChannelConnected,
+    aiEnabled: options.initialAiEnabled,
+    cannedResponses: options.initialCannedResponses,
+    skipInitialLoad: false,
+  };
+}
+
 export function useInboxActiveConversation({
   initialConversationId,
   initialConversation,
@@ -25,29 +79,31 @@ export function useInboxActiveConversation({
   initialAiEnabled,
   initialCannedResponses,
 }: UseInboxActiveConversationOptions) {
+  const bootstrap = resolveConversationBootstrap({
+    initialConversationId,
+    initialConversation,
+    initialChannelConnected,
+    initialAiEnabled,
+    initialCannedResponses,
+  });
+
   const [selectedConversationId, setSelectedConversationId] = useState(
     initialConversationId,
   );
   const [conversation, setConversation] = useState<ConversationDetail | null>(
-    initialConversation,
+    bootstrap.conversation,
   );
   const [channelConnected, setChannelConnected] = useState(
-    initialChannelConnected,
+    bootstrap.channelConnected,
   );
-  const [aiEnabled, setAiEnabled] = useState<boolean | null>(initialAiEnabled);
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(bootstrap.aiEnabled);
   const [cannedResponses, setCannedResponses] = useState(
-    initialCannedResponses,
+    bootstrap.cannedResponses,
   );
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const requestIdRef = useRef(0);
-  const skipInitialLoadRef = useRef(
-    Boolean(
-      initialConversation &&
-        initialConversationId &&
-        initialConversation.id === initialConversationId,
-    ),
-  );
+  const skipInitialLoadRef = useRef(bootstrap.skipInitialLoad);
   const selectedConversationIdRef = useRef(selectedConversationId);
   selectedConversationIdRef.current = selectedConversationId;
 
@@ -85,6 +141,12 @@ export function useInboxActiveConversation({
       setChannelConnected(result.data.channelConnected);
       setAiEnabled(result.data.aiEnabled);
       setCannedResponses(result.data.cannedResponses);
+      setCachedConversationDetail(conversationId, {
+        conversation: result.data.conversation,
+        channelConnected: result.data.channelConnected,
+        aiEnabled: result.data.aiEnabled,
+        cannedResponses: result.data.cannedResponses,
+      });
       setIsLoadingConversation(false);
     },
     [clearConversation],
@@ -209,9 +271,37 @@ export function useInboxActiveConversation({
           (item) => item.id !== pendingId,
         );
         const hasReal = withoutPending.some((item) => item.id === message.id);
+        let resolvedMessage = message;
 
         if (pendingMessage) {
-          revokeOptimisticMediaContent(pendingMessage.content);
+          const pendingParsed = parseMediaMessage(pendingMessage.content);
+          const realParsed = parseMediaMessage(message.content);
+          const pendingBlobUrl = pendingParsed.media?.url?.startsWith("blob:")
+            ? pendingParsed.media.url
+            : null;
+          let keepBlob = false;
+
+          if (pendingBlobUrl && realParsed.media) {
+            const cacheKey = buildMediaUrlCacheKey(
+              realParsed.media,
+              message.id,
+            );
+
+            if (!cacheKey || !getCachedMediaUrl(cacheKey)) {
+              resolvedMessage = {
+                ...message,
+                content: encodeMediaMessage(
+                  { ...realParsed.media, url: pendingBlobUrl },
+                  realParsed.text,
+                ),
+              };
+              keepBlob = true;
+            }
+          }
+
+          if (!keepBlob) {
+            revokeOptimisticMediaContent(pendingMessage.content);
+          }
         }
 
         if (hasReal) {
@@ -234,11 +324,11 @@ export function useInboxActiveConversation({
 
         return {
           ...current,
-          messages: [...withoutPending, message],
+          messages: [...withoutPending, resolvedMessage],
           totalMessageCount: hadPending
             ? current.totalMessageCount
             : current.totalMessageCount + 1,
-          updatedAt: message.createdAt,
+          updatedAt: resolvedMessage.createdAt,
         };
       });
     },
@@ -288,7 +378,7 @@ export function useInboxActiveConversation({
   updateMessageRef.current = updateMessage;
   removeMessageRef.current = removeMessage;
 
-  const { isClientTyping } = useConversationRealtime({
+  const { isClientTyping, isRealtimeConnected } = useConversationRealtime({
     conversationId: selectedConversationId,
     onMessage: (message) => {
       appendMessageRef.current(message);
@@ -311,10 +401,20 @@ export function useInboxActiveConversation({
     );
   }, [conversation]);
 
+  const latestMessageId = useMemo(() => {
+    if (!conversation) {
+      return null;
+    }
+
+    return conversation.messages.at(-1)?.id ?? null;
+  }, [conversation]);
+
   useActiveConversationPolling({
     conversationId: selectedConversationId,
     latestMessageAt,
-    enabled: Boolean(selectedConversationId && conversation),
+    latestMessageId,
+    enabled:
+      Boolean(selectedConversationId && conversation) && !isRealtimeConnected,
     onNewMessages: (messages) => {
       for (const message of messages) {
         appendMessageRef.current(message);
@@ -361,13 +461,51 @@ export function useInboxActiveConversation({
       return;
     }
 
+    const cached = peekCachedConversationDetail(selectedConversationId);
+
+    if (cached) {
+      setConversation(cached.conversation);
+      setChannelConnected(cached.channelConnected);
+      setAiEnabled(cached.aiEnabled);
+      setCannedResponses(cached.cannedResponses);
+      setIsLoadingConversation(false);
+    }
+
     if (skipInitialLoadRef.current) {
       skipInitialLoadRef.current = false;
+
+      if (!isConversationDetailFresh(selectedConversationId)) {
+        void loadConversation(selectedConversationId, true);
+      }
+
       return;
     }
 
-    void loadConversation(selectedConversationId);
+    if (cached && isConversationDetailFresh(selectedConversationId)) {
+      return;
+    }
+
+    void loadConversation(selectedConversationId, Boolean(cached));
   }, [clearConversation, loadConversation, selectedConversationId]);
+
+  useEffect(() => {
+    if (!conversation || !selectedConversationId) {
+      return;
+    }
+
+    setCachedConversationDetail(selectedConversationId, {
+      conversation,
+      channelConnected,
+      aiEnabled,
+      cannedResponses,
+    });
+  }, [
+    aiEnabled,
+    cannedResponses,
+    channelConnected,
+    conversation,
+    selectedConversationId,
+  ]);
 
   return {
     selectedConversationId,

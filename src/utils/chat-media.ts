@@ -35,13 +35,13 @@ export function parseMediaMessage(content: string): {
   text: string;
 } {
   if (!content.startsWith(MEDIA_TOKEN)) {
-    return { media: null, text: content };
+    return parseLegacyMediaFallback(content);
   }
 
   const endIndex = content.indexOf("]]");
 
   if (endIndex === -1) {
-    return { media: null, text: content };
+    return parseLegacyMediaFallback(content);
   }
 
   try {
@@ -50,13 +50,87 @@ export function parseMediaMessage(content: string): {
     const text = content.slice(endIndex + 2).trimStart();
 
     if (!media.kind) {
-      return { media: null, text: content };
+      return parseLegacyMediaFallback(content);
     }
 
     return { media, text };
   } catch {
-    return { media: null, text: content };
+    return parseLegacyMediaFallback(content);
   }
+}
+
+const LEGACY_MEDIA_LABELS: Record<string, ChatMediaKind> = {
+  Photo: "image",
+  "Voice message": "audio",
+  Video: "video",
+};
+
+function buildLegacyMediaPayload(
+  kind: ChatMediaKind,
+  fileName: string,
+): ChatMediaPayload {
+  return {
+    kind,
+    fileName,
+    mimeType: "",
+    sizeBytes: 0,
+  };
+}
+
+function parseLegacyMediaFallback(content: string): {
+  media: ChatMediaPayload | null;
+  text: string;
+} {
+  const trimmed = content.trim();
+
+  for (const [label, kind] of Object.entries(LEGACY_MEDIA_LABELS)) {
+    if (trimmed === label) {
+      return {
+        media: buildLegacyMediaPayload(kind, label),
+        text: "",
+      };
+    }
+
+    const prefix = `${label}: `;
+
+    if (trimmed.startsWith(prefix)) {
+      return {
+        media: buildLegacyMediaPayload(kind, label),
+        text: trimmed.slice(prefix.length),
+      };
+    }
+  }
+
+  return { media: null, text: content };
+}
+
+export function isMediaPendingHydration(media: ChatMediaPayload): boolean {
+  if (media.url?.startsWith("blob:")) {
+    return false;
+  }
+
+  return !resolveMediaStoragePath(media) && !media.url?.trim();
+}
+
+export function buildMediaUrlCacheKey(
+  media: ChatMediaPayload,
+  messageId?: string,
+): string | undefined {
+  const storagePath = resolveMediaStoragePath(media);
+
+  if (storagePath) {
+    return storagePath;
+  }
+
+  if (media.url?.trim()) {
+    return media.url.trim();
+  }
+
+  if (messageId) {
+    return `message:${messageId}`;
+  }
+
+  return undefined;
 }
 
 export function extractStoragePathFromUrl(url: string): string | null {
@@ -161,14 +235,15 @@ export function buildInboundMediaFallbackContent(
   caption?: string,
   fileName?: string,
 ): string {
-  const label = getMediaPreviewLabel(kind, fileName ?? "");
-  const trimmedCaption = caption?.trim();
-
-  if (trimmedCaption) {
-    return `${label}: ${trimmedCaption}`;
-  }
-
-  return label;
+  return encodeMediaMessage(
+    {
+      kind,
+      fileName: fileName?.trim() || getMediaPreviewLabel(kind, ""),
+      mimeType: "application/octet-stream",
+      sizeBytes: 0,
+    },
+    caption,
+  );
 }
 
 export function getMessagePreviewText(content: string, maxLength = 80): string {

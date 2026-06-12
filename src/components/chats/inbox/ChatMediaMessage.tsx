@@ -7,7 +7,6 @@ import {
   FileTextIcon,
   ImageIcon,
   Loader2Icon,
-  MicIcon,
   PlayIcon,
   VideoIcon,
   XIcon,
@@ -21,14 +20,17 @@ import {
 } from "@/components/ui/dialog";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { useChatMediaUrl } from "@/hooks/use-chat-media-url";
+import { VoiceMessagePlayer } from "@/components/chats/inbox/VoiceMessagePlayer";
 import { cn } from "@/lib/utils";
 import {
   formatMediaFileSize,
+  isMediaPendingHydration,
   type ChatMediaPayload,
 } from "@/utils/chat-media";
 
 type ChatMediaMessageProps = {
   media: ChatMediaPayload;
+  messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
 };
@@ -145,8 +147,11 @@ function ChatMediaImage({
   hasError: boolean;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const previewUrl =
+    resolvedUrl ??
+    (media.url?.startsWith("blob:") ? media.url : null);
 
-  if (isLoading) {
+  if (isLoading && !previewUrl) {
     return (
       <div className="space-y-1">
         <MediaLoadingPlaceholder className="max-w-[min(280px,100%)]" />
@@ -155,7 +160,7 @@ function ChatMediaImage({
     );
   }
 
-  if (hasError || !resolvedUrl) {
+  if (hasError || !previewUrl) {
     return (
       <div className="space-y-1">
         <MediaErrorPlaceholder fileName={media.fileName} />
@@ -175,20 +180,29 @@ function ChatMediaImage({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={resolvedUrl}
+            src={previewUrl}
             alt={media.fileName}
-            loading="lazy"
-            className="max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95"
+            className={cn(
+              "max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95",
+              isLoading && "opacity-80",
+            )}
           />
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+              <Loader2Icon className="size-5 animate-spin text-white" />
+            </div>
+          ) : null}
         </button>
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <MediaDownloadButton
-            url={resolvedUrl}
-            fileName={media.fileName}
-            isOutgoing={isOutgoing}
-            className="bg-black/55 text-white hover:bg-black/70"
-          />
-        </div>
+        {!isLoading ? (
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <MediaDownloadButton
+              url={previewUrl}
+              fileName={media.fileName}
+              isOutgoing={isOutgoing}
+              className="bg-black/55 text-white hover:bg-black/70"
+            />
+          </div>
+        ) : null}
       </div>
 
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
@@ -199,7 +213,7 @@ function ChatMediaImage({
           <DialogTitle className="sr-only">{media.fileName}</DialogTitle>
           <div className="absolute top-2 right-2 z-10 flex gap-1">
             <MediaDownloadButton
-              url={resolvedUrl}
+              url={previewUrl}
               fileName={media.fileName}
               className="bg-white/10 text-white hover:bg-white/20"
             />
@@ -216,7 +230,7 @@ function ChatMediaImage({
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={resolvedUrl}
+            src={previewUrl}
             alt={media.fileName}
             className="max-h-[88vh] max-w-full object-contain"
           />
@@ -291,6 +305,7 @@ function ChatMediaVideo({
 
 function ChatMediaAudio({
   media,
+  messageId,
   caption,
   isOutgoing,
   resolvedUrl,
@@ -298,22 +313,18 @@ function ChatMediaAudio({
   hasError,
 }: {
   media: ChatMediaPayload;
+  messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
 }) {
-  if (isLoading) {
-    return (
-      <div className="space-y-1">
-        <MediaLoadingPlaceholder className="h-12 min-h-0 w-[min(260px,100%)]" />
-        <CaptionText caption={caption} isOutgoing={isOutgoing} />
-      </div>
-    );
-  }
+  const playbackUrl =
+    resolvedUrl ??
+    (media.url?.startsWith("blob:") ? media.url : null);
 
-  if (hasError || !resolvedUrl) {
+  if (hasError && !playbackUrl) {
     return (
       <div className="space-y-1">
         <MediaErrorPlaceholder fileName={media.fileName} />
@@ -324,29 +335,13 @@ function ChatMediaAudio({
 
   return (
     <div className="space-y-1">
-      <div
-        className={cn(
-          "flex min-w-[220px] max-w-[min(280px,100%)] items-center gap-2 rounded-full px-3 py-2",
-          isOutgoing ? "bg-emerald-700/40" : "bg-muted/80",
-        )}
-      >
-        <div
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-full",
-            isOutgoing ? "bg-emerald-800/60" : "bg-background",
-          )}
-        >
-          <MicIcon className="size-4" />
-        </div>
-        <audio controls preload="metadata" className="h-8 min-w-0 flex-1">
-          <source src={resolvedUrl} type={media.mimeType} />
-        </audio>
-        <MediaDownloadButton
-          url={resolvedUrl}
-          fileName={media.fileName}
-          isOutgoing={isOutgoing}
-        />
-      </div>
+      <VoiceMessagePlayer
+        src={playbackUrl}
+        seed={messageId ?? media.fileName}
+        durationSec={media.durationSec}
+        isOutgoing={isOutgoing}
+        isLoading={isLoading && !playbackUrl}
+      />
       <CaptionText caption={caption} isOutgoing={isOutgoing} />
     </div>
   );
@@ -411,12 +406,15 @@ function ChatMediaDocument({
 
 export function ChatMediaMessage({
   media,
+  messageId,
   caption,
   isOutgoing = false,
 }: ChatMediaMessageProps) {
-  const { url, isLoading, error } = useChatMediaUrl(media);
+  const { url, isLoading, error } = useChatMediaUrl(media, { messageId });
+  const isHydrating = isMediaPendingHydration(media);
+  const showLoading = isLoading || isHydrating;
 
-  if (!media.path && !media.url) {
+  if (!isHydrating && !media.path && !media.url) {
     return (
       <div className="space-y-1">
         <MediaErrorPlaceholder fileName={media.fileName} />
@@ -430,8 +428,8 @@ export function ChatMediaMessage({
     caption,
     isOutgoing,
     resolvedUrl: url,
-    isLoading,
-    hasError: error,
+    isLoading: showLoading,
+    hasError: error && !isHydrating,
   };
 
   if (media.kind === "image") {
@@ -443,7 +441,7 @@ export function ChatMediaMessage({
   }
 
   if (media.kind === "audio") {
-    return <ChatMediaAudio {...shared} />;
+    return <ChatMediaAudio {...shared} messageId={messageId} />;
   }
 
   return <ChatMediaDocument {...shared} />;

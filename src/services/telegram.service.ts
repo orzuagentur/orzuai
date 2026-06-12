@@ -18,12 +18,17 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
+import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
   findContactForChannel,
+  findMessageByExternalId,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  markOutboundMessageFailed,
+  createOutboundMessageDelivery,
+  recordMessageDeliveryFailure,
+  recordMessageDeliverySuccess,
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
@@ -329,6 +334,14 @@ async function ingestTelegramMessage(
     return;
   }
 
+  await syncContactChannelIdentity(admin, {
+    businessId,
+    contactId,
+    channel: "telegram",
+    identifier,
+    displayLabel: message.contactName,
+  });
+
   if (connection.bot_token) {
     void scheduleContactAvatarSync({
       admin,
@@ -369,12 +382,34 @@ async function ingestTelegramMessage(
     return;
   }
 
+  if (message.externalMessageId) {
+    const existing = await findMessageByExternalId(
+      admin,
+      "telegram",
+      message.externalMessageId,
+    );
+
+    if (existing) {
+      return;
+    }
+  }
+
   const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "telegram",
     senderType: "client",
     content,
+    externalMessageId: message.externalMessageId,
   });
+
+  if (message.kind === "media") {
+    await createPendingMessageAttachment(admin, {
+      messageId: insertedMessage.id,
+      businessId,
+      content,
+      providerMediaId: message.fileId,
+    });
+  }
 
   if (message.kind === "media" && connection.bot_token) {
     scheduleInboundMediaHydration({
@@ -560,6 +595,12 @@ export async function sendTelegramChatMessage(
     content,
   });
 
+  await createOutboundMessageDelivery(admin, {
+    messageId: insertedMessage.id,
+    businessId,
+    channel: "telegram",
+  });
+
   void deliverTelegramOutboundText({
     admin,
     messageId: insertedMessage.id,
@@ -589,9 +630,16 @@ async function deliverTelegramOutboundText(input: {
   );
 
   if (!sendResult.success) {
-    await markOutboundMessageFailed(input.admin, input.messageId);
+    await recordMessageDeliveryFailure(input.admin, {
+      messageId: input.messageId,
+      errorMessage: sendResult.message,
+    });
     return;
   }
+
+  await recordMessageDeliverySuccess(input.admin, {
+    messageId: input.messageId,
+  });
 
   await incrementMessagingAnalytics(input.admin, input.businessId, "telegram", {
     totalMessages: 1,

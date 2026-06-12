@@ -24,8 +24,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
+import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import {
   findContactForChannel,
+  findMessageByExternalId,
   incrementMessagingAnalytics,
   insertChannelMessage,
   scheduleChannelAutoReply,
@@ -603,6 +606,14 @@ async function ingestIncomingMessage(
     return;
   }
 
+  await syncContactChannelIdentity(admin, {
+    businessId,
+    contactId,
+    channel: "whatsapp",
+    identifier: normalizedPhone,
+    displayLabel: message.contactName,
+  });
+
   const conversationId = await resolveInboundConversation(
     admin,
     businessId,
@@ -630,12 +641,34 @@ async function ingestIncomingMessage(
     return;
   }
 
+  if (message.messageId) {
+    const existing = await findMessageByExternalId(
+      admin,
+      "whatsapp",
+      message.messageId,
+    );
+
+    if (existing) {
+      return;
+    }
+  }
+
   const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel: "whatsapp",
     senderType: "client",
     content,
+    externalMessageId: message.messageId,
   });
+
+  if (message.kind === "media") {
+    await createPendingMessageAttachment(admin, {
+      messageId: insertedMessage.id,
+      businessId,
+      content,
+      providerMediaId: message.mediaId,
+    });
+  }
 
   if (message.kind === "media" && connection.meta_access_token) {
     scheduleInboundMediaHydration({

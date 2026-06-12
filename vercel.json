@@ -11,6 +11,14 @@
     {
       "path": "/api/cron/follow-up-agent",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/message-deliveries",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/webhook-queue",
+      "schedule": "*/1 * * * *"
     }
   ]
 }

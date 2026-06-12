@@ -26,6 +26,7 @@ import {
   insertChannelMessage,
   markOutboundMessageFailed,
 } from "@/services/messaging.service";
+import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import type { SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { mapChatMessage, resolveContactFromRow } from "@/utils/chat";
@@ -439,6 +440,19 @@ export async function sendChatMedia(
     content,
   });
 
+  await createReadyMessageAttachment(supabase, {
+    messageId: insertedMessage.id,
+    businessId,
+    media: buildMediaPayloadFromUpload({
+      kind: mediaKind,
+      fileName: file.name,
+      mimeType,
+      path: stored.path,
+      sizeBytes: stored.sizeBytes,
+      legacyUrl: stored.url,
+    }),
+  });
+
   const now = new Date().toISOString();
   const contactUpdates = contact.id
     ? [
@@ -514,10 +528,13 @@ export async function sendChatMedia(
 
   revalidateChatPaths(conversation.channel);
 
+  const mediaSignedUrl = await getChatAttachmentSignedUrl(stored.path);
+
   return {
     success: true,
     data: {
       message: mapChatMessage(insertedMessage),
+      mediaSignedUrl: mediaSignedUrl ?? undefined,
     },
   };
 }

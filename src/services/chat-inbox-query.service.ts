@@ -8,6 +8,7 @@ import {
 } from "@/features/chats/constants";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
+import { requireUser } from "@/services/auth.service";
 import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
@@ -32,6 +33,7 @@ export type ListConversationsPageInput = {
   view?: InboxQuickView;
   filter?: ChatInboxFilter;
   sort?: ChatInboxSort;
+  userId?: string;
 };
 
 export type ListConversationsPageResult = {
@@ -46,6 +48,7 @@ type RawConversationQueryRow = {
   status: ConversationListItem["status"];
   updated_at: string;
   last_read_at: string | null;
+  unread_count: number;
   last_message_preview: string | null;
   last_message_at: string | null;
   last_message_sender_type: ConversationListItem["lastMessageSenderType"];
@@ -163,13 +166,33 @@ async function findFavoriteContactIds(businessId: string): Promise<string[]> {
 }
 
 const CONVERSATION_LIST_SELECT =
-  "id, channel, status, updated_at, last_read_at, last_message_preview, last_message_at, last_message_sender_type, last_message_ai_generated, last_client_message_at, contact:contacts(id, name, phone_number, lead_score, is_favorite, avatar_url)";
+  "id, channel, status, updated_at, last_read_at, unread_count, last_message_preview, last_message_at, last_message_sender_type, last_message_ai_generated, last_client_message_at, contact:contacts(id, name, phone_number, lead_score, is_favorite, avatar_url)";
 
 async function mapConversationRows(
   rows: RawConversationQueryRow[],
+  userId?: string,
 ): Promise<ConversationListItem[]> {
   if (!rows.length) {
     return [];
+  }
+
+  const unreadByConversationId = new Map<string, number>();
+
+  if (userId) {
+    const supabase = await createClient();
+    const conversationIds = rows.map((row) => row.id);
+    const { data: reads } = await supabase
+      .from("conversation_reads")
+      .select("conversation_id, unread_count")
+      .eq("user_id", userId)
+      .in("conversation_id", conversationIds);
+
+    for (const read of reads ?? []) {
+      unreadByConversationId.set(
+        read.conversation_id,
+        read.unread_count ?? 0,
+      );
+    }
   }
 
   const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
@@ -178,11 +201,14 @@ async function mapConversationRows(
 
   return rows.flatMap((row) => {
     const contact = resolveContactFromRow(row.contact);
+    const unreadCount = unreadByConversationId.has(row.id)
+      ? (unreadByConversationId.get(row.id) ?? 0)
+      : (row.unread_count ?? 0);
     const item = mapConversationListItem(
       row,
       undefined,
       undefined,
-      0,
+      unreadCount,
       resolveAvatarUrlFromMap(contact?.avatar_url, avatarSignedUrlMap),
     );
     return item ? [item] : [];
@@ -286,7 +312,7 @@ async function listNeedsReplyConversationsPage(
     scanned += rows.length;
     batchOffset += batchSize;
 
-    const mapped = await mapConversationRows(rows);
+    const mapped = await mapConversationRows(rows, input.userId);
 
     for (const item of mapped) {
       if (!isConversationNeedsAttention(item)) {
@@ -331,13 +357,15 @@ export async function listConversationsPage(
     return { items: [], totalCount: 0, hasMore: false };
   }
 
-  const limit = input.limit ?? INBOX_PAGE_SIZE;
-  const offset = input.offset ?? 0;
-  const view = input.view ?? "all";
-  const search = input.search?.trim() ?? "";
+  const userId = input.userId ?? (await requireUser()).id;
+  const resolvedInput = { ...input, userId };
+  const limit = resolvedInput.limit ?? INBOX_PAGE_SIZE;
+  const offset = resolvedInput.offset ?? 0;
+  const view = resolvedInput.view ?? "all";
+  const search = resolvedInput.search?.trim() ?? "";
 
   if (view === "needs_reply" && !search) {
-    return listNeedsReplyConversationsPage(businessId, input);
+    return listNeedsReplyConversationsPage(businessId, resolvedInput);
   }
 
   let conversationIds: string[] | undefined;
@@ -377,7 +405,7 @@ export async function listConversationsPage(
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  let items = await mapConversationRows(pageRows);
+  let items = await mapConversationRows(pageRows, userId);
 
   items = dedupeConversationsByContactPhone(items);
 
@@ -416,6 +444,10 @@ export async function getConversationListItem(
     return null;
   }
 
-  const items = await mapConversationRows([data as RawConversationQueryRow]);
+  const userId = (await requireUser()).id;
+  const items = await mapConversationRows(
+    [data as RawConversationQueryRow],
+    userId,
+  );
   return items[0] ?? null;
 }

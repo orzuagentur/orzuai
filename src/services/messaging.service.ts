@@ -13,7 +13,7 @@ import { updateConversationLastMessageFromInsert } from "@/services/conversation
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveAgentMatch } from "@/utils/ai-agent-routing";
-import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
+import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -26,6 +26,7 @@ export type ChannelMessageInsert = {
   content: string;
   aiGenerated?: boolean;
   aiAgentId?: string | null;
+  externalMessageId?: string | null;
 };
 
 export type InsertedChannelMessageRow = {
@@ -36,12 +37,42 @@ export type InsertedChannelMessageRow = {
   content: string;
   ai_generated: boolean;
   created_at: string;
+  external_message_id?: string | null;
 };
+
+export async function findMessageByExternalId(
+  admin: MessagingDbClient,
+  channel: MessagingChannel,
+  externalMessageId: string,
+): Promise<InsertedChannelMessageRow | null> {
+  const { data } = await admin
+    .from("messages")
+    .select(
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, external_message_id",
+    )
+    .eq("channel", channel)
+    .eq("external_message_id", externalMessageId)
+    .maybeSingle();
+
+  return data;
+}
 
 export async function insertChannelMessage(
   admin: MessagingDbClient,
   input: ChannelMessageInsert,
 ): Promise<InsertedChannelMessageRow> {
+  if (input.externalMessageId) {
+    const existing = await findMessageByExternalId(
+      admin,
+      input.channel,
+      input.externalMessageId,
+    );
+
+    if (existing) {
+      return existing;
+    }
+  }
+
   const { data: inserted, error } = await admin
     .from("messages")
     .insert({
@@ -51,13 +82,26 @@ export async function insertChannelMessage(
       content: input.content,
       ai_generated: input.aiGenerated ?? false,
       ai_agent_id: input.aiAgentId ?? null,
+      external_message_id: input.externalMessageId ?? null,
     })
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, external_message_id",
     )
     .single();
 
   if (error) {
+    if (input.externalMessageId && error.code === "23505") {
+      const existing = await findMessageByExternalId(
+        admin,
+        input.channel,
+        input.externalMessageId,
+      );
+
+      if (existing) {
+        return existing;
+      }
+    }
+
     throw error;
   }
 
@@ -80,6 +124,106 @@ export async function markOutboundMessageFailed(
     .from("messages")
     .update({ hidden_for_business: true })
     .eq("id", messageId);
+
+  await admin
+    .from("message_deliveries")
+    .update({
+      status: "failed",
+      failed_at: new Date().toISOString(),
+    })
+    .eq("message_id", messageId);
+}
+
+const DELIVERY_RETRY_BASE_SECONDS = 30;
+
+function computeDeliveryRetryAt(attemptCount: number): string {
+  const delaySeconds =
+    DELIVERY_RETRY_BASE_SECONDS * 2 ** Math.max(0, attemptCount - 1);
+
+  return new Date(Date.now() + delaySeconds * 1000).toISOString();
+}
+
+export async function createOutboundMessageDelivery(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    businessId: string;
+    channel: MessagingChannel;
+  },
+): Promise<void> {
+  const { error } = await admin.from("message_deliveries").upsert(
+    {
+      message_id: input.messageId,
+      business_id: input.businessId,
+      channel: input.channel,
+      status: "pending",
+      attempt_count: 0,
+      next_attempt_at: new Date().toISOString(),
+    },
+    { onConflict: "message_id", ignoreDuplicates: true },
+  );
+
+  if (error) {
+    console.error("[message-delivery] create failed", error.message);
+  }
+}
+
+export async function recordMessageDeliverySuccess(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    providerMessageId?: string | null;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  await admin
+    .from("message_deliveries")
+    .update({
+      status: "sent",
+      provider_message_id: input.providerMessageId ?? null,
+      sent_at: now,
+      last_error: null,
+    })
+    .eq("message_id", input.messageId);
+}
+
+export async function recordMessageDeliveryFailure(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    errorMessage: string;
+    hideMessageOnExhausted?: boolean;
+  },
+): Promise<void> {
+  const { data: delivery } = await admin
+    .from("message_deliveries")
+    .select("attempt_count, max_attempts")
+    .eq("message_id", input.messageId)
+    .maybeSingle();
+
+  const attemptCount = (delivery?.attempt_count ?? 0) + 1;
+  const maxAttempts = delivery?.max_attempts ?? 5;
+  const exhausted = attemptCount >= maxAttempts;
+  const now = new Date().toISOString();
+
+  await admin
+    .from("message_deliveries")
+    .update({
+      status: exhausted ? "failed" : "pending",
+      attempt_count: attemptCount,
+      next_attempt_at: exhausted ? now : computeDeliveryRetryAt(attemptCount),
+      last_error: input.errorMessage.slice(0, 2000),
+      failed_at: exhausted ? now : null,
+    })
+    .eq("message_id", input.messageId);
+
+  if (exhausted && input.hideMessageOnExhausted !== false) {
+    await admin
+      .from("messages")
+      .update({ hidden_for_business: true })
+      .eq("id", input.messageId);
+  }
 }
 
 export async function updateChannelMessageContent(
@@ -105,37 +249,12 @@ export async function findContactForChannel(
   channel: MessagingChannel,
   identifier: string,
 ): Promise<{ id: string } | null> {
-  if (channel === "whatsapp") {
-    const canonical = canonicalPhoneNumber(identifier);
-    const digits = phoneDigitsOnly(identifier);
-    const variants = [...new Set([canonical, digits, `+${digits}`].filter(Boolean))];
-
-    for (const phoneNumber of variants) {
-      const { data } = await admin
-        .from("contacts")
-        .select("id")
-        .eq("business_id", businessId)
-        .eq("channel", channel)
-        .eq("phone_number", phoneNumber)
-        .maybeSingle();
-
-      if (data?.id) {
-        return { id: data.id };
-      }
-    }
-
-    return null;
-  }
-
-  const { data } = await admin
-    .from("contacts")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("channel", channel)
-    .eq("phone_number", identifier)
-    .maybeSingle();
-
-  return data?.id ? { id: data.id } : null;
+  return findContactForChannelWithIdentities(
+    admin,
+    businessId,
+    channel,
+    identifier,
+  );
 }
 
 export async function resolveInboundConversation(

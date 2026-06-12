@@ -22,6 +22,11 @@ import { getInboxDetailsPanelAction } from "@/features/chats/actions/get-inbox-d
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import {
+  isCrmDetailsFresh,
+  peekCachedCrmDetails,
+  setCachedCrmDetails,
+} from "@/lib/client-cache/inbox-messenger-cache";
 import type { InboxDetailsPanelData } from "@/services/inbox-details.service";
 import { cn } from "@/lib/utils";
 import type { CannedResponseItem } from "@/types/canned-response.types";
@@ -73,14 +78,21 @@ export function InboxDetailsPanel({
   onGenerateReply,
   className,
 }: InboxDetailsPanelProps) {
-  const [details, setDetails] = useState<InboxDetailsPanelData | null>(null);
-  const [loadState, setLoadState] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle",
+  const conversationId = conversation?.id ?? null;
+  const [details, setDetails] = useState<InboxDetailsPanelData | null>(() =>
+    conversationId ? peekCachedCrmDetails(conversationId) : null,
   );
-  const [suggestedAction, setSuggestedAction] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >(() =>
+    conversationId && peekCachedCrmDetails(conversationId) ? "ready" : "idle",
+  );
+  const [suggestedAction, setSuggestedAction] = useState<string | null>(() => {
+    const cached = conversationId ? peekCachedCrmDetails(conversationId) : null;
+    return cached?.suggestedAction ?? null;
+  });
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const loadedConversationIdRef = useRef<string | null>(null);
-  const conversationId = conversation?.id ?? null;
 
   const refreshDetails = useCallback(async () => {
     if (!conversationId) {
@@ -92,6 +104,7 @@ export function InboxDetailsPanel({
     if (result.success) {
       setDetails(result.data);
       setSuggestedAction(result.data.suggestedAction);
+      setCachedCrmDetails(conversationId, result.data);
     }
   }, [conversationId]);
 
@@ -101,6 +114,29 @@ export function InboxDetailsPanel({
       setSuggestedAction(null);
       setLoadState("idle");
       loadedConversationIdRef.current = null;
+      return;
+    }
+
+    const cached = peekCachedCrmDetails(conversationId);
+
+    if (cached) {
+      setDetails(cached);
+      setSuggestedAction(cached.suggestedAction);
+      setLoadState("ready");
+      loadedConversationIdRef.current = conversationId;
+
+      if (!isCrmDetailsFresh(conversationId)) {
+        void getInboxDetailsPanelAction({ conversationId }).then((result) => {
+          if (!result.success) {
+            return;
+          }
+
+          setDetails(result.data);
+          setSuggestedAction(result.data.suggestedAction);
+          setCachedCrmDetails(conversationId, result.data);
+        });
+      }
+
       return;
     }
 
@@ -124,6 +160,7 @@ export function InboxDetailsPanel({
         if (result.success) {
           setDetails(result.data);
           setSuggestedAction(result.data.suggestedAction);
+          setCachedCrmDetails(activeConversationId, result.data);
           setLoadState("ready");
         } else {
           setDetails(null);

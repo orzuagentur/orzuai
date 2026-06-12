@@ -102,6 +102,7 @@ export type TelegramInboundMessage =
       telegramUserId: number;
       body: string;
       contactName: string;
+      externalMessageId?: string;
     }
   | {
       kind: "media";
@@ -113,4 +114,5 @@ export type TelegramInboundMessage =
       mimeType?: string;
       fileName?: string;
       caption?: string;
+      externalMessageId?: string;
     };

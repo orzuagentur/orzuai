@@ -4,13 +4,16 @@ import { z } from "zod";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { updateConversationSyncCursor } from "@/services/conversation-sync.service";
 import { getNewConversationMessages } from "@/services/chat.service";
 
 const fetchNewMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   afterCreatedAt: z.string().min(1),
+  afterMessageId: z.string().uuid().optional(),
 });
 
 export async function fetchNewConversationMessagesAction(
@@ -48,6 +51,7 @@ export async function fetchNewConversationMessagesAction(
     parsed.data.conversationId,
     business.id,
     parsed.data.afterCreatedAt,
+    parsed.data.afterMessageId,
   );
 
   if (!messages) {
@@ -55,6 +59,17 @@ export async function fetchNewConversationMessagesAction(
       success: false as const,
       error: { message: CHAT_MESSAGES.genericError },
     };
+  }
+
+  if (messages.length > 0) {
+    const lastMessage = messages.at(-1)!;
+
+    await updateConversationSyncCursor(createAdminClient(), {
+      conversationId: parsed.data.conversationId,
+      businessId: business.id,
+      lastMessageAt: lastMessage.createdAt,
+      lastMessageId: lastMessage.id,
+    });
   }
 
   return {

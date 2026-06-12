@@ -46,6 +46,7 @@ export function useConversationRealtime({
   onMessageHidden,
 }: UseConversationRealtimeOptions) {
   const [isClientTyping, setIsClientTyping] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [reconnectNonce, setReconnectNonce] = useState(0);
   const onMessageRef = useRef(onMessage);
   const onMessageUpdatedRef = useRef(onMessageUpdated);
@@ -72,6 +73,7 @@ export function useConversationRealtime({
   useEffect(() => {
     if (!conversationId) {
       setIsClientTyping(false);
+      setIsRealtimeConnected(false);
       return;
     }
 
@@ -190,6 +192,14 @@ export function useConversationRealtime({
           },
         )
         .subscribe((status) => {
+          setIsRealtimeConnected(status === "SUBSCRIBED");
+
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            window.setTimeout(() => {
+              setReconnectNonce((current) => current + 1);
+            }, 2000);
+          }
+
           if (
             process.env.NODE_ENV === "development" &&
             (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
@@ -205,6 +215,7 @@ export function useConversationRealtime({
       cancelled = true;
       clearTypingTimeout();
       setIsClientTyping(false);
+      setIsRealtimeConnected(false);
       unbindAuthRefresh?.();
 
       if (channel) {
@@ -213,5 +224,5 @@ export function useConversationRealtime({
     };
   }, [conversationId, reconnectNonce]);
 
-  return { isClientTyping };
+  return { isClientTyping, isRealtimeConnected };
 }

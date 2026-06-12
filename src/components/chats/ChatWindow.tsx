@@ -45,6 +45,7 @@ import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
+import { cacheChatMessageMediaUrl } from "@/utils/cache-chat-media-url";
 import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
 import {
   createOptimisticChatMessage,
@@ -544,6 +545,13 @@ export function ChatWindow({
                   );
 
                   if (result.success && result.data?.message) {
+                    if (result.data.mediaSignedUrl) {
+                      cacheChatMessageMediaUrl(
+                        result.data.message,
+                        result.data.mediaSignedUrl,
+                      );
+                    }
+
                     onMessageSent?.(result.data.message, pendingId);
                     return;
                   }

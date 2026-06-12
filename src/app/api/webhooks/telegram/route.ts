@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { processTelegramWebhook } from "@/services/telegram.service";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildWebhookIdempotencyKey,
+  enqueueInboundWebhook,
+} from "@/services/webhook-queue.service";
 import type { TelegramWebhookPayload } from "@/types/telegram.types";
 
 export async function POST(request: NextRequest) {
@@ -10,19 +14,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rawBody = await request.text();
+
   let payload: TelegramWebhookPayload;
 
   try {
-    payload = (await request.json()) as TelegramWebhookPayload;
+    payload = JSON.parse(rawBody) as TelegramWebhookPayload;
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const result = await processTelegramWebhook(secretToken, payload);
+  const admin = createAdminClient();
+  const idempotencyKey = buildWebhookIdempotencyKey("telegram", rawBody);
+  const result = await enqueueInboundWebhook(admin, {
+    channel: "telegram",
+    idempotencyKey,
+    payload,
+    metadata: { secretToken },
+  });
 
   return NextResponse.json({
     success: true,
-    processed: result.processed,
+    queued: result.queued,
+    duplicate: result.duplicate,
   });
 }
 

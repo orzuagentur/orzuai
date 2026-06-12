@@ -1,5 +1,13 @@
 import type { RefObject } from "react";
-import { Clock3Icon, Loader2Icon, SparklesIcon, UserRoundIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  CheckCheckIcon,
+  CheckIcon,
+  Clock3Icon,
+  Loader2Icon,
+  SparklesIcon,
+  UserRoundIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/ui/relative-time";
@@ -8,6 +16,7 @@ import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
 import { TypingIndicator } from "@/components/chats/TypingIndicator";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { usePrefetchConversationMedia } from "@/hooks/use-prefetch-conversation-media";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage } from "@/utils/chat-media";
@@ -45,6 +54,50 @@ function getSenderLabel(message: ChatMessageData): string {
   return "You";
 }
 
+function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
+  if (message.senderType !== "user" || message.isPending) {
+    return null;
+  }
+
+  if (message.deliveryStatus === "failed") {
+    return (
+      <AlertCircleIcon
+        className="size-3 shrink-0 text-red-300"
+        aria-label={CHAT_MESSAGES.messageDeliveryFailed}
+      />
+    );
+  }
+
+  if (message.deliveryStatus === "delivered") {
+    return (
+      <CheckCheckIcon
+        className="size-3 shrink-0 opacity-90"
+        aria-hidden
+      />
+    );
+  }
+
+  if (message.deliveryStatus === "sent") {
+    return (
+      <CheckIcon
+        className="size-3 shrink-0 opacity-90"
+        aria-hidden
+      />
+    );
+  }
+
+  if (message.deliveryStatus === "pending") {
+    return (
+      <Clock3Icon
+        className="size-3 shrink-0 opacity-80"
+        aria-hidden
+      />
+    );
+  }
+
+  return null;
+}
+
 export function MessageHistory({
   messages,
   variant = "default",
@@ -68,6 +121,8 @@ export function MessageHistory({
     messages,
     lastReadAt,
   );
+
+  usePrefetchConversationMedia(messages, messages.length > 0);
 
   if (messages.length === 0) {
     return (
@@ -114,6 +169,7 @@ export function MessageHistory({
           message.senderType === "user" || message.senderType === "ai";
         const isDeleted = isChatMessageDeletedForAll(message);
         const { media, text } = parseMediaMessage(message.content);
+        const isAudioMessage = media?.kind === "audio";
         const showUnreadDivider = isInbox && index === firstUnreadIndex;
         const isUnreadMessage =
           isInbox && isUnreadClientMessage(message, lastReadAt);
@@ -150,7 +206,11 @@ export function MessageHistory({
               <div
                 className={cn(
                   "max-w-[min(85%,28rem)] min-w-0 shrink rounded-lg text-sm shadow-sm",
-                  media ? "px-1.5 py-1.5" : "px-3 py-2",
+                  media
+                    ? isAudioMessage
+                      ? "px-2 py-1"
+                      : "px-1.5 py-1.5"
+                    : "px-3 py-2",
                   message.isPending && "opacity-80",
                   isDeleted
                     ? "border border-dashed bg-muted/40 text-muted-foreground"
@@ -191,6 +251,7 @@ export function MessageHistory({
                 ) : media ? (
                   <ChatMediaMessage
                     media={media}
+                    messageId={message.id}
                     caption={text}
                     isOutgoing={isOutgoing}
                   />
@@ -217,6 +278,7 @@ export function MessageHistory({
                   ) : (
                     <RelativeTime value={message.createdAt} />
                   )}
+                  <OutboundDeliveryIndicator message={message} />
                 </p>
               </div>
               {canShowMessageActions(message) && isOutgoing ? (

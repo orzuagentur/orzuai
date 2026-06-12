@@ -40,6 +40,11 @@ export function parseTelegramWebhookPayload(
   const contactName = buildContactName(message.from ?? {});
 
   if (message.text?.trim()) {
+    const externalMessageId =
+      message.message_id !== undefined
+        ? `tg:${chatId}:${message.message_id}`
+        : undefined;
+
     return [
       {
         kind: "text",
@@ -47,9 +52,15 @@ export function parseTelegramWebhookPayload(
         telegramUserId,
         body: message.text.trim(),
         contactName,
+        externalMessageId,
       },
     ];
   }
+
+  const externalMessageId =
+    message.message_id !== undefined
+      ? `tg:${chatId}:${message.message_id}`
+      : undefined;
 
   if (message.photo?.length) {
     const largest = message.photo[message.photo.length - 1];
@@ -69,6 +80,7 @@ export function parseTelegramWebhookPayload(
         mimeType: "image/jpeg",
         fileName: "photo.jpg",
         caption: message.caption?.trim(),
+        externalMessageId,
       },
     ];
   }
@@ -85,6 +97,7 @@ export function parseTelegramWebhookPayload(
         mimeType: message.voice.mime_type || "audio/ogg",
         fileName: "voice.ogg",
         caption: message.caption?.trim(),
+        externalMessageId,
       },
     ];
   }
@@ -101,6 +114,7 @@ export function parseTelegramWebhookPayload(
         mimeType: message.video.mime_type || "video/mp4",
         fileName: "video.mp4",
         caption: message.caption?.trim(),
+        externalMessageId,
       },
     ];
   }
@@ -117,6 +131,7 @@ export function parseTelegramWebhookPayload(
         mimeType: message.audio.mime_type || "audio/mpeg",
         fileName: message.audio.file_name || "audio",
         caption: message.caption?.trim(),
+        externalMessageId,
       },
     ];
   }
@@ -133,6 +148,7 @@ export function parseTelegramWebhookPayload(
         mimeType: message.document.mime_type || "application/octet-stream",
         fileName: message.document.file_name || "document",
         caption: message.caption?.trim(),
+        externalMessageId,
       },
     ];
   }

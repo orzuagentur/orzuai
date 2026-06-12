@@ -1,7 +1,7 @@
 "use server";
 
+import { getAccessibleBusiness } from "@/services/business-access.service";
 import { getDashboardNavBadgeCounts } from "@/services/conversation-read.service";
-import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { hasSupabaseEnv } from "@/lib/env";
 
@@ -23,7 +23,7 @@ export async function fetchNavBadgeCountsAction() {
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
@@ -41,7 +41,7 @@ export async function fetchNavBadgeCountsAction() {
     };
   }
 
-  const data = await getDashboardNavBadgeCounts(business.id);
+  const data = await getDashboardNavBadgeCounts(business.id, user.id);
 
   return {
     success: true as const,

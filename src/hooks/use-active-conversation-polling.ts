@@ -11,6 +11,7 @@ export const ACTIVE_CONVERSATION_POLL_MS = 3_000;
 type UseActiveConversationPollingOptions = {
   conversationId: string | null;
   latestMessageAt: string | null;
+  latestMessageId?: string | null;
   enabled?: boolean;
   intervalMs?: number;
   onNewMessages: (messages: ChatMessageData[]) => void;
@@ -20,17 +21,20 @@ type UseActiveConversationPollingOptions = {
 export function useActiveConversationPolling({
   conversationId,
   latestMessageAt,
+  latestMessageId = null,
   enabled = true,
   intervalMs = ACTIVE_CONVERSATION_POLL_MS,
   onNewMessages,
   onSyncMessages,
 }: UseActiveConversationPollingOptions) {
   const latestMessageAtRef = useRef(latestMessageAt);
+  const latestMessageIdRef = useRef(latestMessageId);
   const onNewMessagesRef = useRef(onNewMessages);
   const onSyncMessagesRef = useRef(onSyncMessages);
   const isPollingRef = useRef(false);
 
   latestMessageAtRef.current = latestMessageAt;
+  latestMessageIdRef.current = latestMessageId;
   onNewMessagesRef.current = onNewMessages;
   onSyncMessagesRef.current = onSyncMessages;
 
@@ -54,6 +58,7 @@ export function useActiveConversationPolling({
         const result = await fetchNewConversationMessagesAction({
           conversationId,
           afterCreatedAt: latestMessageAtRef.current,
+          afterMessageId: latestMessageIdRef.current ?? undefined,
         });
 
         if (result.success && result.data.messages.length > 0) {
@@ -82,5 +87,5 @@ export function useActiveConversationPolling({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [conversationId, enabled, intervalMs]);
+  }, [conversationId, enabled, intervalMs, latestMessageId]);
 }

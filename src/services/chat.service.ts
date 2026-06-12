@@ -13,9 +13,11 @@ import { createClient } from "@/lib/supabase/server";
 import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
+  createOutboundMessageDelivery,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  markOutboundMessageFailed,
+  recordMessageDeliveryFailure,
+  recordMessageDeliverySuccess,
   listKnowledgeEntriesForBusiness,
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
@@ -28,9 +30,10 @@ import {
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
-import { getPrimaryBusiness } from "@/services/business.service";
+import { getAccessibleBusiness } from "@/services/business-access.service";
 import { resolveContactAvatarSignedUrls } from "@/services/contact-avatar-storage.service";
 import { markConversationRead } from "@/services/conversation-read.service";
+import { enrichChatMessages } from "@/services/message-enrichment.service";
 import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
@@ -89,7 +92,7 @@ function revalidateChatPaths(channel?: DbMessagingChannel): void {
 
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
   return business?.id ?? null;
 }
 
@@ -197,6 +200,11 @@ export async function getConversationDetail(
     avatarSignedUrlMap,
   );
 
+  const enrichedMessages = await enrichChatMessages(
+    supabase,
+    orderedMessages.map(mapChatMessage),
+  );
+
   return {
     id: conversation.id,
     contactId: contact.id ?? null,
@@ -209,7 +217,7 @@ export async function getConversationDetail(
     internalNote: conversation.internal_note,
     updatedAt: conversation.updated_at,
     lastReadAt: conversation.last_read_at ?? null,
-    messages: orderedMessages.map(mapChatMessage),
+    messages: enrichedMessages,
     hasOlderMessages: totalCount > orderedMessages.length,
     totalMessageCount: totalCount,
   };
@@ -253,7 +261,10 @@ export async function getOlderConversationMessages(
   const orderedMessages = (messages ?? []).slice().reverse();
 
   return {
-    messages: orderedMessages.map(mapChatMessage),
+    messages: await enrichChatMessages(
+      supabase,
+      orderedMessages.map(mapChatMessage),
+    ),
     hasMore: orderedMessages.length >= CONVERSATION_MESSAGES_PAGE_SIZE,
   };
 }
@@ -276,9 +287,17 @@ async function deliverWhatsAppOutboundText(input: {
   );
 
   if (!sendResult.success) {
-    await markOutboundMessageFailed(input.supabase, input.messageId);
+    await recordMessageDeliveryFailure(input.supabase, {
+      messageId: input.messageId,
+      errorMessage: sendResult.message,
+    });
     return;
   }
+
+  await recordMessageDeliverySuccess(input.supabase, {
+    messageId: input.messageId,
+    providerMessageId: sendResult.messageId,
+  });
 
   await incrementMessagingAnalytics(
     createAdminClient(),
@@ -323,13 +342,14 @@ export async function getConversationMessagesTail(
 
   const orderedMessages = (messages ?? []).slice().reverse();
 
-  return orderedMessages.map(mapChatMessage);
+  return enrichChatMessages(supabase, orderedMessages.map(mapChatMessage));
 }
 
 export async function getNewConversationMessages(
   conversationId: string,
   businessId: string,
   afterCreatedAt: string,
+  afterMessageId?: string,
 ): Promise<ReturnType<typeof mapChatMessage>[] | null> {
   if (!hasSupabaseEnv()) {
     return null;
@@ -347,17 +367,25 @@ export async function getNewConversationMessages(
     return null;
   }
 
-  const { data: messages } = await supabase
+  let query = supabase
     .from("messages")
     .select(
       "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
     )
     .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .gt("created_at", afterCreatedAt)
-    .order("created_at", { ascending: true });
+    .eq("hidden_for_business", false);
 
-  return (messages ?? []).map(mapChatMessage);
+  if (afterMessageId) {
+    query = query.or(
+      `created_at.gt.${afterCreatedAt},and(created_at.eq.${afterCreatedAt},id.gt.${afterMessageId})`,
+    );
+  } else {
+    query = query.gt("created_at", afterCreatedAt);
+  }
+
+  const { data: messages } = await query.order("created_at", { ascending: true });
+
+  return enrichChatMessages(supabase, (messages ?? []).map(mapChatMessage));
 }
 
 async function isWhatsAppConnected(businessId: string): Promise<boolean> {
@@ -446,11 +474,13 @@ export async function getActiveConversationContext(
     return null;
   }
 
+  const user = await requireUser();
+
   const [channelConnected, aiEnabled, cannedResponses] = await Promise.all([
     isChatChannelConnected(businessId, conversation.channel),
     getAiEnabledForChannel(businessId, conversation.channel),
     listCannedResponses(conversation.channel),
-    markConversationRead(businessId, conversationId),
+    markConversationRead(businessId, conversationId, user.id),
   ]);
 
   return {
@@ -484,6 +514,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   if (!hasSupabaseEnv()) {
     return {
       hasBusiness: false,
+      businessId: null,
       channels: [],
       visibleChannelIds: [],
       totalConversations: 0,
@@ -493,11 +524,12 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
       hasBusiness: false,
+      businessId: null,
       channels: [],
       visibleChannelIds: [],
       totalConversations: 0,
@@ -557,6 +589,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
 
   return {
     hasBusiness: true,
+    businessId: business.id,
     channels,
     visibleChannelIds,
     totalConversations,
@@ -583,7 +616,7 @@ export async function getChatsMonitorPageData(): Promise<ChatsMonitorPageData> {
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
@@ -702,6 +735,7 @@ export async function getChatsChannelPageData(
   if (!hasSupabaseEnv()) {
     return {
       hasBusiness: false,
+      businessId: null,
       channel,
       channelConnected: false,
       aiEnabled: null,
@@ -712,11 +746,12 @@ export async function getChatsChannelPageData(
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
       hasBusiness: false,
+      businessId: null,
       channel,
       channelConnected: false,
       aiEnabled: null,
@@ -736,6 +771,7 @@ export async function getChatsChannelPageData(
 
   return {
     hasBusiness: true,
+    businessId: business.id,
     channel,
     channelConnected,
     aiEnabled,
@@ -763,7 +799,7 @@ export async function getChatsFavoritesPageData(): Promise<ChatsMonitorPageData>
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
@@ -818,7 +854,7 @@ export async function resolveInboxActiveConversationContext(
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return empty;
@@ -854,7 +890,7 @@ export async function getChatsPageData(
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {
@@ -1044,6 +1080,12 @@ export async function sendChatMessage(
       channel: conversation.channel,
       senderType: "user",
       content: parsed.data.content,
+    });
+
+    await createOutboundMessageDelivery(supabase, {
+      messageId: insertedMessage.id,
+      businessId,
+      channel: conversation.channel,
     });
 
     const now = new Date().toISOString();

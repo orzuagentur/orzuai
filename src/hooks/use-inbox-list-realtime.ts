@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase/realtime-auth";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
+import { getInboxRealtimeChannelName } from "@/lib/realtime/inbox-channel";
 import {
   applyRealtimeConversationUpdate,
   applyRealtimeMessageToList,
@@ -23,6 +24,7 @@ const REFRESH_DEBOUNCE_MS = 500;
 
 type UseInboxListRealtimeOptions = {
   enabled?: boolean;
+  businessId?: string | null;
   channelFilter?: MessagingChannel;
   selectedConversationId: string | null;
   hasActiveFilters?: boolean;
@@ -38,6 +40,7 @@ type UseInboxListRealtimeOptions = {
 
 export function useInboxListRealtime({
   enabled = true,
+  businessId = null,
   channelFilter,
   selectedConversationId,
   hasActiveFilters = false,
@@ -77,7 +80,7 @@ export function useInboxListRealtime({
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !businessId) {
       return;
     }
 
@@ -228,13 +231,14 @@ export function useInboxListRealtime({
       }
 
       channel = supabase
-        .channel("inbox-list")
+        .channel(getInboxRealtimeChannelName(businessId))
         .on(
           "postgres_changes",
           {
             event: "INSERT",
             schema: "public",
             table: "messages",
+            filter: `business_id=eq.${businessId}`,
           },
           (payload) => {
             handleMessageInsert(payload.new as InboxRealtimeMessageRow);
@@ -246,6 +250,7 @@ export function useInboxListRealtime({
             event: "INSERT",
             schema: "public",
             table: "conversations",
+            filter: `business_id=eq.${businessId}`,
           },
           (payload) => {
             void handleConversationUpsert(
@@ -260,6 +265,7 @@ export function useInboxListRealtime({
             event: "UPDATE",
             schema: "public",
             table: "conversations",
+            filter: `business_id=eq.${businessId}`,
           },
           (payload) => {
             void handleConversationUpsert(
@@ -270,6 +276,12 @@ export function useInboxListRealtime({
         )
         .subscribe((status) => {
           onConnectionChangeRef.current?.(status === "SUBSCRIBED");
+
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            window.setTimeout(() => {
+              setReconnectNonce((current) => current + 1);
+            }, 2000);
+          }
 
           if (
             process.env.NODE_ENV === "development" &&
@@ -294,5 +306,5 @@ export function useInboxListRealtime({
         void supabase.removeChannel(channel);
       }
     };
-  }, [channelFilter, enabled, reconnectNonce]);
+  }, [businessId, channelFilter, enabled, reconnectNonce]);
 }

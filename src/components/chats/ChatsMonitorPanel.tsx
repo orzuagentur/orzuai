@@ -31,6 +31,10 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { fetchChatsMonitorInitialAction } from "@/features/chats/actions/fetch-chats-monitor-initial";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { CHAT_MESSAGES } from "@/features/chats";
+import {
+  getCachedConversationList,
+  setCachedConversationList,
+} from "@/lib/client-cache/inbox-messenger-cache";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import {
   INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
@@ -60,6 +64,7 @@ type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData> & {
 
 export function ChatsMonitorPanel({
   hasBusiness: initialHasBusiness,
+  businessId: initialBusinessId = null,
   channels: initialChannels,
   conversations: initialConversations,
   conversationsTotalCount: initialTotalCount,
@@ -74,8 +79,14 @@ export function ChatsMonitorPanel({
   const usesClientBootstrap = initialConversations === undefined;
   const searchParams = useSearchParams();
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
+  const listScope = favoritesOnly ? ("favorites" as const) : ("monitor" as const);
+  const cachedList = getCachedConversationList({ scope: listScope });
+  const hasWarmList =
+    (Array.isArray(initialConversations) ? initialConversations.length : 0) > 0 ||
+    (cachedList?.items.length ?? 0) > 0;
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
+  const [businessId, setBusinessId] = useState<string | null>(initialBusinessId);
   const [channelStats, setChannels] = useState<ChatMonitorChannelStats[]>(
     initialChannels ?? [],
   );
@@ -84,14 +95,21 @@ export function ChatsMonitorPanel({
     [channelStats],
   );
   const [conversations, setConversations] = useState<ConversationListItem[]>(
-    initialConversations ?? [],
+    () =>
+      Array.isArray(initialConversations) && initialConversations.length > 0
+        ? initialConversations
+        : (cachedList?.items ?? initialConversations ?? []),
   );
   const [needsAttentionConversations, setNeedsAttentionConversations] =
     useState<ConversationListItem[]>(initialNeedsAttention ?? []);
-  const [totalCount, setTotalCount] = useState(initialTotalCount ?? 0);
-  const [hasMore, setHasMore] = useState(initialHasMore ?? false);
+  const [totalCount, setTotalCount] = useState(
+    initialTotalCount ?? cachedList?.totalCount ?? 0,
+  );
+  const [hasMore, setHasMore] = useState(
+    initialHasMore ?? cachedList?.hasMore ?? false,
+  );
   const [isInitialLoading, setIsInitialLoading] = useState(
-    usesClientBootstrap && !favoritesOnly,
+    usesClientBootstrap && !favoritesOnly && !hasWarmList,
   );
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
@@ -129,6 +147,21 @@ export function ChatsMonitorPanel({
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
   const skipInitialFetchRef = useRef(!usesClientBootstrap);
+
+  useEffect(() => {
+    if (conversations.length === 0) {
+      return;
+    }
+
+    setCachedConversationList(
+      { scope: listScope },
+      {
+        items: conversations,
+        totalCount,
+        hasMore,
+      },
+    );
+  }, [conversations, hasMore, listScope, totalCount]);
 
   const needsAttentionIds = useMemo(
     () => new Set(needsAttentionConversations.map((item) => item.id)),
@@ -338,6 +371,7 @@ export function ChatsMonitorPanel({
 
       const data = result.data;
       setHasBusiness(data.hasBusiness);
+      setBusinessId(data.businessId ?? null);
       setChannels(data.channels);
       setConversations(data.conversations);
       setNeedsAttentionConversations(data.needsAttentionConversations);
@@ -358,6 +392,7 @@ export function ChatsMonitorPanel({
 
   useInboxListRealtime({
     enabled: hasBusiness && !isInitialLoading,
+    businessId,
     selectedConversationId,
     hasActiveFilters: hasActiveListFilters,
     onConnectionChange: setRealtimeConnected,
@@ -405,6 +440,7 @@ export function ChatsMonitorPanel({
     }
 
     setHasBusiness(initialHasBusiness ?? true);
+    setBusinessId(initialBusinessId);
     setChannels(initialChannels ?? []);
     setConversations(initialConversations ?? []);
     setNeedsAttentionConversations(initialNeedsAttention ?? []);
@@ -414,6 +450,7 @@ export function ChatsMonitorPanel({
     initialChannels,
     initialConversations,
     initialHasBusiness,
+    initialBusinessId,
     initialHasMore,
     initialNeedsAttention,
     initialTotalCount,
