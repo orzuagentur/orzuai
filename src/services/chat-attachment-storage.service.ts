@@ -1,20 +1,7 @@
 import "server-only";
 
-import {
-  CHAT_ATTACHMENTS_BUCKET,
-} from "@/features/chats/chat-attachments";
+import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  getCachedSignedMediaUrl,
-  storeCachedSignedMediaUrl,
-} from "@/services/media-url-cache.service";
-import {
-  buildThumbnailStoragePath,
-  generateImageThumbnailBuffer,
-} from "@/utils/image-thumbnail";
-import { applyMediaCdnUrl } from "@/utils/media-cdn";
-
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export type ChatAttachmentUploadResult = {
   path: string;
@@ -25,6 +12,11 @@ export type ChatAttachmentUploadResult = {
   /** @deprecated Legacy public URL; prefer signed URLs via getChatAttachmentSignedUrl */
   url: string;
 };
+
+export {
+  downloadChatAttachmentBuffer,
+  getChatAttachmentSignedUrl,
+} from "@/services/chat-attachment-signed-url.service";
 
 async function uploadBuffer(
   path: string,
@@ -68,6 +60,10 @@ async function uploadImageThumbnail(
   storagePath: string,
   sourceBuffer: Buffer,
 ): Promise<Pick<ChatAttachmentUploadResult, "thumbnailPath" | "thumbWidth" | "thumbHeight"> | null> {
+  const { buildThumbnailStoragePath, generateImageThumbnailBuffer } = await import(
+    "@/utils/image-thumbnail"
+  );
+
   const thumbnail = await generateImageThumbnailBuffer(sourceBuffer);
 
   if (!thumbnail) {
@@ -90,50 +86,6 @@ async function uploadImageThumbnail(
     thumbWidth: thumbnail.width,
     thumbHeight: thumbnail.height,
   };
-}
-
-export async function getChatAttachmentSignedUrl(
-  path: string,
-  expiresIn = SIGNED_URL_TTL_SECONDS,
-): Promise<string | null> {
-  const cached = await getCachedSignedMediaUrl(path);
-
-  if (cached) {
-    return cached;
-  }
-
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, expiresIn);
-
-  if (error) {
-    console.error("[chat-attachments] signed URL failed:", error.message);
-    return null;
-  }
-
-  const signedUrl = applyMediaCdnUrl(data.signedUrl);
-  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-
-  void storeCachedSignedMediaUrl(path, signedUrl, expiresAt);
-
-  return signedUrl;
-}
-
-export async function downloadChatAttachmentBuffer(
-  path: string,
-): Promise<Buffer | null> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .download(path);
-
-  if (error || !data) {
-    console.error("[chat-attachments] download failed:", error?.message);
-    return null;
-  }
-
-  return Buffer.from(await data.arrayBuffer());
 }
 
 export async function uploadChatAttachmentBuffer(

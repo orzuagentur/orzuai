@@ -2,7 +2,7 @@ import "server-only";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
-import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-storage.service";
+import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import {

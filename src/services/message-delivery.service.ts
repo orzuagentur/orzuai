@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverChannelMediaMessage } from "@/services/channels/deliver-media";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
-import { downloadChatAttachmentBuffer } from "@/services/chat-attachment-storage.service";
+import { downloadChatAttachmentBuffer } from "@/services/chat-attachment-signed-url.service";
 import {
   incrementMessagingAnalytics,
   recordMessageDeliveryFailure,

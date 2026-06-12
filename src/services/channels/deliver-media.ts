@@ -6,7 +6,7 @@ import {
   sendWhatsAppMediaMessage,
   uploadWhatsAppMedia,
 } from "@/lib/whatsapp/client";
-import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-storage.service";
+import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
