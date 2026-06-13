@@ -18,7 +18,7 @@ import {
   createOutboundMessageDelivery,
   insertChannelMessage,
 } from "@/services/messaging.service";
-import { processPendingMessageDeliveries } from "@/services/message-delivery.service";
+import { dispatchMessageDelivery } from "@/services/message-delivery.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import type { SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -297,8 +297,8 @@ export async function sendChatMedia(
     ...contactUpdates,
   ]);
 
-  void processPendingMessageDeliveries().catch((error) => {
-    console.error("[chat-media] outbound delivery worker failed", error);
+  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
+    console.error("[chat-media] outbound delivery failed", error);
   });
 
   revalidateChatPaths(conversation.channel);

@@ -22,11 +22,13 @@ function collectUncachedMediaPaths(messages: ChatMessageData[]): string[] {
 
     const path = resolveMediaStoragePath(media);
 
-    if (!path || getCachedMediaUrl(path)) {
-      continue;
+    if (path && !getCachedMediaUrl(path)) {
+      paths.add(path);
     }
 
-    paths.add(path);
+    if (media.thumbPath?.trim() && !getCachedMediaUrl(media.thumbPath.trim())) {
+      paths.add(media.thumbPath.trim());
+    }
   }
 
   return [...paths];

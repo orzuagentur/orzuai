@@ -32,6 +32,7 @@ import {
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
+import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
 import type {
   ConnectTelegramBotResult,
@@ -552,7 +553,10 @@ export async function sendTelegramChatMessage(
   businessId: string,
   conversationId: string,
   content: string,
-): Promise<{ success: true } | { success: false; message: string }> {
+): Promise<
+  | { success: true; message: InsertedChannelMessageRow }
+  | { success: false; message: string }
+> {
   const admin = createAdminClient();
 
   const { data: conversation } = await admin
@@ -612,7 +616,7 @@ export async function sendTelegramChatMessage(
     console.error("[telegram] outbound delivery failed", error);
   });
 
-  return { success: true };
+  return { success: true, message: insertedMessage };
 }
 
 async function deliverTelegramOutboundText(input: {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
 import {
-  getCachedMediaUrl,
+  resolveCachedMediaUrl,
   setCachedMediaUrl,
 } from "@/lib/client-cache/inbox-messenger-cache";
 import type { ChatMediaPayload } from "@/utils/chat-media";
@@ -16,6 +16,7 @@ import {
 
 type UseChatMediaUrlOptions = {
   messageId?: string;
+  enabled?: boolean;
 };
 
 type UseChatMediaUrlResult = {
@@ -24,9 +25,28 @@ type UseChatMediaUrlResult = {
   error: boolean;
 };
 
-function getInitialMediaUrl(
-  cacheKey: string | undefined,
+function getCandidateCacheKeys(
   media: ChatMediaPayload,
+  messageId?: string,
+): string[] {
+  const keys: string[] = [];
+  const storagePath = resolveMediaStoragePath(media);
+  const cacheKey = buildMediaUrlCacheKey(media, messageId);
+
+  if (storagePath) {
+    keys.push(storagePath);
+  }
+
+  if (cacheKey && !keys.includes(cacheKey)) {
+    keys.push(cacheKey);
+  }
+
+  return keys;
+}
+
+function getInitialMediaUrl(
+  media: ChatMediaPayload,
+  messageId?: string,
 ): string | null {
   if (media.url?.startsWith("blob:")) {
     return media.url;
@@ -36,27 +56,26 @@ function getInitialMediaUrl(
     return null;
   }
 
-  if (!cacheKey) {
-    return null;
-  }
-
-  return getCachedMediaUrl(cacheKey);
+  return resolveCachedMediaUrl(getCandidateCacheKeys(media, messageId));
 }
 
 export function useChatMediaUrl(
   media: ChatMediaPayload,
   options: UseChatMediaUrlOptions = {},
 ): UseChatMediaUrlResult {
+  const enabled = options.enabled ?? true;
   const storagePath = resolveMediaStoragePath(media);
-  const cacheKey = buildMediaUrlCacheKey(media, options.messageId);
+  const cacheKeys = getCandidateCacheKeys(media, options.messageId);
+  const primaryCacheKey = buildMediaUrlCacheKey(media, options.messageId);
 
   const [url, setUrl] = useState<string | null>(() =>
-    getInitialMediaUrl(cacheKey, media),
+    getInitialMediaUrl(media, options.messageId),
   );
   const [isLoading, setIsLoading] = useState(
     () =>
-      isMediaPendingHydration(media) ||
-      !getInitialMediaUrl(cacheKey, media),
+      enabled &&
+      (isMediaPendingHydration(media) ||
+        !getInitialMediaUrl(media, options.messageId)),
   );
   const [error, setError] = useState(false);
 
@@ -64,6 +83,11 @@ export function useChatMediaUrl(
     let cancelled = false;
 
     async function load() {
+      if (!enabled) {
+        setIsLoading(false);
+        return;
+      }
+
       if (media.url?.startsWith("blob:")) {
         setUrl(media.url);
         setError(false);
@@ -85,12 +109,12 @@ export function useChatMediaUrl(
         return;
       }
 
-      const initial = getInitialMediaUrl(cacheKey, media);
+      const initial = getInitialMediaUrl(media, options.messageId);
       setUrl(initial);
       setError(false);
       setIsLoading(!initial);
 
-      const cached = cacheKey ? getCachedMediaUrl(cacheKey) : null;
+      const cached = resolveCachedMediaUrl(cacheKeys);
 
       if (cached) {
         setUrl(cached);
@@ -112,8 +136,12 @@ export function useChatMediaUrl(
       }
 
       if (result.success) {
-        if (cacheKey) {
+        for (const cacheKey of cacheKeys) {
           setCachedMediaUrl(cacheKey, result.url);
+        }
+
+        if (storagePath && !cacheKeys.includes(storagePath)) {
+          setCachedMediaUrl(storagePath, result.url);
         }
 
         setUrl(result.url);
@@ -131,7 +159,15 @@ export function useChatMediaUrl(
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, media.path, media.url, options.messageId, storagePath]);
+  }, [
+    cacheKeys.join("|"),
+    enabled,
+    media.path,
+    media.url,
+    options.messageId,
+    primaryCacheKey,
+    storagePath,
+  ]);
 
   return { url, isLoading, error };
 }

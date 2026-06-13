@@ -40,6 +40,24 @@ export function getCachedMediaUrl(key: string): string | null {
   return mediaUrlCache.get(key);
 }
 
+export function resolveCachedMediaUrl(
+  keys: Array<string | null | undefined>,
+): string | null {
+  for (const key of keys) {
+    if (!key) {
+      continue;
+    }
+
+    const cached = mediaUrlCache.get(key);
+
+    if (cached) {
+      return cached;
+    }
+  }
+
+  return null;
+}
+
 export function setCachedMediaUrl(key: string, url: string): void {
   mediaUrlCache.set(key, url);
 }

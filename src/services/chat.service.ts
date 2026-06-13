@@ -1009,6 +1009,15 @@ export async function sendChatMessage(
         },
       };
     }
+
+    revalidateChatPaths(conversation.channel);
+
+    return {
+      success: true,
+      data: {
+        message: mapChatMessage(sendResult.message),
+      },
+    };
   } else if (conversation.channel === "telegram") {
     const sendResult = await sendTelegramChatMessage(
       businessId,
@@ -1025,6 +1034,15 @@ export async function sendChatMessage(
         },
       };
     }
+
+    revalidateChatPaths(conversation.channel);
+
+    return {
+      success: true,
+      data: {
+        message: mapChatMessage(sendResult.message),
+      },
+    };
   } else if (conversation.channel === "website_forms") {
     const connected = await isWebsiteFormsConnected(businessId);
 
@@ -1136,48 +1154,9 @@ export async function sendChatMessage(
     };
   }
 
-  const now = new Date().toISOString();
-
-  if (
-    conversation.channel === "instagram" ||
-    conversation.channel === "telegram"
-  ) {
-    const { data: latestMessage } = await supabase
-      .from("messages")
-      .select(
-        "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
-      )
-      .eq("conversation_id", parsed.data.conversationId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!latestMessage) {
-      return {
-        success: false,
-        error: {
-          code: "SEND_FAILED",
-          message: CHAT_MESSAGES.sendFailed,
-        },
-      };
-    }
-
-    await supabase
-      .from("conversations")
-      .update({ updated_at: now })
-      .eq("id", parsed.data.conversationId);
-
-    revalidateChatPaths(conversation.channel);
-
-    return {
-      success: true,
-      data: {
-        message: mapChatMessage(latestMessage),
-      },
-    };
-  }
-
   const contact = resolveContactFromRow(conversation.contact);
+
+  const now = new Date().toISOString();
 
   await insertChannelMessage(supabase, {
     conversationId: parsed.data.conversationId,

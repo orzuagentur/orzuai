@@ -82,11 +82,13 @@ function MediaDownloadButton({
   fileName,
   isOutgoing,
   className,
+  onClick,
 }: {
   url: string;
   fileName: string;
   isOutgoing?: boolean;
   className?: string;
+  onClick?: () => void;
 }) {
   return (
     <a
@@ -94,6 +96,7 @@ function MediaDownloadButton({
       download={fileName}
       target="_blank"
       rel="noreferrer"
+      onClick={onClick}
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
         isOutgoing
@@ -133,29 +136,47 @@ function CaptionText({
 
 function ChatMediaImage({
   media,
+  messageId,
   caption,
   isOutgoing,
-  resolvedUrl,
   previewUrl,
-  isLoading,
-  hasError,
+  isPreviewLoading,
+  previewError,
 }: {
   media: ChatMediaPayload;
+  messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
-  resolvedUrl: string | null;
   previewUrl: string | null;
-  isLoading: boolean;
-  hasError: boolean;
+  isPreviewLoading: boolean;
+  previewError: boolean;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [needsFullUrl, setNeedsFullUrl] = useState(false);
+  const hasThumb = Boolean(media.thumbPath);
+  const shouldLoadFullUrl = lightboxOpen || needsFullUrl || !hasThumb;
+  const {
+    url: fullUrl,
+    isLoading: isFullLoading,
+    error: fullError,
+  } = useChatMediaUrl(media, {
+    messageId,
+    enabled: shouldLoadFullUrl,
+  });
   const displayUrl =
     previewUrl ??
-    resolvedUrl ??
+    fullUrl ??
     (media.url?.startsWith("blob:") ? media.url : null);
-  const fullUrl =
-    resolvedUrl ??
-    (media.url?.startsWith("blob:") ? media.url : null);
+  const resolvedFullUrl =
+    fullUrl ?? (media.url?.startsWith("blob:") ? media.url : null);
+  const isLoading = hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading;
+  const hasError = hasThumb
+    ? previewError && !displayUrl
+    : (fullError || previewError) && !displayUrl;
+
+  const requestFullUrl = () => {
+    setNeedsFullUrl(true);
+  };
 
   if (isLoading && !displayUrl) {
     return (
@@ -180,7 +201,10 @@ function ChatMediaImage({
       <div className="group relative max-w-[min(280px,100%)]">
         <button
           type="button"
-          onClick={() => setLightboxOpen(true)}
+          onClick={() => {
+            requestFullUrl();
+            setLightboxOpen(true);
+          }}
           className="block w-full overflow-hidden rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
           aria-label={CHAT_MESSAGES.openMediaPreview}
         >
@@ -202,10 +226,11 @@ function ChatMediaImage({
         {!isLoading ? (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <MediaDownloadButton
-              url={fullUrl ?? displayUrl}
+              url={resolvedFullUrl ?? displayUrl}
               fileName={media.fileName}
               isOutgoing={isOutgoing}
               className="bg-black/55 text-white hover:bg-black/70"
+              onClick={requestFullUrl}
             />
           </div>
         ) : null}
@@ -219,9 +244,10 @@ function ChatMediaImage({
           <DialogTitle className="sr-only">{media.fileName}</DialogTitle>
           <div className="absolute top-2 right-2 z-10 flex gap-1">
             <MediaDownloadButton
-              url={fullUrl ?? displayUrl}
+              url={resolvedFullUrl ?? displayUrl}
               fileName={media.fileName}
               className="bg-white/10 text-white hover:bg-white/20"
+              onClick={requestFullUrl}
             />
             <Button
               type="button"
@@ -236,7 +262,7 @@ function ChatMediaImage({
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={fullUrl ?? displayUrl}
+            src={resolvedFullUrl ?? displayUrl}
             alt={media.fileName}
             className="max-h-[88vh] max-w-full object-contain"
           />
@@ -416,19 +442,24 @@ export function ChatMediaMessage({
   caption,
   isOutgoing = false,
 }: ChatMediaMessageProps) {
-  const { url, isLoading, error } = useChatMediaUrl(media, { messageId });
-  const previewMedia = media.thumbPath
-    ? { ...media, path: media.thumbPath }
-    : media;
+  const hasThumb = Boolean(media.thumbPath && media.kind === "image");
+  const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
   const {
-    url: previewResolvedUrl,
+    url: previewUrl,
     isLoading: isPreviewLoading,
     error: previewError,
-  } = useChatMediaUrl(previewMedia, {
-    messageId: media.thumbPath ? `${messageId}:thumb` : messageId,
+  } = useChatMediaUrl(previewMedia, { messageId });
+  const {
+    url: resolvedUrl,
+    isLoading: isFullLoading,
+    error: fullError,
+  } = useChatMediaUrl(media, {
+    messageId,
+    enabled: !hasThumb,
   });
   const isHydrating = isMediaPendingHydration(media);
-  const showLoading = isLoading || isPreviewLoading || isHydrating;
+  const showLoading =
+    isHydrating || (hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading);
 
   if (!isHydrating && !media.path && !media.url) {
     return (
@@ -439,19 +470,29 @@ export function ChatMediaMessage({
     );
   }
 
+  if (media.kind === "image") {
+    return (
+      <ChatMediaImage
+        media={media}
+        messageId={messageId}
+        caption={caption}
+        isOutgoing={isOutgoing}
+        previewUrl={hasThumb ? previewUrl : resolvedUrl}
+        isPreviewLoading={showLoading}
+        previewError={hasThumb ? previewError : fullError || previewError}
+      />
+    );
+  }
+
   const shared = {
     media,
     caption,
     isOutgoing,
-    resolvedUrl: url,
-    previewUrl: media.thumbPath ? previewResolvedUrl : url,
+    resolvedUrl,
+    previewUrl: resolvedUrl,
     isLoading: showLoading,
-    hasError: (error || previewError) && !isHydrating,
+    hasError: (fullError || previewError) && !isHydrating,
   };
-
-  if (media.kind === "image") {
-    return <ChatMediaImage {...shared} />;
-  }
 
   if (media.kind === "video") {
     return <ChatMediaVideo {...shared} />;

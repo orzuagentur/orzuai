@@ -42,6 +42,7 @@ import {
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
+import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { InstagramConnection } from "@/types/database.types";
 import type {
   CompleteInstagramEmbeddedSignupInput,
@@ -734,7 +735,10 @@ export async function sendInstagramChatMessage(
   businessId: string,
   conversationId: string,
   content: string,
-): Promise<{ success: true } | { success: false; message: string }> {
+): Promise<
+  | { success: true; message: InsertedChannelMessageRow }
+  | { success: false; message: string }
+> {
   const admin = createAdminClient();
 
   const { data: conversation } = await admin
@@ -795,7 +799,7 @@ export async function sendInstagramChatMessage(
     console.error("[instagram] outbound delivery failed", error);
   });
 
-  return { success: true };
+  return { success: true, message: insertedMessage };
 }
 
 async function deliverInstagramOutboundText(input: {
