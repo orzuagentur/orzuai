@@ -44,13 +44,39 @@ export async function enqueueInboundWebhook(
 
   if (error) {
     if (error.code === "23505") {
+      scheduleInboundWebhookProcessing();
       return { queued: false, duplicate: true };
     }
 
     throw error;
   }
 
+  scheduleInboundWebhookProcessing();
   return { queued: true, duplicate: false };
+}
+
+let webhookDrainPromise: Promise<void> | null = null;
+
+async function drainInboundWebhookQueue(): Promise<void> {
+  let batch = await processPendingInboundWebhooks();
+
+  while (batch.processed === BATCH_SIZE) {
+    batch = await processPendingInboundWebhooks();
+  }
+}
+
+export function scheduleInboundWebhookProcessing(): void {
+  if (webhookDrainPromise) {
+    return;
+  }
+
+  webhookDrainPromise = drainInboundWebhookQueue()
+    .catch((error) => {
+      console.error("[webhook-queue] immediate processing failed", error);
+    })
+    .finally(() => {
+      webhookDrainPromise = null;
+    });
 }
 
 async function processWebhookJob(job: {

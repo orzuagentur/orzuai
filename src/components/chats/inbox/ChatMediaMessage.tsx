@@ -7,6 +7,7 @@ import {
   FileTextIcon,
   ImageIcon,
   Loader2Icon,
+  MicIcon,
   PlayIcon,
   VideoIcon,
   XIcon,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import {
   formatMediaFileSize,
   isMediaPendingHydration,
+  type ChatMediaKind,
   type ChatMediaPayload,
 } from "@/utils/chat-media";
 
@@ -33,17 +35,101 @@ type ChatMediaMessageProps = {
   messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
+  isHydrating?: boolean;
 };
 
-function MediaLoadingPlaceholder({ className }: { className?: string }) {
+function getMediaHydratingLabel(kind: ChatMediaKind): string {
+  if (kind === "image") {
+    return CHAT_MESSAGES.mediaHydratingPhoto;
+  }
+
+  if (kind === "audio") {
+    return CHAT_MESSAGES.mediaHydratingVoice;
+  }
+
+  if (kind === "video") {
+    return CHAT_MESSAGES.mediaHydratingVideo;
+  }
+
+  return CHAT_MESSAGES.mediaHydratingFile;
+}
+
+function getMediaHydratingIcon(kind: ChatMediaKind) {
+  if (kind === "image") {
+    return ImageIcon;
+  }
+
+  if (kind === "audio") {
+    return MicIcon;
+  }
+
+  if (kind === "video") {
+    return VideoIcon;
+  }
+
+  return FileIcon;
+}
+
+function MediaHydratingPlaceholder({
+  kind,
+  isOutgoing,
+  className,
+}: {
+  kind: ChatMediaKind;
+  isOutgoing?: boolean;
+  className?: string;
+}) {
+  const Icon = getMediaHydratingIcon(kind);
+  const label = getMediaHydratingLabel(kind);
+
   return (
     <div
       className={cn(
-        "flex min-h-[120px] min-w-[180px] items-center justify-center rounded-lg bg-black/5",
+        "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg px-4 py-5 text-center",
+        isOutgoing ? "bg-emerald-800/25 text-emerald-50" : "bg-black/5 text-muted-foreground",
         className,
       )}
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+    >
+      <div
+        className={cn(
+          "flex size-11 items-center justify-center rounded-full",
+          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+        )}
+      >
+        <Icon className="size-5 opacity-80" aria-hidden />
+      </div>
+      <div className="flex items-center gap-2 text-xs font-medium">
+        <Loader2Icon className="size-3.5 shrink-0 animate-spin" aria-hidden />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function MediaLoadingPlaceholder({
+  className,
+  label,
+}: {
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-[120px] min-w-[180px] flex-col items-center justify-center gap-2 rounded-lg bg-black/5 px-3 py-4",
+        className,
+      )}
+      role="status"
+      aria-live="polite"
+      aria-label={label ?? CHAT_MESSAGES.mediaHydratingFile}
     >
       <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+      {label ? (
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      ) : null}
     </div>
   );
 }
@@ -142,6 +228,7 @@ function ChatMediaImage({
   previewUrl,
   isPreviewLoading,
   previewError,
+  isHydrating = false,
 }: {
   media: ChatMediaPayload;
   messageId?: string;
@@ -150,6 +237,7 @@ function ChatMediaImage({
   previewUrl: string | null;
   isPreviewLoading: boolean;
   previewError: boolean;
+  isHydrating?: boolean;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [needsFullUrl, setNeedsFullUrl] = useState(false);
@@ -178,10 +266,26 @@ function ChatMediaImage({
     setNeedsFullUrl(true);
   };
 
+  if (isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaHydratingPlaceholder
+          kind="image"
+          isOutgoing={isOutgoing}
+          className="max-w-[min(280px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
+
   if (isLoading && !displayUrl) {
     return (
       <div className="space-y-1">
-        <MediaLoadingPlaceholder className="max-w-[min(280px,100%)]" />
+        <MediaLoadingPlaceholder
+          className="max-w-[min(280px,100%)]"
+          label={CHAT_MESSAGES.mediaHydratingPhoto}
+        />
         <CaptionText caption={caption} isOutgoing={isOutgoing} />
       </div>
     );
@@ -281,6 +385,7 @@ function ChatMediaVideo({
   resolvedUrl,
   isLoading,
   hasError,
+  isHydrating = false,
 }: {
   media: ChatMediaPayload;
   caption?: string;
@@ -288,11 +393,28 @@ function ChatMediaVideo({
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
+  isHydrating?: boolean;
 }) {
+  if (isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaHydratingPlaceholder
+          kind="video"
+          isOutgoing={isOutgoing}
+          className="max-w-[min(300px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-1">
-        <MediaLoadingPlaceholder className="max-w-[min(300px,100%)]" />
+        <MediaLoadingPlaceholder
+          className="max-w-[min(300px,100%)]"
+          label={CHAT_MESSAGES.mediaHydratingVideo}
+        />
         <CaptionText caption={caption} isOutgoing={isOutgoing} />
       </div>
     );
@@ -343,6 +465,7 @@ function ChatMediaAudio({
   resolvedUrl,
   isLoading,
   hasError,
+  isHydrating = false,
 }: {
   media: ChatMediaPayload;
   messageId?: string;
@@ -351,10 +474,24 @@ function ChatMediaAudio({
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
+  isHydrating?: boolean;
 }) {
   const playbackUrl =
     resolvedUrl ??
     (media.url?.startsWith("blob:") ? media.url : null);
+
+  if (isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaHydratingPlaceholder
+          kind="audio"
+          isOutgoing={isOutgoing}
+          className="min-h-[72px] max-w-[min(300px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
 
   if (hasError && !playbackUrl) {
     return (
@@ -386,6 +523,7 @@ function ChatMediaDocument({
   resolvedUrl,
   isLoading,
   hasError,
+  isHydrating = false,
 }: {
   media: ChatMediaPayload;
   caption?: string;
@@ -393,9 +531,23 @@ function ChatMediaDocument({
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
+  isHydrating?: boolean;
 }) {
   const DocIcon = getDocumentIcon(media.mimeType);
   const sizeLabel = formatMediaFileSize(media.sizeBytes);
+
+  if (isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaHydratingPlaceholder
+          kind="document"
+          isOutgoing={isOutgoing}
+          className="min-h-[88px] max-w-[min(300px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1">
@@ -441,23 +593,28 @@ export function ChatMediaMessage({
   messageId,
   caption,
   isOutgoing = false,
+  isHydrating: isHydratingProp,
 }: ChatMediaMessageProps) {
+  const isHydrating =
+    isHydratingProp ?? isMediaPendingHydration(media);
   const hasThumb = Boolean(media.thumbPath && media.kind === "image");
   const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
   const {
     url: previewUrl,
     isLoading: isPreviewLoading,
     error: previewError,
-  } = useChatMediaUrl(previewMedia, { messageId });
+  } = useChatMediaUrl(previewMedia, {
+    messageId,
+    enabled: !isHydrating,
+  });
   const {
     url: resolvedUrl,
     isLoading: isFullLoading,
     error: fullError,
   } = useChatMediaUrl(media, {
     messageId,
-    enabled: !hasThumb,
+    enabled: !isHydrating && !hasThumb,
   });
-  const isHydrating = isMediaPendingHydration(media);
   const showLoading =
     isHydrating || (hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading);
 
@@ -480,6 +637,7 @@ export function ChatMediaMessage({
         previewUrl={hasThumb ? previewUrl : resolvedUrl}
         isPreviewLoading={showLoading}
         previewError={hasThumb ? previewError : fullError || previewError}
+        isHydrating={isHydrating}
       />
     );
   }
@@ -492,6 +650,7 @@ export function ChatMediaMessage({
     previewUrl: resolvedUrl,
     isLoading: showLoading,
     hasError: (fullError || previewError) && !isHydrating,
+    isHydrating,
   };
 
   if (media.kind === "video") {

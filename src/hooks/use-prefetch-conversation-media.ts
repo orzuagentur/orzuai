@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { prefetchChatMediaUrlsAction } from "@/features/chats/actions/prefetch-chat-media-urls";
+import { warmMediaBlobCache } from "@/lib/client-cache/media-browser-cache";
 import {
   getCachedMediaUrl,
   setCachedMediaUrl,
@@ -60,6 +61,7 @@ export function usePrefetchConversationMedia(
 
       for (const [path, url] of Object.entries(result.urls)) {
         setCachedMediaUrl(path, url);
+        void warmMediaBlobCache(path, url);
       }
     });
   }, [enabled, messages]);

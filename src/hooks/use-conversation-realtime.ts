@@ -8,8 +8,10 @@ import {
   waitForSupabaseRealtime,
 } from "@/lib/supabase/realtime-auth";
 import {
+  CONVERSATION_MESSAGE_UPDATED_EVENT,
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
+  type ConversationMessageUpdatedPayload,
   type ConversationTypingPayload,
 } from "@/lib/realtime/conversation-channel";
 import type { ChatMessageData } from "@/types/chat.types";
@@ -189,6 +191,23 @@ export function useConversationRealtime({
 
             clearTypingTimeout();
             setIsClientTyping(false);
+          },
+        )
+        .on(
+          "broadcast",
+          { event: CONVERSATION_MESSAGE_UPDATED_EVENT },
+          (payload) => {
+            const row = payload.payload as ConversationMessageUpdatedPayload;
+
+            if (row.hidden_for_business) {
+              onMessageHiddenRef.current?.(row.id);
+              return;
+            }
+
+            onMessageUpdatedRef.current?.({
+              ...mapChatMessage(row),
+              attachmentPending: row.attachment_pending ?? false,
+            });
           },
         )
         .subscribe((status) => {

@@ -413,8 +413,9 @@ export function useInboxActiveConversation({
     conversationId: selectedConversationId,
     latestMessageAt,
     latestMessageId,
-    enabled:
-      Boolean(selectedConversationId && conversation) && !isRealtimeConnected,
+    enabled: Boolean(selectedConversationId && conversation),
+    pollNewMessages: !isRealtimeConnected,
+    syncRecentMessages: true,
     onNewMessages: (messages) => {
       for (const message of messages) {
         appendMessageRef.current(message);

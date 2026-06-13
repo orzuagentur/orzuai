@@ -107,6 +107,10 @@ export const CHAT_MESSAGES = {
   mediaNotSupportedForChannel:
     "Media is not supported for this channel.",
   mediaLoadFailed: "Unable to load attachment",
+  mediaHydratingPhoto: "Downloading photo…",
+  mediaHydratingVoice: "Downloading voice message…",
+  mediaHydratingVideo: "Downloading video…",
+  mediaHydratingFile: "Downloading file…",
   openMediaPreview: "Open attachment preview",
   closeMediaPreview: "Close preview",
   downloadAttachment: "Download file",

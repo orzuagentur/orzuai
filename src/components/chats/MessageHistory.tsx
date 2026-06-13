@@ -19,7 +19,7 @@ import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { usePrefetchConversationMedia } from "@/hooks/use-prefetch-conversation-media";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
-import { parseMediaMessage } from "@/utils/chat-media";
+import { parseMediaMessage, isMediaPendingHydration } from "@/utils/chat-media";
 import { isChatMessageDeletedForAll } from "@/utils/chat";
 import {
   findFirstUnreadClientMessageIndex,
@@ -254,6 +254,10 @@ export function MessageHistory({
                     messageId={message.id}
                     caption={text}
                     isOutgoing={isOutgoing}
+                    isHydrating={
+                      Boolean(message.attachmentPending) ||
+                      isMediaPendingHydration(media)
+                    }
                   />
                 ) : (
                   <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]">
