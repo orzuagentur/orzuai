@@ -35,28 +35,34 @@ function buildTabHref(
     });
   }
 
-  if (tab === "leads" && listData && "activeLeadSegment" in listData) {
+  if (tab === "leads") {
+    const leadsData =
+      listData && "activeLeadSegment" in listData ? listData : null;
+
     return buildContactsHref({
       tab: "leads",
-      channel: listData.activeChannelFilter,
-      leadSegment: listData.activeLeadSegment,
-      view: listData.activeView,
-      contact: listData.activeContactId,
-      profile: listData.showProfilePanel,
-      q: listData.searchQuery || null,
-      page: listData.page,
+      channel: leadsData?.activeChannelFilter ?? listData?.activeChannelFilter,
+      leadSegment: leadsData?.activeLeadSegment,
+      view: leadsData?.activeView ?? listData?.activeView,
+      contact: leadsData?.activeContactId ?? listData?.activeContactId,
+      profile: leadsData?.showProfilePanel ?? listData?.showProfilePanel,
+      q: leadsData?.searchQuery ?? listData?.searchQuery ?? null,
+      page: leadsData?.page ?? listData?.page,
     });
   }
 
+  const contactsData =
+    listData && !("activeLeadSegment" in listData) ? listData : null;
+
   return buildContactsHref({
     tab: "contacts",
-    channel: listData?.activeChannelFilter,
-    segment: listData?.activeSegment,
-    view: listData?.activeView,
-    contact: listData?.activeContactId,
-    profile: listData?.showProfilePanel,
-    q: listData?.searchQuery || null,
-    page: listData?.page,
+    channel: contactsData?.activeChannelFilter ?? listData?.activeChannelFilter,
+    segment: contactsData?.activeSegment ?? listData?.activeSegment,
+    view: contactsData?.activeView ?? listData?.activeView,
+    contact: contactsData?.activeContactId ?? listData?.activeContactId,
+    profile: contactsData?.showProfilePanel ?? listData?.showProfilePanel,
+    q: contactsData?.searchQuery ?? listData?.searchQuery ?? null,
+    page: contactsData?.page ?? listData?.page,
   });
 }
 
