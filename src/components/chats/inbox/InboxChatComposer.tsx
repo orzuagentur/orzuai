@@ -33,6 +33,7 @@ import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants
 import { CHAT_ATTACHMENT_ACCEPT } from "@/features/chats/chat-attachments";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { cn } from "@/lib/utils";
+import type { MediaUploadProgress } from "@/hooks/use-send-chat-media";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -62,6 +63,7 @@ type InboxChatComposerProps = {
   websiteFormsHint?: boolean;
   isSending: boolean;
   isSendingMedia?: boolean;
+  mediaUploadProgress?: MediaUploadProgress | null;
   composerTab: "reply" | "note";
   onComposerTabChange: (tab: "reply" | "note") => void;
   onSubmit: () => void;
@@ -114,6 +116,7 @@ export function InboxChatComposer({
   websiteFormsHint = false,
   isSending,
   isSendingMedia = false,
+  mediaUploadProgress = null,
   composerTab,
   onComposerTabChange,
   onSubmit,
@@ -411,6 +414,9 @@ export function InboxChatComposer({
               caption={mediaCaption}
               onCaptionChange={setMediaCaption}
               isSending={isSendingMedia}
+              uploadProgress={mediaUploadProgress?.percent}
+              uploadSpeedBps={mediaUploadProgress?.bytesPerSecond}
+              uploadPhase={mediaUploadProgress?.phase}
               onCancel={clearPendingAttachment}
               onSend={() => {
                 void handleSendPendingAttachment();

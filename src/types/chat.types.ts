@@ -91,6 +91,12 @@ export type ChatMessageData = {
   isEdited: boolean;
   /** Client-only optimistic outbound message before server confirms. */
   isPending?: boolean;
+  /** 0–100 while optimistic media is uploading. */
+  uploadProgress?: number;
+  /** Bytes per second during media upload. */
+  uploadSpeedBps?: number;
+  /** Client-only media send phase before server confirms. */
+  uploadPhase?: "preparing" | "uploading" | "completing";
   /** Outbound delivery state from message_deliveries (user messages only). */
   deliveryStatus?: MessageDeliveryStatus | null;
   /** Inbound/outbound media still hydrating in storage. */

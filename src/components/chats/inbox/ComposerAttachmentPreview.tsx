@@ -24,6 +24,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { cn } from "@/lib/utils";
+import type { ChatMessageData } from "@/types/chat.types";
+import {
+  formatUploadPercent,
+  formatUploadSpeed,
+} from "@/utils/format-upload-rate";
 
 export type ComposerAttachmentKind =
   | "image"
@@ -39,6 +44,9 @@ export type ComposerAttachmentPreviewProps = {
   caption: string;
   onCaptionChange: (value: string) => void;
   isSending: boolean;
+  uploadProgress?: number;
+  uploadSpeedBps?: number;
+  uploadPhase?: ChatMessageData["uploadPhase"];
   onCancel: () => void;
   onSend: () => void;
 };
@@ -181,6 +189,9 @@ export function ComposerAttachmentPreview({
   caption,
   onCaptionChange,
   isSending,
+  uploadProgress,
+  uploadSpeedBps,
+  uploadPhase,
   onCancel,
   onSend,
 }: ComposerAttachmentPreviewProps) {
@@ -314,6 +325,33 @@ export function ComposerAttachmentPreview({
                 disabled={isSending}
                 className="h-9"
               />
+            </div>
+          ) : null}
+
+          {isSending && uploadPhase ? (
+            <div className="space-y-1.5 rounded-lg border bg-muted/30 px-3 py-2">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span>
+                  {uploadPhase === "preparing"
+                    ? CHAT_MESSAGES.mediaUploadPreparing
+                    : uploadPhase === "completing"
+                      ? CHAT_MESSAGES.mediaUploadCompleting
+                      : formatUploadPercent(uploadProgress ?? 0)}
+                </span>
+                {uploadPhase === "uploading" && uploadSpeedBps ? (
+                  <span className="text-muted-foreground">
+                    {formatUploadSpeed(uploadSpeedBps)}
+                  </span>
+                ) : null}
+              </div>
+              {uploadPhase === "uploading" ? (
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-150 ease-out"
+                    style={{ width: `${Math.min(100, uploadProgress ?? 0)}%` }}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
 

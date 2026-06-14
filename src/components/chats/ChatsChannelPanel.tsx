@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
@@ -35,9 +35,7 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES, type ChatChannelId } from "@/features/chats";
-import type { ChatInboxFilter } from "@/features/chats/constants";
-import { filterConversations } from "@/utils/chat-inbox-filters";
-import { sortConversations } from "@/utils/chat-inbox-priority";
+import { INBOX_PAGE_SIZE, type ChatInboxFilter } from "@/features/chats/constants";
 import type {
   ChatMonitorChannelStats,
   ChatsChannelPageData,
@@ -150,7 +148,10 @@ export function ChatsChannelPanel({
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
+  const [, startFetching] = useTransition();
+  const skipInitialFetchRef = useRef(!usesClientBootstrap);
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
 
@@ -224,23 +225,40 @@ export function ChatsChannelPanel({
     usesClientBootstrap,
   ]);
 
-  const refreshConversations = useCallback(async () => {
-    const result = await fetchMonitorConversationsAction({
-      channel: channelId,
-      offset: 0,
-      limit: 100,
-      view: "all",
-      filter: "all",
-      sort: "latest",
-    });
+  const fetchConversations = useCallback(
+    (silent = false) => {
+      const run = async () => {
+        const result = await fetchMonitorConversationsAction({
+          channel: channelId,
+          offset: 0,
+          limit: INBOX_PAGE_SIZE,
+          search: debouncedSearch || undefined,
+          view: "all",
+          filter: activeFilter,
+          sort: "latest",
+        });
 
-    if (result.success) {
-      setConversations(result.data.items);
-    }
-  }, [channelId]);
+        if (result.success) {
+          setConversations(result.data.items);
+        }
+      };
+
+      if (silent) {
+        void run();
+        return;
+      }
+
+      startFetching(run);
+    },
+    [activeFilter, channelId, debouncedSearch],
+  );
+
+  const refreshConversations = useCallback(async () => {
+    fetchConversations(true);
+  }, [fetchConversations]);
 
   const hasActiveListFilters =
-    Boolean(searchQuery.trim()) || activeFilter !== "all";
+    Boolean(debouncedSearch) || activeFilter !== "all";
 
   useInboxListRealtime({
     enabled: hasBusiness && !isInitialLoading,
@@ -303,17 +321,24 @@ export function ChatsChannelPanel({
     [selectConversation],
   );
 
-  const filteredConversations = useMemo(
-    () =>
-      sortConversations(
-        filterConversations(conversations, {
-          searchQuery,
-          filter: activeFilter,
-        }),
-        "latest",
-      ),
-    [activeFilter, conversations, searchQuery],
-  );
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+      return;
+    }
+
+    if (!isInitialLoading) {
+      fetchConversations();
+    }
+  }, [fetchConversations, isInitialLoading]);
 
   const selectedListItem = useMemo(() => {
     if (!selectedConversationId) {
@@ -381,19 +406,20 @@ export function ChatsChannelPanel({
         />
       }
       listColumn={
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1">
           {isInitialLoading ? (
             <ConversationListSkeleton rows={8} />
           ) : (
             <ChatList
-              conversations={filteredConversations}
+              className="h-full"
+              conversations={conversations}
               activeConversationId={activeConversationId}
               channelId={channelId}
               hideChannelBadge
               onConversationSelect={handleConversationSelect}
               variant="inbox"
               emptyVariant={
-                conversations.length > 0 && filteredConversations.length === 0
+                hasActiveListFilters && conversations.length === 0
                   ? "search"
                   : "default"
               }

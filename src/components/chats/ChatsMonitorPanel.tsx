@@ -500,48 +500,47 @@ export function ChatsMonitorPanel({
         />
       }
       listColumn={
-        <>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {isInitialLoading ? (
-              <ConversationListSkeleton rows={8} />
-            ) : (
-              <>
-                {showNeedsAttentionSection ? (
-                  <div className="border-b bg-amber-500/5">
-                    <div className="px-4 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                      {CHAT_MESSAGES.needsAttentionTitle}
-                    </div>
-                    <ChatList
-                      conversations={needsAttentionConversations}
-                      activeConversationId={activeConversationId}
-                      channelId="whatsapp"
-                      linkToConversationChannel
-                      linkMode="overview"
-                      onConversationSelect={handleConversationSelect}
-                      variant="inbox"
-                    />
+        <div className="flex min-h-0 flex-1 flex-col">
+          {isInitialLoading ? (
+            <ConversationListSkeleton rows={8} />
+          ) : (
+            <>
+              {showNeedsAttentionSection ? (
+                <div className="shrink-0 border-b bg-amber-500/5">
+                  <div className="px-4 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    {CHAT_MESSAGES.needsAttentionTitle}
                   </div>
-                ) : null}
+                  <ChatList
+                    conversations={needsAttentionConversations}
+                    activeConversationId={activeConversationId}
+                    channelId="whatsapp"
+                    linkToConversationChannel
+                    linkMode="overview"
+                    onConversationSelect={handleConversationSelect}
+                    variant="inbox"
+                  />
+                </div>
+              ) : null}
 
-                <ChatList
-                  conversations={mainConversations}
-                  activeConversationId={activeConversationId}
-                  channelId="whatsapp"
-                  linkToConversationChannel
-                  linkMode={favoritesOnly ? "favorites" : "overview"}
-                  onConversationSelect={handleConversationSelect}
-                  variant="inbox"
-                  emptyVariant={
-                    favoritesOnly
-                      ? "favorites"
-                      : totalCount > 0 && conversations.length === 0
-                        ? "search"
-                        : "default"
-                  }
-                />
-              </>
-            )}
-          </div>
+              <ChatList
+                className="min-h-0 flex-1"
+                conversations={mainConversations}
+                activeConversationId={activeConversationId}
+                channelId="whatsapp"
+                linkToConversationChannel
+                linkMode={favoritesOnly ? "favorites" : "overview"}
+                onConversationSelect={handleConversationSelect}
+                variant="inbox"
+                emptyVariant={
+                  favoritesOnly
+                    ? "favorites"
+                    : totalCount > 0 && conversations.length === 0
+                      ? "search"
+                      : "default"
+                }
+              />
+            </>
+          )}
 
           {!isInitialLoading && hasMore ? (
             <div className="shrink-0 border-t p-3">
@@ -559,7 +558,7 @@ export function ChatsMonitorPanel({
               </Button>
             </div>
           ) : null}
-        </>
+        </div>
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">

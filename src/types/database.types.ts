@@ -50,11 +50,16 @@ export type ConversationStatus =
 export type MessageSenderType = "user" | "client" | "ai";
 export type MessageDeliveryStatus =
   | "pending"
+  | "processing"
   | "sent"
   | "delivered"
   | "failed";
 export type MessageAttachmentKind = "image" | "audio" | "video" | "document";
-export type MessageAttachmentStatus = "pending" | "ready" | "failed";
+export type MessageAttachmentStatus =
+  | "pending"
+  | "processing"
+  | "ready"
+  | "failed";
 export type WebhookQueueStatus = "pending" | "processing" | "completed" | "failed";
 
 export type Database = {
@@ -992,6 +997,7 @@ export type Database = {
           message_id: string;
           business_id: string;
           channel: MessagingChannel;
+          conversation_id: string | null;
           status: MessageDeliveryStatus;
           attempt_count: number;
           max_attempts: number;
@@ -1008,6 +1014,7 @@ export type Database = {
           message_id: string;
           business_id: string;
           channel: MessagingChannel;
+          conversation_id?: string | null;
           status?: MessageDeliveryStatus;
           attempt_count?: number;
           max_attempts?: number;
@@ -1024,6 +1031,7 @@ export type Database = {
           message_id?: string;
           business_id?: string;
           channel?: MessagingChannel;
+          conversation_id?: string | null;
           status?: MessageDeliveryStatus;
           attempt_count?: number;
           max_attempts?: number;
@@ -1064,6 +1072,8 @@ export type Database = {
           size_bytes: number | null;
           duration_sec: number | null;
           provider_media_id: string | null;
+          provider_media_url: string | null;
+          provider_media_url_expires_at: string | null;
           status: MessageAttachmentStatus;
           thumbnail_path: string | null;
           thumb_width: number | null;
@@ -1087,6 +1097,8 @@ export type Database = {
           size_bytes?: number | null;
           duration_sec?: number | null;
           provider_media_id?: string | null;
+          provider_media_url?: string | null;
+          provider_media_url_expires_at?: string | null;
           status?: MessageAttachmentStatus;
           thumbnail_path?: string | null;
           thumb_width?: number | null;
@@ -1110,6 +1122,8 @@ export type Database = {
           size_bytes?: number | null;
           duration_sec?: number | null;
           provider_media_id?: string | null;
+          provider_media_url?: string | null;
+          provider_media_url_expires_at?: string | null;
           thumbnail_path?: string | null;
           thumb_width?: number | null;
           thumb_height?: number | null;
@@ -1932,6 +1946,75 @@ export type Database = {
           business_uuid: string;
         };
         Returns: boolean;
+      };
+      claim_inbound_webhook_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["inbound_webhook_queue"]["Row"][];
+      };
+      claim_message_delivery_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["message_deliveries"]["Row"][];
+      };
+      claim_message_delivery_job: {
+        Args: {
+          p_message_id: string;
+        };
+        Returns: Database["public"]["Tables"]["message_deliveries"]["Row"][];
+      };
+      claim_inbound_media_hydration_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["message_attachments"]["Row"][];
+      };
+      claim_inbound_media_hydration_job: {
+        Args: {
+          p_message_id: string;
+        };
+        Returns: Database["public"]["Tables"]["message_attachments"]["Row"][];
+      };
+      list_inbox_conversations: {
+        Args: {
+          p_business_id: string;
+          p_user_id?: string | null;
+          p_channel?: Database["public"]["Enums"]["messaging_channel"] | null;
+          p_search?: string | null;
+          p_view?: string;
+          p_filter?: string;
+          p_sort?: string;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          id: string;
+          channel: Database["public"]["Enums"]["messaging_channel"];
+          status: Database["public"]["Enums"]["conversation_status"];
+          updated_at: string;
+          last_read_at: string | null;
+          unread_count: number;
+          last_message_preview: string | null;
+          last_message_at: string | null;
+          last_message_sender_type: Database["public"]["Enums"]["message_sender_type"];
+          last_message_ai_generated: boolean;
+          last_client_message_at: string | null;
+          contact_id: string;
+          contact_name: string;
+          contact_phone: string;
+          contact_lead_score: number | null;
+          contact_is_favorite: boolean;
+          contact_avatar_url: string | null;
+          total_count: number;
+        }[];
+      };
+      inbox_search_tsquery: {
+        Args: {
+          p_search: string;
+        };
+        Returns: unknown;
       };
     };
     Enums: {

@@ -1,12 +1,8 @@
 import "server-only";
 
 import { sendInstagramMediaMessage } from "@/lib/instagram/client";
-import { sendTelegramMediaMessage } from "@/lib/telegram/client";
-import {
-  sendWhatsAppMediaMessage,
-  uploadWhatsAppMedia,
-} from "@/lib/whatsapp/client";
-import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
+import { sendTelegramMediaMessageByUrl } from "@/lib/telegram/client";
+import { sendWhatsAppMediaMessageByUrl } from "@/lib/whatsapp/client";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -20,22 +16,16 @@ export type ChannelMediaDeliveryInput = {
   channel: MessagingChannel;
   recipientId: string;
   content: string;
-  buffer: Buffer;
+  mediaUrl: string;
   fileName: string;
   mimeType: string;
   mediaKind: ChatMediaKind;
-  storagePath: string;
 };
-
-function bufferToBlob(buffer: Buffer, mimeType: string): Blob {
-  return new Blob([new Uint8Array(buffer)], { type: mimeType });
-}
 
 export async function deliverChannelMediaMessage(
   input: ChannelMediaDeliveryInput,
 ): Promise<ChannelTextDeliveryResult> {
   const { text: caption } = parseMediaMessage(input.content);
-  const blob = bufferToBlob(input.buffer, input.mimeType);
 
   if (input.channel === "website_forms" || input.channel === "email") {
     return { success: true };
@@ -60,24 +50,12 @@ export async function deliverChannelMediaMessage(
       return { success: false, error: "WhatsApp is not connected." };
     }
 
-    const uploadResult = await uploadWhatsAppMedia(
-      connection.meta_phone_number_id,
-      connection.meta_access_token,
-      blob,
-      input.mimeType,
-      input.fileName,
-    );
-
-    if (!uploadResult.success) {
-      return { success: false, error: uploadResult.message };
-    }
-
-    const sendResult = await sendWhatsAppMediaMessage(
+    const sendResult = await sendWhatsAppMediaMessageByUrl(
       connection.meta_phone_number_id,
       connection.meta_access_token,
       input.recipientId,
       input.mediaKind,
-      uploadResult.mediaId,
+      input.mediaUrl,
       {
         caption: caption || undefined,
         filename: input.fileName,
@@ -103,11 +81,10 @@ export async function deliverChannelMediaMessage(
       return { success: false, error: "Telegram is not connected." };
     }
 
-    const sendResult = await sendTelegramMediaMessage(
+    const sendResult = await sendTelegramMediaMessageByUrl(
       connection.bot_token,
       input.recipientId,
-      blob,
-      input.fileName,
+      input.mediaUrl,
       input.mimeType,
       { caption: caption || undefined },
     );
@@ -131,21 +108,12 @@ export async function deliverChannelMediaMessage(
       return { success: false, error: "Instagram is not connected." };
     }
 
-    const instagramMediaUrl = await getChatAttachmentSignedUrl(
-      input.storagePath,
-      3600,
-    );
-
-    if (!instagramMediaUrl) {
-      return { success: false, error: "Unable to sign media URL." };
-    }
-
     const sendResult = await sendInstagramMediaMessage(
       connection.meta_page_id,
       connection.meta_access_token,
       input.recipientId,
       input.mediaKind,
-      instagramMediaUrl,
+      input.mediaUrl,
     );
 
     if (!sendResult.success) {

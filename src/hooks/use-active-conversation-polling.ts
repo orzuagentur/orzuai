@@ -12,10 +12,11 @@ type UseActiveConversationPollingOptions = {
   conversationId: string | null;
   latestMessageAt: string | null;
   latestMessageId?: string | null;
+  /** Polling runs only when enabled (typically realtime fallback). */
   enabled?: boolean;
-  /** Fetch messages newer than the tail cursor (realtime fallback). */
+  /** Fetch messages newer than the tail cursor. */
   pollNewMessages?: boolean;
-  /** Refresh the recent tail to pick up hydrated media content updates. */
+  /** Refresh recent tail to pick up missed content updates while disconnected. */
   syncRecentMessages?: boolean;
   intervalMs?: number;
   onNewMessages: (messages: ChatMessageData[]) => void;

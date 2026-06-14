@@ -167,6 +167,66 @@ export async function sendTelegramMediaMessage(
   );
 }
 
+export async function sendTelegramMediaMessageByUrl(
+  botToken: string,
+  chatId: string,
+  mediaUrl: string,
+  mimeType: string,
+  options?: { caption?: string },
+): Promise<{ success: true } | { success: false; message: string }> {
+  const caption = options?.caption?.trim();
+  const fields: Record<string, unknown> = {
+    chat_id: chatId,
+  };
+
+  if (caption) {
+    fields.caption = caption;
+  }
+
+  if (mimeType.startsWith("image/")) {
+    return callTelegramApi<boolean>(botToken, "sendPhoto", {
+      ...fields,
+      photo: mediaUrl,
+    }).then((result) =>
+      result.success ? { success: true as const } : result,
+    );
+  }
+
+  if (mimeType === "audio/ogg" || mimeType === "audio/opus") {
+    return callTelegramApi<boolean>(botToken, "sendVoice", {
+      ...fields,
+      voice: mediaUrl,
+    }).then((result) =>
+      result.success ? { success: true as const } : result,
+    );
+  }
+
+  if (mimeType.startsWith("audio/")) {
+    return callTelegramApi<boolean>(botToken, "sendAudio", {
+      ...fields,
+      audio: mediaUrl,
+    }).then((result) =>
+      result.success ? { success: true as const } : result,
+    );
+  }
+
+  if (mimeType.startsWith("video/")) {
+    return callTelegramApi<boolean>(botToken, "sendVideo", {
+      ...fields,
+      video: mediaUrl,
+    }).then((result) =>
+      result.success ? { success: true as const } : result,
+    );
+  }
+
+  return callTelegramApi<boolean>(botToken, "sendDocument", {
+    ...fields,
+    document: mediaUrl,
+  }).then((result) =>
+    result.success ? { success: true as const } : result,
+  );
+}
+
 export async function getTelegramFile(
   botToken: string,
   fileId: string,

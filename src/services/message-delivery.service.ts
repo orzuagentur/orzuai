@@ -1,18 +1,28 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  claimMessageDeliveryJob,
+  claimMessageDeliveryJobs,
+} from "@/lib/queue/claim-jobs";
+import {
+  getWorkerConcurrency,
+  runWithConcurrency,
+} from "@/lib/queue/worker-concurrency";
 import { deliverChannelMediaMessage } from "@/services/channels/deliver-media";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
-import { downloadChatAttachmentBuffer } from "@/services/chat-attachment-signed-url.service";
+import { resolveAttachmentProviderMediaUrl } from "@/services/provider-media-url.service";
 import {
   incrementMessagingAnalytics,
+  publishMessageDeliveryStatus,
   recordMessageDeliveryFailure,
   recordMessageDeliverySuccess,
 } from "@/services/messaging.service";
 import { parseMediaMessage } from "@/utils/chat-media";
 
 const BATCH_SIZE = 25;
+const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 type DeliveryRow = {
   id: string;
@@ -24,6 +34,20 @@ type DeliveryRow = {
 };
 
 type DeliveryProcessResult = "sent" | "retried" | "failed" | "skipped";
+
+export async function recoverStaleMessageDeliveries(): Promise<number> {
+  const admin = createAdminClient();
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+
+  const { data } = await admin
+    .from("message_deliveries")
+    .update({ status: "pending" })
+    .eq("status", "processing")
+    .lt("updated_at", staleBefore)
+    .select("id");
+
+  return data?.length ?? 0;
+}
 
 async function processDeliveryRow(
   admin: ReturnType<typeof createAdminClient>,
@@ -45,6 +69,10 @@ async function processDeliveryRow(
         last_error: "Message unavailable.",
       })
       .eq("id", delivery.id);
+    await publishMessageDeliveryStatus(admin, {
+      messageId: delivery.message_id,
+      status: "failed",
+    });
     return "failed";
   }
 
@@ -68,17 +96,25 @@ async function processDeliveryRow(
   if (media?.path) {
     const { data: attachment } = await admin
       .from("message_attachments")
-      .select("storage_path, mime_type, file_name, kind")
+      .select(
+        "storage_path, mime_type, file_name, kind, provider_media_url, provider_media_url_expires_at",
+      )
       .eq("message_id", message.id)
       .maybeSingle();
 
     const storagePath = attachment?.storage_path ?? media.path;
-    const buffer = await downloadChatAttachmentBuffer(storagePath);
+    const mediaUrl = await resolveAttachmentProviderMediaUrl(admin, {
+      messageId: message.id,
+      storagePath,
+      providerMediaUrl: attachment?.provider_media_url ?? null,
+      providerMediaUrlExpiresAt:
+        attachment?.provider_media_url_expires_at ?? null,
+    });
 
-    if (!buffer) {
+    if (!mediaUrl) {
       await recordMessageDeliveryFailure(admin, {
         messageId: message.id,
-        errorMessage: "Media file unavailable.",
+        errorMessage: "Media URL unavailable.",
       });
       return "failed";
     }
@@ -89,11 +125,10 @@ async function processDeliveryRow(
       channel: delivery.channel,
       recipientId,
       content: message.content,
-      buffer,
+      mediaUrl,
       fileName: attachment?.file_name ?? media.fileName,
       mimeType: attachment?.mime_type ?? media.mimeType,
       mediaKind: attachment?.kind ?? media.kind,
-      storagePath,
     });
   } else {
     result = await deliverChannelTextMessage({
@@ -130,22 +165,18 @@ async function processDeliveryRow(
 }
 
 export async function dispatchMessageDelivery(messageId: string): Promise<void> {
-  const admin = createAdminClient();
-  const now = new Date().toISOString();
+  await recoverStaleMessageDeliveries();
 
-  const { data: delivery } = await admin
-    .from("message_deliveries")
-    .select("id, message_id, business_id, channel, attempt_count, max_attempts")
-    .eq("message_id", messageId)
-    .eq("status", "pending")
-    .lte("next_attempt_at", now)
-    .maybeSingle();
+  const claimed = await claimMessageDeliveryJob(messageId);
 
-  if (!delivery) {
+  if (!claimed) {
     return;
   }
 
-  await processDeliveryRow(admin, delivery, now);
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  await processDeliveryRow(admin, claimed, now);
 }
 
 export async function processPendingMessageDeliveries(): Promise<{
@@ -153,42 +184,34 @@ export async function processPendingMessageDeliveries(): Promise<{
   sent: number;
   retried: number;
   failed: number;
+  recoveredStale: number;
 }> {
+  const recoveredStale = await recoverStaleMessageDeliveries();
   const admin = createAdminClient();
   const now = new Date().toISOString();
+  const claimed = await claimMessageDeliveryJobs(BATCH_SIZE);
 
-  const { data: pending } = await admin
-    .from("message_deliveries")
-    .select("id, message_id, business_id, channel, attempt_count, max_attempts")
-    .eq("status", "pending")
-    .lte("next_attempt_at", now)
-    .order("next_attempt_at", { ascending: true })
-    .limit(BATCH_SIZE);
-
-  if (!pending?.length) {
-    return { processed: 0, sent: 0, retried: 0, failed: 0 };
+  if (claimed.length === 0) {
+    return {
+      processed: 0,
+      sent: 0,
+      retried: 0,
+      failed: 0,
+      recoveredStale,
+    };
   }
 
-  let sent = 0;
-  let retried = 0;
-  let failed = 0;
-
-  for (const delivery of pending) {
-    const outcome = await processDeliveryRow(admin, delivery, now);
-
-    if (outcome === "sent") {
-      sent += 1;
-    } else if (outcome === "retried") {
-      retried += 1;
-    } else if (outcome === "failed") {
-      failed += 1;
-    }
-  }
+  const outcomes = await runWithConcurrency(
+    claimed,
+    getWorkerConcurrency(),
+    (delivery) => processDeliveryRow(admin, delivery, now),
+  );
 
   return {
-    processed: pending.length,
-    sent,
-    retried,
-    failed,
+    processed: claimed.length,
+    sent: outcomes.filter((outcome) => outcome === "sent").length,
+    retried: outcomes.filter((outcome) => outcome === "retried").length,
+    failed: outcomes.filter((outcome) => outcome === "failed").length,
+    recoveredStale,
   };
 }

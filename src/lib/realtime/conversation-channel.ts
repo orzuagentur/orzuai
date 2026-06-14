@@ -1,5 +1,12 @@
 export const CONVERSATION_TYPING_EVENT = "typing";
 export const CONVERSATION_MESSAGE_UPDATED_EVENT = "message_updated";
+export const CONVERSATION_DELIVERY_STATUS_EVENT = "delivery_status";
+
+export type ConversationDeliveryStatusPayload = {
+  conversation_id: string;
+  message_id: string;
+  status: import("@/types/database.types").MessageDeliveryStatus;
+};
 
 export type ConversationTypingSender = "agent" | "client";
 
@@ -23,6 +30,17 @@ export type ConversationMessageUpdatedPayload = {
   is_edited?: boolean;
   attachment_pending?: boolean;
   attachment_failed?: boolean;
+};
+
+export type ConversationReconnectCursor = {
+  afterCreatedAt: string;
+  afterMessageId: string | null;
+};
+
+export type ConversationGapSyncPayload = {
+  newMessages: import("@/types/chat.types").ChatMessageData[];
+  recentMessages: import("@/types/chat.types").ChatMessageData[];
+  cursor: ConversationReconnectCursor;
 };
 
 export function getConversationRealtimeChannelName(

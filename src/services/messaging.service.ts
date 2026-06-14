@@ -10,7 +10,8 @@ import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
 import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
-import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
+import { broadcastConversationDeliveryStatus } from "@/services/conversation-realtime-broadcast.service";
+import type { Database, MessageDeliveryStatus, MessageSenderType, MessagingChannel } from "@/types/database.types";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
@@ -143,19 +144,69 @@ function computeDeliveryRetryAt(attemptCount: number): string {
   return new Date(Date.now() + delaySeconds * 1000).toISOString();
 }
 
+export async function publishMessageDeliveryStatus(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    status: MessageDeliveryStatus;
+  },
+): Promise<void> {
+  const { data: delivery } = await admin
+    .from("message_deliveries")
+    .select("conversation_id")
+    .eq("message_id", input.messageId)
+    .maybeSingle();
+
+  let conversationId = delivery?.conversation_id ?? null;
+
+  if (!conversationId) {
+    const { data: message } = await admin
+      .from("messages")
+      .select("conversation_id")
+      .eq("id", input.messageId)
+      .maybeSingle();
+    conversationId = message?.conversation_id ?? null;
+  }
+
+  if (!conversationId) {
+    return;
+  }
+
+  void broadcastConversationDeliveryStatus(conversationId, {
+    conversation_id: conversationId,
+    message_id: input.messageId,
+    status: input.status,
+  }).catch((error) => {
+    console.error("[message-delivery] status broadcast failed", error);
+  });
+}
+
 export async function createOutboundMessageDelivery(
   admin: MessagingDbClient,
   input: {
     messageId: string;
     businessId: string;
     channel: MessagingChannel;
+    conversationId?: string;
   },
 ): Promise<void> {
+  let conversationId = input.conversationId ?? null;
+
+  if (!conversationId) {
+    const { data: message } = await admin
+      .from("messages")
+      .select("conversation_id")
+      .eq("id", input.messageId)
+      .maybeSingle();
+    conversationId = message?.conversation_id ?? null;
+  }
+
   const { error } = await admin.from("message_deliveries").upsert(
     {
       message_id: input.messageId,
       business_id: input.businessId,
       channel: input.channel,
+      conversation_id: conversationId,
       status: "pending",
       attempt_count: 0,
       next_attempt_at: new Date().toISOString(),
@@ -165,6 +216,14 @@ export async function createOutboundMessageDelivery(
 
   if (error) {
     console.error("[message-delivery] create failed", error.message);
+    return;
+  }
+
+  if (conversationId) {
+    await publishMessageDeliveryStatus(admin, {
+      messageId: input.messageId,
+      status: "pending",
+    });
   }
 }
 
@@ -186,6 +245,11 @@ export async function recordMessageDeliverySuccess(
       last_error: null,
     })
     .eq("message_id", input.messageId);
+
+  await publishMessageDeliveryStatus(admin, {
+    messageId: input.messageId,
+    status: "sent",
+  });
 }
 
 export async function recordMessageDeliveryFailure(
@@ -217,6 +281,11 @@ export async function recordMessageDeliveryFailure(
       failed_at: exhausted ? now : null,
     })
     .eq("message_id", input.messageId);
+
+  await publishMessageDeliveryStatus(admin, {
+    messageId: input.messageId,
+    status: exhausted ? "failed" : "pending",
+  });
 
   if (exhausted && input.hideMessageOnExhausted !== false) {
     await admin
@@ -342,6 +411,23 @@ export async function incrementMessagingAnalytics(
   );
 
   await incrementChannelAnalytics(admin, businessId, channel, updates);
+}
+
+export function scheduleMessagingAnalyticsIncrement(
+  admin: MessagingDbClient,
+  businessId: string,
+  channel: MessagingChannel,
+  updates: {
+    totalMessages?: number;
+    totalContacts?: number;
+    aiReplies?: number;
+  },
+): void {
+  void incrementMessagingAnalytics(admin, businessId, channel, updates).catch(
+    (error) => {
+      console.error("[messaging] analytics increment failed", error);
+    },
+  );
 }
 
 export async function listKnowledgeEntriesForBusiness(

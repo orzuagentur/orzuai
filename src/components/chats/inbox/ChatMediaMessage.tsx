@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   DownloadIcon,
   FileIcon,
@@ -311,6 +311,7 @@ function ChatMediaImage({
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [needsFullUrl, setNeedsFullUrl] = useState(false);
+  const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const hasThumb = Boolean(media.thumbPath);
   const shouldLoadFullUrl = lightboxOpen || needsFullUrl || !hasThumb;
   const {
@@ -320,6 +321,7 @@ function ChatMediaImage({
   } = useChatMediaUrl(media, {
     messageId,
     enabled: shouldLoadFullUrl,
+    preferDirectUrl: true,
   });
   const displayUrl =
     previewUrl ??
@@ -331,10 +333,20 @@ function ChatMediaImage({
   const hasError = hasThumb
     ? previewError && !displayUrl
     : (fullError || previewError) && !displayUrl;
+  const showProgressiveFull =
+    hasThumb &&
+    Boolean(resolvedFullUrl) &&
+    resolvedFullUrl !== displayUrl;
 
   const requestFullUrl = () => {
     setNeedsFullUrl(true);
   };
+
+  useEffect(() => {
+    if (hasThumb && previewUrl && !needsFullUrl && !isHydrating) {
+      setNeedsFullUrl(true);
+    }
+  }, [hasThumb, previewUrl, needsFullUrl, isHydrating]);
 
   if (isHydrating) {
     return (
@@ -386,11 +398,29 @@ function ChatMediaImage({
           <img
             src={displayUrl}
             alt={media.fileName}
+            loading="lazy"
+            decoding="async"
             className={cn(
-              "max-h-72 w-full object-contain bg-black/5 transition-opacity group-hover:opacity-95",
+              "max-h-72 w-full object-contain bg-black/5 transition-opacity duration-300 group-hover:opacity-95",
               isLoading && "opacity-80",
+              showProgressiveFull && !fullImageLoaded && "opacity-95",
             )}
           />
+          {showProgressiveFull ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={resolvedFullUrl ?? undefined}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setFullImageLoaded(true)}
+              className={cn(
+                "absolute inset-0 max-h-72 w-full object-contain bg-black/5 transition-opacity duration-300",
+                fullImageLoaded ? "opacity-100" : "opacity-0",
+              )}
+            />
+          ) : null}
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-black/10">
               <Loader2Icon className="size-5 animate-spin text-white" />
@@ -681,6 +711,7 @@ export function ChatMediaMessage({
   } = useChatMediaUrl(previewMedia, {
     messageId,
     enabled: !isHydrating && !showFailed,
+    preferDirectUrl: true,
   });
   const {
     url: resolvedUrl,
@@ -689,6 +720,7 @@ export function ChatMediaMessage({
   } = useChatMediaUrl(media, {
     messageId,
     enabled: !isHydrating && !hasThumb && !showFailed,
+    preferDirectUrl: true,
   });
 
   const handleRetry = () => {

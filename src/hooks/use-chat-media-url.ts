@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
-import {
-  getCachedMediaBlobUrl,
-  storeMediaBlobFromUrl,
-} from "@/lib/client-cache/media-browser-cache";
+import { getCachedMediaBlobUrl } from "@/lib/client-cache/media-browser-cache";
 import {
   resolveCachedMediaUrl,
   setCachedMediaUrl,
@@ -21,6 +18,8 @@ import {
 type UseChatMediaUrlOptions = {
   messageId?: string;
   enabled?: boolean;
+  /** Serve signed CDN URLs directly instead of fetching blobs in the background. */
+  preferDirectUrl?: boolean;
 };
 
 type UseChatMediaUrlResult = {
@@ -74,6 +73,7 @@ export function useChatMediaUrl(
   options: UseChatMediaUrlOptions = {},
 ): UseChatMediaUrlResult {
   const enabled = options.enabled ?? true;
+  const preferDirectUrl = options.preferDirectUrl ?? true;
   const storagePath = resolveMediaStoragePath(media);
   const cacheKeys = getCandidateCacheKeys(media, options.messageId);
   const primaryCacheKey = buildMediaUrlCacheKey(media, options.messageId);
@@ -104,6 +104,12 @@ export function useChatMediaUrl(
 
       activeBlobUrl = nextBlobUrl;
       setUrl(nextBlobUrl);
+      setError(false);
+      setIsLoading(false);
+    };
+
+    const applyDirectUrl = (nextUrl: string) => {
+      setUrl(nextUrl);
       setError(false);
       setIsLoading(false);
     };
@@ -154,22 +160,7 @@ export function useChatMediaUrl(
       const cachedSignedUrl = resolveCachedMediaUrl(cacheKeys);
 
       if (cachedSignedUrl) {
-        setUrl(cachedSignedUrl);
-        setError(false);
-        setIsLoading(false);
-
-        if (storagePath) {
-          void storeMediaBlobFromUrl(storagePath, cachedSignedUrl).then(
-            (blobUrl) => {
-              if (!cancelled) {
-                applyBlobUrl(blobUrl);
-              } else if (blobUrl) {
-                revokeBlobUrl(blobUrl);
-              }
-            },
-          );
-        }
-
+        applyDirectUrl(cachedSignedUrl);
         return;
       }
 
@@ -200,11 +191,13 @@ export function useChatMediaUrl(
         setCachedMediaUrl(storagePath, result.url);
       }
 
-      setUrl(result.url);
-      setError(false);
-      setIsLoading(false);
+      applyDirectUrl(result.url);
 
-      if (storagePath) {
+      if (!preferDirectUrl && storagePath) {
+        const { storeMediaBlobFromUrl } = await import(
+          "@/lib/client-cache/media-browser-cache"
+        );
+
         void storeMediaBlobFromUrl(storagePath, result.url).then((blobUrl) => {
           if (!cancelled) {
             applyBlobUrl(blobUrl);
@@ -227,6 +220,7 @@ export function useChatMediaUrl(
     media.path,
     media.url,
     options.messageId,
+    preferDirectUrl,
     primaryCacheKey,
     storagePath,
   ]);

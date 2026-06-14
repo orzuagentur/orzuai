@@ -94,6 +94,8 @@ export async function createReadyMessageAttachment(
     messageId: string;
     businessId: string;
     media: ChatMediaPayload;
+    providerMediaUrl?: string | null;
+    providerMediaUrlExpiresAt?: string | null;
   },
 ): Promise<void> {
   const { error } = await admin.from("message_attachments").upsert(
@@ -107,6 +109,8 @@ export async function createReadyMessageAttachment(
       size_bytes: input.media.sizeBytes ?? null,
       duration_sec: input.media.durationSec ?? null,
       status: "ready",
+      provider_media_url: input.providerMediaUrl ?? null,
+      provider_media_url_expires_at: input.providerMediaUrlExpiresAt ?? null,
       ...attachmentThumbnailFields(input.media),
     },
     { onConflict: "message_id" },
@@ -193,7 +197,7 @@ export async function resetMessageAttachmentForRetry(
       next_retry_at: null,
     })
     .eq("message_id", messageId)
-    .in("status", ["pending", "failed"])
+    .in("status", ["pending", "failed", "processing"])
     .select("message_id")
     .maybeSingle();
 

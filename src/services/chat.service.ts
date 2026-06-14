@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 
-import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   CHAT_MESSAGES,
   CONVERSATION_MESSAGES_PAGE_SIZE,
@@ -14,7 +14,7 @@ import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
   createOutboundMessageDelivery,
-  incrementMessagingAnalytics,
+  scheduleMessagingAnalyticsIncrement,
   insertChannelMessage,
   recordMessageDeliveryFailure,
   recordMessageDeliverySuccess,
@@ -82,13 +82,13 @@ function missingConfigError(): {
 
 function revalidateChatPaths(channel?: DbMessagingChannel): void {
   revalidatePath(DASHBOARD_ROUTES.chats);
-  if (channel && (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)) {
+
+  if (
+    channel &&
+    (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)
+  ) {
     revalidatePath(`${DASHBOARD_ROUTES.chats}/${channel}`);
   }
-  for (const ch of MESSAGING_INTEGRATION_CHANNELS) {
-    revalidatePath(`${DASHBOARD_ROUTES.chats}/${ch}`);
-  }
-  revalidatePath(APP_ROUTES.dashboard);
 }
 
 async function getOwnedBusinessId(): Promise<string | null> {
@@ -300,7 +300,7 @@ async function deliverWhatsAppOutboundText(input: {
     providerMessageId: sendResult.messageId,
   });
 
-  await incrementMessagingAnalytics(
+  scheduleMessagingAnalyticsIncrement(
     createAdminClient(),
     input.businessId,
     input.channel,
@@ -1010,8 +1010,6 @@ export async function sendChatMessage(
       };
     }
 
-    revalidateChatPaths(conversation.channel);
-
     return {
       success: true,
       data: {
@@ -1034,8 +1032,6 @@ export async function sendChatMessage(
         },
       };
     }
-
-    revalidateChatPaths(conversation.channel);
 
     return {
       success: true,
@@ -1144,8 +1140,6 @@ export async function sendChatMessage(
       console.error("[whatsapp] outbound delivery failed", error);
     });
 
-    revalidateChatPaths(conversation.channel);
-
     return {
       success: true,
       data: {
@@ -1200,12 +1194,16 @@ export async function sendChatMessage(
       .update({ updated_at: now })
       .eq("id", parsed.data.conversationId),
     ...contactUpdates,
-    incrementMessagingAnalytics(createAdminClient(), businessId, conversation.channel, {
-      totalMessages: 1,
-    }),
   ]);
 
-  revalidateChatPaths(conversation.channel);
+  scheduleMessagingAnalyticsIncrement(
+    createAdminClient(),
+    businessId,
+    conversation.channel,
+    {
+      totalMessages: 1,
+    },
+  );
 
   return {
     success: true,

@@ -1,6 +1,14 @@
 import "server-only";
 
 import { dispatchInboundMediaHydrationWorker } from "@/lib/queue/qstash-inbound-media-worker";
+import {
+  claimInboundMediaHydrationJob,
+  claimInboundMediaHydrationJobs,
+} from "@/lib/queue/claim-jobs";
+import {
+  getWorkerConcurrency,
+  runWithConcurrency,
+} from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   downloadAndStoreTelegramInboundMedia,
@@ -32,6 +40,7 @@ export type InboundMediaHydrationContext = {
 
 const BATCH_SIZE = 15;
 const BASE_RETRY_SECONDS = 30;
+const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 type AttachmentRow = {
   message_id: string;
@@ -45,6 +54,7 @@ type AttachmentRow = {
   max_retries: number;
   next_retry_at: string | null;
   hydration_context: InboundMediaHydrationContext | null;
+  storage_path: string | null;
 };
 
 type MessageRow = {
@@ -66,7 +76,23 @@ export type InboundMediaHydrationDrainResult = {
   completed: number;
   failed: number;
   skipped: number;
+  recoveredStale: number;
 };
+
+export async function recoverStaleInboundMediaHydrations(): Promise<number> {
+  const admin = createAdminClient();
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+
+  const { data } = await admin
+    .from("message_attachments")
+    .update({ status: "pending" })
+    .eq("status", "processing")
+    .is("storage_path", null)
+    .lt("updated_at", staleBefore)
+    .select("message_id");
+
+  return data?.length ?? 0;
+}
 
 export function scheduleInboundMediaHydration(input: {
   admin: InboundMediaDbClient;
@@ -133,11 +159,14 @@ export async function retryInboundMediaHydration(
 }
 
 export async function drainInboundMediaHydrationQueue(): Promise<InboundMediaHydrationDrainResult> {
+  const recoveredStale = await recoverStaleInboundMediaHydrations();
+
   const totals: InboundMediaHydrationDrainResult = {
     processed: 0,
     completed: 0,
     failed: 0,
     skipped: 0,
+    recoveredStale,
   };
 
   let batch = await processPendingInboundMediaHydrations();
@@ -159,63 +188,33 @@ export async function drainInboundMediaHydrationQueue(): Promise<InboundMediaHyd
 }
 
 export async function processPendingInboundMediaHydrations(): Promise<InboundMediaHydrationDrainResult> {
-  const admin = createAdminClient();
-  const now = new Date().toISOString();
+  const claimed = await claimInboundMediaHydrationJobs(BATCH_SIZE);
 
-  const { data: candidates } = await admin
-    .from("message_attachments")
-    .select(
-      "message_id, business_id, kind, mime_type, file_name, provider_media_id, status, retry_count, max_retries, next_retry_at, hydration_context, storage_path",
-    )
-    .in("status", ["pending", "failed"])
-    .order("created_at", { ascending: true })
-    .limit(BATCH_SIZE * 2);
-
-  const eligible =
-    candidates?.filter((attachment) => {
-      if (attachment.status === "ready" || attachment.storage_path) {
-        return false;
-      }
-
-      if (attachment.status === "pending") {
-        return true;
-      }
-
-      const maxRetries = attachment.max_retries ?? 5;
-      const retryCount = attachment.retry_count ?? 0;
-
-      if (retryCount >= maxRetries) {
-        return false;
-      }
-
-      return !attachment.next_retry_at || attachment.next_retry_at <= now;
-    }) ?? [];
-
-  if (eligible.length === 0) {
-    return { processed: 0, completed: 0, failed: 0, skipped: 0 };
+  if (claimed.length === 0) {
+    return {
+      processed: 0,
+      completed: 0,
+      failed: 0,
+      skipped: 0,
+      recoveredStale: 0,
+    };
   }
 
-  let completed = 0;
-  let failed = 0;
-  let skipped = 0;
-
-  for (const attachment of eligible.slice(0, BATCH_SIZE)) {
-    const result = await runInboundMediaHydration(attachment.message_id);
-
-    if (result.skipped) {
-      skipped += 1;
-    } else if (result.completed) {
-      completed += 1;
-    } else {
-      failed += 1;
-    }
-  }
+  const outcomes = await runWithConcurrency(
+    claimed,
+    getWorkerConcurrency(),
+    (attachment) =>
+      processClaimedInboundMediaHydration(attachment as AttachmentRow),
+  );
 
   return {
-    processed: Math.min(eligible.length, BATCH_SIZE),
-    completed,
-    failed,
-    skipped,
+    processed: claimed.length,
+    completed: outcomes.filter((outcome) => outcome.completed).length,
+    failed: outcomes.filter(
+      (outcome) => !outcome.completed && !outcome.skipped,
+    ).length,
+    skipped: outcomes.filter((outcome) => outcome.skipped).length,
+    recoveredStale: 0,
   };
 }
 
@@ -226,32 +225,29 @@ export async function runInboundMediaHydration(
   skipped: boolean;
   error?: string;
 }> {
-  const admin = createAdminClient();
-  const now = new Date().toISOString();
+  await recoverStaleInboundMediaHydrations();
 
-  const { data: attachment } = await admin
-    .from("message_attachments")
-    .select(
-      "message_id, business_id, kind, mime_type, file_name, provider_media_id, status, retry_count, max_retries, next_retry_at, hydration_context, storage_path",
-    )
-    .eq("message_id", messageId)
-    .maybeSingle();
+  const claimed = await claimInboundMediaHydrationJob(messageId);
 
-  if (!attachment || attachment.status === "ready" || attachment.storage_path) {
+  if (!claimed) {
     return { completed: true, skipped: true };
   }
 
-  if (attachment.status === "failed") {
-    const maxRetries = attachment.max_retries ?? 5;
-    const retryCount = attachment.retry_count ?? 0;
+  return processClaimedInboundMediaHydration(claimed as AttachmentRow);
+}
 
-    if (retryCount >= maxRetries) {
-      return { completed: false, skipped: true };
-    }
+async function processClaimedInboundMediaHydration(
+  attachment: AttachmentRow,
+): Promise<{
+  completed: boolean;
+  skipped: boolean;
+  error?: string;
+}> {
+  const admin = createAdminClient();
+  const messageId = attachment.message_id;
 
-    if (attachment.next_retry_at && attachment.next_retry_at > now) {
-      return { completed: false, skipped: true };
-    }
+  if (attachment.storage_path) {
+    return { completed: true, skipped: true };
   }
 
   const { data: message } = await admin
@@ -263,20 +259,19 @@ export async function runInboundMediaHydration(
     .maybeSingle();
 
   if (!message) {
+    await markMessageAttachmentFailed(admin, {
+      messageId,
+      error: "Message not found.",
+      retryCount: attachment.retry_count ?? 0,
+      nextRetryAt: null,
+    });
     return { completed: false, skipped: true, error: "Message not found." };
   }
 
-  if (attachment.status === "failed") {
-    await admin
-      .from("message_attachments")
-      .update({ status: "pending", last_error: null })
-      .eq("message_id", messageId);
-
-    await broadcastHydrationState(message as MessageRow, {
-      attachment_pending: true,
-      attachment_failed: false,
-    });
-  }
+  await broadcastHydrationState(message as MessageRow, {
+    attachment_pending: true,
+    attachment_failed: false,
+  });
 
   let content: string | null = null;
   let hydrationError: string | undefined;
@@ -284,7 +279,7 @@ export async function runInboundMediaHydration(
   try {
     content = await resolveInboundMediaContent(
       admin,
-      attachment as AttachmentRow,
+      attachment,
       message as MessageRow,
     );
   } catch (error) {

@@ -179,7 +179,8 @@ export function ChatWindow({
       Boolean(conversation),
   });
 
-  const { sendMedia, isLoading: isSendingMedia } = useSendChatMedia();
+  const { sendMedia, isLoading: isSendingMedia, uploadProgress } =
+    useSendChatMedia();
 
   useEffect(() => {
     if (!isInboxLayout || !isLoadingOlderMessages) {
@@ -531,6 +532,7 @@ export function ChatWindow({
               websiteFormsHint={conversation.channel === "website_forms"}
               isSending={isLoading}
               isSendingMedia={isSendingMedia}
+              mediaUploadProgress={uploadProgress}
               composerTab={composerTab}
               onComposerTabChange={setComposerTab}
               onSubmit={() => {
@@ -539,22 +541,32 @@ export function ChatWindow({
               onOpenAiSuggest={() => setSuggestOpen(true)}
               onSendMedia={(file, caption) => {
                 const pendingId = createOptimisticMessageId();
+                const optimisticMessage = createOptimisticMediaChatMessage({
+                  id: pendingId,
+                  conversationId: conversation.id,
+                  channel: conversation.channel,
+                  file,
+                  caption,
+                });
 
-                onOptimisticMessage?.(
-                  createOptimisticMediaChatMessage({
-                    id: pendingId,
-                    conversationId: conversation.id,
-                    channel: conversation.channel,
-                    file,
-                    caption,
-                  }),
-                );
+                onOptimisticMessage?.(optimisticMessage);
 
                 void (async () => {
                   const result = await sendMedia(
                     conversation.id,
                     file,
                     caption,
+                    {
+                      onProgress: (progress) => {
+                        onMessageUpdated?.({
+                          ...optimisticMessage,
+                          uploadProgress: progress.percent,
+                          uploadSpeedBps: progress.bytesPerSecond,
+                          uploadPhase: progress.phase,
+                          isPending: true,
+                        });
+                      },
+                    },
                   );
 
                   if (result.success && result.data?.message) {

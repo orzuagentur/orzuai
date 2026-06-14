@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRef, type RefObject } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
@@ -25,6 +27,9 @@ import { RelativeTime } from "@/components/ui/relative-time";
 import { getLeadScoreBadgeClassName } from "@/utils/lead-score";
 import { HIGH_INTENT_LEAD_SCORE } from "@/features/chats/constants";
 
+const CHAT_LIST_ROW_ESTIMATE_PX = 80;
+const CHAT_LIST_VIRTUALIZE_THRESHOLD = 20;
+
 type ChatListProps = {
   conversations: ConversationListItem[];
   activeConversationId: string | null;
@@ -36,6 +41,8 @@ type ChatListProps = {
   variant?: "default" | "inbox";
   emptyVariant?: "default" | "search" | "favorites";
   className?: string;
+  /** When set, virtualizes against this parent scroll container instead of owning scroll. */
+  scrollElementRef?: RefObject<HTMLElement | null>;
 };
 
 function buildConversationHref(
@@ -57,6 +64,179 @@ function buildConversationHref(
   return `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`;
 }
 
+type ConversationListRowProps = {
+  conversation: ConversationListItem;
+  activeConversationId: string | null;
+  channelId: ChatChannelId;
+  hideChannelBadge: boolean;
+  linkToConversationChannel: boolean;
+  linkMode: "channel" | "overview" | "favorites";
+  onConversationSelect?: (conversationId: string) => void;
+  variant: "default" | "inbox";
+};
+
+function ConversationListRow({
+  conversation,
+  activeConversationId,
+  channelId,
+  hideChannelBadge,
+  linkToConversationChannel,
+  linkMode,
+  onConversationSelect,
+  variant,
+}: ConversationListRowProps) {
+  const isInboxVariant = variant === "inbox";
+  const isActive = conversation.id === activeConversationId;
+  const needsAttention = isConversationNeedsAttention(conversation);
+  const isUnread =
+    conversation.unreadMessageCount > 0 || conversation.isUnread;
+  const unreadCount = conversation.unreadMessageCount;
+
+  const rowClassName = cn(
+    "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+    isActive && (isInboxVariant ? "bg-muted/80" : "bg-primary/5"),
+    isInboxVariant &&
+      isUnread &&
+      !isActive &&
+      "border-l-[3px] border-l-primary bg-primary/5",
+    !isInboxVariant &&
+      needsAttention &&
+      "border-l-2 border-l-amber-500 bg-amber-500/5",
+  );
+
+  const rowContent = (
+    <>
+      <div className="relative shrink-0">
+        <ContactAvatar
+          name={conversation.contactName}
+          avatarUrl={conversation.contactAvatarUrl}
+          className="size-11"
+          size="lg"
+        />
+        {isInboxVariant ? (
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background",
+              getChannelBadgeClassName(conversation.channel),
+            )}
+          >
+            <ChannelBrandIcon
+              channel={conversation.channel}
+              className="size-3"
+            />
+          </span>
+        ) : isUnread ? (
+          <span
+            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-background bg-amber-500"
+            aria-hidden="true"
+          />
+        ) : null}
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <p
+            className={cn(
+              "truncate",
+              isUnread && isInboxVariant ? "font-semibold" : "font-medium",
+            )}
+          >
+            {conversation.contactName}
+          </p>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            <RelativeTime
+              value={conversation.lastMessageAt ?? conversation.updatedAt}
+            />
+          </span>
+        </div>
+        {conversation.lastMessagePreview ? (
+          <p className="line-clamp-1 text-sm text-muted-foreground">
+            {conversation.lastMessagePreview}
+          </p>
+        ) : (
+          <p className="truncate text-xs text-muted-foreground">
+            {formatContactIdentifier(conversation.contactPhone)}
+          </p>
+        )}
+        {!isInboxVariant ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {!hideChannelBadge ? (
+              <Badge
+                variant="outline"
+                className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
+              >
+                <ChannelBrandIcon
+                  channel={conversation.channel}
+                  className="size-3"
+                />
+                {getChannelBadgeLabel(conversation.channel)}
+              </Badge>
+            ) : null}
+            {isUnread ? (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+              >
+                {CHAT_MESSAGES.awaitingReply}
+              </Badge>
+            ) : null}
+            {conversation.leadScore !== null &&
+            conversation.leadScore >= HIGH_INTENT_LEAD_SCORE ? (
+              <Badge
+                variant="outline"
+                className={`shrink-0 text-[10px] ${getLeadScoreBadgeClassName(conversation.leadScore)}`}
+              >
+                {CHAT_MESSAGES.highIntentBadge} · {conversation.leadScore}
+              </Badge>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {isInboxVariant && isUnread ? (
+        <span
+          className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground"
+          aria-label={`${CHAT_MESSAGES.unreadMessage} (${unreadCount})`}
+        >
+          {unreadCount > 99 ? "99+" : Math.max(unreadCount, 1)}
+        </span>
+      ) : !isInboxVariant ? (
+        <Badge
+          variant="outline"
+          className={`shrink-0 self-start text-[10px] ${getConversationStatusClassName(conversation.status)}`}
+        >
+          {getConversationStatusLabel(conversation.status)}
+        </Badge>
+      ) : null}
+    </>
+  );
+
+  if (onConversationSelect) {
+    return (
+      <button
+        type="button"
+        onClick={() => onConversationSelect(conversation.id)}
+        className={rowClassName}
+      >
+        {rowContent}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={buildConversationHref(
+        channelId,
+        conversation.id,
+        conversation.channel,
+        linkToConversationChannel,
+        linkMode,
+      )}
+      className={rowClassName}
+    >
+      {rowContent}
+    </Link>
+  );
+}
+
 export function ChatList({
   conversations,
   activeConversationId,
@@ -68,8 +248,22 @@ export function ChatList({
   variant = "default",
   emptyVariant = "default",
   className,
+  scrollElementRef,
 }: ChatListProps) {
-  const isInboxVariant = variant === "inbox";
+  const internalScrollRef = useRef<HTMLDivElement>(null);
+  const usesExternalScroll = Boolean(scrollElementRef);
+  const shouldVirtualize =
+    conversations.length >= CHAT_LIST_VIRTUALIZE_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: shouldVirtualize ? conversations.length : 0,
+    getScrollElement: () =>
+      scrollElementRef?.current ?? internalScrollRef.current,
+    estimateSize: () => CHAT_LIST_ROW_ESTIMATE_PX,
+    overscan: 8,
+    getItemKey: (index) => conversations[index]?.id ?? index,
+  });
+
   if (conversations.length === 0) {
     const isSearchEmpty = emptyVariant === "search";
     const isFavoritesEmpty = emptyVariant === "favorites";
@@ -104,164 +298,68 @@ export function ChatList({
     );
   }
 
-  return (
-    <div className={cn("divide-y", className)}>
-      {conversations.map((conversation) => {
-        const isActive = conversation.id === activeConversationId;
-        const needsAttention = isConversationNeedsAttention(conversation);
-        const isUnread =
-          conversation.unreadMessageCount > 0 || conversation.isUnread;
-        const unreadCount = conversation.unreadMessageCount;
+  const listBody = shouldVirtualize ? (
+    <div
+      className="relative divide-y"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const conversation = conversations[virtualRow.index];
 
-        const rowClassName = cn(
-          "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-          isActive &&
-            (isInboxVariant ? "bg-muted/80" : "bg-primary/5"),
-          isInboxVariant &&
-            isUnread &&
-            !isActive &&
-            "border-l-[3px] border-l-primary bg-primary/5",
-          !isInboxVariant &&
-            needsAttention &&
-            "border-l-2 border-l-amber-500 bg-amber-500/5",
-        );
-
-        const rowContent = (
-          <>
-            <div className="relative shrink-0">
-              <ContactAvatar
-                name={conversation.contactName}
-                avatarUrl={conversation.contactAvatarUrl}
-                className="size-11"
-                size="lg"
-              />
-              {isInboxVariant ? (
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background",
-                    getChannelBadgeClassName(conversation.channel),
-                  )}
-                >
-                  <ChannelBrandIcon
-                    channel={conversation.channel}
-                    className="size-3"
-                  />
-                </span>
-              ) : isUnread ? (
-                <span
-                  className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-background bg-amber-500"
-                  aria-hidden="true"
-                />
-              ) : null}
-            </div>
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex items-start justify-between gap-2">
-                <p
-                  className={cn(
-                    "truncate",
-                    isUnread && isInboxVariant ? "font-semibold" : "font-medium",
-                  )}
-                >
-                  {conversation.contactName}
-                </p>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  <RelativeTime
-                    value={
-                      conversation.lastMessageAt ?? conversation.updatedAt
-                    }
-                  />
-                </span>
-              </div>
-              {conversation.lastMessagePreview ? (
-                <p className="line-clamp-1 text-sm text-muted-foreground">
-                  {conversation.lastMessagePreview}
-                </p>
-              ) : (
-                <p className="truncate text-xs text-muted-foreground">
-                  {formatContactIdentifier(conversation.contactPhone)}
-                </p>
-              )}
-              {!isInboxVariant ? (
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  {!hideChannelBadge ? (
-                    <Badge
-                      variant="outline"
-                      className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(conversation.channel)}`}
-                    >
-                      <ChannelBrandIcon
-                        channel={conversation.channel}
-                        className="size-3"
-                      />
-                      {getChannelBadgeLabel(conversation.channel)}
-                    </Badge>
-                  ) : null}
-                  {isUnread ? (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
-                    >
-                      {CHAT_MESSAGES.awaitingReply}
-                    </Badge>
-                  ) : null}
-                  {conversation.leadScore !== null &&
-                  conversation.leadScore >= HIGH_INTENT_LEAD_SCORE ? (
-                    <Badge
-                      variant="outline"
-                      className={`shrink-0 text-[10px] ${getLeadScoreBadgeClassName(conversation.leadScore)}`}
-                    >
-                      {CHAT_MESSAGES.highIntentBadge} · {conversation.leadScore}
-                    </Badge>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            {isInboxVariant && isUnread ? (
-              <span
-                className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground"
-                aria-label={`${CHAT_MESSAGES.unreadMessage} (${unreadCount})`}
-              >
-                {unreadCount > 99 ? "99+" : Math.max(unreadCount, 1)}
-              </span>
-            ) : !isInboxVariant ? (
-              <Badge
-                variant="outline"
-                className={`shrink-0 self-start text-[10px] ${getConversationStatusClassName(conversation.status)}`}
-              >
-                {getConversationStatusLabel(conversation.status)}
-              </Badge>
-            ) : null}
-          </>
-        );
-
-        if (onConversationSelect) {
-          return (
-            <button
-              key={conversation.id}
-              type="button"
-              onClick={() => onConversationSelect(conversation.id)}
-              className={rowClassName}
-            >
-              {rowContent}
-            </button>
-          );
+        if (!conversation) {
+          return null;
         }
 
         return (
-          <Link
-            key={conversation.id}
-            href={buildConversationHref(
-              channelId,
-              conversation.id,
-              conversation.channel,
-              linkToConversationChannel,
-              linkMode,
-            )}
-            className={rowClassName}
+          <div
+            key={virtualRow.key}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
+            className="absolute top-0 left-0 w-full"
+            style={{ transform: `translateY(${virtualRow.start}px)` }}
           >
-            {rowContent}
-          </Link>
+            <ConversationListRow
+              conversation={conversation}
+              activeConversationId={activeConversationId}
+              channelId={channelId}
+              hideChannelBadge={hideChannelBadge}
+              linkToConversationChannel={linkToConversationChannel}
+              linkMode={linkMode}
+              onConversationSelect={onConversationSelect}
+              variant={variant}
+            />
+          </div>
         );
       })}
+    </div>
+  ) : (
+    <div className="divide-y">
+      {conversations.map((conversation) => (
+        <ConversationListRow
+          key={conversation.id}
+          conversation={conversation}
+          activeConversationId={activeConversationId}
+          channelId={channelId}
+          hideChannelBadge={hideChannelBadge}
+          linkToConversationChannel={linkToConversationChannel}
+          linkMode={linkMode}
+          onConversationSelect={onConversationSelect}
+          variant={variant}
+        />
+      ))}
+    </div>
+  );
+
+  if (usesExternalScroll) {
+    return <div className={className}>{listBody}</div>;
+  }
+
+  return (
+    <div
+      ref={internalScrollRef}
+      className={cn("h-full overflow-y-auto", className)}
+    >
+      {listBody}
     </div>
   );
 }

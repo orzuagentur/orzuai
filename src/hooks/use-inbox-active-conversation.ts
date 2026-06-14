@@ -6,6 +6,7 @@ import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-co
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
 import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
+import type { ConversationReconnectCursor } from "@/lib/realtime/conversation-channel";
 import {
   getCachedMediaUrl,
   isConversationDetailFresh,
@@ -20,6 +21,11 @@ import {
 } from "@/utils/chat-media";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ChatMessageData, ConversationDetail } from "@/types/chat.types";
+import type { MessageDeliveryStatus } from "@/types/database.types";
+import {
+  applyMessageMetadataPatch,
+  hasMessageMetadataChanged,
+} from "@/utils/message-metadata";
 
 type UseInboxActiveConversationOptions = {
   initialConversationId: string | null;
@@ -344,10 +350,6 @@ export function useInboxActiveConversation({
       const index = current.messages.findIndex((item) => item.id === message.id);
 
       if (index === -1) {
-        if (current.messages.some((item) => item.id === message.id)) {
-          return current;
-        }
-
         return {
           ...current,
           messages: [...current.messages, message],
@@ -356,11 +358,9 @@ export function useInboxActiveConversation({
         };
       }
 
-      if (
-        current.messages[index]?.content === message.content &&
-        current.messages[index]?.attachmentPending === message.attachmentPending &&
-        current.messages[index]?.attachmentFailed === message.attachmentFailed
-      ) {
+      const previous = current.messages[index]!;
+
+      if (!hasMessageMetadataChanged(previous, message)) {
         return current;
       }
 
@@ -375,23 +375,68 @@ export function useInboxActiveConversation({
     });
   }, []);
 
+  const patchMessageDeliveryStatus = useCallback(
+    (messageId: string, deliveryStatus: MessageDeliveryStatus) => {
+      setConversation((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const messages = applyMessageMetadataPatch(current.messages, messageId, {
+          deliveryStatus,
+        });
+
+        if (!messages) {
+          return current;
+        }
+
+        return {
+          ...current,
+          messages,
+        };
+      });
+    },
+    [],
+  );
+
   const appendMessageRef = useRef(appendMessage);
   const updateMessageRef = useRef(updateMessage);
+  const patchMessageDeliveryStatusRef = useRef(patchMessageDeliveryStatus);
   const removeMessageRef = useRef(removeMessage);
+  const reconnectCursorRef = useRef<ConversationReconnectCursor | null>(null);
   appendMessageRef.current = appendMessage;
   updateMessageRef.current = updateMessage;
+  patchMessageDeliveryStatusRef.current = patchMessageDeliveryStatus;
   removeMessageRef.current = removeMessage;
 
   const { isClientTyping, isRealtimeConnected } = useConversationRealtime({
     conversationId: selectedConversationId,
+    getReconnectCursor: () => reconnectCursorRef.current,
     onMessage: (message) => {
       appendMessageRef.current(message);
     },
     onMessageUpdated: (message) => {
       updateMessageRef.current(message);
     },
+    onDeliveryStatusUpdated: (payload) => {
+      patchMessageDeliveryStatusRef.current(payload.message_id, payload.status);
+    },
     onMessageHidden: (messageId) => {
       removeMessageRef.current(messageId);
+    },
+    onGapSync: ({ newMessages, recentMessages, cursor }) => {
+      reconnectCursorRef.current = cursor;
+
+      for (const message of newMessages) {
+        appendMessageRef.current(message);
+      }
+
+      for (const message of recentMessages) {
+        updateMessageRef.current(message);
+      }
+    },
+    onReconnectCursorChange: (cursor) => {
+      reconnectCursorRef.current = cursor;
     },
   });
 
@@ -413,12 +458,25 @@ export function useInboxActiveConversation({
     return conversation.messages.at(-1)?.id ?? null;
   }, [conversation]);
 
+  useEffect(() => {
+    if (!latestMessageAt) {
+      reconnectCursorRef.current = null;
+      return;
+    }
+
+    reconnectCursorRef.current = {
+      afterCreatedAt: latestMessageAt,
+      afterMessageId: latestMessageId,
+    };
+  }, [latestMessageAt, latestMessageId, selectedConversationId]);
+
   useActiveConversationPolling({
     conversationId: selectedConversationId,
     latestMessageAt,
     latestMessageId,
-    enabled: Boolean(selectedConversationId && conversation),
-    pollNewMessages: !isRealtimeConnected,
+    enabled:
+      Boolean(selectedConversationId && conversation) && !isRealtimeConnected,
+    pollNewMessages: true,
     syncRecentMessages: true,
     onNewMessages: (messages) => {
       for (const message of messages) {

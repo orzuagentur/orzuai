@@ -2,6 +2,7 @@ import "server-only";
 
 import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildChatAttachmentStoragePath } from "@/utils/chat-attachment-path";
 
 export type ChatAttachmentUploadResult = {
   path: string;
@@ -97,10 +98,11 @@ export async function uploadChatAttachmentBuffer(
     mimeType: string;
   },
 ): Promise<ChatAttachmentUploadResult | null> {
-  const extension = options.fileName.includes(".")
-    ? options.fileName.slice(options.fileName.lastIndexOf("."))
-    : "";
-  const path = `${businessId}/${conversationId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
+  const path = buildChatAttachmentStoragePath(
+    businessId,
+    conversationId,
+    options.fileName,
+  );
 
   const uploaded = await uploadBuffer(path, buffer, options.mimeType);
 

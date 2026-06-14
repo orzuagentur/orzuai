@@ -32,6 +32,8 @@ export const CHAT_MESSAGES = {
     "Enable Website Forms in Integrations to receive leads here.",
   sendSuccess: "Message sent successfully.",
   messageSending: "Sending…",
+  mediaUploadPreparing: "Preparing upload…",
+  mediaUploadCompleting: "Finishing send…",
   messageDeliveryFailed: "Delivery failed",
   sendFailed: "Unable to send message. Please try again.",
   aiEnabledSuccess: "AI auto-replies enabled.",

@@ -226,6 +226,66 @@ export async function sendWhatsAppMediaMessage(
   };
 }
 
+export async function sendWhatsAppMediaMessageByUrl(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  mediaType: "image" | "audio" | "document" | "video",
+  mediaUrl: string,
+  options?: { caption?: string; filename?: string },
+): Promise<SendMediaMessageResult> {
+  const mediaPayload: Record<string, unknown> = { link: mediaUrl };
+
+  if (options?.caption?.trim()) {
+    mediaPayload.caption = options.caption.trim();
+  }
+
+  if (mediaType === "document" && options?.filename) {
+    mediaPayload.filename = options.filename;
+  }
+
+  const response = await fetch(buildWhatsAppApiUrl(`${phoneNumberId}/messages`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: mediaType,
+      [mediaType]: mediaPayload,
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { messages?: Array<{ id?: string }>; error?: { message?: string } }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message || "Unable to send WhatsApp media message.",
+    };
+  }
+
+  const messageId = payload?.messages?.[0]?.id;
+
+  if (!messageId) {
+    return {
+      success: false,
+      message: "Meta accepted the media request but did not return a message ID.",
+    };
+  }
+
+  return {
+    success: true,
+    messageId,
+  };
+}
+
 type ExchangeTokenResult =
   | { success: true; accessToken: string }
   | { success: false; message: string };

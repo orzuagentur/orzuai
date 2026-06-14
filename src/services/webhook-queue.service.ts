@@ -3,6 +3,11 @@ import "server-only";
 import { createHash } from "crypto";
 
 import { dispatchWebhookQueueWorker } from "@/lib/queue/qstash-webhook-worker";
+import { claimInboundWebhookJobs } from "@/lib/queue/claim-jobs";
+import {
+  getWorkerConcurrency,
+  runWithConcurrency,
+} from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processInstagramWebhook } from "@/services/instagram.service";
 import { processTelegramWebhook } from "@/services/telegram.service";
@@ -227,95 +232,89 @@ async function processWebhookJob(job: {
   return { success: false, error: `Unsupported channel: ${job.channel}` };
 }
 
+async function processClaimedWebhookJob(job: {
+  id: string;
+  channel: MessagingChannel;
+  payload: unknown;
+  metadata: Record<string, unknown> | null;
+  attempt_count: number | null;
+  max_attempts: number | null;
+}): Promise<"completed" | "retried" | "failed"> {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  const result = await processWebhookJob({
+    id: job.id,
+    channel: job.channel,
+    payload: job.payload,
+    metadata: job.metadata,
+  });
+
+  if (result.success) {
+    await admin
+      .from("inbound_webhook_queue")
+      .update({
+        status: "completed",
+        processed_at: now,
+        last_error: result.error ?? null,
+      })
+      .eq("id", job.id);
+    return "completed";
+  }
+
+  const attemptCount = (job.attempt_count ?? 0) + 1;
+  const maxAttempts = job.max_attempts ?? 5;
+  const exhausted = attemptCount >= maxAttempts;
+
+  await admin
+    .from("inbound_webhook_queue")
+    .update({
+      status: exhausted ? "failed" : "pending",
+      attempt_count: attemptCount,
+      last_error: result.error ?? "Processing failed.",
+      next_attempt_at: new Date(
+        Date.now() + BASE_RETRY_SECONDS * 1000 * 2 ** (attemptCount - 1),
+      ).toISOString(),
+    })
+    .eq("id", job.id);
+
+  if (!exhausted) {
+    dispatchInboundWebhookWorker();
+  }
+
+  return exhausted ? "failed" : "retried";
+}
+
 export async function processPendingInboundWebhooks(): Promise<{
   processed: number;
   completed: number;
   retried: number;
   failed: number;
 }> {
-  const admin = createAdminClient();
-  const now = new Date().toISOString();
+  const claimed = await claimInboundWebhookJobs(BATCH_SIZE);
 
-  const { data: pending } = await admin
-    .from("inbound_webhook_queue")
-    .select("id, channel, payload, metadata, attempt_count, max_attempts")
-    .eq("status", "pending")
-    .lte("next_attempt_at", now)
-    .order("next_attempt_at", { ascending: true })
-    .limit(BATCH_SIZE);
-
-  if (!pending?.length) {
+  if (claimed.length === 0) {
     return { processed: 0, completed: 0, retried: 0, failed: 0 };
   }
 
-  let completed = 0;
-  let retried = 0;
-  let failed = 0;
-  let processed = 0;
-
-  for (const job of pending) {
-    const { data: claimed } = await admin
-      .from("inbound_webhook_queue")
-      .update({ status: "processing" })
-      .eq("id", job.id)
-      .eq("status", "pending")
-      .select("id")
-      .maybeSingle();
-
-    if (!claimed) {
-      continue;
-    }
-
-    processed += 1;
-
-    const result = await processWebhookJob({
-      id: job.id,
-      channel: job.channel,
-      payload: job.payload,
-      metadata: (job.metadata as Record<string, unknown> | null) ?? null,
-    });
-
-    if (result.success) {
-      await admin
-        .from("inbound_webhook_queue")
-        .update({
-          status: "completed",
-          processed_at: now,
-          last_error: result.error ?? null,
-        })
-        .eq("id", job.id);
-      completed += 1;
-      continue;
-    }
-
-    const attemptCount = (job.attempt_count ?? 0) + 1;
-    const maxAttempts = job.max_attempts ?? 5;
-    const exhausted = attemptCount >= maxAttempts;
-
-    await admin
-      .from("inbound_webhook_queue")
-      .update({
-        status: exhausted ? "failed" : "pending",
-        attempt_count: attemptCount,
-        last_error: result.error ?? "Processing failed.",
-        next_attempt_at: new Date(
-          Date.now() + BASE_RETRY_SECONDS * 1000 * 2 ** (attemptCount - 1),
-        ).toISOString(),
-      })
-      .eq("id", job.id);
-
-    if (exhausted) {
-      failed += 1;
-    } else {
-      retried += 1;
-      dispatchInboundWebhookWorker();
-    }
-  }
+  const outcomes = await runWithConcurrency(
+    claimed,
+    getWorkerConcurrency(),
+    (job) =>
+      processClaimedWebhookJob({
+        id: job.id,
+        channel: job.channel,
+        payload: job.payload,
+        metadata: (job.metadata as Record<string, unknown> | null) ?? null,
+        attempt_count: job.attempt_count,
+        max_attempts: job.max_attempts,
+      }),
+  );
 
   return {
-    processed,
-    completed,
-    retried,
-    failed,
+    processed: claimed.length,
+    completed: outcomes.filter((outcome) => outcome === "completed").length,
+    retried: outcomes.filter((outcome) => outcome === "retried").length,
+    failed: outcomes.filter((outcome) => outcome === "failed").length,
   };
 }
