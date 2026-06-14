@@ -4,6 +4,7 @@ import type { Database } from "@/types/database.types";
 
 let prepareGeneration = 0;
 let preparePromise: Promise<boolean> | null = null;
+let appliedAuthToken: string | null = null;
 
 export async function ensureSupabaseRealtimeAuth(
   supabase: SupabaseClient<Database>,
@@ -19,8 +20,8 @@ export async function ensureSupabaseRealtimeAuth(
 }
 
 /**
- * Sets JWT on the Realtime socket and reconnects so postgres_changes respect RLS.
- * Subscriptions created before this completes may never receive events.
+ * Sets JWT on the Realtime socket and reconnects when the token changes.
+ * Avoids disconnecting on every subscription — that was dropping active channels.
  */
 export async function prepareSupabaseRealtime(
   supabase: SupabaseClient<Database>,
@@ -32,8 +33,20 @@ export async function prepareSupabaseRealtime(
     return false;
   }
 
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token ?? null;
+
+  if (!token) {
+    return false;
+  }
+
+  if (token === appliedAuthToken) {
+    return true;
+  }
+
   supabase.realtime.disconnect();
   supabase.realtime.connect();
+  appliedAuthToken = token;
 
   return true;
 }
@@ -53,6 +66,7 @@ export function waitForSupabaseRealtime(
 export function invalidateSupabaseRealtime(): void {
   prepareGeneration += 1;
   preparePromise = null;
+  appliedAuthToken = null;
 }
 
 export function bindSupabaseRealtimeAuthRefresh(

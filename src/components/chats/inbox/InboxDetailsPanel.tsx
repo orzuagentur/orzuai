@@ -140,10 +140,6 @@ export function InboxDetailsPanel({
       return;
     }
 
-    if (loadedConversationIdRef.current === conversationId) {
-      return;
-    }
-
     const activeConversationId = conversationId;
     let cancelled = false;
     loadedConversationIdRef.current = activeConversationId;
@@ -162,15 +158,19 @@ export function InboxDetailsPanel({
           setSuggestedAction(result.data.suggestedAction);
           setCachedCrmDetails(activeConversationId, result.data);
           setLoadState("ready");
-        } else {
-          setDetails(null);
-          setLoadState("error");
+          return;
         }
+
+        setDetails(null);
+        setLoadState("error");
       },
     );
 
     return () => {
       cancelled = true;
+      if (loadedConversationIdRef.current === activeConversationId) {
+        loadedConversationIdRef.current = null;
+      }
     };
   }, [conversationId]);
 

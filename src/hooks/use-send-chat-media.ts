@@ -22,6 +22,31 @@ type SendMediaOptions = {
   onProgress?: (progress: MediaUploadProgress) => void;
 };
 
+const PREPARE_MEDIA_TIMEOUT_MS = 20_000;
+const COMPLETE_MEDIA_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 type UseSendChatMediaOptions = {
   onSuccess?: (result: SendChatMessageResult) => void;
 };
@@ -49,12 +74,16 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
       try {
         reportProgress({ percent: 0, phase: "preparing" });
 
-        const prepared = await prepareChatMediaUploadAction({
-          conversationId,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-        });
+        const prepared = await withTimeout(
+          prepareChatMediaUploadAction({
+            conversationId,
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+          }),
+          PREPARE_MEDIA_TIMEOUT_MS,
+          CHAT_MESSAGES.mediaUploadPreparing,
+        );
 
         if (!prepared.success) {
           toast.error(prepared.error.message);
@@ -95,14 +124,18 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
 
         reportProgress({ percent: 100, phase: "completing" });
 
-        const result = await completeChatMediaUploadAction({
-          conversationId,
-          path: prepared.data.path,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-          caption,
-        });
+        const result = await withTimeout(
+          completeChatMediaUploadAction({
+            conversationId,
+            path: prepared.data.path,
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+            caption,
+          }),
+          COMPLETE_MEDIA_TIMEOUT_MS,
+          CHAT_MESSAGES.mediaUploadCompleting,
+        );
 
         if (result.success) {
           toast.success(CHAT_MESSAGES.mediaSendSuccess);
@@ -112,6 +145,19 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
 
         toast.error(result.error.message);
         return result;
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : CHAT_MESSAGES.mediaSendFailed;
+        toast.error(message);
+        return {
+          success: false as const,
+          error: {
+            code: "SEND_FAILED" as const,
+            message,
+          },
+        };
       } finally {
         setIsLoading(false);
         setUploadProgress(null);

@@ -1,21 +1,29 @@
+"use client";
+
 import { createBrowserClient } from "@supabase/ssr";
 
-import { ENV_KEYS } from "@/constants/env-keys";
 import {
   getSupabaseAnonKey,
   getSupabaseUrl,
-  hasClientSupabaseEnv,
 } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
 let browserClient: ReturnType<typeof createBrowserClient<Database>> | null =
   null;
 
-function getBrowserEnv() {
-  return {
-    url: process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL]?.trim() ?? "",
-    anonKey: process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]?.trim() ?? "",
-  };
+/** Client-safe public Supabase config (static env keys for Next.js inlining). */
+export function getBrowserSupabaseConfig(): {
+  url: string;
+  anonKey: string;
+} | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  return { url, anonKey };
 }
 
 export function createClient() {
@@ -27,13 +35,14 @@ export function createClient() {
 
 /** Safe for client hooks — returns null when public Supabase env is not configured. */
 export function createClientIfConfigured() {
-  if (!hasClientSupabaseEnv()) {
+  const config = getBrowserSupabaseConfig();
+
+  if (!config) {
     return null;
   }
 
   if (!browserClient) {
-    const { url, anonKey } = getBrowserEnv();
-    browserClient = createBrowserClient<Database>(url, anonKey);
+    browserClient = createBrowserClient<Database>(config.url, config.anonKey);
   }
 
   return browserClient;

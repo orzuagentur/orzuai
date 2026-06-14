@@ -1,8 +1,10 @@
 "use client";
 
 import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
-import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
-import { createClientIfConfigured } from "@/lib/supabase/client";
+import {
+  createClientIfConfigured,
+  getBrowserSupabaseConfig,
+} from "@/lib/supabase/client";
 
 export type ChatUploadPhase = "uploading";
 
@@ -19,11 +21,11 @@ type UploadChatAttachmentOptions = {
   onProgress?: (update: ChatUploadProgressUpdate) => void;
 };
 
-function buildStorageUploadUrl(bucket: string, path: string): string {
-  const supabaseUrl = getSupabaseUrl().replace(/\/$/, "");
+function buildStorageUploadUrl(bucket: string, path: string, supabaseUrl: string): string {
+  const normalizedBase = supabaseUrl.replace(/\/$/, "");
   const normalizedPath = path.replace(/^\/+/, "");
 
-  return `${supabaseUrl}/storage/v1/object/${bucket}/${normalizedPath}`;
+  return `${normalizedBase}/storage/v1/object/${bucket}/${normalizedPath}`;
 }
 
 function uploadViaXhr(
@@ -124,8 +126,9 @@ export async function uploadChatAttachmentDirect(
   options: UploadChatAttachmentOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClientIfConfigured();
+  const config = getBrowserSupabaseConfig();
 
-  if (!supabase) {
+  if (!supabase || !config) {
     return { success: false, error: "Supabase is not configured." };
   }
 
@@ -138,34 +141,21 @@ export async function uploadChatAttachmentDirect(
   }
 
   const bucket = options.bucket ?? CHAT_ATTACHMENTS_BUCKET;
-  const supabaseUrl = getSupabaseUrl();
-  const anonKey = getSupabaseAnonKey();
 
-  if (!supabaseUrl || !anonKey) {
-    return { success: false, error: "Supabase is not configured." };
+  if (options.onProgress) {
+    const url = buildStorageUploadUrl(bucket, path, config.url);
+    const xhrResult = await uploadViaXhr(
+      file,
+      url,
+      session.access_token,
+      config.anonKey,
+      options.onProgress,
+    );
+
+    if (xhrResult.success) {
+      return xhrResult;
+    }
   }
 
-  const url = buildStorageUploadUrl(bucket, path);
-  const xhrResult = await uploadViaXhr(
-    file,
-    url,
-    session.access_token,
-    anonKey,
-    options.onProgress,
-  );
-
-  if (xhrResult.success) {
-    return xhrResult;
-  }
-
-  const fallbackResult = await uploadViaSupabaseClient(file, path, bucket);
-
-  if (fallbackResult.success) {
-    return fallbackResult;
-  }
-
-  return {
-    success: false,
-    error: xhrResult.error ?? fallbackResult.error,
-  };
+  return uploadViaSupabaseClient(file, path, bucket);
 }

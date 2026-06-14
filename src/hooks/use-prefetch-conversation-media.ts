@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { prefetchChatMediaUrlsAction } from "@/features/chats/actions/prefetch-chat-media-urls";
 import { setCachedMediaUrl } from "@/lib/client-cache/inbox-messenger-cache";
 import type { ChatMessageData } from "@/types/chat.types";
+import { isOptimisticMessageId } from "@/utils/optimistic-chat-message";
 import { parseMediaMessage, resolveMediaStoragePath } from "@/utils/chat-media";
 
 function collectVisibleMediaPaths(
@@ -28,7 +29,12 @@ function collectVisibleMediaPaths(
 
   for (const index of visibleIndices) {
     const message = messages[index];
-    const { media } = parseMediaMessage(message?.content ?? "");
+
+    if (!message || message.isPending || isOptimisticMessageId(message.id)) {
+      continue;
+    }
+
+    const { media } = parseMediaMessage(message.content ?? "");
 
     if (!media) {
       continue;
@@ -47,14 +53,21 @@ export function usePrefetchVisibleConversationMedia(
   enabled = true,
 ): void {
   const requestIdRef = useRef(0);
-  const visibleKey = visibleIndices.join(",");
+
+  const mediaPathsKey = useMemo(() => {
+    if (!enabled || messages.length === 0 || visibleIndices.length === 0) {
+      return "";
+    }
+
+    return collectVisibleMediaPaths(messages, visibleIndices).join("\u0000");
+  }, [enabled, messages, visibleIndices]);
 
   useEffect(() => {
-    if (!enabled || messages.length === 0 || visibleIndices.length === 0) {
+    if (!mediaPathsKey) {
       return;
     }
 
-    const paths = collectVisibleMediaPaths(messages, visibleIndices);
+    const paths = mediaPathsKey.split("\u0000");
 
     if (paths.length === 0) {
       return;
@@ -71,7 +84,7 @@ export function usePrefetchVisibleConversationMedia(
         setCachedMediaUrl(path, url);
       }
     });
-  }, [enabled, messages, visibleIndices, visibleKey]);
+  }, [mediaPathsKey]);
 }
 
 /** @deprecated Use usePrefetchVisibleConversationMedia with virtual row indices. */

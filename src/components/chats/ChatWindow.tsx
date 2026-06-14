@@ -47,6 +47,7 @@ import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { cacheChatMessageMediaUrl } from "@/utils/cache-chat-media-url";
 import { isChatScrollPinnedToBottom } from "@/utils/chat-scroll";
+import { throttle } from "@/utils/throttle";
 import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
 import {
   createOptimisticChatMessage,
@@ -181,6 +182,28 @@ export function ChatWindow({
 
   const { sendMedia, isLoading: isSendingMedia, uploadProgress } =
     useSendChatMedia();
+
+  const reportMediaUploadProgressRef = useRef(
+    throttle(
+      (
+        message: ChatMessageData,
+        progress: {
+          percent: number;
+          bytesPerSecond?: number;
+          phase: NonNullable<ChatMessageData["uploadPhase"]>;
+        },
+      ) => {
+        onMessageUpdated?.({
+          ...message,
+          uploadProgress: progress.percent,
+          uploadSpeedBps: progress.bytesPerSecond,
+          uploadPhase: progress.phase,
+          isPending: true,
+        });
+      },
+      200,
+    ),
+  );
 
   useEffect(() => {
     if (!isInboxLayout || !isLoadingOlderMessages) {
@@ -558,13 +581,10 @@ export function ChatWindow({
                     caption,
                     {
                       onProgress: (progress) => {
-                        onMessageUpdated?.({
-                          ...optimisticMessage,
-                          uploadProgress: progress.percent,
-                          uploadSpeedBps: progress.bytesPerSecond,
-                          uploadPhase: progress.phase,
-                          isPending: true,
-                        });
+                        reportMediaUploadProgressRef.current(
+                          optimisticMessage,
+                          progress,
+                        );
                       },
                     },
                   );

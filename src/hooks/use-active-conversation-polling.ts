@@ -6,7 +6,7 @@ import { fetchNewConversationMessagesAction } from "@/features/chats/actions/fet
 import { fetchRecentConversationMessagesAction } from "@/features/chats/actions/fetch-recent-conversation-messages";
 import type { ChatMessageData } from "@/types/chat.types";
 
-export const ACTIVE_CONVERSATION_POLL_MS = 3_000;
+export const ACTIVE_CONVERSATION_POLL_MS = 5_000;
 
 type UseActiveConversationPollingOptions = {
   conversationId: string | null;

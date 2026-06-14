@@ -8,7 +8,7 @@ import {
 import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getPrimaryBusiness } from "@/services/business.service";
+import { getAccessibleBusiness } from "@/services/business-access.service";
 import { requireUser } from "@/services/auth.service";
 import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
 import { scheduleOutboundAttachmentThumbnail } from "@/services/chat-attachment-thumbnail.service";
@@ -77,7 +77,7 @@ function missingConfigError(): SendChatMessageResult {
 
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
   return business?.id ?? null;
 }
 

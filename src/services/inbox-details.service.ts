@@ -6,7 +6,7 @@ import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
-import { getPrimaryBusiness } from "@/services/business.service";
+import { getAccessibleBusiness } from "@/services/business-access.service";
 import { getContactForInboxSidebar } from "@/services/contacts.service";
 import type { ContactProfileData } from "@/types/contact.types";
 import type { CrmDealItem } from "@/types/crm-deal.types";
@@ -57,7 +57,7 @@ export async function getInboxDetailsPanel(
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {

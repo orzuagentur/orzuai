@@ -33,8 +33,8 @@ export function getSupabaseServiceRoleKey(): string {
 
 export function hasClientSupabaseEnv(): boolean {
   return Boolean(
-    process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL]?.trim() &&
-      process.env[ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY]?.trim(),
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
   );
 }
 
