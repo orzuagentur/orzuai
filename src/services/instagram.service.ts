@@ -21,6 +21,7 @@ import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { getWhatsAppApiVersion } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { dispatchMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
@@ -37,8 +38,6 @@ import {
   incrementMessagingAnalytics,
   insertChannelMessage,
   createOutboundMessageDelivery,
-  recordMessageDeliveryFailure,
-  recordMessageDeliverySuccess,
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
@@ -781,51 +780,9 @@ export async function sendInstagramChatMessage(
     channel: "instagram",
   });
 
-  void deliverInstagramOutboundText({
-    admin,
-    messageId: insertedMessage.id,
-    pageId: connection.meta_page_id,
-    accessToken: connection.meta_access_token,
-    recipientId,
-    content,
-    businessId,
-  }).catch((error) => {
-    console.error("[instagram] outbound delivery failed", error);
+  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
+    console.error("[instagram] outbound delivery dispatch failed", error);
   });
 
   return { success: true, message: insertedMessage };
-}
-
-async function deliverInstagramOutboundText(input: {
-  admin: ReturnType<typeof createAdminClient>;
-  messageId: string;
-  pageId: string;
-  accessToken: string;
-  recipientId: string;
-  content: string;
-  businessId: string;
-}): Promise<void> {
-  const sendResult = await sendInstagramTextMessage(
-    input.pageId,
-    input.accessToken,
-    input.recipientId,
-    input.content,
-  );
-
-  if (!sendResult.success) {
-    await recordMessageDeliveryFailure(input.admin, {
-      messageId: input.messageId,
-      errorMessage: sendResult.message,
-    });
-    return;
-  }
-
-  await recordMessageDeliverySuccess(input.admin, {
-    messageId: input.messageId,
-    providerMessageId: sendResult.messageId,
-  });
-
-  await incrementMessagingAnalytics(input.admin, input.businessId, "instagram", {
-    totalMessages: 1,
-  });
 }

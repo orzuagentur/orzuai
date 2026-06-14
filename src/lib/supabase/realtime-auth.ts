@@ -69,9 +69,21 @@ export function invalidateSupabaseRealtime(): void {
   appliedAuthToken = null;
 }
 
+let authRefreshBound = false;
+
+/**
+ * Registers a single global auth-state listener for Realtime JWT refresh.
+ * Call once from dashboard bootstrap; subscription hooks only need waitForSupabaseRealtime.
+ */
 export function bindSupabaseRealtimeAuthRefresh(
   supabase: SupabaseClient<Database>,
 ): () => void {
+  if (authRefreshBound) {
+    return () => {};
+  }
+
+  authRefreshBound = true;
+
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
     invalidateSupabaseRealtime();
 
@@ -82,5 +94,6 @@ export function bindSupabaseRealtimeAuthRefresh(
 
   return () => {
     data.subscription.unsubscribe();
+    authRefreshBound = false;
   };
 }

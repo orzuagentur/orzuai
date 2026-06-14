@@ -8,9 +8,15 @@ import {
   prepareChatMediaUploadAction,
 } from "@/features/chats/actions/send-chat-media";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
-import { uploadChatAttachmentDirect } from "@/lib/client/upload-chat-attachment";
+import { generateClientImageThumbnail } from "@/lib/client/generate-image-thumbnail";
+import {
+  getChatAttachmentSignedUrlClient,
+  uploadChatAttachmentBlob,
+  uploadChatAttachmentDirect,
+} from "@/lib/client/upload-chat-attachment";
 import type { ChatMessageData } from "@/types/chat.types";
 import type { SendChatMessageResult } from "@/types/chat.types";
+import { buildThumbnailStoragePath } from "@/utils/chat-attachment-path";
 
 export type MediaUploadProgress = {
   percent: number;
@@ -95,6 +101,12 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
 
         reportProgress({ percent: 0, phase: "uploading" });
 
+        const mimeType = file.type || "application/octet-stream";
+        const thumbPromise =
+          mimeType.startsWith("image/")
+            ? generateClientImageThumbnail(file)
+            : Promise.resolve(null);
+
         const uploaded = await uploadChatAttachmentDirect(
           file,
           prepared.data.path,
@@ -122,6 +134,27 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
           };
         }
 
+        const thumbnail = await thumbPromise;
+        let thumbPath: string | undefined;
+        let thumbWidth: number | undefined;
+        let thumbHeight: number | undefined;
+
+        if (thumbnail) {
+          thumbPath = buildThumbnailStoragePath(prepared.data.path);
+          const thumbUploaded = await uploadChatAttachmentBlob(
+            thumbnail.blob,
+            thumbPath,
+            { bucket: prepared.data.bucket },
+          );
+
+          if (thumbUploaded.success) {
+            thumbWidth = thumbnail.width;
+            thumbHeight = thumbnail.height;
+          } else {
+            thumbPath = undefined;
+          }
+        }
+
         reportProgress({ percent: 100, phase: "completing" });
 
         const result = await withTimeout(
@@ -129,18 +162,36 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
             conversationId,
             path: prepared.data.path,
             fileName: file.name,
-            mimeType: file.type || "application/octet-stream",
+            mimeType,
             sizeBytes: file.size,
             caption,
+            thumbPath,
+            thumbWidth,
+            thumbHeight,
           }),
           COMPLETE_MEDIA_TIMEOUT_MS,
           CHAT_MESSAGES.mediaUploadCompleting,
         );
 
         if (result.success) {
+          const mediaSignedUrl = await getChatAttachmentSignedUrlClient(
+            prepared.data.path,
+            prepared.data.bucket,
+          );
+
+          const enrichedResult: SendChatMessageResult = mediaSignedUrl
+            ? {
+                ...result,
+                data: {
+                  ...result.data,
+                  mediaSignedUrl,
+                },
+              }
+            : result;
+
           toast.success(CHAT_MESSAGES.mediaSendSuccess);
-          onSuccess?.(result);
-          return result;
+          onSuccess?.(enrichedResult);
+          return enrichedResult;
         }
 
         toast.error(result.error.message);

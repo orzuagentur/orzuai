@@ -15,6 +15,7 @@ import {
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { dispatchMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
@@ -27,8 +28,6 @@ import {
   incrementMessagingAnalytics,
   insertChannelMessage,
   createOutboundMessageDelivery,
-  recordMessageDeliveryFailure,
-  recordMessageDeliverySuccess,
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
@@ -599,47 +598,9 @@ export async function sendTelegramChatMessage(
     channel: "telegram",
   });
 
-  void deliverTelegramOutboundText({
-    admin,
-    messageId: insertedMessage.id,
-    botToken: connection.bot_token,
-    chatId,
-    content,
-    businessId,
-  }).catch((error) => {
-    console.error("[telegram] outbound delivery failed", error);
+  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
+    console.error("[telegram] outbound delivery dispatch failed", error);
   });
 
   return { success: true, message: insertedMessage };
-}
-
-async function deliverTelegramOutboundText(input: {
-  admin: ReturnType<typeof createAdminClient>;
-  messageId: string;
-  botToken: string;
-  chatId: string;
-  content: string;
-  businessId: string;
-}): Promise<void> {
-  const sendResult = await sendTelegramTextMessage(
-    input.botToken,
-    input.chatId,
-    input.content,
-  );
-
-  if (!sendResult.success) {
-    await recordMessageDeliveryFailure(input.admin, {
-      messageId: input.messageId,
-      errorMessage: sendResult.message,
-    });
-    return;
-  }
-
-  await recordMessageDeliverySuccess(input.admin, {
-    messageId: input.messageId,
-  });
-
-  await incrementMessagingAnalytics(input.admin, input.businessId, "telegram", {
-    totalMessages: 1,
-  });
 }

@@ -4,10 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { fetchConversationListItemAction } from "@/features/chats/actions/fetch-conversation-list-item";
 import { createClientIfConfigured } from "@/lib/supabase/client";
-import {
-  bindSupabaseRealtimeAuthRefresh,
-  waitForSupabaseRealtime,
-} from "@/lib/supabase/realtime-auth";
+import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { getInboxRealtimeChannelName } from "@/lib/realtime/inbox-channel";
@@ -90,7 +87,6 @@ export function useInboxListRealtime({
       return;
     }
 
-    let unbindAuthRefresh: (() => void) | null = null;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
@@ -224,12 +220,6 @@ export function useInboxListRealtime({
         return;
       }
 
-      unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
-
-      if (cancelled) {
-        return;
-      }
-
       channel = supabase
         .channel(getInboxRealtimeChannelName(businessId))
         .on(
@@ -277,6 +267,10 @@ export function useInboxListRealtime({
         .subscribe((status) => {
           onConnectionChangeRef.current?.(status === "SUBSCRIBED");
 
+          if (status === "SUBSCRIBED" && reconnectNonce > 0) {
+            scheduleRefresh();
+          }
+
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             window.setTimeout(() => {
               setReconnectNonce((current) => current + 1);
@@ -299,8 +293,6 @@ export function useInboxListRealtime({
       if (refreshTimeoutRef.current !== null) {
         window.clearTimeout(refreshTimeoutRef.current);
       }
-
-      unbindAuthRefresh?.();
 
       if (channel) {
         void supabase.removeChannel(channel);

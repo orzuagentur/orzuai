@@ -18,6 +18,7 @@ export type ChatUploadProgressUpdate = {
 
 type UploadChatAttachmentOptions = {
   bucket?: string;
+  upsert?: boolean;
   onProgress?: (update: ChatUploadProgressUpdate) => void;
 };
 
@@ -29,11 +30,14 @@ function buildStorageUploadUrl(bucket: string, path: string, supabaseUrl: string
 }
 
 function uploadViaXhr(
-  file: File,
+  body: File | Blob,
   url: string,
   accessToken: string,
   anonKey: string,
-  onProgress?: (update: ChatUploadProgressUpdate) => void,
+  options: {
+    upsert?: boolean;
+    onProgress?: (update: ChatUploadProgressUpdate) => void;
+  } = {},
 ): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
@@ -42,10 +46,10 @@ function uploadViaXhr(
 
     const formData = new FormData();
     formData.append("cacheControl", "3600");
-    formData.append("", file);
+    formData.append("", body);
 
     xhr.upload.addEventListener("progress", (event) => {
-      if (!event.lengthComputable || !onProgress) {
+      if (!event.lengthComputable || !options.onProgress) {
         return;
       }
 
@@ -58,7 +62,7 @@ function uploadViaXhr(
       lastLoaded = event.loaded;
       lastTime = now;
 
-      onProgress({
+      options.onProgress({
         percent: Math.min(100, (event.loaded / event.total) * 100),
         loaded: event.loaded,
         total: event.total,
@@ -92,15 +96,16 @@ function uploadViaXhr(
     xhr.open("POST", url);
     xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
     xhr.setRequestHeader("apikey", anonKey);
-    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("x-upsert", options.upsert ? "true" : "false");
     xhr.send(formData);
   });
 }
 
 async function uploadViaSupabaseClient(
-  file: File,
+  body: File | Blob,
   path: string,
   bucket: string,
+  upsert: boolean,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClientIfConfigured();
 
@@ -108,9 +113,14 @@ async function uploadViaSupabaseClient(
     return { success: false, error: "Supabase is not configured." };
   }
 
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    contentType: file.type || "application/octet-stream",
-    upsert: false,
+  const contentType =
+    body instanceof File
+      ? body.type || "application/octet-stream"
+      : body.type || "application/octet-stream";
+
+  const { error } = await supabase.storage.from(bucket).upload(path, body, {
+    contentType,
+    upsert,
   });
 
   if (error) {
@@ -120,8 +130,8 @@ async function uploadViaSupabaseClient(
   return { success: true };
 }
 
-export async function uploadChatAttachmentDirect(
-  file: File,
+async function uploadStorageObject(
+  body: File | Blob,
   path: string,
   options: UploadChatAttachmentOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
@@ -141,15 +151,19 @@ export async function uploadChatAttachmentDirect(
   }
 
   const bucket = options.bucket ?? CHAT_ATTACHMENTS_BUCKET;
+  const upsert = options.upsert ?? false;
 
   if (options.onProgress) {
     const url = buildStorageUploadUrl(bucket, path, config.url);
     const xhrResult = await uploadViaXhr(
-      file,
+      body,
       url,
       session.access_token,
       config.anonKey,
-      options.onProgress,
+      {
+        upsert,
+        onProgress: options.onProgress,
+      },
     );
 
     if (xhrResult.success) {
@@ -157,5 +171,46 @@ export async function uploadChatAttachmentDirect(
     }
   }
 
-  return uploadViaSupabaseClient(file, path, bucket);
+  return uploadViaSupabaseClient(body, path, bucket, upsert);
+}
+
+export async function uploadChatAttachmentDirect(
+  file: File,
+  path: string,
+  options: UploadChatAttachmentOptions = {},
+): Promise<{ success: boolean; error?: string }> {
+  return uploadStorageObject(file, path, options);
+}
+
+export async function uploadChatAttachmentBlob(
+  blob: Blob,
+  path: string,
+  options: Omit<UploadChatAttachmentOptions, "onProgress"> = {},
+): Promise<{ success: boolean; error?: string }> {
+  return uploadStorageObject(blob, path, {
+    ...options,
+    upsert: options.upsert ?? true,
+  });
+}
+
+export async function getChatAttachmentSignedUrlClient(
+  path: string,
+  bucket = CHAT_ATTACHMENTS_BUCKET,
+  expiresIn = 60 * 60,
+): Promise<string | null> {
+  const supabase = createClientIfConfigured();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresIn);
+
+  if (error || !data?.signedUrl) {
+    return null;
+  }
+
+  return data.signedUrl;
 }

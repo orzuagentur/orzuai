@@ -54,18 +54,4 @@ export async function generateImageThumbnailBuffer(
   }
 }
 
-export function buildThumbnailStoragePath(storagePath: string): string {
-  const slashIndex = storagePath.lastIndexOf("/");
-
-  if (slashIndex === -1) {
-    return `thumbs/${storagePath}.jpg`;
-  }
-
-  const directory = storagePath.slice(0, slashIndex);
-  const fileName = storagePath.slice(slashIndex + 1);
-  const baseName = fileName.includes(".")
-    ? fileName.slice(0, fileName.lastIndexOf("."))
-    : fileName;
-
-  return `${directory}/thumbs/${baseName}.jpg`;
-}
+export { buildThumbnailStoragePath } from "@/utils/chat-attachment-path";

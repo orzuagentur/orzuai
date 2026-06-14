@@ -5,6 +5,7 @@ import {
   claimMessageDeliveryJob,
   claimMessageDeliveryJobs,
 } from "@/lib/queue/claim-jobs";
+import { dispatchMessageDeliveryQStashWorker } from "@/lib/queue/qstash-message-delivery-worker";
 import {
   getWorkerConcurrency,
   runWithConcurrency,
@@ -23,6 +24,10 @@ import { parseMediaMessage } from "@/utils/chat-media";
 
 const BATCH_SIZE = 25;
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
+const MAX_DRAIN_BATCHES = 20;
+const DELIVERY_RETRY_BASE_SECONDS = 30;
+
+let deliveryDrainPromise: Promise<DeliveryDrainResult> | null = null;
 
 type DeliveryRow = {
   id: string;
@@ -34,6 +39,20 @@ type DeliveryRow = {
 };
 
 type DeliveryProcessResult = "sent" | "retried" | "failed" | "skipped";
+
+export type DeliveryDrainResult = {
+  processed: number;
+  sent: number;
+  retried: number;
+  failed: number;
+  recoveredStale: number;
+  batches: number;
+  durationMs: number;
+};
+
+function getDeliveryRetryDelaySeconds(attemptCount: number): number {
+  return DELIVERY_RETRY_BASE_SECONDS * 2 ** Math.max(0, attemptCount - 1);
+}
 
 export async function recoverStaleMessageDeliveries(): Promise<number> {
   const admin = createAdminClient();
@@ -76,6 +95,26 @@ async function processDeliveryRow(
     return "failed";
   }
 
+  const failDelivery = async (
+    messageId: string,
+    errorMessage: string,
+  ): Promise<DeliveryProcessResult> => {
+    await recordMessageDeliveryFailure(admin, {
+      messageId,
+      errorMessage,
+    });
+
+    const attemptCount = (delivery.attempt_count ?? 0) + 1;
+    const maxAttempts = delivery.max_attempts ?? 5;
+
+    if (attemptCount < maxAttempts) {
+      scheduleMessageDeliveryRetry(attemptCount);
+      return "retried";
+    }
+
+    return "failed";
+  };
+
   const recipientId = await resolveChannelRecipient(admin, {
     businessId: delivery.business_id,
     conversationId: message.conversation_id,
@@ -83,11 +122,7 @@ async function processDeliveryRow(
   });
 
   if (!recipientId) {
-    await recordMessageDeliveryFailure(admin, {
-      messageId: message.id,
-      errorMessage: "Recipient unavailable.",
-    });
-    return "failed";
+    return failDelivery(message.id, "Recipient unavailable.");
   }
 
   const { media } = parseMediaMessage(message.content);
@@ -112,11 +147,7 @@ async function processDeliveryRow(
     });
 
     if (!mediaUrl) {
-      await recordMessageDeliveryFailure(admin, {
-        messageId: message.id,
-        errorMessage: "Media URL unavailable.",
-      });
-      return "failed";
+      return failDelivery(message.id, "Media URL unavailable.");
     }
 
     result = await deliverChannelMediaMessage({
@@ -153,15 +184,48 @@ async function processDeliveryRow(
     return "sent";
   }
 
-  const attemptCount = (delivery.attempt_count ?? 0) + 1;
-  const maxAttempts = delivery.max_attempts ?? 5;
+  return await failDelivery(message.id, result.error);
+}
 
-  await recordMessageDeliveryFailure(admin, {
-    messageId: message.id,
-    errorMessage: result.error,
-  });
+function scheduleInProcessDeliveryDrain(): void {
+  if (deliveryDrainPromise) {
+    return;
+  }
 
-  return attemptCount >= maxAttempts ? "failed" : "retried";
+  deliveryDrainPromise = drainPendingMessageDeliveries()
+    .catch((error) => {
+      console.error("[message-delivery] in-process drain failed", error);
+      return {
+        processed: 0,
+        sent: 0,
+        retried: 0,
+        failed: 0,
+        recoveredStale: 0,
+        batches: 0,
+        durationMs: 0,
+      };
+    })
+    .finally(() => {
+      deliveryDrainPromise = null;
+    });
+}
+
+export function dispatchMessageDeliveryWorker(
+  source: "enqueue" | "retry" = "enqueue",
+  delaySeconds = 0,
+): void {
+  if (delaySeconds <= 0) {
+    scheduleInProcessDeliveryDrain();
+  }
+
+  void dispatchMessageDeliveryQStashWorker({ source, delaySeconds });
+}
+
+function scheduleMessageDeliveryRetry(attemptCount: number): void {
+  dispatchMessageDeliveryWorker(
+    "retry",
+    getDeliveryRetryDelaySeconds(attemptCount),
+  );
 }
 
 export async function dispatchMessageDelivery(messageId: string): Promise<void> {
@@ -169,36 +233,28 @@ export async function dispatchMessageDelivery(messageId: string): Promise<void> 
 
   const claimed = await claimMessageDeliveryJob(messageId);
 
-  if (!claimed) {
+  if (claimed) {
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+    await processDeliveryRow(admin, claimed, now);
     return;
   }
 
-  const admin = createAdminClient();
-  const now = new Date().toISOString();
-
-  await processDeliveryRow(admin, claimed, now);
+  dispatchMessageDeliveryWorker("enqueue");
 }
 
-export async function processPendingMessageDeliveries(): Promise<{
+async function processPendingMessageDeliveriesBatch(): Promise<{
   processed: number;
   sent: number;
   retried: number;
   failed: number;
-  recoveredStale: number;
 }> {
-  const recoveredStale = await recoverStaleMessageDeliveries();
   const admin = createAdminClient();
   const now = new Date().toISOString();
   const claimed = await claimMessageDeliveryJobs(BATCH_SIZE);
 
   if (claimed.length === 0) {
-    return {
-      processed: 0,
-      sent: 0,
-      retried: 0,
-      failed: 0,
-      recoveredStale,
-    };
+    return { processed: 0, sent: 0, retried: 0, failed: 0 };
   }
 
   const outcomes = await runWithConcurrency(
@@ -212,6 +268,61 @@ export async function processPendingMessageDeliveries(): Promise<{
     sent: outcomes.filter((outcome) => outcome === "sent").length,
     retried: outcomes.filter((outcome) => outcome === "retried").length,
     failed: outcomes.filter((outcome) => outcome === "failed").length,
-    recoveredStale,
   };
+}
+
+export async function processPendingMessageDeliveries(): Promise<{
+  processed: number;
+  sent: number;
+  retried: number;
+  failed: number;
+  recoveredStale: number;
+}> {
+  const result = await drainPendingMessageDeliveries();
+  return {
+    processed: result.processed,
+    sent: result.sent,
+    retried: result.retried,
+    failed: result.failed,
+    recoveredStale: result.recoveredStale,
+  };
+}
+
+export async function drainPendingMessageDeliveries(): Promise<DeliveryDrainResult> {
+  const startedAt = Date.now();
+  const recoveredStale = await recoverStaleMessageDeliveries();
+
+  const totals: DeliveryDrainResult = {
+    processed: 0,
+    sent: 0,
+    retried: 0,
+    failed: 0,
+    batches: 0,
+    recoveredStale,
+    durationMs: 0,
+  };
+
+  let batch = await processPendingMessageDeliveriesBatch();
+
+  while (batch.processed > 0 && totals.batches < MAX_DRAIN_BATCHES) {
+    totals.batches += 1;
+    totals.processed += batch.processed;
+    totals.sent += batch.sent;
+    totals.retried += batch.retried;
+    totals.failed += batch.failed;
+
+    if (batch.processed < BATCH_SIZE) {
+      break;
+    }
+
+    batch = await processPendingMessageDeliveriesBatch();
+  }
+
+  totals.durationMs = Date.now() - startedAt;
+
+  if (totals.processed > 0) {
+    console.info("[message-delivery] drain complete", totals);
+  }
+
+  return totals;
 }

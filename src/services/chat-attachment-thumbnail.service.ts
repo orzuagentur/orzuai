@@ -2,15 +2,15 @@ import "server-only";
 
 import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  dispatchOutboundThumbnailWorker,
+  getOutboundThumbnailRetryDelaySeconds,
+} from "@/lib/queue/qstash-outbound-thumbnail-worker";
 import { updateChannelMessageContent } from "@/services/messaging.service";
 import { markMessageAttachmentReady } from "@/services/message-attachment.service";
-import {
-  downloadChatAttachmentBuffer,
-} from "@/services/chat-attachment-signed-url.service";
-import {
-  buildThumbnailStoragePath,
-  generateImageThumbnailBuffer,
-} from "@/utils/image-thumbnail";
+import { downloadChatAttachmentBuffer } from "@/services/chat-attachment-signed-url.service";
+import { generateImageThumbnailBuffer } from "@/utils/image-thumbnail";
+import { buildThumbnailStoragePath } from "@/utils/chat-attachment-path";
 import {
   encodeMediaMessage,
   parseMediaMessage,
@@ -27,28 +27,121 @@ export function scheduleOutboundAttachmentThumbnail(input: {
     return;
   }
 
-  void generateAndAttachChatThumbnail(input).catch((error) => {
-    console.error("[chat-attachments] thumbnail generation failed", error);
+  void (async () => {
+    const { dispatched } = await dispatchOutboundThumbnailWorker({
+      messageId: input.messageId,
+      storagePath: input.storagePath,
+      mimeType: input.mimeType,
+      attempt: 1,
+    });
+
+    if (!dispatched) {
+      await runOutboundAttachmentThumbnail({
+        messageId: input.messageId,
+        storagePath: input.storagePath,
+        mimeType: input.mimeType,
+        attempt: 1,
+        maxAttempts: 3,
+      });
+    }
+  })().catch((error) => {
+    console.error("[chat-attachments] thumbnail worker failed", error);
   });
+}
+
+export async function runOutboundAttachmentThumbnail(input: {
+  messageId: string;
+  storagePath: string;
+  mimeType: string;
+  attempt?: number;
+  maxAttempts?: number;
+}): Promise<{ completed: boolean; error?: string }> {
+  const attempt = input.attempt ?? 1;
+  const maxAttempts = input.maxAttempts ?? 3;
+
+  if (!input.mimeType.startsWith("image/")) {
+    return { completed: true };
+  }
+
+  try {
+    const attached = await generateAndAttachChatThumbnail({
+      messageId: input.messageId,
+      storagePath: input.storagePath,
+    });
+
+    if (attached) {
+      return { completed: true };
+    }
+
+    const error = "Thumbnail generation returned empty result.";
+
+    if (attempt < maxAttempts) {
+      const nextAttempt = attempt + 1;
+      dispatchOutboundThumbnailWorker({
+        messageId: input.messageId,
+        storagePath: input.storagePath,
+        mimeType: input.mimeType,
+        attempt: nextAttempt,
+        delaySeconds: getOutboundThumbnailRetryDelaySeconds(nextAttempt),
+      });
+      console.warn("[chat-attachments] thumbnail retry scheduled", {
+        messageId: input.messageId,
+        attempt: nextAttempt,
+      });
+      return { completed: false, error };
+    }
+
+    console.error("[chat-attachments] thumbnail exhausted retries", {
+      messageId: input.messageId,
+      attempt,
+      error,
+    });
+    return { completed: false, error };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Thumbnail generation failed.";
+
+    if (attempt < maxAttempts) {
+      const nextAttempt = attempt + 1;
+      dispatchOutboundThumbnailWorker({
+        messageId: input.messageId,
+        storagePath: input.storagePath,
+        mimeType: input.mimeType,
+        attempt: nextAttempt,
+        delaySeconds: getOutboundThumbnailRetryDelaySeconds(nextAttempt),
+      });
+      console.warn("[chat-attachments] thumbnail retry scheduled", {
+        messageId: input.messageId,
+        attempt: nextAttempt,
+        error: message,
+      });
+      return { completed: false, error: message };
+    }
+
+    console.error("[chat-attachments] thumbnail exhausted retries", {
+      messageId: input.messageId,
+      attempt,
+      error: message,
+    });
+    return { completed: false, error: message };
+  }
 }
 
 async function generateAndAttachChatThumbnail(input: {
   messageId: string;
-  businessId: string;
   storagePath: string;
-  mimeType: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const admin = createAdminClient();
   const sourceBuffer = await downloadChatAttachmentBuffer(input.storagePath);
 
   if (!sourceBuffer) {
-    return;
+    return false;
   }
 
   const thumbnail = await generateImageThumbnailBuffer(sourceBuffer);
 
   if (!thumbnail) {
-    return;
+    return false;
   }
 
   const thumbnailPath = buildThumbnailStoragePath(input.storagePath);
@@ -60,8 +153,7 @@ async function generateAndAttachChatThumbnail(input: {
     });
 
   if (thumbError) {
-    console.error("[chat-attachments] thumbnail upload failed", thumbError.message);
-    return;
+    throw new Error(thumbError.message);
   }
 
   const { data: messageRow } = await admin
@@ -71,13 +163,13 @@ async function generateAndAttachChatThumbnail(input: {
     .maybeSingle();
 
   if (!messageRow?.content) {
-    return;
+    return false;
   }
 
   const { media, text } = parseMediaMessage(messageRow.content);
 
-  if (!media) {
-    return;
+  if (!media || media.thumbPath) {
+    return Boolean(media?.thumbPath);
   }
 
   const enrichedMedia: ChatMediaPayload = {
@@ -96,4 +188,6 @@ async function generateAndAttachChatThumbnail(input: {
     messageId: input.messageId,
     media: enrichedMedia,
   });
+
+  return true;
 }

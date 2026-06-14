@@ -10,9 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import { requireUser } from "@/services/auth.service";
-import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
 import { scheduleOutboundAttachmentThumbnail } from "@/services/chat-attachment-thumbnail.service";
-import { ensureProviderReadyMediaUrl } from "@/services/provider-media-url.service";
 import {
   createOutboundMessageDelivery,
   insertChannelMessage,
@@ -24,6 +22,7 @@ import type { MessagingChannel } from "@/types/database.types";
 import { mapChatMessage, resolveContactFromRow } from "@/utils/chat";
 import {
   buildChatAttachmentStoragePath,
+  buildThumbnailStoragePath,
   isValidChatAttachmentStoragePath,
 } from "@/utils/chat-attachment-path";
 import {
@@ -59,6 +58,9 @@ export type CompleteChatMediaUploadInput = {
   mimeType: string;
   sizeBytes: number;
   caption?: string;
+  thumbPath?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
 };
 
 function missingConfigActionError(): ChatActionError {
@@ -231,22 +233,11 @@ async function resolveMediaSendContext(
 
 async function storageObjectExists(path: string): Promise<boolean> {
   const admin = createAdminClient();
-  const lastSlash = path.lastIndexOf("/");
-
-  if (lastSlash === -1) {
-    return false;
-  }
-
-  const folder = path.slice(0, lastSlash);
-  const fileName = path.slice(lastSlash + 1);
-  const { data } = await admin.storage
+  const { data, error } = await admin.storage
     .from(CHAT_ATTACHMENTS_BUCKET)
-    .list(folder, {
-      search: fileName,
-      limit: 1,
-    });
+    .createSignedUrl(path, 60);
 
-  return data?.some((item) => item.name === fileName) ?? false;
+  return !error && Boolean(data?.signedUrl);
 }
 
 export async function prepareChatMediaUpload(input: {
@@ -363,6 +354,35 @@ export async function completeChatMediaUpload(
     };
   }
 
+  const thumbPath = input.thumbPath?.trim();
+  const hasClientThumbnail =
+    Boolean(thumbPath) &&
+    thumbPath === buildThumbnailStoragePath(path) &&
+    typeof input.thumbWidth === "number" &&
+    typeof input.thumbHeight === "number" &&
+    input.thumbWidth > 0 &&
+    input.thumbHeight > 0;
+
+  if (thumbPath && !hasClientThumbnail) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: CHAT_MESSAGES.mediaInvalidFile,
+      },
+    };
+  }
+
+  if (hasClientThumbnail && thumbPath && !(await storageObjectExists(thumbPath))) {
+    return {
+      success: false,
+      error: {
+        code: "SEND_FAILED",
+        message: CHAT_MESSAGES.mediaSendFailed,
+      },
+    };
+  }
+
   const mediaKind = resolveMediaKind(mimeType);
   const mediaPayload = buildMediaPayloadFromUpload({
     kind: mediaKind,
@@ -370,11 +390,13 @@ export async function completeChatMediaUpload(
     mimeType,
     path,
     sizeBytes: input.sizeBytes,
+    thumbPath: hasClientThumbnail ? thumbPath : undefined,
+    thumbWidth: hasClientThumbnail ? input.thumbWidth : undefined,
+    thumbHeight: hasClientThumbnail ? input.thumbHeight : undefined,
   });
 
   const content = encodeMediaMessage(mediaPayload, input.caption?.trim() || "");
   const supabase = await createClient();
-  const providerMedia = await ensureProviderReadyMediaUrl(path);
 
   const insertedMessage = await insertChannelMessage(supabase, {
     conversationId,
@@ -387,8 +409,6 @@ export async function completeChatMediaUpload(
     messageId: insertedMessage.id,
     businessId,
     media: mediaPayload,
-    providerMediaUrl: providerMedia?.url ?? null,
-    providerMediaUrlExpiresAt: providerMedia?.expiresAt ?? null,
   });
 
   await createOutboundMessageDelivery(supabase, {
@@ -415,24 +435,23 @@ export async function completeChatMediaUpload(
     ...contactUpdates,
   ]);
 
-  scheduleOutboundAttachmentThumbnail({
-    messageId: insertedMessage.id,
-    businessId,
-    storagePath: path,
-    mimeType,
-  });
+  if (!hasClientThumbnail) {
+    scheduleOutboundAttachmentThumbnail({
+      messageId: insertedMessage.id,
+      businessId,
+      storagePath: path,
+      mimeType,
+    });
+  }
 
   void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
     console.error("[chat-media] outbound delivery failed", error);
   });
 
-  const mediaSignedUrl = await getChatAttachmentSignedUrl(path);
-
   return {
     success: true,
     data: {
       message: mapChatMessage(insertedMessage),
-      mediaSignedUrl: mediaSignedUrl ?? undefined,
     },
   };
 }

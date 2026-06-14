@@ -14,14 +14,12 @@ import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
   createOutboundMessageDelivery,
-  scheduleMessagingAnalyticsIncrement,
   insertChannelMessage,
-  recordMessageDeliveryFailure,
-  recordMessageDeliverySuccess,
   listKnowledgeEntriesForBusiness,
+  scheduleMessagingAnalyticsIncrement,
 } from "@/services/messaging.service";
+import { dispatchMessageDelivery } from "@/services/message-delivery.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
   getActiveMessagingChannelIds,
@@ -268,46 +266,6 @@ export async function getOlderConversationMessages(
     ),
     hasMore: orderedMessages.length >= CONVERSATION_MESSAGES_PAGE_SIZE,
   };
-}
-
-async function deliverWhatsAppOutboundText(input: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  businessId: string;
-  messageId: string;
-  phoneNumberId: string;
-  accessToken: string;
-  recipientPhone: string;
-  content: string;
-  channel: DbMessagingChannel;
-}): Promise<void> {
-  const sendResult = await sendWhatsAppTextMessage(
-    input.phoneNumberId,
-    input.accessToken,
-    input.recipientPhone,
-    input.content,
-  );
-
-  if (!sendResult.success) {
-    await recordMessageDeliveryFailure(input.supabase, {
-      messageId: input.messageId,
-      errorMessage: sendResult.message,
-    });
-    return;
-  }
-
-  await recordMessageDeliverySuccess(input.supabase, {
-    messageId: input.messageId,
-    providerMessageId: sendResult.messageId,
-  });
-
-  scheduleMessagingAnalyticsIncrement(
-    createAdminClient(),
-    input.businessId,
-    input.channel,
-    {
-      totalMessages: 1,
-    },
-  );
 }
 
 export async function getConversationMessagesTail(
@@ -1076,26 +1034,6 @@ export async function sendChatMessage(
       };
     }
 
-    const { data: connection } = await supabase
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", businessId)
-      .eq("whatsapp_status", "connected")
-      .maybeSingle();
-
-    if (
-      !connection?.meta_phone_number_id ||
-      !connection.meta_access_token
-    ) {
-      return {
-        success: false,
-        error: {
-          code: "WHATSAPP_NOT_CONNECTED",
-          message: CHAT_MESSAGES.whatsappNotConnected,
-        },
-      };
-    }
-
     const insertedMessage = await insertChannelMessage(supabase, {
       conversationId: parsed.data.conversationId,
       channel: conversation.channel,
@@ -1127,17 +1065,8 @@ export async function sendChatMessage(
       ...contactUpdates,
     ]);
 
-    void deliverWhatsAppOutboundText({
-      supabase,
-      businessId,
-      messageId: insertedMessage.id,
-      phoneNumberId: connection.meta_phone_number_id,
-      accessToken: connection.meta_access_token,
-      recipientPhone: contact.phone_number.replace(/^\+/, ""),
-      content: parsed.data.content,
-      channel: conversation.channel,
-    }).catch((error) => {
-      console.error("[whatsapp] outbound delivery failed", error);
+    void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
+      console.error("[whatsapp] outbound delivery dispatch failed", error);
     });
 
     return {

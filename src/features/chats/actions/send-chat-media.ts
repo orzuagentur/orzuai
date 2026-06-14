@@ -22,6 +22,9 @@ export async function completeChatMediaUploadAction(input: {
   mimeType: string;
   sizeBytes: number;
   caption?: string;
+  thumbPath?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
 }): Promise<SendChatMessageResult> {
   return completeChatMediaUpload(input);
 }

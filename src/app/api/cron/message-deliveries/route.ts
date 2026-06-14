@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ENV_KEYS } from "@/constants/env-keys";
-import { processPendingMessageDeliveries } from "@/services/message-delivery.service";
+import { drainPendingMessageDeliveries } from "@/services/message-delivery.service";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env[ENV_KEYS.CRON_SECRET]?.trim();
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await processPendingMessageDeliveries();
+  const result = await drainPendingMessageDeliveries();
 
   return NextResponse.json({
     success: true,

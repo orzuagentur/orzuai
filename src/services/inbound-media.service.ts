@@ -11,6 +11,7 @@ import {
 } from "@/utils/chat-media";
 
 type PersistInboundMediaInput = {
+  messageId: string;
   businessId: string;
   conversationId: string;
   kind: ChatMediaKind;
@@ -30,6 +31,7 @@ export async function persistInboundMediaMessage(
     {
       fileName: input.fileName,
       mimeType: input.mimeType,
+      messageId: input.messageId,
     },
   );
 
@@ -45,12 +47,16 @@ export async function persistInboundMediaMessage(
       path: stored.path,
       sizeBytes: stored.sizeBytes,
       legacyUrl: stored.url,
+      thumbPath: stored.thumbnailPath,
+      thumbWidth: stored.thumbWidth,
+      thumbHeight: stored.thumbHeight,
     }),
     input.caption,
   );
 }
 
 export async function downloadAndStoreWhatsAppInboundMedia(input: {
+  messageId: string;
   accessToken: string;
   mediaId: string;
   businessId: string;
@@ -71,6 +77,7 @@ export async function downloadAndStoreWhatsAppInboundMedia(input: {
   }
 
   return persistInboundMediaMessage({
+    messageId: input.messageId,
     businessId: input.businessId,
     conversationId: input.conversationId,
     kind: input.kind,
@@ -82,6 +89,7 @@ export async function downloadAndStoreWhatsAppInboundMedia(input: {
 }
 
 export async function downloadAndStoreTelegramInboundMedia(input: {
+  messageId: string;
   botToken: string;
   fileId: string;
   businessId: string;
@@ -102,6 +110,7 @@ export async function downloadAndStoreTelegramInboundMedia(input: {
   }
 
   return persistInboundMediaMessage({
+    messageId: input.messageId,
     businessId: input.businessId,
     conversationId: input.conversationId,
     kind: input.kind,
@@ -113,6 +122,7 @@ export async function downloadAndStoreTelegramInboundMedia(input: {
 }
 
 export async function downloadAndStoreUrlInboundMedia(input: {
+  messageId: string;
   sourceUrl: string;
   businessId: string;
   conversationId: string;
@@ -145,6 +155,7 @@ export async function downloadAndStoreUrlInboundMedia(input: {
   const buffer = Buffer.from(await response.arrayBuffer());
 
   return persistInboundMediaMessage({
+    messageId: input.messageId,
     businessId: input.businessId,
     conversationId: input.conversationId,
     kind: input.kind || resolveMediaKind(mimeType),

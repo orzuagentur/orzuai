@@ -2,12 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { requestConversationGapSync } from "@/lib/client/conversation-gap-sync";
+import { requestConversationGapSyncWithRetry } from "@/lib/client/conversation-gap-sync";
 import { createClientIfConfigured } from "@/lib/supabase/client";
-import {
-  bindSupabaseRealtimeAuthRefresh,
-  waitForSupabaseRealtime,
-} from "@/lib/supabase/realtime-auth";
+import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import {
   CONVERSATION_DELIVERY_STATUS_EVENT,
   CONVERSATION_MESSAGE_UPDATED_EVENT,
@@ -31,6 +28,7 @@ const CLIENT_TYPING_TIMEOUT_MS = 4_000;
 
 type UseConversationRealtimeOptions = {
   conversationId: string | null;
+  reconnectCursor?: ConversationReconnectCursor | null;
   getReconnectCursor?: () => ConversationReconnectCursor | null;
   onMessage?: (message: ChatMessageData) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
@@ -71,6 +69,7 @@ type RealtimeDeliveryRow = {
 
 export function useConversationRealtime({
   conversationId,
+  reconnectCursor = null,
   getReconnectCursor,
   onMessage,
   onMessageUpdated,
@@ -90,6 +89,9 @@ export function useConversationRealtime({
   const getReconnectCursorRef = useRef(getReconnectCursor);
   const onReconnectCursorChangeRef = useRef(onReconnectCursorChange);
   const gapSyncInFlightRef = useRef(false);
+  const gapSyncPendingRef = useRef(false);
+  const isSubscribedRef = useRef(false);
+  const reconnectCursorPropRef = useRef(reconnectCursor);
   const typingTimeoutRef = useRef<number | null>(null);
   onMessageRef.current = onMessage;
   onMessageUpdatedRef.current = onMessageUpdated;
@@ -98,6 +100,7 @@ export function useConversationRealtime({
   onGapSyncRef.current = onGapSync;
   getReconnectCursorRef.current = getReconnectCursor;
   onReconnectCursorChangeRef.current = onReconnectCursorChange;
+  reconnectCursorPropRef.current = reconnectCursor;
 
   useEffect(() => {
     const onVisible = () => {
@@ -117,6 +120,8 @@ export function useConversationRealtime({
     if (!conversationId) {
       setIsClientTyping(false);
       setIsRealtimeConnected(false);
+      gapSyncPendingRef.current = false;
+      isSubscribedRef.current = false;
       return;
     }
 
@@ -127,7 +132,6 @@ export function useConversationRealtime({
     }
 
     const channelName = getConversationRealtimeChannelName(conversationId);
-    let unbindAuthRefresh: (() => void) | null = null;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
@@ -145,22 +149,41 @@ export function useConversationRealtime({
       }, CLIENT_TYPING_TIMEOUT_MS);
     };
 
-    const runGapSync = async () => {
-      const cursor = getReconnectCursorRef.current?.();
+    const resolveCursor = (): ConversationReconnectCursor | null => {
+      return (
+        getReconnectCursorRef.current?.() ??
+        reconnectCursorPropRef.current ??
+        null
+      );
+    };
 
-      if (!cursor || !onGapSyncRef.current || gapSyncInFlightRef.current) {
+    const runGapSync = async () => {
+      const cursor = resolveCursor();
+
+      if (!cursor) {
+        if (isSubscribedRef.current) {
+          gapSyncPendingRef.current = true;
+        }
+        return;
+      }
+
+      if (!onGapSyncRef.current || gapSyncInFlightRef.current) {
         return;
       }
 
       gapSyncInFlightRef.current = true;
 
       try {
-        const result = await requestConversationGapSync(conversationId, cursor);
+        const result = await requestConversationGapSyncWithRetry(
+          conversationId,
+          cursor,
+        );
 
         if (!result.success) {
           return;
         }
 
+        gapSyncPendingRef.current = false;
         onGapSyncRef.current({
           newMessages: result.newMessages,
           recentMessages: result.recentMessages,
@@ -187,8 +210,6 @@ export function useConversationRealtime({
         }
         return;
       }
-
-      unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
 
       if (cancelled) {
         return;
@@ -342,10 +363,14 @@ export function useConversationRealtime({
           },
         )
         .subscribe((status) => {
-          setIsRealtimeConnected(status === "SUBSCRIBED");
+          const subscribed = status === "SUBSCRIBED";
+          isSubscribedRef.current = subscribed;
+          setIsRealtimeConnected(subscribed);
 
-          if (status === "SUBSCRIBED") {
+          if (subscribed) {
             void runGapSync();
+          } else {
+            gapSyncPendingRef.current = false;
           }
 
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -370,13 +395,65 @@ export function useConversationRealtime({
       clearTypingTimeout();
       setIsClientTyping(false);
       setIsRealtimeConnected(false);
-      unbindAuthRefresh?.();
+      isSubscribedRef.current = false;
+      gapSyncPendingRef.current = false;
 
       if (channel) {
         void supabase.removeChannel(channel);
       }
     };
   }, [conversationId, reconnectNonce]);
+
+  useEffect(() => {
+    if (!conversationId || !reconnectCursor || !isSubscribedRef.current) {
+      return;
+    }
+
+    if (!gapSyncPendingRef.current) {
+      return;
+    }
+
+    void (async () => {
+      const supabase = createClientIfConfigured();
+
+      if (!supabase || gapSyncInFlightRef.current) {
+        return;
+      }
+
+      const cursor = getReconnectCursorRef.current?.() ?? reconnectCursor;
+
+      if (!cursor || !onGapSyncRef.current) {
+        return;
+      }
+
+      gapSyncInFlightRef.current = true;
+
+      try {
+        const result = await requestConversationGapSyncWithRetry(
+          conversationId,
+          cursor,
+        );
+
+        if (!result.success) {
+          return;
+        }
+
+        gapSyncPendingRef.current = false;
+        onGapSyncRef.current({
+          newMessages: result.newMessages,
+          recentMessages: result.recentMessages,
+          cursor: result.cursor,
+        });
+        onReconnectCursorChangeRef.current?.(result.cursor);
+      } finally {
+        gapSyncInFlightRef.current = false;
+      }
+    })();
+  }, [
+    conversationId,
+    reconnectCursor?.afterCreatedAt,
+    reconnectCursor?.afterMessageId,
+  ]);
 
   return { isClientTyping, isRealtimeConnected };
 }

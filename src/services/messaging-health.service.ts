@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInboundMediaHydrationLagMetrics } from "@/services/inbound-media-hydration.service";
 import { getWebhookQueueLagMetrics } from "@/services/webhook-queue.service";
 
 export type MessagingHealthSnapshot = {
@@ -12,6 +13,11 @@ export type MessagingHealthSnapshot = {
   webhookQueueLagSeconds: number;
   oldestPendingWebhookAt: string | null;
   staleProcessingWebhooks: number;
+  pendingHydration: number;
+  failedHydration: number;
+  hydrationLagSeconds: number;
+  oldestPendingHydrationAt: string | null;
+  staleProcessingHydration: number;
   capturedAt: string;
 };
 
@@ -26,6 +32,7 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
     pendingWebhooks,
     failedWebhooks,
     webhookQueueLag,
+    hydrationLag,
   ] = await Promise.all([
     admin
       .from("message_deliveries")
@@ -49,6 +56,7 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
       .select("id", { count: "exact", head: true })
       .eq("status", "failed"),
     getWebhookQueueLagMetrics(),
+    getInboundMediaHydrationLagMetrics(),
   ]);
 
   return {
@@ -60,6 +68,11 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
     webhookQueueLagSeconds: webhookQueueLag.lagSeconds,
     oldestPendingWebhookAt: webhookQueueLag.oldestPendingAt,
     staleProcessingWebhooks: webhookQueueLag.staleProcessingCount,
+    pendingHydration: hydrationLag.pendingCount,
+    failedHydration: hydrationLag.failedCount,
+    hydrationLagSeconds: hydrationLag.lagSeconds,
+    oldestPendingHydrationAt: hydrationLag.oldestPendingAt,
+    staleProcessingHydration: hydrationLag.staleProcessingCount,
     capturedAt: now,
   };
 }

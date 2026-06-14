@@ -1,6 +1,7 @@
 import "server-only";
 
 import { dispatchInboundMediaHydrationWorker } from "@/lib/queue/qstash-inbound-media-worker";
+import { fetchInstagramMessageAttachmentUrl } from "@/lib/instagram/client";
 import {
   claimInboundMediaHydrationJob,
   claimInboundMediaHydrationJobs,
@@ -39,6 +40,7 @@ export type InboundMediaHydrationContext = {
 };
 
 const BATCH_SIZE = 15;
+const MAX_DRAIN_BATCHES = 20;
 const BASE_RETRY_SECONDS = 30;
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
@@ -69,6 +71,15 @@ type MessageRow = {
   hidden_for_business: boolean;
   edited_at: string | null;
   is_edited: boolean;
+  external_message_id: string | null;
+};
+
+export type InboundMediaHydrationLagMetrics = {
+  pendingCount: number;
+  failedCount: number;
+  lagSeconds: number;
+  oldestPendingAt: string | null;
+  staleProcessingCount: number;
 };
 
 export type InboundMediaHydrationDrainResult = {
@@ -77,6 +88,8 @@ export type InboundMediaHydrationDrainResult = {
   failed: number;
   skipped: number;
   recoveredStale: number;
+  batches: number;
+  durationMs: number;
 };
 
 export async function recoverStaleInboundMediaHydrations(): Promise<number> {
@@ -92,6 +105,52 @@ export async function recoverStaleInboundMediaHydrations(): Promise<number> {
     .select("message_id");
 
   return data?.length ?? 0;
+}
+
+export async function getInboundMediaHydrationLagMetrics(): Promise<InboundMediaHydrationLagMetrics> {
+  const admin = createAdminClient();
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+  const nowMs = Date.now();
+
+  const [pending, failed, oldestPending, staleProcessing] = await Promise.all([
+    admin
+      .from("message_attachments")
+      .select("message_id", { count: "exact", head: true })
+      .is("storage_path", null)
+      .in("status", ["pending", "processing"]),
+    admin
+      .from("message_attachments")
+      .select("message_id", { count: "exact", head: true })
+      .is("storage_path", null)
+      .eq("status", "failed"),
+    admin
+      .from("message_attachments")
+      .select("created_at")
+      .is("storage_path", null)
+      .in("status", ["pending", "processing"])
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("message_attachments")
+      .select("message_id", { count: "exact", head: true })
+      .eq("status", "processing")
+      .is("storage_path", null)
+      .lt("updated_at", staleBefore),
+  ]);
+
+  const oldestPendingAt = oldestPending.data?.created_at ?? null;
+  const lagSeconds = oldestPendingAt
+    ? Math.max(0, Math.floor((nowMs - Date.parse(oldestPendingAt)) / 1000))
+    : 0;
+
+  return {
+    pendingCount: pending.count ?? 0,
+    failedCount: failed.count ?? 0,
+    lagSeconds,
+    oldestPendingAt,
+    staleProcessingCount: staleProcessing.count ?? 0,
+  };
 }
 
 export function scheduleInboundMediaHydration(input: {
@@ -137,7 +196,7 @@ export async function retryInboundMediaHydration(
   const { data: message } = await admin
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, deleted_for_all_at, hidden_for_business, edited_at, is_edited",
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, deleted_for_all_at, hidden_for_business, edited_at, is_edited, external_message_id",
     )
     .eq("id", messageId)
     .maybeSingle();
@@ -159,6 +218,7 @@ export async function retryInboundMediaHydration(
 }
 
 export async function drainInboundMediaHydrationQueue(): Promise<InboundMediaHydrationDrainResult> {
+  const startedAt = Date.now();
   const recoveredStale = await recoverStaleInboundMediaHydrations();
 
   const totals: InboundMediaHydrationDrainResult = {
@@ -167,11 +227,14 @@ export async function drainInboundMediaHydrationQueue(): Promise<InboundMediaHyd
     failed: 0,
     skipped: 0,
     recoveredStale,
+    batches: 0,
+    durationMs: 0,
   };
 
   let batch = await processPendingInboundMediaHydrations();
 
-  while (batch.processed > 0) {
+  while (batch.processed > 0 && totals.batches < MAX_DRAIN_BATCHES) {
+    totals.batches += 1;
     totals.processed += batch.processed;
     totals.completed += batch.completed;
     totals.failed += batch.failed;
@@ -182,6 +245,12 @@ export async function drainInboundMediaHydrationQueue(): Promise<InboundMediaHyd
     }
 
     batch = await processPendingInboundMediaHydrations();
+  }
+
+  totals.durationMs = Date.now() - startedAt;
+
+  if (totals.processed > 0) {
+    console.info("[inbound-media] drain complete", totals);
   }
 
   return totals;
@@ -197,6 +266,8 @@ export async function processPendingInboundMediaHydrations(): Promise<InboundMed
       failed: 0,
       skipped: 0,
       recoveredStale: 0,
+      batches: 0,
+      durationMs: 0,
     };
   }
 
@@ -215,6 +286,8 @@ export async function processPendingInboundMediaHydrations(): Promise<InboundMed
     ).length,
     skipped: outcomes.filter((outcome) => outcome.skipped).length,
     recoveredStale: 0,
+    batches: 0,
+    durationMs: 0,
   };
 }
 
@@ -253,7 +326,7 @@ async function processClaimedInboundMediaHydration(
   const { data: message } = await admin
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, deleted_for_all_at, hidden_for_business, edited_at, is_edited",
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, deleted_for_all_at, hidden_for_business, edited_at, is_edited, external_message_id",
     )
     .eq("id", messageId)
     .maybeSingle();
@@ -394,6 +467,7 @@ async function resolveInboundMediaContent(
   const { text: captionFromContent } = parseMediaMessage(message.content);
   const caption = context.caption ?? captionFromContent;
   const kind = attachment.kind as ChatMediaKind;
+  const messageId = attachment.message_id;
 
   if (message.channel === "whatsapp") {
     const { data: connection } = await admin
@@ -407,6 +481,7 @@ async function resolveInboundMediaContent(
     }
 
     return downloadAndStoreWhatsAppInboundMedia({
+      messageId,
       accessToken: connection.meta_access_token,
       mediaId: attachment.provider_media_id,
       businessId: attachment.business_id,
@@ -430,6 +505,7 @@ async function resolveInboundMediaContent(
     }
 
     return downloadAndStoreTelegramInboundMedia({
+      messageId,
       botToken: connection.bot_token,
       fileId: attachment.provider_media_id,
       businessId: attachment.business_id,
@@ -448,13 +524,36 @@ async function resolveInboundMediaContent(
       .eq("business_id", attachment.business_id)
       .maybeSingle();
 
-    const sourceUrl = context.sourceUrl;
+    let sourceUrl = context.sourceUrl;
+
+    if (
+      (attachment.retry_count ?? 0) > 0 &&
+      message.external_message_id &&
+      connection?.meta_access_token
+    ) {
+      const refreshed = await fetchInstagramMessageAttachmentUrl(
+        connection.meta_access_token,
+        message.external_message_id,
+      );
+
+      if (refreshed) {
+        sourceUrl = refreshed;
+        await saveMessageAttachmentHydrationContext(admin, {
+          messageId,
+          context: {
+            ...context,
+            sourceUrl: refreshed,
+          },
+        });
+      }
+    }
 
     if (!sourceUrl) {
       throw new Error("Instagram media source URL is missing.");
     }
 
-    return downloadAndStoreUrlInboundMedia({
+    const stored = await downloadAndStoreUrlInboundMedia({
+      messageId,
       sourceUrl,
       businessId: attachment.business_id,
       conversationId: message.conversation_id,
@@ -464,6 +563,41 @@ async function resolveInboundMediaContent(
       caption,
       accessToken: connection?.meta_access_token ?? undefined,
     });
+
+    if (stored) {
+      return stored;
+    }
+
+    if (message.external_message_id && connection?.meta_access_token) {
+      const refreshed = await fetchInstagramMessageAttachmentUrl(
+        connection.meta_access_token,
+        message.external_message_id,
+      );
+
+      if (refreshed && refreshed !== sourceUrl) {
+        await saveMessageAttachmentHydrationContext(admin, {
+          messageId,
+          context: {
+            ...context,
+            sourceUrl: refreshed,
+          },
+        });
+
+        return downloadAndStoreUrlInboundMedia({
+          messageId,
+          sourceUrl: refreshed,
+          businessId: attachment.business_id,
+          conversationId: message.conversation_id,
+          kind,
+          fileName: attachment.file_name,
+          mimeType: attachment.mime_type,
+          caption,
+          accessToken: connection.meta_access_token,
+        });
+      }
+    }
+
+    return null;
   }
 
   throw new Error(`Unsupported channel for media hydration: ${message.channel}`);

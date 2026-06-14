@@ -2,7 +2,10 @@ import "server-only";
 
 import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildChatAttachmentStoragePath } from "@/utils/chat-attachment-path";
+import {
+  buildChatAttachmentStoragePath,
+  buildInboundAttachmentStoragePath,
+} from "@/utils/chat-attachment-path";
 
 export type ChatAttachmentUploadResult = {
   path: string;
@@ -23,6 +26,7 @@ async function uploadBuffer(
   path: string,
   buffer: Buffer,
   mimeType: string,
+  options?: { upsert?: boolean },
 ): Promise<ChatAttachmentUploadResult | null> {
   const admin = createAdminClient();
 
@@ -31,7 +35,7 @@ async function uploadBuffer(
       .from(CHAT_ATTACHMENTS_BUCKET)
       .upload(path, buffer, {
         contentType,
-        upsert: false,
+        upsert: options?.upsert ?? false,
       });
 
     return error;
@@ -96,15 +100,25 @@ export async function uploadChatAttachmentBuffer(
   options: {
     fileName: string;
     mimeType: string;
+    messageId?: string;
   },
 ): Promise<ChatAttachmentUploadResult | null> {
-  const path = buildChatAttachmentStoragePath(
-    businessId,
-    conversationId,
-    options.fileName,
-  );
+  const path = options.messageId
+    ? buildInboundAttachmentStoragePath(
+        businessId,
+        conversationId,
+        options.messageId,
+        options.fileName,
+      )
+    : buildChatAttachmentStoragePath(
+        businessId,
+        conversationId,
+        options.fileName,
+      );
 
-  const uploaded = await uploadBuffer(path, buffer, options.mimeType);
+  const uploaded = await uploadBuffer(path, buffer, options.mimeType, {
+    upsert: Boolean(options.messageId),
+  });
 
   if (!uploaded) {
     return null;

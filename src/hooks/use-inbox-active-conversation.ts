@@ -409,8 +409,38 @@ export function useInboxActiveConversation({
   patchMessageDeliveryStatusRef.current = patchMessageDeliveryStatus;
   removeMessageRef.current = removeMessage;
 
+  const latestMessageAt = useMemo(() => {
+    if (!conversation) {
+      return null;
+    }
+
+    return (
+      conversation.messages.at(-1)?.createdAt ?? "1970-01-01T00:00:00.000Z"
+    );
+  }, [conversation]);
+
+  const latestMessageId = useMemo(() => {
+    if (!conversation) {
+      return null;
+    }
+
+    return conversation.messages.at(-1)?.id ?? null;
+  }, [conversation]);
+
+  const reconnectCursor = useMemo((): ConversationReconnectCursor | null => {
+    if (!latestMessageAt || !latestMessageId) {
+      return null;
+    }
+
+    return {
+      afterCreatedAt: latestMessageAt,
+      afterMessageId: latestMessageId,
+    };
+  }, [latestMessageAt, latestMessageId]);
+
   const { isClientTyping, isRealtimeConnected } = useConversationRealtime({
     conversationId: selectedConversationId,
+    reconnectCursor,
     getReconnectCursor: () => reconnectCursorRef.current,
     onMessage: (message) => {
       appendMessageRef.current(message);
@@ -439,24 +469,6 @@ export function useInboxActiveConversation({
       reconnectCursorRef.current = cursor;
     },
   });
-
-  const latestMessageAt = useMemo(() => {
-    if (!conversation) {
-      return null;
-    }
-
-    return (
-      conversation.messages.at(-1)?.createdAt ?? "1970-01-01T00:00:00.000Z"
-    );
-  }, [conversation]);
-
-  const latestMessageId = useMemo(() => {
-    if (!conversation) {
-      return null;
-    }
-
-    return conversation.messages.at(-1)?.id ?? null;
-  }, [conversation]);
 
   useEffect(() => {
     if (!latestMessageAt) {

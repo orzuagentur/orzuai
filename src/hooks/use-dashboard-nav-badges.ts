@@ -4,10 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchNavBadgeCountsAction } from "@/features/dashboard/actions/fetch-nav-badge-counts";
 import { createClientIfConfigured } from "@/lib/supabase/client";
-import {
-  bindSupabaseRealtimeAuthRefresh,
-  waitForSupabaseRealtime,
-} from "@/lib/supabase/realtime-auth";
+import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import type { DashboardNavBadgeCounts } from "@/services/conversation-read.service";
 import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
@@ -61,7 +58,6 @@ export function useDashboardNavBadges() {
       return;
     }
 
-    let unbindAuthRefresh: (() => void) | null = null;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
@@ -69,12 +65,6 @@ export function useDashboardNavBadges() {
       const authed = await waitForSupabaseRealtime(supabase);
 
       if (cancelled || !authed) {
-        return;
-      }
-
-      unbindAuthRefresh = bindSupabaseRealtimeAuthRefresh(supabase);
-
-      if (cancelled) {
         return;
       }
 
@@ -107,7 +97,6 @@ export function useDashboardNavBadges() {
 
     return () => {
       cancelled = true;
-      unbindAuthRefresh?.();
 
       if (refreshTimeoutRef.current !== null) {
         window.clearTimeout(refreshTimeoutRef.current);

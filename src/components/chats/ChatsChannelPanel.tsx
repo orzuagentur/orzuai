@@ -14,7 +14,6 @@ import {
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import {
   INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
-  INBOX_LIST_POLL_INTERVAL_MS,
   useInboxListPolling,
 } from "@/hooks/use-inbox-list-polling";
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
@@ -280,10 +279,8 @@ export function ChatsChannelPanel({
       }
     },
     {
-      enabled: hasBusiness && !isInitialLoading,
-      intervalMs: realtimeConnected
-        ? INBOX_LIST_POLL_INTERVAL_MS
-        : INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
+      enabled: hasBusiness && !isInitialLoading && !realtimeConnected,
+      intervalMs: INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
     },
   );
 

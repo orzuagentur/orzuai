@@ -354,6 +354,44 @@ export async function sendInstagramTextMessage(
   return { success: true, messageId };
 }
 
+export async function fetchInstagramMessageAttachmentUrl(
+  accessToken: string,
+  messageId: string,
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    fields: "attachments",
+    access_token: accessToken,
+  });
+
+  const response = await fetch(
+    `${buildInstagramApiUrl(messageId)}?${params.toString()}`,
+    { cache: "no-store" },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        attachments?: {
+          data?: Array<{
+            payload?: { url?: string };
+          }>;
+        };
+        error?: { message?: string };
+      }
+    | null;
+
+  if (!response.ok) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        "[instagram] attachment URL refresh failed",
+        payload?.error?.message,
+      );
+    }
+    return null;
+  }
+
+  return payload?.attachments?.data?.[0]?.payload?.url ?? null;
+}
+
 export function verifyInstagramWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
