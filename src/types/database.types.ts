@@ -1068,6 +1068,11 @@ export type Database = {
           thumbnail_path: string | null;
           thumb_width: number | null;
           thumb_height: number | null;
+          retry_count: number;
+          max_retries: number;
+          last_error: string | null;
+          next_retry_at: string | null;
+          hydration_context: Json;
           created_at: string;
           updated_at: string;
         };
@@ -1086,6 +1091,11 @@ export type Database = {
           thumbnail_path?: string | null;
           thumb_width?: number | null;
           thumb_height?: number | null;
+          retry_count?: number;
+          max_retries?: number;
+          last_error?: string | null;
+          next_retry_at?: string | null;
+          hydration_context?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -1104,6 +1114,11 @@ export type Database = {
           thumb_width?: number | null;
           thumb_height?: number | null;
           status?: MessageAttachmentStatus;
+          retry_count?: number;
+          max_retries?: number;
+          last_error?: string | null;
+          next_retry_at?: string | null;
+          hydration_context?: Json;
           created_at?: string;
           updated_at?: string;
         };

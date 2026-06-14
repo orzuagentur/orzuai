@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   DownloadIcon,
   FileIcon,
@@ -9,6 +9,7 @@ import {
   Loader2Icon,
   MicIcon,
   PlayIcon,
+  RefreshCwIcon,
   VideoIcon,
   XIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { retryInboundMediaAttachmentAction } from "@/features/chats/actions/retry-inbound-media-attachment";
 import { useChatMediaUrl } from "@/hooks/use-chat-media-url";
 import { VoiceMessagePlayer } from "@/components/chats/inbox/VoiceMessagePlayer";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,11 @@ type ChatMediaMessageProps = {
   caption?: string;
   isOutgoing?: boolean;
   isHydrating?: boolean;
+  isFailed?: boolean;
+  onRetryStateChange?: (state: {
+    attachmentPending: boolean;
+    attachmentFailed: boolean;
+  }) => void;
 };
 
 function getMediaHydratingLabel(kind: ChatMediaKind): string {
@@ -105,6 +112,69 @@ function MediaHydratingPlaceholder({
         <Loader2Icon className="size-3.5 shrink-0 animate-spin" aria-hidden />
         <span>{label}</span>
       </div>
+    </div>
+  );
+}
+
+function MediaFailedPlaceholder({
+  kind,
+  fileName,
+  isOutgoing,
+  isRetrying,
+  onRetry,
+  className,
+}: {
+  kind: ChatMediaKind;
+  fileName: string;
+  isOutgoing?: boolean;
+  isRetrying?: boolean;
+  onRetry?: () => void;
+  className?: string;
+}) {
+  const Icon = getMediaHydratingIcon(kind);
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center",
+        isOutgoing
+          ? "border-emerald-400/30 bg-emerald-800/20 text-emerald-50"
+          : "border-border bg-muted/20 text-muted-foreground",
+        className,
+      )}
+      role="alert"
+    >
+      <div
+        className={cn(
+          "flex size-11 items-center justify-center rounded-full",
+          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+        )}
+      >
+        <Icon className="size-5 opacity-80" aria-hidden />
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs font-medium">{fileName || "Attachment"}</p>
+        <p className="text-xs opacity-80">{CHAT_MESSAGES.mediaHydrationFailed}</p>
+      </div>
+      {onRetry ? (
+        <Button
+          type="button"
+          size="sm"
+          variant={isOutgoing ? "secondary" : "outline"}
+          className="h-8 gap-1.5"
+          disabled={isRetrying}
+          onClick={onRetry}
+        >
+          {isRetrying ? (
+            <Loader2Icon className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <RefreshCwIcon className="size-3.5" aria-hidden />
+          )}
+          {isRetrying
+            ? CHAT_MESSAGES.mediaRetryingHydration
+            : CHAT_MESSAGES.mediaRetryHydration}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -594,9 +664,52 @@ export function ChatMediaMessage({
   caption,
   isOutgoing = false,
   isHydrating: isHydratingProp,
+  isFailed: isFailedProp,
+  onRetryStateChange,
 }: ChatMediaMessageProps) {
+  const [isRetrying, startRetryTransition] = useTransition();
   const isHydrating =
     isHydratingProp ?? isMediaPendingHydration(media);
+  const isFailed = isFailedProp ?? false;
+
+  const handleRetry = () => {
+    if (!messageId || isRetrying) {
+      return;
+    }
+
+    onRetryStateChange?.({
+      attachmentPending: true,
+      attachmentFailed: false,
+    });
+
+    startRetryTransition(async () => {
+      const result = await retryInboundMediaAttachmentAction({ messageId });
+
+      if (!result.success) {
+        onRetryStateChange?.({
+          attachmentPending: false,
+          attachmentFailed: true,
+        });
+      }
+    });
+  };
+
+  if (isFailed && !isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaFailedPlaceholder
+          kind={media.kind}
+          fileName={media.fileName}
+          isOutgoing={isOutgoing}
+          isRetrying={isRetrying}
+          onRetry={messageId ? handleRetry : undefined}
+          className="max-w-[min(300px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
+
   const hasThumb = Boolean(media.thumbPath && media.kind === "image");
   const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
   const {

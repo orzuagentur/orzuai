@@ -82,6 +82,12 @@ export async function enrichChatMessages(
       .map((attachment) => attachment.message_id),
   );
 
+  const failedAttachmentIds = new Set(
+    (attachments ?? [])
+      .filter((attachment) => attachment.status === "failed")
+      .map((attachment) => attachment.message_id),
+  );
+
   return messages.map((message) => {
     const deliveryStatus = deliveryByMessageId.get(message.id) ?? null;
     const attachment = attachmentByMessageId.get(message.id);
@@ -93,6 +99,7 @@ export async function enrichChatMessages(
         : message.content,
       deliveryStatus,
       attachmentPending: pendingAttachmentIds.has(message.id),
+      attachmentFailed: failedAttachmentIds.has(message.id),
     };
   });
 }

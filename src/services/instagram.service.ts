@@ -58,10 +58,7 @@ import {
   completeInstagramEmbeddedSignupSchema,
   connectManualInstagramSchema,
 } from "@/types/instagram.types";
-import {
-  downloadAndStoreUrlInboundMedia,
-  scheduleInboundMediaHydration,
-} from "@/services/inbound-media.service";
+import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydration.service";
 import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
@@ -600,17 +597,14 @@ async function ingestInstagramMessage(
     scheduleInboundMediaHydration({
       admin,
       messageId: insertedMessage.id,
-      resolveContent: () =>
-        downloadAndStoreUrlInboundMedia({
-          sourceUrl: message.sourceUrl,
-          businessId,
-          conversationId,
-          kind: message.mediaKind,
-          fileName: message.fileName,
-          mimeType: message.mimeType,
-          caption: message.caption,
-          accessToken: connection.meta_access_token ?? undefined,
-        }),
+      businessId,
+      conversationId,
+      channel: "instagram",
+      kind: message.mediaKind,
+      fileName: message.fileName,
+      mimeType: message.mimeType,
+      caption: message.caption,
+      sourceUrl: message.sourceUrl,
     });
   }
 

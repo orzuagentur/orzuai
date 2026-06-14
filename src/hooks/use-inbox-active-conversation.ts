@@ -356,7 +356,11 @@ export function useInboxActiveConversation({
         };
       }
 
-      if (current.messages[index]?.content === message.content) {
+      if (
+        current.messages[index]?.content === message.content &&
+        current.messages[index]?.attachmentPending === message.attachmentPending &&
+        current.messages[index]?.attachmentFailed === message.attachmentFailed
+      ) {
         return current;
       }
 

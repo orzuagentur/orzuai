@@ -57,6 +57,10 @@ export const deleteChatMessageSchema = z.object({
   messageId: z.string().uuid("Invalid message identifier."),
 });
 
+export const retryInboundMediaAttachmentSchema = z.object({
+  messageId: z.string().uuid("Invalid message identifier."),
+});
+
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
 export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
 export type UpdateConversationStatusInput = z.infer<
@@ -69,6 +73,9 @@ export type SuggestConversationReplyInput = z.infer<
   typeof suggestConversationReplySchema
 >;
 export type DeleteChatMessageInput = z.infer<typeof deleteChatMessageSchema>;
+export type RetryInboundMediaAttachmentInput = z.infer<
+  typeof retryInboundMediaAttachmentSchema
+>;
 
 export type ChatMessageData = {
   id: string;
@@ -88,6 +95,8 @@ export type ChatMessageData = {
   deliveryStatus?: MessageDeliveryStatus | null;
   /** Inbound/outbound media still hydrating in storage. */
   attachmentPending?: boolean;
+  /** Inbound media hydration failed — user can retry. */
+  attachmentFailed?: boolean;
 };
 
 export type ConversationListItem = {

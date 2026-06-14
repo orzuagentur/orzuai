@@ -3,16 +3,9 @@ import "server-only";
 import { downloadTelegramFile } from "@/lib/telegram/client";
 import { downloadWhatsAppMedia } from "@/lib/whatsapp/client";
 import { uploadChatAttachmentBuffer } from "@/services/chat-attachment-storage.service";
-import { recomputeConversationLastMessage } from "@/services/conversation-last-message.service";
-import { broadcastConversationMessageUpdated } from "@/services/conversation-realtime-broadcast.service";
-import { markMessageAttachmentReady } from "@/services/message-attachment.service";
-import { updateChannelMessageContent } from "@/services/messaging.service";
-import type { Database } from "@/types/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildMediaPayloadFromUpload,
   encodeMediaMessage,
-  parseMediaMessage,
   resolveMediaKind,
   type ChatMediaKind,
 } from "@/utils/chat-media";
@@ -159,59 +152,5 @@ export async function downloadAndStoreUrlInboundMedia(input: {
     mimeType,
     fileName,
     caption: input.caption,
-  });
-}
-
-type InboundMediaDbClient = SupabaseClient<Database>;
-
-export function scheduleInboundMediaHydration(input: {
-  admin: InboundMediaDbClient;
-  messageId: string;
-  resolveContent: () => Promise<string | null>;
-}): void {
-  void (async () => {
-    const content = await input.resolveContent();
-
-    if (!content) {
-      return;
-    }
-
-    await updateChannelMessageContent(input.admin, {
-      messageId: input.messageId,
-      content,
-    });
-
-    const { media } = parseMediaMessage(content);
-
-    if (media) {
-      await markMessageAttachmentReady(input.admin, {
-        messageId: input.messageId,
-        media,
-      });
-    }
-
-    const { data: messageRow } = await input.admin
-      .from("messages")
-      .select(
-        "id, conversation_id, channel, sender_type, content, ai_generated, created_at, deleted_for_all_at, hidden_for_business, edited_at, is_edited",
-      )
-      .eq("id", input.messageId)
-      .maybeSingle();
-
-    if (messageRow?.conversation_id) {
-      await recomputeConversationLastMessage(
-        input.admin,
-        messageRow.conversation_id,
-      );
-
-      void broadcastConversationMessageUpdated(messageRow.conversation_id, {
-        ...messageRow,
-        attachment_pending: false,
-      }).catch((error) => {
-        console.error("[inbound-media] hydration broadcast failed", error);
-      });
-    }
-  })().catch((error) => {
-    console.error("[inbound-media] hydration failed", error);
   });
 }

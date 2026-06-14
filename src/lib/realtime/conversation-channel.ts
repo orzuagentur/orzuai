@@ -22,6 +22,7 @@ export type ConversationMessageUpdatedPayload = {
   edited_at?: string | null;
   is_edited?: boolean;
   attachment_pending?: boolean;
+  attachment_failed?: boolean;
 };
 
 export function getConversationRealtimeChannelName(

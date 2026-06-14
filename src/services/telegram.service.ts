@@ -42,10 +42,7 @@ import type {
   TelegramWebhookPayload,
 } from "@/types/telegram.types";
 import { telegramConnectSchema } from "@/types/telegram.types";
-import {
-  downloadAndStoreTelegramInboundMedia,
-  scheduleInboundMediaHydration,
-} from "@/services/inbound-media.service";
+import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydration.service";
 import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
@@ -416,17 +413,14 @@ async function ingestTelegramMessage(
     scheduleInboundMediaHydration({
       admin,
       messageId: insertedMessage.id,
-      resolveContent: () =>
-        downloadAndStoreTelegramInboundMedia({
-          botToken: connection.bot_token!,
-          fileId: message.fileId,
-          businessId,
-          conversationId,
-          kind: message.mediaKind,
-          fileName: message.fileName,
-          mimeType: message.mimeType,
-          caption: message.caption,
-        }),
+      businessId,
+      conversationId,
+      channel: "telegram",
+      kind: message.mediaKind,
+      fileName: message.fileName,
+      mimeType: message.mimeType,
+      caption: message.caption,
+      providerMediaId: message.fileId,
     });
   }
 

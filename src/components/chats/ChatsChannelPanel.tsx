@@ -136,6 +136,7 @@ export function ChatsChannelPanel({
     appendMessage,
     removeMessage,
     reconcileMessage,
+    updateMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
@@ -455,6 +456,7 @@ export function ChatsChannelPanel({
             }}
             onSendFailed={removeMessage}
             onMessageRemoved={removeMessage}
+            onMessageUpdated={updateMessage}
             onContactDeleted={() => {
               handleConversationSelect(null);
               void refreshConversations();

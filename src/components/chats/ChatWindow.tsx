@@ -77,6 +77,7 @@ type ChatWindowProps = {
   onMessageSent?: (message: ChatMessageData, pendingId?: string) => void;
   onSendFailed?: (pendingId: string) => void;
   onMessageRemoved?: (messageId: string) => void;
+  onMessageUpdated?: (message: ChatMessageData) => void;
   onContactDeleted?: () => void;
   onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
   isClientTyping?: boolean;
@@ -119,6 +120,7 @@ export function ChatWindow({
   onMessageSent,
   onSendFailed,
   onMessageRemoved,
+  onMessageUpdated,
   onContactDeleted,
   onContactFavoriteChange,
   isClientTyping = false,
@@ -511,6 +513,7 @@ export function ChatWindow({
               isClientTyping={isClientTyping}
               typingContactName={conversation.contactName}
               onMessageRemoved={onMessageRemoved}
+              onMessageUpdated={onMessageUpdated}
               hasOlderMessages={hasOlderMessages}
               isLoadingOlderMessages={isLoadingOlderMessages}
               onLoadOlderMessages={onLoadOlderMessages}
@@ -638,6 +641,7 @@ export function ChatWindow({
           messages={conversation.messages}
           className="min-h-0 flex-1"
           onMessageRemoved={onMessageRemoved}
+          onMessageUpdated={onMessageUpdated}
         />
 
         <div ref={bottomRef} />

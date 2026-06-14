@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getWebhookQueueLagMetrics } from "@/services/webhook-queue.service";
 
 export type MessagingHealthSnapshot = {
   pendingDeliveries: number;
@@ -8,6 +9,9 @@ export type MessagingHealthSnapshot = {
   deadLetterDeliveries: number;
   pendingWebhooks: number;
   failedWebhooks: number;
+  webhookQueueLagSeconds: number;
+  oldestPendingWebhookAt: string | null;
+  staleProcessingWebhooks: number;
   capturedAt: string;
 };
 
@@ -21,6 +25,7 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
     deadLetterDeliveries,
     pendingWebhooks,
     failedWebhooks,
+    webhookQueueLag,
   ] = await Promise.all([
     admin
       .from("message_deliveries")
@@ -43,6 +48,7 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
       .from("inbound_webhook_queue")
       .select("id", { count: "exact", head: true })
       .eq("status", "failed"),
+    getWebhookQueueLagMetrics(),
   ]);
 
   return {
@@ -51,6 +57,9 @@ export async function getMessagingHealthSnapshot(): Promise<MessagingHealthSnaps
     deadLetterDeliveries: deadLetterDeliveries.count ?? 0,
     pendingWebhooks: pendingWebhooks.count ?? 0,
     failedWebhooks: failedWebhooks.count ?? 0,
+    webhookQueueLagSeconds: webhookQueueLag.lagSeconds,
+    oldestPendingWebhookAt: webhookQueueLag.oldestPendingAt,
+    staleProcessingWebhooks: webhookQueueLag.staleProcessingCount,
     capturedAt: now,
   };
 }

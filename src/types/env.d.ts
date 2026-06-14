@@ -11,5 +11,8 @@ declare namespace NodeJS {
     GEMINI_DEFAULT_MODEL?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
+    QSTASH_TOKEN?: string;
+    QSTASH_CURRENT_SIGNING_KEY?: string;
+    QSTASH_NEXT_SIGNING_KEY?: string;
   }
 }

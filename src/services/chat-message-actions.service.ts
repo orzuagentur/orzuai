@@ -6,10 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
+  ChatActionResult,
   DeleteChatMessageInput,
   DeleteChatMessageResult,
 } from "@/types/chat.types";
 import { deleteChatMessageSchema } from "@/types/chat.types";
+import { z } from "zod";
+import { retryInboundMediaHydration } from "@/services/inbound-media-hydration.service";
 import { recomputeConversationLastMessageForBusiness } from "@/services/conversation-last-message.service";
 import { mapChatMessage } from "@/utils/chat";
 
@@ -100,4 +103,51 @@ export async function deleteChatMessage(
   }
 
   return { success: true, data: { messageId: parsed.data.messageId } };
+}
+
+const retryInboundMediaAttachmentSchema = z.object({
+  messageId: z.string().uuid("Invalid message identifier."),
+});
+
+export async function retryInboundMediaAttachment(
+  input: z.infer<typeof retryInboundMediaAttachmentSchema>,
+): Promise<ChatActionResult<{ messageId: string }>> {
+  const parsed = retryInboundMediaAttachmentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          parsed.error.issues[0]?.message ?? CHAT_MESSAGES.mediaLoadFailed,
+      },
+    };
+  }
+
+  const message = await getOwnedMessage(parsed.data.messageId);
+
+  if (!message) {
+    return {
+      success: false,
+      error: { code: "NOT_FOUND", message: CHAT_MESSAGES.messageNotFound },
+    };
+  }
+
+  const result = await retryInboundMediaHydration(parsed.data.messageId);
+
+  if (!result.success) {
+    return {
+      success: false,
+      error: {
+        code: "UPDATE_FAILED",
+        message: result.error ?? CHAT_MESSAGES.mediaLoadFailed,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    data: { messageId: parsed.data.messageId },
+  };
 }

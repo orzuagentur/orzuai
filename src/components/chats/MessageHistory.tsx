@@ -36,6 +36,7 @@ type MessageHistoryProps = {
   isClientTyping?: boolean;
   typingContactName?: string;
   onMessageRemoved?: (messageId: string) => void;
+  onMessageUpdated?: (message: ChatMessageData) => void;
   hasOlderMessages?: boolean;
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
@@ -108,6 +109,7 @@ export function MessageHistory({
   isClientTyping = false,
   typingContactName = "Customer",
   onMessageRemoved,
+  onMessageUpdated,
   hasOlderMessages = false,
   isLoadingOlderMessages = false,
   onLoadOlderMessages,
@@ -257,6 +259,18 @@ export function MessageHistory({
                     isHydrating={
                       Boolean(message.attachmentPending) ||
                       isMediaPendingHydration(media)
+                    }
+                    isFailed={Boolean(message.attachmentFailed)}
+                    onRetryStateChange={
+                      onMessageUpdated
+                        ? (state) => {
+                            onMessageUpdated({
+                              ...message,
+                              attachmentPending: state.attachmentPending,
+                              attachmentFailed: state.attachmentFailed,
+                            });
+                          }
+                        : undefined
                     }
                   />
                 ) : (

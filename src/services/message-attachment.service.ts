@@ -77,6 +77,8 @@ export async function markMessageAttachmentReady(
       size_bytes: input.media.sizeBytes ?? null,
       duration_sec: input.media.durationSec ?? null,
       status: "ready",
+      last_error: null,
+      next_retry_at: null,
       ...attachmentThumbnailFields(input.media),
     })
     .eq("message_id", input.messageId);
@@ -113,4 +115,92 @@ export async function createReadyMessageAttachment(
   if (error) {
     console.error("[message-attachment] create ready failed", error.message);
   }
+}
+
+export async function saveMessageAttachmentHydrationContext(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    providerMediaId?: string;
+    context?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const update: Database["public"]["Tables"]["message_attachments"]["Update"] =
+    {
+      hydration_context: (input.context ?? {}) as Database["public"]["Tables"]["message_attachments"]["Update"]["hydration_context"],
+    };
+
+  if (input.providerMediaId) {
+    update.provider_media_id = input.providerMediaId;
+  }
+
+  const { error } = await admin
+    .from("message_attachments")
+    .update(update)
+    .eq("message_id", input.messageId);
+
+  if (error) {
+    console.error(
+      "[message-attachment] save hydration context failed",
+      error.message,
+    );
+  }
+}
+
+export async function markMessageAttachmentFailed(
+  admin: MessagingDbClient,
+  input: {
+    messageId: string;
+    error: string;
+    retryCount: number;
+    nextRetryAt: string | null;
+  },
+): Promise<void> {
+  const { error } = await admin
+    .from("message_attachments")
+    .update({
+      status: "failed",
+      retry_count: input.retryCount,
+      last_error: input.error,
+      next_retry_at: input.nextRetryAt,
+    })
+    .eq("message_id", input.messageId);
+
+  if (error) {
+    console.error("[message-attachment] mark failed failed", error.message);
+  }
+}
+
+export async function resetMessageAttachmentForRetry(
+  admin: MessagingDbClient,
+  messageId: string,
+): Promise<boolean> {
+  const { data: attachment } = await admin
+    .from("message_attachments")
+    .select("status, storage_path")
+    .eq("message_id", messageId)
+    .maybeSingle();
+
+  if (!attachment || attachment.status === "ready" || attachment.storage_path) {
+    return false;
+  }
+
+  const { data: updated, error } = await admin
+    .from("message_attachments")
+    .update({
+      status: "pending",
+      last_error: null,
+      next_retry_at: null,
+    })
+    .eq("message_id", messageId)
+    .in("status", ["pending", "failed"])
+    .select("message_id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[message-attachment] reset for retry failed", error.message);
+    return false;
+  }
+
+  return Boolean(updated);
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "crypto";
 
+import { dispatchWebhookQueueWorker } from "@/lib/queue/qstash-webhook-worker";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processInstagramWebhook } from "@/services/instagram.service";
 import { processTelegramWebhook } from "@/services/telegram.service";
@@ -16,6 +17,22 @@ type MessagingDbClient = SupabaseClient<Database>;
 
 const BATCH_SIZE = 20;
 const BASE_RETRY_SECONDS = 15;
+const STALE_PROCESSING_MS = 5 * 60 * 1000;
+
+export type WebhookQueueDrainResult = {
+  processed: number;
+  completed: number;
+  retried: number;
+  failed: number;
+  batches: number;
+  recoveredStale: number;
+};
+
+export type WebhookQueueLagMetrics = {
+  lagSeconds: number;
+  oldestPendingAt: string | null;
+  staleProcessingCount: number;
+};
 
 export function buildWebhookIdempotencyKey(
   channel: MessagingChannel,
@@ -44,39 +61,132 @@ export async function enqueueInboundWebhook(
 
   if (error) {
     if (error.code === "23505") {
-      scheduleInboundWebhookProcessing();
+      dispatchInboundWebhookWorker();
       return { queued: false, duplicate: true };
     }
 
     throw error;
   }
 
-  scheduleInboundWebhookProcessing();
+  dispatchInboundWebhookWorker();
   return { queued: true, duplicate: false };
 }
 
-let webhookDrainPromise: Promise<void> | null = null;
+let webhookDrainPromise: Promise<WebhookQueueDrainResult> | null = null;
 
-async function drainInboundWebhookQueue(): Promise<void> {
-  let batch = await processPendingInboundWebhooks();
+export async function recoverStaleWebhookJobs(): Promise<number> {
+  const admin = createAdminClient();
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
 
-  while (batch.processed === BATCH_SIZE) {
-    batch = await processPendingInboundWebhooks();
-  }
+  const { data } = await admin
+    .from("inbound_webhook_queue")
+    .update({ status: "pending" })
+    .eq("status", "processing")
+    .lt("updated_at", staleBefore)
+    .select("id");
+
+  return data?.length ?? 0;
 }
 
-export function scheduleInboundWebhookProcessing(): void {
+export async function getWebhookQueueLagMetrics(): Promise<WebhookQueueLagMetrics> {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+
+  const [oldestPending, staleProcessing] = await Promise.all([
+    admin
+      .from("inbound_webhook_queue")
+      .select("created_at")
+      .eq("status", "pending")
+      .lte("next_attempt_at", now)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("inbound_webhook_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "processing")
+      .lt("updated_at", staleBefore),
+  ]);
+
+  const oldestPendingAt = oldestPending.data?.created_at ?? null;
+  const lagSeconds = oldestPendingAt
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(oldestPendingAt).getTime()) / 1000,
+        ),
+      )
+    : 0;
+
+  return {
+    lagSeconds,
+    oldestPendingAt,
+    staleProcessingCount: staleProcessing.count ?? 0,
+  };
+}
+
+export async function drainInboundWebhookQueue(): Promise<WebhookQueueDrainResult> {
+  const recoveredStale = await recoverStaleWebhookJobs();
+
+  const totals: WebhookQueueDrainResult = {
+    processed: 0,
+    completed: 0,
+    retried: 0,
+    failed: 0,
+    batches: 0,
+    recoveredStale,
+  };
+
+  let batch = await processPendingInboundWebhooks();
+
+  while (batch.processed > 0) {
+    totals.batches += 1;
+    totals.processed += batch.processed;
+    totals.completed += batch.completed;
+    totals.retried += batch.retried;
+    totals.failed += batch.failed;
+
+    if (batch.processed < BATCH_SIZE) {
+      break;
+    }
+
+    batch = await processPendingInboundWebhooks();
+  }
+
+  return totals;
+}
+
+function scheduleInboundWebhookProcessingInProcess(): void {
   if (webhookDrainPromise) {
     return;
   }
 
   webhookDrainPromise = drainInboundWebhookQueue()
     .catch((error) => {
-      console.error("[webhook-queue] immediate processing failed", error);
+      console.error("[webhook-queue] in-process drain failed", error);
+      return {
+        processed: 0,
+        completed: 0,
+        retried: 0,
+        failed: 0,
+        batches: 0,
+        recoveredStale: 0,
+      };
     })
     .finally(() => {
       webhookDrainPromise = null;
     });
+}
+
+export function dispatchInboundWebhookWorker(): void {
+  scheduleInboundWebhookProcessingInProcess();
+  void dispatchWebhookQueueWorker("enqueue");
+}
+
+/** @deprecated Use dispatchInboundWebhookWorker */
+export function scheduleInboundWebhookProcessing(): void {
+  dispatchInboundWebhookWorker();
 }
 
 async function processWebhookJob(job: {
@@ -141,12 +251,22 @@ export async function processPendingInboundWebhooks(): Promise<{
   let completed = 0;
   let retried = 0;
   let failed = 0;
+  let processed = 0;
 
   for (const job of pending) {
-    await admin
+    const { data: claimed } = await admin
       .from("inbound_webhook_queue")
       .update({ status: "processing" })
-      .eq("id", job.id);
+      .eq("id", job.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (!claimed) {
+      continue;
+    }
+
+    processed += 1;
 
     const result = await processWebhookJob({
       id: job.id,
@@ -188,11 +308,12 @@ export async function processPendingInboundWebhooks(): Promise<{
       failed += 1;
     } else {
       retried += 1;
+      dispatchInboundWebhookWorker();
     }
   }
 
   return {
-    processed: pending.length,
+    processed,
     completed,
     retried,
     failed,

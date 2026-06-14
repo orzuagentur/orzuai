@@ -207,6 +207,7 @@ export function useConversationRealtime({
             onMessageUpdatedRef.current?.({
               ...mapChatMessage(row),
               attachmentPending: row.attachment_pending ?? false,
+              attachmentFailed: row.attachment_failed ?? false,
             });
           },
         )

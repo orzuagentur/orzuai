@@ -126,6 +126,7 @@ export function ChatsMonitorPanel({
     appendMessage,
     removeMessage,
     reconcileMessage,
+    updateMessage,
     isClientTyping,
     refreshConversation,
   } = useInboxActiveConversation({
@@ -615,6 +616,7 @@ export function ChatsMonitorPanel({
             }}
             onSendFailed={removeMessage}
             onMessageRemoved={removeMessage}
+            onMessageUpdated={updateMessage}
             onContactDeleted={() => {
               handleConversationSelect(null);
               fetchConversations(0, false, true);

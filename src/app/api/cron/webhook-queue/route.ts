@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ENV_KEYS } from "@/constants/env-keys";
-import { processPendingInboundWebhooks } from "@/services/webhook-queue.service";
+import { drainInboundWebhookQueue } from "@/services/webhook-queue.service";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env[ENV_KEYS.CRON_SECRET]?.trim();
@@ -13,10 +13,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await processPendingInboundWebhooks();
+  const result = await drainInboundWebhookQueue();
 
   return NextResponse.json({
     success: true,
+    fallback: true,
     ...result,
   });
 }

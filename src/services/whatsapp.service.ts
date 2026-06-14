@@ -50,10 +50,7 @@ import {
   completeEmbeddedSignupSchema,
   connectManualWhatsAppSchema,
 } from "@/types/whatsapp.types";
-import {
-  downloadAndStoreWhatsAppInboundMedia,
-  scheduleInboundMediaHydration,
-} from "@/services/inbound-media.service";
+import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydration.service";
 import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
@@ -674,17 +671,14 @@ async function ingestIncomingMessage(
     scheduleInboundMediaHydration({
       admin,
       messageId: insertedMessage.id,
-      resolveContent: () =>
-        downloadAndStoreWhatsAppInboundMedia({
-          accessToken: connection.meta_access_token!,
-          mediaId: message.mediaId,
-          businessId,
-          conversationId,
-          kind: message.mediaKind,
-          fileName: message.fileName,
-          mimeType: message.mimeType,
-          caption: message.caption,
-        }),
+      businessId,
+      conversationId,
+      channel: "whatsapp",
+      kind: message.mediaKind,
+      fileName: message.fileName,
+      mimeType: message.mimeType,
+      caption: message.caption,
+      providerMediaId: message.mediaId,
     });
   }
 
