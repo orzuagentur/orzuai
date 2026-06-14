@@ -671,6 +671,25 @@ export function ChatMediaMessage({
   const isHydrating =
     isHydratingProp ?? isMediaPendingHydration(media);
   const isFailed = isFailedProp ?? false;
+  const showFailed = isFailed && !isHydrating;
+  const hasThumb = Boolean(media.thumbPath && media.kind === "image");
+  const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
+  const {
+    url: previewUrl,
+    isLoading: isPreviewLoading,
+    error: previewError,
+  } = useChatMediaUrl(previewMedia, {
+    messageId,
+    enabled: !isHydrating && !showFailed,
+  });
+  const {
+    url: resolvedUrl,
+    isLoading: isFullLoading,
+    error: fullError,
+  } = useChatMediaUrl(media, {
+    messageId,
+    enabled: !isHydrating && !hasThumb && !showFailed,
+  });
 
   const handleRetry = () => {
     if (!messageId || isRetrying) {
@@ -694,7 +713,7 @@ export function ChatMediaMessage({
     });
   };
 
-  if (isFailed && !isHydrating) {
+  if (showFailed) {
     return (
       <div className="space-y-1">
         <MediaFailedPlaceholder
@@ -710,24 +729,6 @@ export function ChatMediaMessage({
     );
   }
 
-  const hasThumb = Boolean(media.thumbPath && media.kind === "image");
-  const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
-  const {
-    url: previewUrl,
-    isLoading: isPreviewLoading,
-    error: previewError,
-  } = useChatMediaUrl(previewMedia, {
-    messageId,
-    enabled: !isHydrating,
-  });
-  const {
-    url: resolvedUrl,
-    isLoading: isFullLoading,
-    error: fullError,
-  } = useChatMediaUrl(media, {
-    messageId,
-    enabled: !isHydrating && !hasThumb,
-  });
   const showLoading =
     isHydrating || (hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading);
 
