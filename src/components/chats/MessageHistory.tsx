@@ -4,6 +4,7 @@ import type { RefObject } from "react";
 import { memo, useMemo } from "react";
 import {
   AlertCircleIcon,
+  BookOpenIcon,
   CheckCheckIcon,
   CheckIcon,
   Clock3Icon,
@@ -71,7 +72,7 @@ function getSenderLabel(message: ChatMessageData): string {
 }
 
 function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
-  if (message.senderType !== "user" || message.isPending) {
+  if (message.senderType !== "user") {
     return null;
   }
 
@@ -85,6 +86,7 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
   }
 
   if (
+    message.isPending ||
     message.deliveryStatus === "pending" ||
     message.deliveryStatus === "processing"
   ) {
@@ -92,6 +94,15 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
       <Loader2Icon
         className="size-3 shrink-0 animate-spin opacity-80"
         aria-label={CHAT_MESSAGES.messageSending}
+      />
+    );
+  }
+
+  if (message.deliveryStatus === "read") {
+    return (
+      <BookOpenIcon
+        className="size-2.5 shrink-0 opacity-90"
+        aria-label={CHAT_MESSAGES.messageRead}
       />
     );
   }

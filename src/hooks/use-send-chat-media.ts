@@ -189,7 +189,6 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
               }
             : result;
 
-          toast.success(CHAT_MESSAGES.mediaSendSuccess);
           onSuccess?.(enrichedResult);
           return enrichedResult;
         }

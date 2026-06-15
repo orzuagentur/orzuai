@@ -21,7 +21,7 @@ import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { getWhatsAppApiVersion } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { dispatchMessageDelivery } from "@/services/message-delivery.service";
+import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
@@ -776,9 +776,7 @@ export async function sendInstagramChatMessage(
     channel: "instagram",
   });
 
-  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
-    console.error("[instagram] outbound delivery dispatch failed", error);
-  });
+  await deliverOutboundMessageNow(insertedMessage.id);
 
   return { success: true, message: insertedMessage };
 }

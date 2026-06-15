@@ -53,6 +53,7 @@ export type MessageDeliveryStatus =
   | "processing"
   | "sent"
   | "delivered"
+  | "read"
   | "failed";
 export type MessageAttachmentKind = "image" | "audio" | "video" | "document";
 export type MessageAttachmentStatus =

@@ -14,6 +14,7 @@ import { deliverChannelMediaMessage } from "@/services/channels/deliver-media";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import { resolveAttachmentProviderMediaUrl } from "@/services/provider-media-url.service";
+import { advanceMessageDeliveryStatus } from "@/services/message-delivery-status.service";
 import {
   incrementMessagingAnalytics,
   recordMessageDeliveryFailure,
@@ -172,6 +173,13 @@ async function processDeliveryRow(
       providerMessageId: result.providerMessageId,
     });
 
+    if (delivery.channel === "telegram") {
+      await advanceMessageDeliveryStatus(admin, {
+        messageId: message.id,
+        status: "delivered",
+      });
+    }
+
     await incrementMessagingAnalytics(admin, delivery.business_id, delivery.channel, {
       totalMessages: 1,
     });
@@ -236,6 +244,13 @@ export async function dispatchMessageDelivery(messageId: string): Promise<void> 
   }
 
   dispatchMessageDeliveryWorker("enqueue");
+}
+
+/** Delivers one outbound message inline (waits for provider API when claim succeeds). */
+export async function deliverOutboundMessageNow(
+  messageId: string,
+): Promise<void> {
+  await dispatchMessageDelivery(messageId);
 }
 
 async function processPendingMessageDeliveriesBatch(): Promise<{

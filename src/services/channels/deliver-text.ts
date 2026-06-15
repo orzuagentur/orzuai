@@ -69,7 +69,7 @@ export async function deliverChannelTextMessage(input: {
       return { success: false, error: sendResult.message };
     }
 
-    return { success: true };
+    return { success: true, providerMessageId: sendResult.messageId };
   }
 
   if (input.channel === "instagram") {

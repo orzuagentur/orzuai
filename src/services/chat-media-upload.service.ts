@@ -15,11 +15,12 @@ import {
   createOutboundMessageDelivery,
   insertChannelMessage,
 } from "@/services/messaging.service";
-import { dispatchMessageDelivery } from "@/services/message-delivery.service";
+import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
+import { buildOutboundChatMessage } from "@/services/outbound-message.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import type { ChatActionError, SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
-import { mapChatMessage, resolveContactFromRow } from "@/utils/chat";
+import { resolveContactFromRow } from "@/utils/chat";
 import {
   buildChatAttachmentStoragePath,
   buildThumbnailStoragePath,
@@ -444,14 +445,15 @@ export async function completeChatMediaUpload(
     });
   }
 
-  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
-    console.error("[chat-media] outbound delivery failed", error);
-  });
+  await deliverOutboundMessageNow(insertedMessage.id);
+
+  const admin = createAdminClient();
+  const message = await buildOutboundChatMessage(admin, insertedMessage);
 
   return {
     success: true,
     data: {
-      message: mapChatMessage(insertedMessage),
+      message,
     },
   };
 }

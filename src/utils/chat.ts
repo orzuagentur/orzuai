@@ -65,6 +65,19 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
   };
 }
 
+export function withPendingDeliveryStatus(
+  message: ChatMessageData,
+): ChatMessageData {
+  if (message.senderType !== "user" || message.hiddenForBusiness) {
+    return message;
+  }
+
+  return {
+    ...message,
+    deliveryStatus: message.deliveryStatus ?? "pending",
+  };
+}
+
 export function isChatMessageDeletedForAll(message: ChatMessageData): boolean {
   return Boolean(message.deletedForAllAt);
 }

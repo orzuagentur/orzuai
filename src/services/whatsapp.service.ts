@@ -27,6 +27,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { applyWhatsAppDeliveryStatusUpdates } from "@/services/message-delivery-status.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
@@ -63,6 +64,7 @@ import {
   mapWhatsAppConnection,
   normalizePhoneNumber,
   parseWhatsAppWebhookPayload,
+  parseWhatsAppWebhookStatusUpdates,
 } from "@/utils/whatsapp";
 import type { WhatsAppWebhookMessage } from "@/types/whatsapp.types";
 
@@ -774,13 +776,15 @@ export async function processWhatsAppWebhook(
     return { processed: 0 };
   }
 
+  const admin = createAdminClient();
+  const statusUpdates = parseWhatsAppWebhookStatusUpdates(payload);
+  let processed = await applyWhatsAppDeliveryStatusUpdates(admin, statusUpdates);
+
   const messages = parseWhatsAppWebhookPayload(payload);
 
   if (messages.length === 0) {
-    return { processed: 0 };
+    return { processed };
   }
-
-  const admin = createAdminClient();
 
   const outcomes = await runWithConcurrency(
     messages,
@@ -802,7 +806,7 @@ export async function processWhatsAppWebhook(
     },
   );
 
-  const processed = outcomes.filter((count) => count === 1).length;
+  processed += outcomes.filter((count) => count === 1).length;
 
   return { processed };
 }

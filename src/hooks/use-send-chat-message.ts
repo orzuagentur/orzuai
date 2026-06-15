@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { sendChatMessageAction } from "@/features/chats/actions/send-chat-message";
-import { CHAT_MESSAGES } from "@/features/chats/constants";
 import type {
   SendChatMessageInput,
   SendChatMessageResult,
@@ -20,7 +19,6 @@ export function useSendChatMessage({ onSuccess }: UseSendChatMessageOptions = {}
       const result = await sendChatMessageAction(input);
 
       if (result.success) {
-        toast.success(CHAT_MESSAGES.sendSuccess);
         onSuccess?.(result);
         return result;
       }

@@ -161,6 +161,12 @@ export type WhatsAppWebhookPayload = {
             mime_type?: string;
           };
         }>;
+        statuses?: Array<{
+          id?: string;
+          status?: string;
+          timestamp?: string;
+          recipient_id?: string;
+        }>;
       };
     }>;
   }>;

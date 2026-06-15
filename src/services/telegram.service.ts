@@ -15,7 +15,7 @@ import {
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { dispatchMessageDelivery } from "@/services/message-delivery.service";
+import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
@@ -592,9 +592,7 @@ export async function sendTelegramChatMessage(
     channel: "telegram",
   });
 
-  void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
-    console.error("[telegram] outbound delivery dispatch failed", error);
-  });
+  await deliverOutboundMessageNow(insertedMessage.id);
 
   return { success: true, message: insertedMessage };
 }

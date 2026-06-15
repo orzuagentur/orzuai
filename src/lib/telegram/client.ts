@@ -356,7 +356,9 @@ export async function sendTelegramTextMessage(
   botToken: string,
   chatId: string,
   text: string,
-): Promise<{ success: true } | { success: false; message: string }> {
+): Promise<
+  { success: true; messageId: string } | { success: false; message: string }
+> {
   const result = await callTelegramApi<{ message_id: number }>(
     botToken,
     "sendMessage",
@@ -370,7 +372,7 @@ export async function sendTelegramTextMessage(
     return result;
   }
 
-  return { success: true };
+  return { success: true, messageId: String(result.result.message_id) };
 }
 
 export function verifyTelegramWebhookSecret(

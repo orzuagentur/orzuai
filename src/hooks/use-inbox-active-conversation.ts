@@ -15,6 +15,7 @@ import {
   setCachedConversationDetail,
 } from "@/lib/client-cache/inbox-messenger-cache";
 import { revokeOptimisticMediaContent } from "@/utils/optimistic-chat-message";
+import { withPendingDeliveryStatus } from "@/utils/chat";
 import {
   buildMediaUrlCacheKey,
   encodeMediaMessage,
@@ -326,6 +327,8 @@ export function useInboxActiveConversation({
             ),
           };
         }
+
+        resolvedMessage = withPendingDeliveryStatus(resolvedMessage);
 
         const hadPending = current.messages.some((item) => item.id === pendingId);
 

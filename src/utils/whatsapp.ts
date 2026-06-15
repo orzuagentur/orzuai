@@ -78,6 +78,34 @@ function buildWhatsAppMediaMessage(
   };
 }
 
+export type WhatsAppWebhookStatusUpdate = {
+  providerMessageId: string;
+  status: string;
+};
+
+export function parseWhatsAppWebhookStatusUpdates(
+  payload: WhatsAppWebhookPayload,
+): WhatsAppWebhookStatusUpdate[] {
+  const statuses: WhatsAppWebhookStatusUpdate[] = [];
+
+  for (const entry of payload.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      for (const status of change.value?.statuses ?? []) {
+        if (!status.id || !status.status) {
+          continue;
+        }
+
+        statuses.push({
+          providerMessageId: status.id,
+          status: status.status,
+        });
+      }
+    }
+  }
+
+  return statuses;
+}
+
 export function parseWhatsAppWebhookPayload(
   payload: WhatsAppWebhookPayload,
 ): WhatsAppWebhookMessage[] {

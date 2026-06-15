@@ -18,7 +18,8 @@ import {
   listKnowledgeEntriesForBusiness,
   scheduleMessagingAnalyticsIncrement,
 } from "@/services/messaging.service";
-import { dispatchMessageDelivery } from "@/services/message-delivery.service";
+import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
+import { buildOutboundChatMessage } from "@/services/outbound-message.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
@@ -883,7 +884,10 @@ export async function sendChatMessage(
     return {
       success: true,
       data: {
-        message: mapChatMessage(sendResult.message),
+        message: await buildOutboundChatMessage(
+          createAdminClient(),
+          sendResult.message,
+        ),
       },
     };
   } else if (conversation.channel === "telegram") {
@@ -906,7 +910,10 @@ export async function sendChatMessage(
     return {
       success: true,
       data: {
-        message: mapChatMessage(sendResult.message),
+        message: await buildOutboundChatMessage(
+          createAdminClient(),
+          sendResult.message,
+        ),
       },
     };
   } else if (conversation.channel === "website_forms") {
@@ -977,14 +984,15 @@ export async function sendChatMessage(
       ...contactUpdates,
     ]);
 
-    void dispatchMessageDelivery(insertedMessage.id).catch((error) => {
-      console.error("[whatsapp] outbound delivery dispatch failed", error);
-    });
+    await deliverOutboundMessageNow(insertedMessage.id);
+
+    const admin = createAdminClient();
+    const message = await buildOutboundChatMessage(admin, insertedMessage);
 
     return {
       success: true,
       data: {
-        message: mapChatMessage(insertedMessage),
+        message,
       },
     };
   }
