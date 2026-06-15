@@ -7,7 +7,7 @@ import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
-import { getInboxRealtimeChannelName } from "@/lib/realtime/inbox-channel";
+import { getInboxListPostgresFilter, getInboxRealtimeChannelName } from "@/lib/realtime/inbox-channel";
 import {
   applyRealtimeConversationUpdate,
   applyRealtimeMessageToList,
@@ -221,14 +221,14 @@ export function useInboxListRealtime({
       }
 
       channel = supabase
-        .channel(getInboxRealtimeChannelName(businessId))
+        .channel(getInboxRealtimeChannelName(businessId, channelFilter))
         .on(
           "postgres_changes",
           {
             event: "INSERT",
             schema: "public",
             table: "messages",
-            filter: `business_id=eq.${businessId}`,
+            filter: getInboxListPostgresFilter(businessId, channelFilter),
           },
           (payload) => {
             handleMessageInsert(payload.new as InboxRealtimeMessageRow);
@@ -240,7 +240,7 @@ export function useInboxListRealtime({
             event: "INSERT",
             schema: "public",
             table: "conversations",
-            filter: `business_id=eq.${businessId}`,
+            filter: getInboxListPostgresFilter(businessId, channelFilter),
           },
           (payload) => {
             void handleConversationUpsert(
@@ -255,7 +255,7 @@ export function useInboxListRealtime({
             event: "UPDATE",
             schema: "public",
             table: "conversations",
-            filter: `business_id=eq.${businessId}`,
+            filter: getInboxListPostgresFilter(businessId, channelFilter),
           },
           (payload) => {
             void handleConversationUpsert(

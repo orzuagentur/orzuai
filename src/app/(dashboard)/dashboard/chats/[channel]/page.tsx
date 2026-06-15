@@ -4,8 +4,8 @@ import { ChatsChannelPanel } from "@/components/chats/ChatsChannelPanel";
 import { isChatChannelId, type ChatChannelId } from "@/features/chats";
 import {
   getChatsChannelPageData,
-  getChatsMonitorData,
   resolveInboxActiveConversationContext,
+  resolveInboxBusinessContext,
 } from "@/services/chat.service";
 
 type ChatsChannelPageProps = {
@@ -25,11 +25,11 @@ export default async function ChatsChannelPage({
   }
 
   const channel: ChatChannelId = channelParam;
+  const inboxContext = await resolveInboxBusinessContext();
 
-  const [monitorData, channelData, activeContext] = await Promise.all([
-    getChatsMonitorData(),
-    getChatsChannelPageData(channel),
-    resolveInboxActiveConversationContext(conversationId?.trim()),
+  const [channelData, activeContext] = await Promise.all([
+    getChatsChannelPageData(channel, inboxContext),
+    resolveInboxActiveConversationContext(conversationId?.trim(), inboxContext),
   ]);
 
   return (
@@ -37,7 +37,7 @@ export default async function ChatsChannelPage({
       channelId={channel}
       hasBusiness={channelData.hasBusiness}
       channel={channelData.channel}
-      channelStats={monitorData.channels}
+      visibleChannelIds={channelData.visibleChannelIds}
       channelConnected={channelData.channelConnected}
       aiEnabled={channelData.aiEnabled}
       conversations={channelData.conversations}

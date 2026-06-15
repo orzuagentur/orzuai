@@ -533,12 +533,6 @@ export async function processTelegramWebhook(
     processed += 1;
   }
 
-  if (processed > 0) {
-    queueMicrotask(() => {
-      revalidateTelegramPaths();
-    });
-  }
-
   return { processed };
 }
 

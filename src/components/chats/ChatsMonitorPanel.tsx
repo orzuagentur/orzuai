@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useTransition,
 } from "react";
@@ -14,7 +13,6 @@ import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 
 import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
-import { ConversationListSkeleton } from "@/components/chats/ConversationListSkeleton";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
@@ -28,19 +26,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { fetchChatsMonitorInitialAction } from "@/features/chats/actions/fetch-chats-monitor-initial";
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
+import type { ListConversationsMonitorResult } from "@/services/chat-inbox-query.service";
 import { CHAT_MESSAGES } from "@/features/chats";
+import { useInboxPanel, useDebouncedInboxSearch, useSkipInitialListFetch } from "@/hooks/use-inbox-panel";
 import {
   getCachedConversationList,
   setCachedConversationList,
 } from "@/lib/client-cache/inbox-messenger-cache";
-import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
-import {
-  INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
-  useInboxListPolling,
-} from "@/hooks/use-inbox-list-polling";
-import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import type {
   ChatInboxFilter,
   ChatInboxQuickView,
@@ -54,7 +47,6 @@ import type {
 } from "@/types/chat.types";
 import {
   countUnreadByChannel,
-  markConversationListItemRead,
 } from "@/utils/conversation-unread";
 
 type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData> & {
@@ -75,14 +67,10 @@ export function ChatsMonitorPanel({
   activeCannedResponses: initialActiveCannedResponses,
   favoritesOnly = false,
 }: ChatsMonitorPanelProps = {}) {
-  const usesClientBootstrap = initialConversations === undefined;
   const searchParams = useSearchParams();
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
   const listScope = favoritesOnly ? ("favorites" as const) : ("monitor" as const);
   const cachedList = getCachedConversationList({ scope: listScope });
-  const hasWarmList =
-    (Array.isArray(initialConversations) ? initialConversations.length : 0) > 0 ||
-    (cachedList?.items.length ?? 0) > 0;
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
   const [businessId, setBusinessId] = useState<string | null>(initialBusinessId);
@@ -107,14 +95,80 @@ export function ChatsMonitorPanel({
   const [hasMore, setHasMore] = useState(
     initialHasMore ?? cachedList?.hasMore ?? false,
   );
-  const [isInitialLoading, setIsInitialLoading] = useState(
-    usesClientBootstrap && !favoritesOnly && !hasWarmList,
+  const { searchQuery, setSearchQuery, debouncedSearch } =
+    useDebouncedInboxSearch();
+  const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
+  const [activeSort] = useState<ChatInboxSort>("latest");
+  const [activeQuickView] = useState<ChatInboxQuickView>(
+    favoritesOnly ? "favorites" : "all",
   );
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [isFetching, startFetching] = useTransition();
+  const { consumeSkipInitialFetch } = useSkipInitialListFetch();
+
+  const fetchConversations = useCallback(
+    (
+      offset: number,
+      append: boolean,
+      silent = false,
+      limitOverride?: number,
+    ) => {
+      const run = async () => {
+        const result = await fetchMonitorConversationsAction({
+          offset,
+          limit: limitOverride ?? INBOX_PAGE_SIZE,
+          search: debouncedSearch || undefined,
+          view: activeQuickView,
+          filter: activeFilter,
+          sort: activeSort,
+          includeNeedsAttention:
+            offset === 0 && activeQuickView === "all" && !debouncedSearch,
+        });
+
+        if (!result.success) {
+          return;
+        }
+
+        setConversations((current) =>
+          append
+            ? [...current, ...result.data.items]
+            : result.data.items,
+        );
+        setTotalCount(result.data.totalCount);
+        setHasMore(result.data.hasMore);
+
+        const needsAttention = (
+          result.data as ListConversationsMonitorResult
+        ).needsAttentionConversations;
+
+        if (needsAttention) {
+          setNeedsAttentionConversations(needsAttention);
+        } else if (offset === 0 && activeQuickView !== "all") {
+          setNeedsAttentionConversations([]);
+        }
+      };
+
+      if (silent) {
+        void run();
+        return;
+      }
+
+      startFetching(run);
+    },
+    [activeFilter, activeQuickView, activeSort, debouncedSearch],
+  );
+
+  const refreshConversations = useCallback(() => {
+    const loadedLimit = Math.max(conversations.length, INBOX_PAGE_SIZE);
+    fetchConversations(0, false, true, loadedLimit);
+  }, [conversations.length, fetchConversations]);
+
+  const hasActiveListFilters =
+    Boolean(debouncedSearch) ||
+    activeFilter !== "all" ||
+    activeQuickView !== "all";
 
   const {
     selectedConversationId,
-    selectConversation,
     conversation: activeConversation,
     channelConnected: activeChannelConnected,
     aiEnabled: activeAiEnabled,
@@ -128,25 +182,26 @@ export function ChatsMonitorPanel({
     updateMessage,
     isClientTyping,
     refreshConversation,
-  } = useInboxActiveConversation({
+    draft,
+    setDraft,
+    suggestReplyOpen,
+    setSuggestReplyOpen,
+    handleConversationSelect,
+    selectConversation,
+  } = useInboxPanel({
     initialConversationId,
-    initialConversation: initialActiveConversation,
+    initialActiveConversation,
     initialChannelConnected: initialActiveChannelConnected ?? false,
     initialAiEnabled: initialActiveAiEnabled ?? null,
     initialCannedResponses: initialActiveCannedResponses ?? [],
+    hasBusiness,
+    businessId,
+    isInitialLoading: false,
+    hasActiveListFilters,
+    onConversationsChange: setConversations,
+    onNeedsAttentionChange: setNeedsAttentionConversations,
+    onRefreshConversations: refreshConversations,
   });
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
-  const [activeSort] = useState<ChatInboxSort>("latest");
-  const [activeQuickView] = useState<ChatInboxQuickView>(
-    favoritesOnly ? "favorites" : "all",
-  );
-  const [isFetching, startFetching] = useTransition();
-  const [draft, setDraft] = useState("");
-  const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
-  const skipInitialFetchRef = useRef(!usesClientBootstrap);
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -196,24 +251,6 @@ export function ChatsMonitorPanel({
     return countUnreadByChannel([...merged.values()]);
   }, [conversations, needsAttentionConversations]);
 
-  const handleConversationSelect = useCallback(
-    (conversationId: string | null) => {
-      selectConversation(conversationId);
-
-      if (!conversationId) {
-        return;
-      }
-
-      setConversations((current) =>
-        markConversationListItemRead(current, conversationId),
-      );
-      setNeedsAttentionConversations((current) =>
-        markConversationListItemRead(current, conversationId),
-      );
-    },
-    [selectConversation],
-  );
-
   const selectedListItem = useMemo(() => {
     if (!selectedConversationId) {
       return null;
@@ -226,74 +263,9 @@ export function ChatsMonitorPanel({
     );
   }, [conversations, needsAttentionConversations, selectedConversationId]);
 
-  useEffect(() => {
-    if (!selectedConversationId) {
-      return;
-    }
-
-    setConversations((current) =>
-      markConversationListItemRead(current, selectedConversationId),
-    );
-    setNeedsAttentionConversations((current) =>
-      markConversationListItemRead(current, selectedConversationId),
-    );
-  }, [selectedConversationId]);
-
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
   const aiChannel = activeConversation?.channel ?? null;
-
-  const fetchConversations = useCallback(
-    (offset: number, append: boolean, silent = false) => {
-      const run = async () => {
-        const [listResult, needsAttentionResult] = await Promise.all([
-          fetchMonitorConversationsAction({
-            offset,
-            limit: INBOX_PAGE_SIZE,
-            search: debouncedSearch || undefined,
-            view: activeQuickView,
-            filter: activeFilter,
-            sort: activeSort,
-          }),
-          offset === 0 && activeQuickView === "all" && !debouncedSearch
-            ? fetchMonitorConversationsAction({
-                offset: 0,
-                limit: 8,
-                view: "needs_reply",
-                filter: "all",
-                sort: "latest",
-              })
-            : Promise.resolve(null),
-        ]);
-
-        if (!listResult.success) {
-          return;
-        }
-
-        setConversations((current) =>
-          append
-            ? [...current, ...listResult.data.items]
-            : listResult.data.items,
-        );
-        setTotalCount(listResult.data.totalCount);
-        setHasMore(listResult.data.hasMore);
-
-        if (needsAttentionResult?.success) {
-          setNeedsAttentionConversations(needsAttentionResult.data.items);
-        } else if (offset === 0 && activeQuickView !== "all") {
-          setNeedsAttentionConversations([]);
-        }
-      };
-
-      if (silent) {
-        void run();
-        return;
-      }
-
-      startFetching(run);
-    },
-    [activeFilter, activeQuickView, activeSort, debouncedSearch],
-  );
 
   const handleContactFavoriteChange = useCallback(
     (contactId: string, isFavorite: boolean) => {
@@ -348,95 +320,14 @@ export function ChatsMonitorPanel({
   );
 
   useEffect(() => {
-    if (!usesClientBootstrap) {
+    if (consumeSkipInitialFetch()) {
       return;
     }
 
-    if (favoritesOnly) {
-      setHasBusiness(true);
-      return;
-    }
-
-    let cancelled = false;
-
-    void fetchChatsMonitorInitialAction().then((result) => {
-      if (cancelled) {
-        return;
-      }
-
-      if (!result.success) {
-        setIsInitialLoading(false);
-        return;
-      }
-
-      const data = result.data;
-      setHasBusiness(data.hasBusiness);
-      setBusinessId(data.businessId ?? null);
-      setChannels(data.channels);
-      setConversations(data.conversations);
-      setNeedsAttentionConversations(data.needsAttentionConversations);
-      setTotalCount(data.conversationsTotalCount);
-      setHasMore(data.conversationsHasMore);
-      setIsInitialLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [favoritesOnly, usesClientBootstrap]);
-
-  const hasActiveListFilters =
-    Boolean(debouncedSearch) ||
-    activeFilter !== "all" ||
-    activeQuickView !== "all";
-
-  useInboxListRealtime({
-    enabled: hasBusiness && !isInitialLoading,
-    businessId,
-    selectedConversationId,
-    hasActiveFilters: hasActiveListFilters,
-    onConnectionChange: setRealtimeConnected,
-    onConversationsChange: setConversations,
-    onNeedsAttentionChange: setNeedsAttentionConversations,
-    onRefresh: () => fetchConversations(0, false, true),
-  });
-
-  useInboxListPolling(
-    () => {
-      if (!isInitialLoading) {
-        fetchConversations(0, false, true);
-      }
-    },
-    {
-      enabled: hasBusiness && !isInitialLoading && !realtimeConnected,
-      intervalMs: INBOX_LIST_POLL_FALLBACK_INTERVAL_MS,
-    },
-  );
+    fetchConversations(0, false);
+  }, [consumeSkipInitialFetch, fetchConversations]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setDebouncedSearch(searchQuery.trim());
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (skipInitialFetchRef.current) {
-      skipInitialFetchRef.current = false;
-      return;
-    }
-
-    if (!isInitialLoading) {
-      fetchConversations(0, false);
-    }
-  }, [fetchConversations, isInitialLoading]);
-
-  useEffect(() => {
-    if (usesClientBootstrap) {
-      return;
-    }
-
     setHasBusiness(initialHasBusiness ?? true);
     setBusinessId(initialBusinessId);
     setChannels(initialChannels ?? []);
@@ -452,11 +343,10 @@ export function ChatsMonitorPanel({
     initialHasMore,
     initialNeedsAttention,
     initialTotalCount,
-    usesClientBootstrap,
   ]);
 
   useInboxChromeRegistration(
-    hasBusiness && !isInitialLoading
+    hasBusiness
       ? {
           searchQuery,
           onSearchChange: setSearchQuery,
@@ -468,7 +358,7 @@ export function ChatsMonitorPanel({
       : null,
   );
 
-  if (!isInitialLoading && !hasBusiness) {
+  if (!hasBusiness) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
         <Card className="mx-auto max-w-2xl shadow-none">
@@ -498,48 +388,42 @@ export function ChatsMonitorPanel({
       }
       listColumn={
         <div className="flex min-h-0 flex-1 flex-col">
-          {isInitialLoading ? (
-            <ConversationListSkeleton rows={8} />
-          ) : (
-            <>
-              {showNeedsAttentionSection ? (
-                <div className="shrink-0 border-b bg-amber-500/5">
-                  <div className="px-4 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                    {CHAT_MESSAGES.needsAttentionTitle}
-                  </div>
-                  <ChatList
-                    conversations={needsAttentionConversations}
-                    activeConversationId={activeConversationId}
-                    channelId="whatsapp"
-                    linkToConversationChannel
-                    linkMode="overview"
-                    onConversationSelect={handleConversationSelect}
-                    variant="inbox"
-                  />
-                </div>
-              ) : null}
-
+          {showNeedsAttentionSection ? (
+            <div className="shrink-0 border-b bg-amber-500/5">
+              <div className="px-4 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                {CHAT_MESSAGES.needsAttentionTitle}
+              </div>
               <ChatList
-                className="min-h-0 flex-1"
-                conversations={mainConversations}
+                conversations={needsAttentionConversations}
                 activeConversationId={activeConversationId}
                 channelId="whatsapp"
                 linkToConversationChannel
-                linkMode={favoritesOnly ? "favorites" : "overview"}
+                linkMode="overview"
                 onConversationSelect={handleConversationSelect}
                 variant="inbox"
-                emptyVariant={
-                  favoritesOnly
-                    ? "favorites"
-                    : totalCount > 0 && conversations.length === 0
-                      ? "search"
-                      : "default"
-                }
               />
-            </>
-          )}
+            </div>
+          ) : null}
 
-          {!isInitialLoading && hasMore ? (
+          <ChatList
+            className="min-h-0 flex-1"
+            conversations={mainConversations}
+            activeConversationId={activeConversationId}
+            channelId="whatsapp"
+            linkToConversationChannel
+            linkMode={favoritesOnly ? "favorites" : "overview"}
+            onConversationSelect={handleConversationSelect}
+            variant="inbox"
+            emptyVariant={
+              favoritesOnly
+                ? "favorites"
+                : totalCount > 0 && conversations.length === 0
+                  ? "search"
+                  : "default"
+            }
+          />
+
+          {hasMore ? (
             <div className="shrink-0 border-t p-3">
               <Button
                 type="button"
@@ -595,7 +479,6 @@ export function ChatsMonitorPanel({
                   }
                 : null
             }
-            layout="inbox"
             draft={draft}
             onDraftChange={setDraft}
             className="min-h-0 min-w-0 flex-1"

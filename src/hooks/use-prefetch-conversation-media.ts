@@ -8,6 +8,8 @@ import type { ChatMessageData } from "@/types/chat.types";
 import { isOptimisticMessageId } from "@/utils/optimistic-chat-message";
 import { parseMediaMessage, resolveMediaStoragePath } from "@/utils/chat-media";
 
+const PREFETCH_THROTTLE_MS = 300;
+
 function collectVisibleMediaPaths(
   messages: ChatMessageData[],
   visibleIndices: readonly number[],
@@ -47,52 +49,79 @@ function collectVisibleMediaPaths(
   return [...thumbPaths, ...fullPaths];
 }
 
+function serializeVisibleRange(visibleIndices: readonly number[]): string {
+  if (visibleIndices.length === 0) {
+    return "";
+  }
+
+  let min = visibleIndices[0]!;
+  let max = visibleIndices[0]!;
+
+  for (const index of visibleIndices) {
+    min = Math.min(min, index);
+    max = Math.max(max, index);
+  }
+
+  return `${min}-${max}`;
+}
+
 export function usePrefetchVisibleConversationMedia(
   messages: ChatMessageData[],
   visibleIndices: readonly number[],
   enabled = true,
 ): void {
   const requestIdRef = useRef(0);
+  const throttleTimerRef = useRef<number | null>(null);
+
+  const visibleRangeKey = useMemo(
+    () => (enabled && messages.length > 0 ? serializeVisibleRange(visibleIndices) : ""),
+    [enabled, messages.length, visibleIndices],
+  );
 
   const mediaPathsKey = useMemo(() => {
-    if (!enabled || messages.length === 0 || visibleIndices.length === 0) {
+    if (!visibleRangeKey) {
       return "";
     }
 
     return collectVisibleMediaPaths(messages, visibleIndices).join("\u0000");
-  }, [enabled, messages, visibleIndices]);
+  }, [messages, visibleIndices, visibleRangeKey]);
 
   useEffect(() => {
     if (!mediaPathsKey) {
       return;
     }
 
-    const paths = mediaPathsKey.split("\u0000");
-
-    if (paths.length === 0) {
-      return;
+    if (throttleTimerRef.current !== null) {
+      window.clearTimeout(throttleTimerRef.current);
     }
 
-    const requestId = ++requestIdRef.current;
+    throttleTimerRef.current = window.setTimeout(() => {
+      throttleTimerRef.current = null;
 
-    void prefetchChatMediaUrlsAction(paths).then((result) => {
-      if (requestId !== requestIdRef.current || !result.success) {
+      const paths = mediaPathsKey.split("\u0000");
+
+      if (paths.length === 0) {
         return;
       }
 
-      for (const [path, url] of Object.entries(result.urls)) {
-        setCachedMediaUrl(path, url);
+      const requestId = ++requestIdRef.current;
+
+      void prefetchChatMediaUrlsAction(paths).then((result) => {
+        if (requestId !== requestIdRef.current || !result.success) {
+          return;
+        }
+
+        for (const [path, url] of Object.entries(result.urls)) {
+          setCachedMediaUrl(path, url);
+        }
+      });
+    }, PREFETCH_THROTTLE_MS);
+
+    return () => {
+      if (throttleTimerRef.current !== null) {
+        window.clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = null;
       }
-    });
+    };
   }, [mediaPathsKey]);
-}
-
-/** @deprecated Use usePrefetchVisibleConversationMedia with virtual row indices. */
-export function usePrefetchConversationMedia(
-  messages: ChatMessageData[],
-  enabled = true,
-): void {
-  const indices = messages.map((_, index) => index);
-
-  usePrefetchVisibleConversationMedia(messages, indices, enabled);
 }

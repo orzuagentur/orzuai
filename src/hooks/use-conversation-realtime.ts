@@ -6,7 +6,6 @@ import { requestConversationGapSyncWithRetry } from "@/lib/client/conversation-g
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import {
-  CONVERSATION_DELIVERY_STATUS_EVENT,
   CONVERSATION_MESSAGE_UPDATED_EVENT,
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
@@ -307,19 +306,6 @@ export function useConversationRealtime({
               message_id: row.message_id,
               status: row.status,
             });
-          },
-        )
-        .on(
-          "broadcast",
-          { event: CONVERSATION_DELIVERY_STATUS_EVENT },
-          (payload) => {
-            const event = payload.payload as ConversationDeliveryStatusPayload;
-
-            if (event.conversation_id !== conversationId) {
-              return;
-            }
-
-            onDeliveryStatusUpdatedRef.current?.(event);
           },
         )
         .on(

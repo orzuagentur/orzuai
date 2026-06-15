@@ -183,16 +183,7 @@ export type ChatsChannelPageData = {
   conversations: ConversationListItem[];
   activeConversation: ConversationDetail | null;
   cannedResponses: CannedResponseItem[];
-};
-
-export type ChatsPageData = {
-  hasBusiness: boolean;
-  whatsappConnected: boolean;
-  instagramConnected: boolean;
-  telegramConnected: boolean;
-  aiEnabled: boolean | null;
-  conversations: ConversationListItem[];
-  activeConversation: ConversationDetail | null;
+  visibleChannelIds: MessagingChannel[];
 };
 
 export type ChatErrorCode =

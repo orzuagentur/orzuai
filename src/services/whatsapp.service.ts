@@ -20,6 +20,10 @@ import {
 } from "@/lib/whatsapp/client";
 import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getWorkerConcurrency,
+  runWithConcurrency,
+} from "@/lib/queue/worker-concurrency";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -777,31 +781,28 @@ export async function processWhatsAppWebhook(
   }
 
   const admin = createAdminClient();
-  let processed = 0;
 
-  for (const message of messages) {
-    const { data: connection } = await admin
-      .from("whatsapp_connections")
-      .select("*")
-      .eq("meta_phone_number_id", message.phoneNumberId)
-      .eq("whatsapp_status", "connected")
-      .maybeSingle();
+  const outcomes = await runWithConcurrency(
+    messages,
+    getWorkerConcurrency(),
+    async (message) => {
+      const { data: connection } = await admin
+        .from("whatsapp_connections")
+        .select("*")
+        .eq("meta_phone_number_id", message.phoneNumberId)
+        .eq("whatsapp_status", "connected")
+        .maybeSingle();
 
-    if (!connection) {
-      continue;
-    }
+      if (!connection) {
+        return 0;
+      }
 
-    await ingestIncomingMessage(admin, connection, message);
+      await ingestIncomingMessage(admin, connection, message);
+      return 1;
+    },
+  );
 
-    processed += 1;
-  }
-
-  if (processed > 0) {
-    queueMicrotask(() => {
-      revalidateWhatsAppPaths();
-      revalidatePath(APP_ROUTES.dashboard);
-    });
-  }
+  const processed = outcomes.filter((count) => count === 1).length;
 
   return { processed };
 }

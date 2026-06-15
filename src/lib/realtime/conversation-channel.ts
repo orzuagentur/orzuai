@@ -1,6 +1,7 @@
 export const CONVERSATION_TYPING_EVENT = "typing";
 export const CONVERSATION_MESSAGE_UPDATED_EVENT = "message_updated";
-export const CONVERSATION_DELIVERY_STATUS_EVENT = "delivery_status";
+
+/** Delivery status updates use postgres_changes on message_deliveries only. */
 
 export type ConversationDeliveryStatusPayload = {
   conversation_id: string;

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { ENV_KEYS } from "@/constants/env-keys";
 import { drainInboundMediaHydrationQueue } from "@/services/inbound-media-hydration.service";
+import { logMessagingQueueLagAlerts } from "@/lib/observability/messaging-metrics";
 import { getMessagingHealthSnapshot } from "@/services/messaging-health.service";
 import { drainPendingMessageDeliveries } from "@/services/message-delivery.service";
 
@@ -21,10 +22,13 @@ export async function GET(request: NextRequest) {
     getMessagingHealthSnapshot(),
   ]);
 
+  const queueLagAlerts = logMessagingQueueLagAlerts(health);
+
   return NextResponse.json({
     success: true,
     deliveries,
     mediaHydration,
     health,
+    queueLagAlerts,
   });
 }

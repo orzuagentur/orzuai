@@ -159,7 +159,6 @@ export { telegramConnectSchema } from "./telegram.types";
 
 export type {
   ChatMessageData,
-  ChatsPageData,
   ChatActionError,
   ChatActionResult,
   ChatErrorCode,

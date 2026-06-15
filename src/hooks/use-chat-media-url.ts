@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
-import { getCachedMediaBlobUrl } from "@/lib/client-cache/media-browser-cache";
 import {
   resolveCachedMediaUrl,
   setCachedMediaUrl,
@@ -18,8 +17,6 @@ import {
 type UseChatMediaUrlOptions = {
   messageId?: string;
   enabled?: boolean;
-  /** Serve signed CDN URLs directly instead of fetching blobs in the background. */
-  preferDirectUrl?: boolean;
 };
 
 type UseChatMediaUrlResult = {
@@ -62,21 +59,13 @@ function getInitialMediaUrl(
   return resolveCachedMediaUrl(getCandidateCacheKeys(media, messageId));
 }
 
-function revokeBlobUrl(url: string | null): void {
-  if (url?.startsWith("blob:")) {
-    URL.revokeObjectURL(url);
-  }
-}
-
 export function useChatMediaUrl(
   media: ChatMediaPayload,
   options: UseChatMediaUrlOptions = {},
 ): UseChatMediaUrlResult {
   const enabled = options.enabled ?? true;
-  const preferDirectUrl = options.preferDirectUrl ?? true;
   const storagePath = resolveMediaStoragePath(media);
   const cacheKeys = getCandidateCacheKeys(media, options.messageId);
-  const primaryCacheKey = buildMediaUrlCacheKey(media, options.messageId);
 
   const [url, setUrl] = useState<string | null>(() =>
     getInitialMediaUrl(media, options.messageId),
@@ -91,28 +80,6 @@ export function useChatMediaUrl(
 
   useEffect(() => {
     let cancelled = false;
-    let activeBlobUrl: string | null = null;
-
-    const applyBlobUrl = (nextBlobUrl: string | null) => {
-      if (!nextBlobUrl) {
-        return;
-      }
-
-      if (activeBlobUrl && activeBlobUrl !== nextBlobUrl) {
-        revokeBlobUrl(activeBlobUrl);
-      }
-
-      activeBlobUrl = nextBlobUrl;
-      setUrl(nextBlobUrl);
-      setError(false);
-      setIsLoading(false);
-    };
-
-    const applyDirectUrl = (nextUrl: string) => {
-      setUrl(nextUrl);
-      setError(false);
-      setIsLoading(false);
-    };
 
     async function load() {
       if (!enabled) {
@@ -141,26 +108,12 @@ export function useChatMediaUrl(
         return;
       }
 
-      if (storagePath) {
-        const blobUrl = await getCachedMediaBlobUrl(storagePath);
-
-        if (cancelled) {
-          if (blobUrl) {
-            revokeBlobUrl(blobUrl);
-          }
-          return;
-        }
-
-        if (blobUrl) {
-          applyBlobUrl(blobUrl);
-          return;
-        }
-      }
-
       const cachedSignedUrl = resolveCachedMediaUrl(cacheKeys);
 
       if (cachedSignedUrl) {
-        applyDirectUrl(cachedSignedUrl);
+        setUrl(cachedSignedUrl);
+        setError(false);
+        setIsLoading(false);
         return;
       }
 
@@ -191,28 +144,15 @@ export function useChatMediaUrl(
         setCachedMediaUrl(storagePath, result.url);
       }
 
-      applyDirectUrl(result.url);
-
-      if (!preferDirectUrl && storagePath) {
-        const { storeMediaBlobFromUrl } = await import(
-          "@/lib/client-cache/media-browser-cache"
-        );
-
-        void storeMediaBlobFromUrl(storagePath, result.url).then((blobUrl) => {
-          if (!cancelled) {
-            applyBlobUrl(blobUrl);
-          } else if (blobUrl) {
-            revokeBlobUrl(blobUrl);
-          }
-        });
-      }
+      setUrl(result.url);
+      setError(false);
+      setIsLoading(false);
     }
 
     void load();
 
     return () => {
       cancelled = true;
-      revokeBlobUrl(activeBlobUrl);
     };
   }, [
     cacheKeys.join("|"),
@@ -220,10 +160,70 @@ export function useChatMediaUrl(
     media.path,
     media.url,
     options.messageId,
-    preferDirectUrl,
-    primaryCacheKey,
     storagePath,
   ]);
 
   return { url, isLoading, error };
+}
+
+export function useChatImageMediaUrls(
+  media: ChatMediaPayload,
+  options: UseChatMediaUrlOptions & { isHydrating?: boolean } = {},
+): {
+  previewUrl: string | null;
+  fullUrl: string | null;
+  isPreviewLoading: boolean;
+  isFullLoading: boolean;
+  previewError: boolean;
+  fullError: boolean;
+} {
+  const enabled = (options.enabled ?? true) && !options.isHydrating;
+  const hasThumb = Boolean(media.thumbPath && media.kind === "image");
+  const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
+
+  const {
+    url: previewUrl,
+    isLoading: isPreviewLoading,
+    error: previewError,
+  } = useChatMediaUrl(previewMedia, {
+    messageId: options.messageId,
+    enabled: enabled && hasThumb,
+  });
+
+  const [loadFull, setLoadFull] = useState(!hasThumb);
+
+  useEffect(() => {
+    if (hasThumb && previewUrl && !loadFull) {
+      setLoadFull(true);
+    }
+  }, [hasThumb, loadFull, previewUrl]);
+
+  const {
+    url: fullUrl,
+    isLoading: isFullLoading,
+    error: fullError,
+  } = useChatMediaUrl(media, {
+    messageId: options.messageId,
+    enabled: enabled && loadFull,
+  });
+
+  if (!hasThumb) {
+    return {
+      previewUrl: fullUrl,
+      fullUrl,
+      isPreviewLoading: isFullLoading,
+      isFullLoading,
+      previewError: fullError,
+      fullError,
+    };
+  }
+
+  return {
+    previewUrl,
+    fullUrl,
+    isPreviewLoading,
+    isFullLoading,
+    previewError,
+    fullError,
+  };
 }

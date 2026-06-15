@@ -713,6 +713,7 @@ export type Database = {
           unread_count: number;
           last_sync_message_at: string | null;
           last_sync_message_id: string | null;
+          total_message_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -733,6 +734,7 @@ export type Database = {
           unread_count?: number;
           last_sync_message_at?: string | null;
           last_sync_message_id?: string | null;
+          total_message_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -753,6 +755,7 @@ export type Database = {
           unread_count?: number;
           last_sync_message_at?: string | null;
           last_sync_message_id?: string | null;
+          total_message_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -1988,6 +1991,7 @@ export type Database = {
           p_sort?: string;
           p_limit?: number;
           p_offset?: number;
+          p_include_total_count?: boolean;
         };
         Returns: {
           id: string;
@@ -2007,7 +2011,7 @@ export type Database = {
           contact_lead_score: number | null;
           contact_is_favorite: boolean;
           contact_avatar_url: string | null;
-          total_count: number;
+          total_count: number | null;
         }[];
       };
       inbox_search_tsquery: {

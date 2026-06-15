@@ -1,9 +1,4 @@
 import { createSessionCache } from "@/lib/client-cache/session-cache";
-import {
-  getPersistedMediaUrl,
-  hydratePersistedMediaUrls,
-  setPersistedMediaUrl,
-} from "@/lib/client-cache/media-browser-cache";
 import type { InboxDetailsPanelData } from "@/services/inbox-details.service";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type {
@@ -41,37 +36,9 @@ const conversationListCache = createSessionCache<CachedConversationList>(
   CONVERSATION_LIST_TTL_MS,
 );
 
-let persistedUrlsHydrated = false;
-
-function ensurePersistedMediaUrlsHydrated(): void {
-  if (persistedUrlsHydrated || typeof window === "undefined") {
-    return;
-  }
-
-  persistedUrlsHydrated = true;
-
-  hydratePersistedMediaUrls((storagePath, url) => {
-    mediaUrlCache.set(storagePath, url);
-  });
-}
-
+/** Client media URL cache: session memory only (signed URLs from server). */
 export function getCachedMediaUrl(key: string): string | null {
-  ensurePersistedMediaUrlsHydrated();
-
-  const cached = mediaUrlCache.get(key);
-
-  if (cached) {
-    return cached;
-  }
-
-  const persisted = getPersistedMediaUrl(key);
-
-  if (persisted) {
-    mediaUrlCache.set(key, persisted);
-    return persisted;
-  }
-
-  return null;
+  return mediaUrlCache.get(key);
 }
 
 export function resolveCachedMediaUrl(
@@ -94,7 +61,6 @@ export function resolveCachedMediaUrl(
 
 export function setCachedMediaUrl(key: string, url: string): void {
   mediaUrlCache.set(key, url);
-  setPersistedMediaUrl(key, url, MEDIA_URL_TTL_MS);
 }
 
 export function getCachedCrmDetails(

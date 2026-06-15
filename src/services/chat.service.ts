@@ -38,9 +38,7 @@ import type {
   ChatsChannelPageData,
   ChatsMonitorData,
   ChatsMonitorPageData,
-  ChatsPageData,
   ConversationDetail,
-  ConversationListItem,
   SendChatMessageResult,
   SuggestConversationReplyResult,
   ToggleChatAiResult,
@@ -59,11 +57,33 @@ import type {
 } from "@/types/chat.types";
 import {
   mapChatMessage,
-  mapConversationListItem,
   resolveContactFromRow,
 } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
-import { listConversationsPage } from "@/services/chat-inbox-query.service";
+import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
+
+export type InboxBusinessContext = {
+  userId: string;
+  businessId: string;
+};
+
+export async function resolveInboxBusinessContext(): Promise<InboxBusinessContext | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const user = await requireUser();
+  const business = await getAccessibleBusiness(user.id);
+
+  if (!business) {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    businessId: business.id,
+  };
+}
 
 function missingConfigError(): {
   success: false;
@@ -96,54 +116,6 @@ async function getOwnedBusinessId(): Promise<string | null> {
 }
 
 
-export async function listConversations(
-  businessId: string,
-  channel?: DbMessagingChannel,
-): Promise<ConversationListItem[]> {
-  if (!hasSupabaseEnv()) {
-    return [];
-  }
-
-  const supabase = await createClient();
-  let query = supabase
-    .from("conversations")
-    .select(
-      "id, channel, status, updated_at, last_read_at, last_message_preview, last_message_at, last_message_sender_type, last_message_ai_generated, last_client_message_at, contact:contacts(id, name, phone_number, lead_score, is_favorite, avatar_url)",
-    )
-    .eq("business_id", businessId)
-    .order("updated_at", { ascending: false });
-
-  if (channel) {
-    query = query.eq("channel", channel);
-  }
-
-  const { data: conversations } = await query;
-
-  if (!conversations?.length) {
-    return [];
-  }
-
-  const avatarSignedUrlMap = await resolveContactAvatarSignedUrls(
-    conversations.map((conversation) => {
-      const contact = resolveContactFromRow(conversation.contact);
-      return contact?.avatar_url;
-    }),
-  );
-
-  return conversations.flatMap((conversation) => {
-    const contact = resolveContactFromRow(conversation.contact);
-    const item = mapConversationListItem(
-      conversation,
-      undefined,
-      undefined,
-      0,
-      resolveAvatarUrlFromMap(contact?.avatar_url, avatarSignedUrlMap),
-    );
-
-    return item ? [item] : [];
-  });
-}
-
 export async function getConversationDetail(
   conversationId: string,
   businessId: string,
@@ -156,7 +128,7 @@ export async function getConversationDetail(
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, internal_note, updated_at, last_read_at, contact:contacts(id, name, phone_number, is_favorite, avatar_url)",
+      "id, channel, status, internal_note, updated_at, last_read_at, total_message_count, contact:contacts(id, name, phone_number, is_favorite, avatar_url)",
     )
     .eq("id", conversationId)
     .eq("business_id", businessId)
@@ -172,12 +144,6 @@ export async function getConversationDetail(
     return null;
   }
 
-  const { count: totalMessageCount } = await supabase
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false);
-
   const { data: messages } = await supabase
     .from("messages")
     .select(
@@ -189,7 +155,8 @@ export async function getConversationDetail(
     .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
 
   const orderedMessages = (messages ?? []).slice().reverse();
-  const totalCount = totalMessageCount ?? orderedMessages.length;
+  const totalCount =
+    conversation.total_message_count ?? orderedMessages.length;
 
   const avatarSignedUrlMap = await resolveContactAvatarSignedUrls([
     contact.avatar_url,
@@ -473,7 +440,9 @@ async function getAiEnabledForChannel(
   return data.ai_enabled;
 }
 
-export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
+export async function getChatsMonitorData(
+  businessId?: string,
+): Promise<ChatsMonitorData> {
   if (!hasSupabaseEnv()) {
     return {
       hasBusiness: false,
@@ -486,10 +455,15 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
     };
   }
 
-  const user = await requireUser();
-  const business = await getAccessibleBusiness(user.id);
+  let resolvedBusinessId = businessId;
 
-  if (!business) {
+  if (!resolvedBusinessId) {
+    const user = await requireUser();
+    const business = await getAccessibleBusiness(user.id);
+    resolvedBusinessId = business?.id;
+  }
+
+  if (!resolvedBusinessId) {
     return {
       hasBusiness: false,
       businessId: null,
@@ -502,29 +476,29 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   }
 
   const supabase = await createClient();
-  const channelStatuses = await getChannelConnectionStatuses(business.id);
+  const channelStatuses = await getChannelConnectionStatuses(resolvedBusinessId);
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const channels: ChatMonitorChannelStats[] = [];
 
   for (const channel of visibleChannelIds) {
     const [connected, analyticsResult, conversationsResult, lastConversation] =
       await Promise.all([
-        isChatChannelConnected(business.id, channel),
+        isChatChannelConnected(resolvedBusinessId, channel),
         supabase
           .from("channel_analytics")
           .select("total_messages, ai_replies")
-          .eq("business_id", business.id)
+          .eq("business_id", resolvedBusinessId)
           .eq("channel", channel)
           .maybeSingle(),
         supabase
           .from("conversations")
           .select("id", { count: "exact", head: true })
-          .eq("business_id", business.id)
+          .eq("business_id", resolvedBusinessId)
           .eq("channel", channel),
         supabase
           .from("conversations")
           .select("updated_at")
-          .eq("business_id", business.id)
+          .eq("business_id", resolvedBusinessId)
           .eq("channel", channel)
           .order("updated_at", { ascending: false })
           .limit(1)
@@ -552,7 +526,7 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
 
   return {
     hasBusiness: true,
-    businessId: business.id,
+    businessId: resolvedBusinessId,
     channels,
     visibleChannelIds,
     totalConversations,
@@ -561,10 +535,13 @@ export async function getChatsMonitorData(): Promise<ChatsMonitorData> {
   };
 }
 
-export async function getChatsMonitorPageData(): Promise<ChatsMonitorPageData> {
-  const monitor = await getChatsMonitorData();
+export async function getChatsMonitorPageData(
+  inboxContext?: InboxBusinessContext | null,
+): Promise<ChatsMonitorPageData> {
+  const ctx = inboxContext ?? (await resolveInboxBusinessContext());
 
-  if (!monitor.hasBusiness) {
+  if (!ctx) {
+    const monitor = await getChatsMonitorData();
     return {
       ...monitor,
       conversations: [],
@@ -578,29 +555,13 @@ export async function getChatsMonitorPageData(): Promise<ChatsMonitorPageData> {
     };
   }
 
-  const user = await requireUser();
-  const business = await getAccessibleBusiness(user.id);
-
-  if (!business) {
-    return {
-      ...monitor,
-      conversations: [],
-      conversationsTotalCount: 0,
-      conversationsHasMore: false,
-      needsAttentionConversations: [],
-      activeConversation: null,
-      activeChannelConnected: false,
-      activeAiEnabled: null,
-      activeCannedResponses: [],
-    };
-  }
-
-  const [page, needsAttentionPage] = await Promise.all([
-    listConversationsPage(business.id, { limit: 50, offset: 0 }),
-    listConversationsPage(business.id, {
-      view: "needs_reply",
-      limit: 8,
+  const [monitor, page] = await Promise.all([
+    getChatsMonitorData(ctx.businessId),
+    listConversationsMonitorPage(ctx.businessId, {
+      userId: ctx.userId,
+      limit: 50,
       offset: 0,
+      includeNeedsAttention: true,
     }),
   ]);
 
@@ -609,7 +570,7 @@ export async function getChatsMonitorPageData(): Promise<ChatsMonitorPageData> {
     conversations: page.items,
     conversationsTotalCount: page.totalCount,
     conversationsHasMore: page.hasMore,
-    needsAttentionConversations: needsAttentionPage.items,
+    needsAttentionConversations: page.needsAttentionConversations,
     activeConversation: null,
     activeChannelConnected: false,
     activeAiEnabled: null,
@@ -694,6 +655,7 @@ export async function updateConversationInternalNote(
 
 export async function getChatsChannelPageData(
   channel: DbMessagingChannel,
+  inboxContext?: InboxBusinessContext | null,
 ): Promise<ChatsChannelPageData> {
   if (!hasSupabaseEnv()) {
     return {
@@ -705,13 +667,13 @@ export async function getChatsChannelPageData(
       conversations: [],
       activeConversation: null,
       cannedResponses: [],
+      visibleChannelIds: [],
     };
   }
 
-  const user = await requireUser();
-  const business = await getAccessibleBusiness(user.id);
+  const ctx = inboxContext ?? (await resolveInboxBusinessContext());
 
-  if (!business) {
+  if (!ctx) {
     return {
       hasBusiness: false,
       businessId: null,
@@ -721,28 +683,38 @@ export async function getChatsChannelPageData(
       conversations: [],
       activeConversation: null,
       cannedResponses: [],
+      visibleChannelIds: [],
     };
   }
 
-  const [conversationsPage, channelConnected, cannedResponses] = await Promise.all([
-    listConversationsPage(business.id, { channel, limit: 100, offset: 0 }),
-    isChatChannelConnected(business.id, channel),
-    listCannedResponses(
-      isInboxMessagingChannel(channel) ? channel : undefined,
-    ),
-  ]);
+  const channelStatuses = await getChannelConnectionStatuses(ctx.businessId);
+  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
 
-  const aiEnabled = await getAiEnabledForChannel(business.id, channel);
+  const [conversationsPage, channelConnected, cannedResponses, aiEnabled] =
+    await Promise.all([
+      listConversationsPage(ctx.businessId, {
+        userId: ctx.userId,
+        channel,
+        limit: 100,
+        offset: 0,
+      }),
+      isChatChannelConnected(ctx.businessId, channel),
+      listCannedResponses(
+        isInboxMessagingChannel(channel) ? channel : undefined,
+      ),
+      getAiEnabledForChannel(ctx.businessId, channel),
+    ]);
 
   return {
     hasBusiness: true,
-    businessId: business.id,
+    businessId: ctx.businessId,
     channel,
     channelConnected,
     aiEnabled,
     conversations: conversationsPage.items,
     activeConversation: null,
     cannedResponses,
+    visibleChannelIds,
   };
 }
 
@@ -801,6 +773,7 @@ export async function getChatsFavoritesPageData(): Promise<ChatsMonitorPageData>
 
 export async function resolveInboxActiveConversationContext(
   conversationId: string | undefined,
+  inboxContext?: InboxBusinessContext | null,
 ): Promise<{
   activeConversation: ConversationDetail | null;
   activeChannelConnected: boolean;
@@ -818,14 +791,16 @@ export async function resolveInboxActiveConversationContext(
     return empty;
   }
 
-  const user = await requireUser();
-  const business = await getAccessibleBusiness(user.id);
+  const ctx = inboxContext ?? (await resolveInboxBusinessContext());
 
-  if (!business) {
+  if (!ctx) {
     return empty;
   }
 
-  const context = await getActiveConversationContext(conversationId, business.id);
+  const context = await getActiveConversationContext(
+    conversationId,
+    ctx.businessId,
+  );
 
   if (!context) {
     return empty;
@@ -836,69 +811,6 @@ export async function resolveInboxActiveConversationContext(
     activeChannelConnected: context.channelConnected,
     activeAiEnabled: context.aiEnabled,
     activeCannedResponses: context.cannedResponses,
-  };
-}
-
-export async function getChatsPageData(
-  activeConversationId?: string,
-): Promise<ChatsPageData> {
-  if (!hasSupabaseEnv()) {
-    return {
-      hasBusiness: false,
-      whatsappConnected: false,
-      instagramConnected: false,
-      telegramConnected: false,
-      aiEnabled: null,
-      conversations: [],
-      activeConversation: null,
-    };
-  }
-
-  const user = await requireUser();
-  const business = await getAccessibleBusiness(user.id);
-
-  if (!business) {
-    return {
-      hasBusiness: false,
-      whatsappConnected: false,
-      instagramConnected: false,
-      telegramConnected: false,
-      aiEnabled: null,
-      conversations: [],
-      activeConversation: null,
-    };
-  }
-
-  const [conversations, whatsappConnected, instagramConnected, telegramConnected] =
-    await Promise.all([
-      listConversations(business.id),
-      isWhatsAppConnected(business.id),
-      isInstagramConnected(business.id),
-      isTelegramConnected(business.id),
-    ]);
-
-  const selectedId =
-    activeConversationId &&
-    conversations.some((conversation) => conversation.id === activeConversationId)
-      ? activeConversationId
-      : (conversations[0]?.id ?? null);
-
-  const activeConversation = selectedId
-    ? await getConversationDetail(selectedId, business.id)
-    : null;
-
-  const aiEnabled = activeConversation
-    ? await getAiEnabledForChannel(business.id, activeConversation.channel)
-    : null;
-
-  return {
-    hasBusiness: true,
-    whatsappConnected,
-    instagramConnected,
-    telegramConnected,
-    aiEnabled,
-    conversations,
-    activeConversation,
   };
 }
 

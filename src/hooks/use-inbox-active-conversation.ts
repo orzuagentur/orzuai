@@ -6,6 +6,7 @@ import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-co
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
 import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
+import { useRealtimeFallbackReady } from "@/hooks/use-realtime-fallback-ready";
 import type { ConversationReconnectCursor } from "@/lib/realtime/conversation-channel";
 import {
   getCachedMediaUrl,
@@ -482,14 +483,20 @@ export function useInboxActiveConversation({
     };
   }, [latestMessageAt, latestMessageId, selectedConversationId]);
 
+  const pollingEnabled =
+    Boolean(selectedConversationId && conversation) && !isRealtimeConnected;
+  const syncRecentMessages = useRealtimeFallbackReady(
+    isRealtimeConnected,
+    pollingEnabled,
+  );
+
   useActiveConversationPolling({
     conversationId: selectedConversationId,
     latestMessageAt,
     latestMessageId,
-    enabled:
-      Boolean(selectedConversationId && conversation) && !isRealtimeConnected,
+    enabled: pollingEnabled,
     pollNewMessages: true,
-    syncRecentMessages: false,
+    syncRecentMessages,
     onNewMessages: (messages) => {
       for (const message of messages) {
         appendMessageRef.current(message);

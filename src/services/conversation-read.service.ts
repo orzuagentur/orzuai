@@ -6,6 +6,8 @@ import type { MessagingChannel } from "@/types/database.types";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
 import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
+const OPEN_STATUSES = new Set(["open", "active", "pending"]);
+
 export async function markConversationRead(
   businessId: string,
   conversationId: string,
@@ -18,23 +20,16 @@ export async function markConversationRead(
   const supabase = await createClient();
   const now = new Date().toISOString();
 
-  await Promise.all([
-    supabase
-      .from("conversations")
-      .update({ last_read_at: now, unread_count: 0 })
-      .eq("id", conversationId)
-      .eq("business_id", businessId),
-    supabase.from("conversation_reads").upsert(
-      {
-        business_id: businessId,
-        conversation_id: conversationId,
-        user_id: userId,
-        last_read_at: now,
-        unread_count: 0,
-      },
-      { onConflict: "conversation_id,user_id" },
-    ),
-  ]);
+  await supabase.from("conversation_reads").upsert(
+    {
+      business_id: businessId,
+      conversation_id: conversationId,
+      user_id: userId,
+      last_read_at: now,
+      unread_count: 0,
+    },
+    { onConflict: "conversation_id,user_id" },
+  );
 }
 
 export type DashboardNavBadgeCounts = {
@@ -58,34 +53,37 @@ export async function getDashboardNavBadgeCounts(
   }
 
   const supabase = await createClient();
-  const { data: rows } = await supabase
-    .from("conversation_reads")
-    .select("conversation_id, unread_count, conversation:conversations(channel, contact_id, status)")
-    .eq("business_id", businessId)
-    .eq("user_id", userId)
-    .gt("unread_count", 0);
+  const [{ data: readRows }, { data: fallbackRows }] = await Promise.all([
+    supabase
+      .from("conversation_reads")
+      .select(
+        "conversation_id, unread_count, conversation:conversations(channel, contact_id, status)",
+      )
+      .eq("business_id", businessId)
+      .eq("user_id", userId)
+      .gt("unread_count", 0),
+    supabase
+      .from("conversations")
+      .select("id, unread_count, channel, contact_id, status")
+      .eq("business_id", businessId)
+      .gt("unread_count", 0),
+  ]);
 
-  if (!rows?.length) {
-    return empty;
-  }
-
+  const seenConversationIds = new Set<string>();
   const unreadContactIds = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of readRows ?? []) {
     const conversation = Array.isArray(row.conversation)
       ? row.conversation[0]
       : row.conversation;
 
+    seenConversationIds.add(row.conversation_id);
+
     if (
       !conversation ||
-      !["open", "active", "pending"].includes(conversation.status)
+      !OPEN_STATUSES.has(conversation.status) ||
+      (row.unread_count ?? 0) <= 0
     ) {
-      continue;
-    }
-
-    const unreadMessageCount = row.unread_count ?? 0;
-
-    if (unreadMessageCount <= 0) {
       continue;
     }
 
@@ -95,7 +93,26 @@ export async function getDashboardNavBadgeCounts(
 
     if (conversation.channel in empty.unreadByChannel) {
       empty.unreadByChannel[conversation.channel as MessagingChannel] +=
-        unreadMessageCount;
+        row.unread_count ?? 0;
+    }
+  }
+
+  for (const row of fallbackRows ?? []) {
+    if (seenConversationIds.has(row.id)) {
+      continue;
+    }
+
+    if (!OPEN_STATUSES.has(row.status) || (row.unread_count ?? 0) <= 0) {
+      continue;
+    }
+
+    if (row.contact_id) {
+      unreadContactIds.add(row.contact_id);
+    }
+
+    if (row.channel in empty.unreadByChannel) {
+      empty.unreadByChannel[row.channel as MessagingChannel] +=
+        row.unread_count ?? 0;
     }
   }
 

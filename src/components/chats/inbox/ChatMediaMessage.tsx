@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { memo, useState, useTransition } from "react";
 import {
   DownloadIcon,
   FileIcon,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retryInboundMediaAttachmentAction } from "@/features/chats/actions/retry-inbound-media-attachment";
-import { useChatMediaUrl } from "@/hooks/use-chat-media-url";
+import { useChatImageMediaUrls, useChatMediaUrl } from "@/hooks/use-chat-media-url";
 import { VoiceMessagePlayer } from "@/components/chats/inbox/VoiceMessagePlayer";
 import { cn } from "@/lib/utils";
 import {
@@ -292,41 +292,32 @@ function CaptionText({
 
 function ChatMediaImage({
   media,
-  messageId,
   caption,
   isOutgoing,
   previewUrl,
+  fullUrl,
   isPreviewLoading,
+  isFullLoading,
   previewError,
+  fullError,
   isHydrating = false,
 }: {
   media: ChatMediaPayload;
-  messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
   previewUrl: string | null;
+  fullUrl: string | null;
   isPreviewLoading: boolean;
+  isFullLoading: boolean;
   previewError: boolean;
+  fullError: boolean;
   isHydrating?: boolean;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [needsFullUrl, setNeedsFullUrl] = useState(false);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const hasThumb = Boolean(media.thumbPath);
-  const shouldLoadFullUrl = lightboxOpen || needsFullUrl || !hasThumb;
-  const {
-    url: fullUrl,
-    isLoading: isFullLoading,
-    error: fullError,
-  } = useChatMediaUrl(media, {
-    messageId,
-    enabled: shouldLoadFullUrl,
-    preferDirectUrl: true,
-  });
   const displayUrl =
-    previewUrl ??
-    fullUrl ??
-    (media.url?.startsWith("blob:") ? media.url : null);
+    previewUrl ?? fullUrl ?? (media.url?.startsWith("blob:") ? media.url : null);
   const resolvedFullUrl =
     fullUrl ?? (media.url?.startsWith("blob:") ? media.url : null);
   const isLoading = hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading;
@@ -337,16 +328,6 @@ function ChatMediaImage({
     hasThumb &&
     Boolean(resolvedFullUrl) &&
     resolvedFullUrl !== displayUrl;
-
-  const requestFullUrl = () => {
-    setNeedsFullUrl(true);
-  };
-
-  useEffect(() => {
-    if (hasThumb && previewUrl && !needsFullUrl && !isHydrating) {
-      setNeedsFullUrl(true);
-    }
-  }, [hasThumb, previewUrl, needsFullUrl, isHydrating]);
 
   if (isHydrating) {
     return (
@@ -387,10 +368,7 @@ function ChatMediaImage({
       <div className="group relative max-w-[min(280px,100%)]">
         <button
           type="button"
-          onClick={() => {
-            requestFullUrl();
-            setLightboxOpen(true);
-          }}
+          onClick={() => setLightboxOpen(true)}
           className="block w-full overflow-hidden rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
           aria-label={CHAT_MESSAGES.openMediaPreview}
         >
@@ -434,7 +412,6 @@ function ChatMediaImage({
               fileName={media.fileName}
               isOutgoing={isOutgoing}
               className="bg-black/55 text-white hover:bg-black/70"
-              onClick={requestFullUrl}
             />
           </div>
         ) : null}
@@ -451,7 +428,6 @@ function ChatMediaImage({
               url={resolvedFullUrl ?? displayUrl}
               fileName={media.fileName}
               className="bg-white/10 text-white hover:bg-white/20"
-              onClick={requestFullUrl}
             />
             <Button
               type="button"
@@ -688,7 +664,7 @@ function ChatMediaDocument({
   );
 }
 
-export function ChatMediaMessage({
+export const ChatMediaMessage = memo(function ChatMediaMessage({
   media,
   messageId,
   caption,
@@ -703,15 +679,10 @@ export function ChatMediaMessage({
   const isFailed = isFailedProp ?? false;
   const showFailed = isFailed && !isHydrating;
   const hasThumb = Boolean(media.thumbPath && media.kind === "image");
-  const previewMedia = hasThumb ? { ...media, path: media.thumbPath! } : media;
-  const {
-    url: previewUrl,
-    isLoading: isPreviewLoading,
-    error: previewError,
-  } = useChatMediaUrl(previewMedia, {
+  const imageUrls = useChatImageMediaUrls(media, {
     messageId,
-    enabled: !isHydrating && !showFailed,
-    preferDirectUrl: true,
+    enabled: !isHydrating && !showFailed && media.kind === "image",
+    isHydrating,
   });
   const {
     url: resolvedUrl,
@@ -720,7 +691,6 @@ export function ChatMediaMessage({
   } = useChatMediaUrl(media, {
     messageId,
     enabled: !isHydrating && !hasThumb && !showFailed,
-    preferDirectUrl: true,
   });
 
   const handleRetry = () => {
@@ -762,7 +732,10 @@ export function ChatMediaMessage({
   }
 
   const showLoading =
-    isHydrating || (hasThumb ? isPreviewLoading : isFullLoading || isPreviewLoading);
+    isHydrating ||
+    (media.kind === "image"
+      ? imageUrls.isPreviewLoading || imageUrls.isFullLoading
+      : isFullLoading);
 
   if (!isHydrating && !media.path && !media.url) {
     return (
@@ -777,12 +750,14 @@ export function ChatMediaMessage({
     return (
       <ChatMediaImage
         media={media}
-        messageId={messageId}
         caption={caption}
         isOutgoing={isOutgoing}
-        previewUrl={hasThumb ? previewUrl : resolvedUrl}
+        previewUrl={hasThumb ? imageUrls.previewUrl : imageUrls.fullUrl}
+        fullUrl={imageUrls.fullUrl}
         isPreviewLoading={showLoading}
-        previewError={hasThumb ? previewError : fullError || previewError}
+        isFullLoading={imageUrls.isFullLoading}
+        previewError={hasThumb ? imageUrls.previewError : imageUrls.fullError}
+        fullError={imageUrls.fullError}
         isHydrating={isHydrating}
       />
     );
@@ -795,7 +770,7 @@ export function ChatMediaMessage({
     resolvedUrl,
     previewUrl: resolvedUrl,
     isLoading: showLoading,
-    hasError: (fullError || previewError) && !isHydrating,
+    hasError: fullError && !isHydrating,
     isHydrating,
   };
 
@@ -808,4 +783,4 @@ export function ChatMediaMessage({
   }
 
   return <ChatMediaDocument {...shared} />;
-}
+});

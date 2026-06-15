@@ -16,7 +16,6 @@ import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import { resolveAttachmentProviderMediaUrl } from "@/services/provider-media-url.service";
 import {
   incrementMessagingAnalytics,
-  publishMessageDeliveryStatus,
   recordMessageDeliveryFailure,
   recordMessageDeliverySuccess,
 } from "@/services/messaging.service";
@@ -88,10 +87,6 @@ async function processDeliveryRow(
         last_error: "Message unavailable.",
       })
       .eq("id", delivery.id);
-    await publishMessageDeliveryStatus(admin, {
-      messageId: delivery.message_id,
-      status: "failed",
-    });
     return "failed";
   }
 

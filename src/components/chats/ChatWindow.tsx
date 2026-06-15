@@ -4,34 +4,29 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
-  Loader2Icon,
   Maximize2Icon,
   MessageSquareIcon,
   Minimize2Icon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
-  SendIcon,
-  SparklesIcon,
   StarIcon,
 } from "lucide-react";
 
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
-import { ChatCrmAssistantBar } from "@/components/chats/ChatCrmAssistantBar";
-import { QuickRepliesPicker } from "@/components/chats/QuickRepliesPicker";
-import { ChatAiStatus } from "@/components/chats/ChatAiStatus";
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
 import { useAgentTypingIndicator } from "@/hooks/use-agent-typing-indicator";
 import { useSendChatMedia } from "@/hooks/use-send-chat-media";
+import {
+  clearMessageUploadProgress,
+  setMessageUploadProgress,
+} from "@/lib/client/message-upload-progress-store";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
-import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
-import { ConversationStatusSelect } from "@/components/chats/ConversationStatusSelect";
 import { MessageHistory } from "@/components/chats/MessageHistory";
 import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleton";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
@@ -69,7 +64,6 @@ type ChatWindowProps = {
   cannedResponses: CannedResponseItem[];
   isLoadingConversation?: boolean;
   loadingPreview?: ChatLoadingPreview | null;
-  layout?: "default" | "inbox";
   draft?: string;
   onDraftChange?: (value: string) => void;
   suggestReplyOpen?: boolean;
@@ -106,13 +100,12 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
 
 export function ChatWindow({
   conversation,
-  aiEnabled,
+  aiEnabled: _aiEnabled,
   channelConnected,
   channel,
   cannedResponses,
   isLoadingConversation = false,
   loadingPreview = null,
-  layout = "default",
   draft: controlledDraft,
   onDraftChange,
   suggestReplyOpen: controlledSuggestOpen,
@@ -145,7 +138,6 @@ export function ChatWindow({
   const scrollHeightBeforeOlderLoadRef = useRef(0);
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
-  const isInboxLayout = layout === "inbox";
   const inboxLayout = useOptionalInboxLayout();
   const [isFavorite, setIsFavorite] = useState(
     conversation?.contactIsFavorite ?? false,
@@ -174,7 +166,6 @@ export function ChatWindow({
     conversationId: conversation?.id ?? null,
     draft,
     enabled:
-      isInboxLayout &&
       composerTab === "reply" &&
       canSend &&
       Boolean(conversation),
@@ -184,29 +175,17 @@ export function ChatWindow({
     useSendChatMedia();
 
   const reportMediaUploadProgressRef = useRef(
-    throttle(
-      (
-        message: ChatMessageData,
-        progress: {
-          percent: number;
-          bytesPerSecond?: number;
-          phase: NonNullable<ChatMessageData["uploadPhase"]>;
-        },
-      ) => {
-        onMessageUpdated?.({
-          ...message,
-          uploadProgress: progress.percent,
-          uploadSpeedBps: progress.bytesPerSecond,
-          uploadPhase: progress.phase,
-          isPending: true,
-        });
-      },
-      200,
-    ),
+    throttle((messageId: string, progress: {
+      percent: number;
+      bytesPerSecond?: number;
+      phase: NonNullable<ChatMessageData["uploadPhase"]>;
+    }) => {
+      setMessageUploadProgress(messageId, progress);
+    }, 200),
   );
 
   useEffect(() => {
-    if (!isInboxLayout || !isLoadingOlderMessages) {
+    if (!isLoadingOlderMessages) {
       return;
     }
 
@@ -214,10 +193,10 @@ export function ChatWindow({
     if (scrollContainer) {
       scrollHeightBeforeOlderLoadRef.current = scrollContainer.scrollHeight;
     }
-  }, [isInboxLayout, isLoadingOlderMessages]);
+  }, [isLoadingOlderMessages]);
 
   useEffect(() => {
-    if (!isInboxLayout || isLoadingOlderMessages) {
+    if (isLoadingOlderMessages) {
       return;
     }
 
@@ -232,7 +211,6 @@ export function ChatWindow({
       scrollContainer.scrollHeight - previousScrollHeight;
   }, [
     conversation?.messages.length,
-    isInboxLayout,
     isLoadingOlderMessages,
   ]);
 
@@ -290,10 +268,6 @@ export function ChatWindow({
     isClientTyping,
   ]);
 
-  function handleRefresh() {
-    router.refresh();
-  }
-
   function handleToggleFavorite() {
     if (!conversation?.contactId || isFavoritePending) {
       return;
@@ -335,7 +309,7 @@ export function ChatWindow({
   }
 
   if (!conversation) {
-    if (isLoadingConversation && loadingPreview && isInboxLayout) {
+    if (isLoadingConversation && loadingPreview) {
       return (
         <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
           <div className="shrink-0 border-b bg-card px-4 py-3">
@@ -414,17 +388,11 @@ export function ChatWindow({
     })();
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await sendReplyMessage();
-  }
-
   async function handleInboxSend() {
     await sendReplyMessage();
   }
 
-  if (isInboxLayout) {
-    return (
+  return (
       <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
         <div className="shrink-0 border-b bg-card px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-2">
@@ -582,7 +550,7 @@ export function ChatWindow({
                     {
                       onProgress: (progress) => {
                         reportMediaUploadProgressRef.current(
-                          optimisticMessage,
+                          pendingId,
                           progress,
                         );
                       },
@@ -590,6 +558,8 @@ export function ChatWindow({
                   );
 
                   if (result.success && result.data?.message) {
+                    clearMessageUploadProgress(pendingId);
+
                     if (result.data.mediaSignedUrl) {
                       cacheChatMessageMediaUrl(
                         result.data.message,
@@ -602,6 +572,7 @@ export function ChatWindow({
                   }
 
                   onSendFailed?.(pendingId);
+                  clearMessageUploadProgress(pendingId);
                 })();
 
                 return true;
@@ -618,130 +589,4 @@ export function ChatWindow({
         </div>
       </div>
     );
-  }
-
-  return (
-    <div className={cn("flex h-full min-h-0 flex-1", className)}>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="shrink-0 border-b px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ContactAvatar
-                name={conversation.contactName}
-                avatarUrl={conversation.contactAvatarUrl}
-                className="size-10 shrink-0"
-                size="lg"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-              <p className="font-medium">{conversation.contactName}</p>
-              <Badge
-                variant="outline"
-                className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
-              >
-                <ChannelBrandIcon
-                  channel={conversation.channel}
-                  className="size-3.5"
-                />
-                {getChannelBadgeLabel(conversation.channel)}
-              </Badge>
-              </div>
-            </div>
-            <ConversationStatusSelect
-              conversationId={conversation.id}
-              status={conversation.status}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {formatContactIdentifier(conversation.contactPhone)}
-          </p>
-        </div>
-
-        <ChatCrmAssistantBar conversationId={conversation.id} />
-
-        <ChatAiStatus
-          channel={conversation.channel}
-          aiEnabled={aiEnabled}
-          onToggle={handleRefresh}
-        />
-
-        <ConversationInternalNotes
-          conversationId={conversation.id}
-          initialNote={conversation.internalNote}
-        />
-
-        <MessageHistory
-          messages={conversation.messages}
-          className="min-h-0 flex-1"
-          onMessageRemoved={onMessageRemoved}
-          onMessageUpdated={onMessageUpdated}
-        />
-
-        <div ref={bottomRef} />
-
-        <form
-          onSubmit={(event) => {
-            void handleSubmit(event);
-          }}
-          className="shrink-0 border-t p-3 sm:p-4"
-        >
-          {!canSend ? (
-            <p className="mb-3 text-xs text-muted-foreground">
-              {channelNotConnectedMessage}
-            </p>
-          ) : conversation.channel === "website_forms" ? (
-            <p className="mb-3 text-xs text-muted-foreground">
-              {CHAT_MESSAGES.websiteFormsReplyHint}
-            </p>
-          ) : null}
-          <div className="mb-2 flex flex-wrap justify-end gap-2">
-            <QuickRepliesPicker
-              responses={cannedResponses}
-              disabled={!canSend}
-              onSelect={(content) => setDraft(content)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setSuggestOpen(true)}
-              disabled={!canSend}
-            >
-              <SparklesIcon className="size-3.5" />
-              AI suggest
-            </Button>
-          </div>
-          <div className="flex gap-2">
-            <Textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Type a reply..."
-              rows={2}
-              disabled={isLoading || !canSend}
-              className="min-h-[72px] flex-1 resize-none"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="shrink-0 self-end"
-              disabled={isLoading || !canSend || !draft.trim()}
-            >
-              {isLoading ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <SendIcon className="size-4" />
-              )}
-            </Button>
-          </div>
-        </form>
-      </div>
-
-      <AiSuggestReplyPanel
-        conversationId={conversation.id}
-        open={suggestOpen}
-        onOpenChange={setSuggestOpen}
-        onUseSuggestion={setDraft}
-      />
-    </div>
-  );
 }

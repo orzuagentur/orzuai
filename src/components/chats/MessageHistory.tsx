@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { memo, useMemo } from "react";
 import {
   AlertCircleIcon,
   CheckCheckIcon,
@@ -20,6 +20,8 @@ import { MediaUploadProgressOverlay } from "@/components/chats/inbox/MediaUpload
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
 import { TypingIndicator } from "@/components/chats/TypingIndicator";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMessageUploadProgress } from "@/hooks/use-message-upload-progress";
 import { usePrefetchVisibleConversationMedia } from "@/hooks/use-prefetch-conversation-media";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
@@ -123,6 +125,94 @@ function estimateMessageRowSize(message: ChatMessageData): number {
   }
 
   return MESSAGE_ROW_ESTIMATE_PX;
+}
+
+function messageContentEqual(
+  left: ChatMessageData,
+  right: ChatMessageData,
+): boolean {
+  return (
+    left.id === right.id &&
+    left.content === right.content &&
+    left.senderType === right.senderType &&
+    left.aiGenerated === right.aiGenerated &&
+    left.createdAt === right.createdAt &&
+    left.isPending === right.isPending &&
+    left.deliveryStatus === right.deliveryStatus &&
+    left.attachmentPending === right.attachmentPending &&
+    left.attachmentFailed === right.attachmentFailed &&
+    left.deletedForAllAt === right.deletedForAllAt &&
+    left.hiddenForBusiness === right.hiddenForBusiness &&
+    left.editedAt === right.editedAt &&
+    left.isEdited === right.isEdited
+  );
+}
+
+function MessageUploadOverlay({ messageId }: { messageId: string }) {
+  const uploadProgress = useMessageUploadProgress(messageId, true);
+
+  if (!uploadProgress || uploadProgress.phase === "completing") {
+    return null;
+  }
+
+  return (
+    <MediaUploadProgressOverlay
+      progress={uploadProgress.percent}
+      speedBps={uploadProgress.bytesPerSecond}
+      phase={uploadProgress.phase}
+    />
+  );
+}
+
+function MessageUploadStatus({
+  message,
+  isOutgoing,
+  isInbox,
+}: {
+  message: ChatMessageData;
+  isOutgoing: boolean;
+  isInbox: boolean;
+}) {
+  const uploadProgress = useMessageUploadProgress(
+    message.id,
+    Boolean(message.isPending),
+  );
+
+  return (
+    <p
+      className={cn(
+        "mt-1 flex items-center justify-end gap-1 text-[10px]",
+        isOutgoing
+          ? isInbox
+            ? "text-emerald-100"
+            : "text-primary-foreground/70"
+          : "text-muted-foreground",
+      )}
+    >
+      {message.isPending ? (
+        <Clock3Icon className="size-3 shrink-0" aria-hidden />
+      ) : null}
+      {message.isPending ? (
+        uploadProgress?.phase === "uploading" ? (
+          <>
+            {formatUploadPercent(uploadProgress.percent)}
+            {uploadProgress.bytesPerSecond
+              ? ` · ${formatUploadSpeed(uploadProgress.bytesPerSecond)}`
+              : null}
+          </>
+        ) : uploadProgress?.phase === "preparing" ? (
+          CHAT_MESSAGES.mediaUploadPreparing
+        ) : uploadProgress?.phase === "completing" ? (
+          CHAT_MESSAGES.mediaUploadCompleting
+        ) : (
+          CHAT_MESSAGES.messageSending
+        )
+      ) : (
+        <RelativeTime value={message.createdAt} />
+      )}
+      <OutboundDeliveryIndicator message={message} />
+    </p>
+  );
 }
 
 type MessageHistoryItemProps = {
@@ -256,14 +346,8 @@ function MessageHistoryItem({
                     : undefined
                 }
               />
-              {message.isPending &&
-              message.uploadPhase &&
-              message.uploadPhase !== "completing" ? (
-                <MediaUploadProgressOverlay
-                  progress={message.uploadProgress ?? 0}
-                  speedBps={message.uploadSpeedBps}
-                  phase={message.uploadPhase}
-                />
+              {message.isPending && media ? (
+                <MessageUploadOverlay messageId={message.id} />
               ) : null}
             </div>
           ) : (
@@ -271,40 +355,11 @@ function MessageHistoryItem({
               {text}
             </p>
           )}
-          <p
-            className={cn(
-              "mt-1 flex items-center justify-end gap-1 text-[10px]",
-              isOutgoing
-                ? isInbox
-                  ? "text-emerald-100"
-                  : "text-primary-foreground/70"
-                : "text-muted-foreground",
-            )}
-          >
-            {message.isPending ? (
-              <Clock3Icon className="size-3 shrink-0" aria-hidden />
-            ) : null}
-            {message.isPending ? (
-              message.uploadPhase === "uploading" &&
-              message.uploadProgress != null ? (
-                <>
-                  {formatUploadPercent(message.uploadProgress)}
-                  {message.uploadSpeedBps
-                    ? ` · ${formatUploadSpeed(message.uploadSpeedBps)}`
-                    : null}
-                </>
-              ) : message.uploadPhase === "preparing" ? (
-                CHAT_MESSAGES.mediaUploadPreparing
-              ) : message.uploadPhase === "completing" ? (
-                CHAT_MESSAGES.mediaUploadCompleting
-              ) : (
-                CHAT_MESSAGES.messageSending
-              )
-            ) : (
-              <RelativeTime value={message.createdAt} />
-            )}
-            <OutboundDeliveryIndicator message={message} />
-          </p>
+          <MessageUploadStatus
+            message={message}
+            isOutgoing={isOutgoing}
+            isInbox={isInbox}
+          />
         </div>
         {canShowMessageActions && isOutgoing ? (
           <ChatMessageActionsMenu
@@ -317,6 +372,19 @@ function MessageHistoryItem({
     </div>
   );
 }
+
+const MemoMessageHistoryItem = memo(
+  MessageHistoryItem,
+  (previous, next) =>
+    previous.index === next.index &&
+    previous.firstUnreadIndex === next.firstUnreadIndex &&
+    previous.isInbox === next.isInbox &&
+    previous.lastReadAt === next.lastReadAt &&
+    previous.showMessageActions === next.showMessageActions &&
+    previous.onMessageRemoved === next.onMessageRemoved &&
+    previous.onMessageUpdated === next.onMessageUpdated &&
+    messageContentEqual(previous.message, next.message),
+);
 
 export function MessageHistory({
   messages,
@@ -356,10 +424,20 @@ export function MessageHistory({
     ? virtualItems.map((item) => item.index)
     : messages.map((_, index) => index);
 
+  const visibleRangeKey = useMemo(
+    () =>
+      shouldVirtualize && messages.length > 0
+        ? `${visibleIndices[0] ?? 0}-${visibleIndices[visibleIndices.length - 1] ?? 0}`
+        : messages.length > 0
+          ? `0-${messages.length - 1}`
+          : "",
+    [messages.length, shouldVirtualize, visibleIndices],
+  );
+
   usePrefetchVisibleConversationMedia(
     messages,
     visibleIndices,
-    messages.length > 0,
+    messages.length > 0 && Boolean(visibleRangeKey),
   );
 
   if (messages.length === 0) {
@@ -423,7 +501,7 @@ export function MessageHistory({
                 className="absolute top-0 left-0 w-full"
                 style={{ transform: `translateY(${virtualRow.start}px)` }}
               >
-                <MessageHistoryItem
+                <MemoMessageHistoryItem
                   message={message}
                   index={virtualRow.index}
                   firstUnreadIndex={firstUnreadIndex}
@@ -441,7 +519,7 @@ export function MessageHistory({
       ) : (
         <div className="flex w-full flex-col gap-2">
           {messages.map((message, index) => (
-            <MessageHistoryItem
+            <MemoMessageHistoryItem
               key={message.id}
               message={message}
               index={index}

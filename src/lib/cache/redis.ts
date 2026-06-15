@@ -71,3 +71,38 @@ export async function setRedisCacheValue(
 export function buildMediaUrlRedisKey(storagePath: string): string {
   return `media:url:${storagePath}`;
 }
+
+const STARTUP_PROBE_KEY = "orzuai:startup-probe";
+
+export async function probeRedisCacheOnStartup(): Promise<{
+  ok: boolean;
+  reason?: string;
+}> {
+  if (!isRedisCacheEnabled()) {
+    console.warn("[redis-cache] startup probe: disabled (missing env)");
+    return { ok: false, reason: "disabled" };
+  }
+
+  const redis = getRedisClient();
+
+  if (!redis) {
+    console.warn("[redis-cache] startup probe: client unavailable");
+    return { ok: false, reason: "client_unavailable" };
+  }
+
+  try {
+    await redis.set(STARTUP_PROBE_KEY, "1", { ex: 60 });
+    const value = await redis.get<string>(STARTUP_PROBE_KEY);
+
+    if (value !== "1") {
+      console.error("[redis-cache] startup probe: read mismatch");
+      return { ok: false, reason: "read_mismatch" };
+    }
+
+    console.info("[redis-cache] startup probe: ok");
+    return { ok: true };
+  } catch (error) {
+    console.error("[redis-cache] startup probe failed", error);
+    return { ok: false, reason: "error" };
+  }
+}

@@ -1,5 +1,10 @@
 import "server-only";
 
+/**
+ * Server signed-URL cache: Redis (hot) → Postgres media_signed_url_cache → generate.
+ * Client mirrors resolved URLs in session memory only (inbox-messenger-cache).
+ */
+
 import {
   buildMediaUrlRedisKey,
   getRedisCacheValue,

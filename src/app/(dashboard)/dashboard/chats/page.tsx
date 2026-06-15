@@ -2,6 +2,7 @@ import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
 import {
   getChatsMonitorPageData,
   resolveInboxActiveConversationContext,
+  resolveInboxBusinessContext,
 } from "@/services/chat.service";
 
 type ChatsPageProps = {
@@ -10,9 +11,10 @@ type ChatsPageProps = {
 
 export default async function ChatsPage({ searchParams }: ChatsPageProps) {
   const { conversation: conversationId } = await searchParams;
+  const inboxContext = await resolveInboxBusinessContext();
   const [data, activeContext] = await Promise.all([
-    getChatsMonitorPageData(),
-    resolveInboxActiveConversationContext(conversationId?.trim()),
+    getChatsMonitorPageData(inboxContext),
+    resolveInboxActiveConversationContext(conversationId?.trim(), inboxContext),
   ]);
 
   return (

@@ -717,10 +717,6 @@ export async function processInstagramWebhook(
     processed += 1;
   }
 
-  if (messages.length > 0) {
-    revalidateInstagramPaths();
-  }
-
   return { processed };
 }
 

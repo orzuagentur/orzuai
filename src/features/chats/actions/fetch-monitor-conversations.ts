@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
+  listConversationsMonitorPage,
   listConversationsPage,
   type InboxQuickView,
 } from "@/services/chat-inbox-query.service";
@@ -25,6 +26,7 @@ const fetchMonitorConversationsSchema = z.object({
     .enum(["all", "ai_handled", "needs_human", "active"])
     .default("all"),
   sort: z.enum(["latest", "needs_reply_first", "channel"]).default("latest"),
+  includeNeedsAttention: z.boolean().optional(),
 });
 
 export type FetchMonitorConversationsInput = z.infer<
@@ -62,15 +64,26 @@ export async function fetchMonitorConversationsAction(
     };
   }
 
-  const result = await listConversationsPage(business.id, {
-    offset: parsed.data.offset,
-    limit: parsed.data.limit,
-    channel: parsed.data.channel,
-    search: parsed.data.search,
-    view: parsed.data.view as InboxQuickView,
-    filter: parsed.data.filter,
-    sort: parsed.data.sort,
-  });
+  const result = parsed.data.includeNeedsAttention
+    ? await listConversationsMonitorPage(business.id, {
+        offset: parsed.data.offset,
+        limit: parsed.data.limit,
+        channel: parsed.data.channel,
+        search: parsed.data.search,
+        view: parsed.data.view as InboxQuickView,
+        filter: parsed.data.filter,
+        sort: parsed.data.sort,
+        includeNeedsAttention: true,
+      })
+    : await listConversationsPage(business.id, {
+        offset: parsed.data.offset,
+        limit: parsed.data.limit,
+        channel: parsed.data.channel,
+        search: parsed.data.search,
+        view: parsed.data.view as InboxQuickView,
+        filter: parsed.data.filter,
+        sort: parsed.data.sort,
+      });
 
   return {
     success: true as const,

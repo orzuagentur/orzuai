@@ -13,7 +13,6 @@ import type { ConversationListItem } from "@/types/chat.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import { mapConversationListItem, resolveContactFromRow } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
-import { phoneDigitsOnly } from "@/utils/whatsapp";
 
 export type InboxQuickView = "all" | "needs_reply" | "high_intent" | "favorites";
 
@@ -34,6 +33,10 @@ export type ListConversationsPageResult = {
   hasMore: boolean;
 };
 
+export type ListConversationsMonitorResult = ListConversationsPageResult & {
+  needsAttentionConversations: ConversationListItem[];
+};
+
 type InboxRpcRow = {
   id: string;
   channel: ConversationListItem["channel"];
@@ -52,7 +55,7 @@ type InboxRpcRow = {
   contact_lead_score: number | null;
   contact_is_favorite: boolean;
   contact_avatar_url: string | null;
-  total_count: number;
+  total_count: number | null;
 };
 
 type RawConversationQueryRow = {
@@ -127,26 +130,6 @@ async function mapConversationRows(
   });
 }
 
-function dedupeConversationsByContactPhone(
-  items: ConversationListItem[],
-): ConversationListItem[] {
-  const latestByContact = new Map<string, ConversationListItem>();
-
-  for (const item of items) {
-    const key = `${item.channel}:${phoneDigitsOnly(item.contactPhone)}`;
-    const existing = latestByContact.get(key);
-
-    if (
-      !existing ||
-      new Date(item.updatedAt).getTime() > new Date(existing.updatedAt).getTime()
-    ) {
-      latestByContact.set(key, item);
-    }
-  }
-
-  return Array.from(latestByContact.values());
-}
-
 async function queryInboxConversations(
   businessId: string,
   input: ListConversationsPageInput & { userId: string },
@@ -163,6 +146,7 @@ async function queryInboxConversations(
     p_sort: input.sort ?? "latest",
     p_limit: fetchLimit,
     p_offset: input.offset ?? 0,
+    p_include_total_count: (input.offset ?? 0) === 0,
   });
 
   if (error) {
@@ -207,14 +191,46 @@ export async function listConversationsPage(
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  let items = await mapConversationRows(pageRows.map(mapInboxRpcRow));
-
-  items = dedupeConversationsByContactPhone(items);
+  const items = await mapConversationRows(pageRows.map(mapInboxRpcRow));
 
   return {
     items,
     totalCount,
-    hasMore: hasMore || offset + items.length < totalCount,
+    hasMore: hasMore || (totalCount > 0 && offset + items.length < totalCount),
+  };
+}
+
+export async function listConversationsMonitorPage(
+  businessId: string,
+  input: ListConversationsPageInput & { includeNeedsAttention?: boolean } = {},
+): Promise<ListConversationsMonitorResult> {
+  const userId = input.userId ?? (await requireUser()).id;
+  const offset = input.offset ?? 0;
+  const view = input.view ?? "all";
+  const includeNeedsAttention =
+    input.includeNeedsAttention === true &&
+    offset === 0 &&
+    view === "all" &&
+    !input.search?.trim();
+
+  const [page, needsAttentionPage] = await Promise.all([
+    listConversationsPage(businessId, { ...input, userId }),
+    includeNeedsAttention
+      ? listConversationsPage(businessId, {
+          userId,
+          channel: input.channel,
+          view: "needs_reply",
+          filter: "all",
+          sort: "latest",
+          limit: 8,
+          offset: 0,
+        })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    ...page,
+    needsAttentionConversations: needsAttentionPage?.items ?? [],
   };
 }
 

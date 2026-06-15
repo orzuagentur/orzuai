@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts"
+    "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
+    "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
+    "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

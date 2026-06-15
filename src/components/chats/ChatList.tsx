@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, type RefObject } from "react";
+import { memo, useRef, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
@@ -237,6 +237,30 @@ function ConversationListRow({
   );
 }
 
+const MemoConversationListRow = memo(
+  ConversationListRow,
+  (previous, next) =>
+    previous.activeConversationId === next.activeConversationId &&
+    previous.channelId === next.channelId &&
+    previous.hideChannelBadge === next.hideChannelBadge &&
+    previous.linkToConversationChannel === next.linkToConversationChannel &&
+    previous.linkMode === next.linkMode &&
+    previous.onConversationSelect === next.onConversationSelect &&
+    previous.variant === next.variant &&
+    previous.conversation.id === next.conversation.id &&
+    previous.conversation.updatedAt === next.conversation.updatedAt &&
+    previous.conversation.lastMessageAt === next.conversation.lastMessageAt &&
+    previous.conversation.lastMessagePreview ===
+      next.conversation.lastMessagePreview &&
+    previous.conversation.unreadMessageCount ===
+      next.conversation.unreadMessageCount &&
+    previous.conversation.isUnread === next.conversation.isUnread &&
+    previous.conversation.status === next.conversation.status &&
+    previous.conversation.contactName === next.conversation.contactName &&
+    previous.conversation.contactAvatarUrl ===
+      next.conversation.contactAvatarUrl,
+);
+
 export function ChatList({
   conversations,
   activeConversationId,
@@ -318,7 +342,7 @@ export function ChatList({
             className="absolute top-0 left-0 w-full"
             style={{ transform: `translateY(${virtualRow.start}px)` }}
           >
-            <ConversationListRow
+            <MemoConversationListRow
               conversation={conversation}
               activeConversationId={activeConversationId}
               channelId={channelId}
@@ -335,7 +359,7 @@ export function ChatList({
   ) : (
     <div className="divide-y">
       {conversations.map((conversation) => (
-        <ConversationListRow
+        <MemoConversationListRow
           key={conversation.id}
           conversation={conversation}
           activeConversationId={activeConversationId}

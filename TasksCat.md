@@ -172,7 +172,7 @@
 
 ### CAT-P0-07 — Rewrite `list_inbox_conversations` pagination
 
-* [ ] **P0** (large — отдельный PR)
+* [x] **P0** (large — отдельный PR)
 
 **Проблема:** `COUNT(*) OVER ()` + `ROW_NUMBER()` по всему filtered set; correlated FTS EXISTS.
 
@@ -194,7 +194,7 @@
 
 ### CAT-P0-08 — Unread trigger: batch per-user reads
 
-* [ ] **P0** (DB migration)
+* [x] **P0** (DB migration)
 
 **Проблема:** O(team size) UPSERT в `conversation_reads` на каждое inbound client message.
 
@@ -303,7 +303,7 @@
 
 ### CAT-P1-04 — SSR inbox: dedupe fan-out
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/app/(dashboard)/dashboard/chats/page.tsx` (13–16)
@@ -322,7 +322,7 @@
 
 ### CAT-P1-05 — Conversation open: убрать COUNT messages
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:** `src/services/chat.service.ts` (177–181)
 
@@ -337,7 +337,7 @@
 
 ### CAT-P1-06 — Dual list RPC → single fetch + client split
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:** `src/components/chats/ChatsMonitorPanel.tsx` (250–267)
 
@@ -419,7 +419,7 @@
 
 ### CAT-P1-11 — Убрать `revalidatePath` из inbound webhook hot path
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:** `src/services/whatsapp.service.ts` (799–803)
 
@@ -542,7 +542,7 @@
 
 ### CAT-P2-01 — `React.memo` на row components
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/components/chats/MessageHistory.tsx` (140–318)
@@ -555,7 +555,7 @@
 
 ### CAT-P2-02 — Isolate upload progress state
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/components/chats/ChatWindow.tsx` (186–206)
@@ -571,7 +571,7 @@
 
 ### CAT-P2-03 — Single `useChatMediaUrl` per attachment
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:** `src/components/chats/inbox/ChatMediaMessage.tsx` (705–724, 317–325)
 
@@ -585,7 +585,7 @@
 
 ### CAT-P2-04 — Stabilize prefetch deps
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/components/chats/MessageHistory.tsx` (354–363)
@@ -601,7 +601,7 @@
 
 ### CAT-P2-05 — Merge duplicate mark-read on select
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:** `ChatsChannelPanel.tsx` (317–319, 353–361)
 
@@ -611,7 +611,7 @@
 
 ### CAT-P2-06 — Extract shared `useInboxPanel` hook
 
-* [ ] **P2** (large)
+* [x] **P2** (large)
 
 **Файлы:**
 - `src/components/chats/ChatsChannelPanel.tsx`
@@ -627,7 +627,7 @@
 
 ### CAT-P2-07 — Simplify media cache to 2 layers
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/lib/client/inbox-messenger-cache.ts`
@@ -645,7 +645,7 @@
 
 ### CAT-P2-08 — Delivery status: single path (postgres OR broadcast)
 
-* [ ] **P2**
+* [x] **P2** — postgres `message_deliveries` only; broadcast removed
 
 **Файлы:**
 - `src/hooks/use-conversation-realtime.ts` (247–302)
@@ -661,7 +661,7 @@
 
 ### CAT-P2-09 — List realtime: server-side channel filter
 
-* [ ] **P2**
+* [x] **P2** — `channel=eq.*` postgres filter + per-channel realtime channel name
 
 **Файлы:** `src/hooks/use-inbox-list-realtime.ts`, `src/utils/inbox-list-realtime.ts` (82–84)
 
@@ -674,7 +674,7 @@
 
 ### CAT-P2-10 — Denormalize `total_message_count`
 
-* [ ] **P2** (migration)
+* [x] **P2** (migration)
 
 **Связано с:** CAT-P1-05
 
@@ -684,7 +684,7 @@
 
 ### CAT-P2-11 — Paginated monitor list: realtime patch
 
-* [ ] **P2**
+* [x] **P2** — refresh preserves loaded depth; in-memory rows patched via realtime
 
 **Файлы:** `ChatsMonitorPanel.tsx` load more
 
@@ -698,7 +698,7 @@
 
 ### CAT-P2-12 — `syncRecentMessages` in polling fallback
 
-* [ ] **P2**
+* [x] **P2** — `useRealtimeFallbackReady` (10s after disconnect)
 
 **Файлы:** `src/hooks/use-inbox-active-conversation.ts` (473–491)
 
@@ -711,7 +711,7 @@
 
 ### CAT-P2-13 — WhatsApp webhook: parallel message processing
 
-* [ ] **P2**
+* [x] **P2** — `runWithConcurrency` in `processWhatsAppWebhook`
 
 **Файлы:** `src/services/whatsapp.service.ts` (782–794)
 
@@ -724,7 +724,7 @@
 
 ### CAT-P2-14 — Production README + env docs
 
-* [ ] **P2**
+* [x] **P2** — `README.md` runbook + `.env.example` messaging section
 
 **Файлы:** `README.md`, `.env.example`
 
@@ -740,51 +740,51 @@
 
 ### CAT-P3-01 — Delete dead ChatWindow default layout
 
-* [ ] **P3** · `src/components/chats/ChatWindow.tsx` (623–746)
+* [x] **P3** · `src/components/chats/ChatWindow.tsx` (623–746)
 
 ### CAT-P3-02 — Delete `ChatsHub`, `ChatsFavoritesPanel`, `ChatInboxToolbar`
 
-* [ ] **P3**
+* [x] **P3**
 
 ### CAT-P3-03 — Delete legacy `getChatsPageData` / `listConversations`
 
-* [ ] **P3** · `src/services/chat.service.ts` (101–147, 884–945)
+* [x] **P3** · `src/services/chat.service.ts` (101–147, 884–945)
 
 ### CAT-P3-04 — Delete unreachable client bootstrap path
 
-* [ ] **P3** · panels 169–201 / 351–387
+* [x] **P3** · panels 169–201 / 351–387
 
 ### CAT-P3-05 — Delete deprecated `usePrefetchConversationMedia` export
 
-* [ ] **P3**
+* [x] **P3**
 
 ### CAT-P3-06 — Instrumentation startup probe
 
-* [ ] **P3** · `src/instrumentation.ts` — Redis probe on boot
+* [x] **P3** · `src/instrumentation.ts` — Redis probe on boot
 
 ### CAT-P3-07 — Sentry / structured logging for queue lag
 
-* [ ] **P3**
+* [x] **P3** · `src/lib/observability/messaging-metrics.ts` + messaging-health cron
 
 ### CAT-P3-08 — Load test: 1000 webhook msg/min
 
-* [ ] **P3**
+* [x] **P3** · `npm run load-test:webhooks`
 
 ### CAT-P3-09 — Load test: 100 concurrent inbox sessions
 
-* [ ] **P3**
+* [x] **P3** · `npm run load-test:inbox`
 
 ### CAT-P3-10 — Consider React Query for inbox data layer
 
-* [ ] **P3** (spike)
+* [x] **P3** (spike) — **defer**: SSR hydrate + session cache + server actions достаточны; миграция не окупается сейчас
 
 ### CAT-P3-11 — Edge signed URL generation (spike)
 
-* [ ] **P3**
+* [x] **P3** (spike) — **defer**: Redis→Postgres server cache закрывает p95; edge добавит сложность без bottleneck
 
 ### CAT-P3-12 — Dedicated delivery worker service (spike)
 
-* [ ] **P3**
+* [x] **P3** (spike) — **already covered**: QStash worker + cron drain; отдельный сервис — только при multi-region
 
 ---
 
@@ -835,37 +835,43 @@
 
 ---
 
-### Sprint E (7–10 дней) — «Inbox load»
-1. CAT-P0-07 list_inbox_conversations rewrite (big)
-2. CAT-P1-04 SSR dedupe
-3. CAT-P1-06 Dual list RPC
-4. CAT-P1-05 / CAT-P2-10 message count
+### Sprint E (7–10 дней) — «Inbox load» ✅
+1. [x] CAT-P0-07 list_inbox_conversations rewrite (big)
+2. [x] CAT-P1-04 SSR dedupe
+3. [x] CAT-P1-06 Dual list RPC
+4. [x] CAT-P1-05 / CAT-P2-10 message count
 
 **Exit:** inbox cold load < 1s p95
 
 ---
 
-### Sprint F (5–7 дней) — «DB write path»
-1. CAT-P0-08 Unread trigger batch
-2. CAT-P1-11 Remove revalidatePath webhook
+### Sprint F (5–7 дней) — «DB write path» ✅
+1. [x] CAT-P0-08 Unread trigger batch
+2. [x] CAT-P1-11 Remove revalidatePath webhook
 
 **Exit:** inbound write ≤2 per message
 
 ---
 
-### Sprint G (5–7 дней) — «Frontend polish»
-1. CAT-P2-01 React.memo rows
-2. CAT-P2-02 Upload progress isolate
-3. CAT-P2-03 Single media hook
-4. CAT-P2-04 Prefetch stabilize
-5. CAT-P2-06 Shared inbox panel hook
+### Sprint G (5–7 дней) — «Frontend polish» ✅
+1. [x] CAT-P2-01 React.memo rows
+2. [x] CAT-P2-02 Upload progress isolate
+3. [x] CAT-P2-03 Single media hook
+4. [x] CAT-P2-04 Prefetch stabilize
+5. [x] CAT-P2-06 Shared inbox panel hook
 
 **Exit:** smooth scroll + upload без jank
 
 ---
 
-### Sprint H (ongoing) — «Cleanup & scale prep»
-P3 tasks + load tests + observability
+### Sprint H — «Cleanup & scale prep» ✅
+1. [x] CAT-P3-01 … P3-07 cleanup + observability
+2. [x] CAT-P2-07 Simplify media cache
+3. [x] CAT-P3-08 … P3-09 load tests
+4. [x] CAT-P3-10 … P3-12 spikes
+5. [x] CAT-P2-08, P2-12, P2-13 reliability
+
+**Exit:** dead code removed; queue lag visible in logs/cron; delivery status single path
 
 ---
 
