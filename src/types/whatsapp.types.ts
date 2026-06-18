@@ -68,12 +68,16 @@ export type Complete360DialogEmbeddedSignupResult = WhatsAppActionResult<{
   activationStatus: "connected" | "pending";
 }>;
 
+export type Dialog360ApiMode = "production" | "sandbox" | "custom";
+
 export type WhatsAppConnectConfig = {
   isConfigured: boolean;
   webhookUrl: string;
   embeddedSignupEnabled: boolean;
   partnerId?: string;
   integrationsRedirectUrl: string;
+  apiMode: Dialog360ApiMode;
+  apiBaseUrl: string;
 };
 
 export type SyncWhatsAppResult = WhatsAppActionResult<{

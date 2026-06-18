@@ -29,6 +29,13 @@ export function WhatsAppConnectPanel({
 
   const canSubmit =
     config.isConfigured && apiKey.trim() && phoneNumberId.trim();
+  const isSandbox = config.apiMode === "sandbox";
+  const apiKeyHint = isSandbox
+    ? WHATSAPP_MESSAGES.sandboxApiKeyHint
+    : WHATSAPP_MESSAGES.apiKeyHint;
+  const phoneNumberIdHint = isSandbox
+    ? WHATSAPP_MESSAGES.sandboxPhoneNumberIdHint
+    : WHATSAPP_MESSAGES.phoneNumberIdHint;
 
   async function handleConnect() {
     if (!canSubmit) {
@@ -76,7 +83,7 @@ export function WhatsAppConnectPanel({
           onChange={(event) => setApiKey(event.target.value)}
           placeholder={WHATSAPP_MESSAGES.apiKeyPlaceholder}
         />
-        <p className="text-xs text-muted-foreground">{WHATSAPP_MESSAGES.apiKeyHint}</p>
+        <p className="text-xs text-muted-foreground">{apiKeyHint}</p>
       </div>
 
       <div className="space-y-2">
@@ -89,9 +96,7 @@ export function WhatsAppConnectPanel({
           onChange={(event) => setPhoneNumberId(event.target.value)}
           placeholder={WHATSAPP_MESSAGES.phoneNumberIdPlaceholder}
         />
-        <p className="text-xs text-muted-foreground">
-          {WHATSAPP_MESSAGES.phoneNumberIdHint}
-        </p>
+        <p className="text-xs text-muted-foreground">{phoneNumberIdHint}</p>
       </div>
 
       <div className="space-y-2">

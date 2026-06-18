@@ -4,6 +4,13 @@ export const WHATSAPP_MESSAGES = {
   connectTitle: "WhatsApp Business",
   connectDescription:
     "Connect your WhatsApp number through 360dialog Embedded Signup — or paste an API key manually from the Hub.",
+  sandboxBannerTitle: "360dialog Sandbox mode",
+  sandboxBannerDescription:
+    "API calls go to waba-sandbox.360dialog.io. Use a sandbox API key and Phone number ID from the 360dialog demo — Embedded Signup is disabled in sandbox.",
+  sandboxApiKeyHint:
+    "Sandbox API key from the 360dialog demo or sandbox dashboard.",
+  sandboxPhoneNumberIdHint:
+    "Phone number ID shown in the sandbox demo (used to route inbound webhooks).",
   connectButton: "Connect WhatsApp",
   connectWaiting: "Verifying API key and registering webhook…",
   connectSuccess: "WhatsApp connected.",

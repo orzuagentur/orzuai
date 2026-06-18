@@ -163,6 +163,18 @@ export function WhatsAppIntegrationPanel({
         </p>
       </div>
 
+      {connectConfig.apiMode === "sandbox" ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <p className="font-medium">{WHATSAPP_MESSAGES.sandboxBannerTitle}</p>
+          <p className="mt-1 text-muted-foreground">
+            {WHATSAPP_MESSAGES.sandboxBannerDescription}
+          </p>
+          <code className="mt-2 block break-all rounded bg-background/80 px-2 py-1 text-xs">
+            {connectConfig.apiBaseUrl}
+          </code>
+        </div>
+      ) : null}
+
       <ul className="space-y-1.5 text-sm text-muted-foreground">
         <li className="flex gap-2">
           <span className="text-foreground/40">•</span>

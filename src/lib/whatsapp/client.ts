@@ -1,11 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
-import { DIALOG360_API_BASE } from "@/lib/whatsapp/constants";
+import { getDialog360ApiBase } from "@/lib/whatsapp/constants";
 
 function buildDialog360Url(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${DIALOG360_API_BASE}${normalizedPath}`;
+  return `${getDialog360ApiBase()}${normalizedPath}`;
 }
 
 function dialog360Headers(apiKey: string, json = true): HeadersInit {

@@ -15,6 +15,11 @@ import {
 } from "@/lib/dialog360/partner";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
+  getDialog360ApiBase,
+  getDialog360ApiMode,
+  isDialog360SandboxMode,
+} from "@/lib/whatsapp/constants";
+import {
   sendWhatsAppTextMessage,
   set360DialogWebhook,
   verifyWhatsAppCredentials,
@@ -129,9 +134,12 @@ export function getWhatsAppConnectConfig(): WhatsAppConnectConfig {
   return {
     isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
     webhookUrl,
-    embeddedSignupEnabled: hasDialog360EmbeddedSignupEnv(),
+    embeddedSignupEnabled:
+      hasDialog360EmbeddedSignupEnv() && !isDialog360SandboxMode(),
     partnerId: getDialog360PartnerId(),
     integrationsRedirectUrl,
+    apiMode: getDialog360ApiMode(),
+    apiBaseUrl: getDialog360ApiBase(),
   };
 }
 
