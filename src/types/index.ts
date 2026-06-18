@@ -117,8 +117,6 @@ export type {
 } from "./business.types";
 
 export type {
-  CompleteEmbeddedSignupInput,
-  CompleteEmbeddedSignupResult,
   SyncWhatsAppResult,
   WhatsAppActionError,
   WhatsAppActionResult,
@@ -126,27 +124,11 @@ export type {
   WhatsAppConnectionData,
   ConnectManualWhatsAppInput,
   ConnectManualWhatsAppResult,
-  WhatsAppEmbeddedSignupConfig,
   WhatsAppErrorCode,
   WhatsAppWebhookMessage,
   WhatsAppWebhookPayload,
 } from "./whatsapp.types";
-export {
-  completeEmbeddedSignupSchema,
-  connectManualWhatsAppSchema,
-} from "./whatsapp.types";
-
-export type {
-  InstagramActionError,
-  InstagramActionResult,
-  ConnectManualInstagramInput,
-  ConnectManualInstagramResult,
-  InstagramConnectConfig,
-  InstagramConnectionData,
-  InstagramEmbeddedSignupConfig,
-  InstagramErrorCode,
-} from "./instagram.types";
-export { connectManualInstagramSchema } from "./instagram.types";
+export { connectManualWhatsAppSchema } from "./whatsapp.types";
 
 export type {
   TelegramActionError,

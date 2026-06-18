@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2Icon } from "lucide-react";
 
-import { WhatsAppEmbeddedSignup } from "@/components/whatsapp/WhatsAppEmbeddedSignup";
+import { WhatsAppConnectPanel } from "@/components/whatsapp/WhatsAppConnectPanel";
+import { WhatsAppEmbeddedConnect } from "@/components/whatsapp/WhatsAppEmbeddedConnect";
 import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
 import { disconnectWhatsAppAction } from "@/features/whatsapp/actions/disconnect";
 import {
@@ -14,14 +17,14 @@ import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import type {
-  WhatsAppEmbeddedSignupConfig,
   WhatsAppConnectionData,
+  WhatsAppConnectConfig,
 } from "@/types/whatsapp.types";
 
 type WhatsAppIntegrationPanelProps = {
   connection: WhatsAppConnectionData | null;
   hasBusiness: boolean;
-  embeddedSignupConfig: WhatsAppEmbeddedSignupConfig;
+  connectConfig: WhatsAppConnectConfig;
   embeddedInHub?: boolean;
 };
 
@@ -49,9 +52,15 @@ function formatDate(value: string): string {
 export function WhatsAppIntegrationPanel({
   connection,
   hasBusiness,
-  embeddedSignupConfig,
+  connectConfig,
   embeddedInHub: _embeddedInHub = false,
 }: WhatsAppIntegrationPanelProps) {
+  const router = useRouter();
+
+  function handleConnected() {
+    router.refresh();
+  }
+
   if (!hasBusiness) {
     return (
       <div className="mx-auto max-w-lg space-y-4 rounded-lg border bg-card p-6">
@@ -64,6 +73,32 @@ export function WhatsAppIntegrationPanel({
         <Button asChild>
           <Link href={DASHBOARD_ROUTES.settings}>Business settings</Link>
         </Button>
+      </div>
+    );
+  }
+
+  if (connection?.status === "pending") {
+    return (
+      <div className="mx-auto w-full max-w-xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">{WHATSAPP_MESSAGES.pendingTitle}</h2>
+            <p className="text-sm text-muted-foreground">
+              {WHATSAPP_MESSAGES.pendingDescription}
+            </p>
+          </div>
+          <Badge variant="secondary">Activating</Badge>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-lg border bg-card p-4 text-sm">
+          <Loader2Icon className="size-5 shrink-0 animate-spin text-muted-foreground" />
+          <div>
+            <p className="font-medium">{connection.phoneNumber}</p>
+            <p className="text-muted-foreground">
+              Waiting for 360dialog to mark the channel live.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -131,15 +166,44 @@ export function WhatsAppIntegrationPanel({
       <ul className="space-y-1.5 text-sm text-muted-foreground">
         <li className="flex gap-2">
           <span className="text-foreground/40">•</span>
-          {WHATSAPP_MESSAGES.requirementMeta}
+          {WHATSAPP_MESSAGES.requirementAccount}
         </li>
         <li className="flex gap-2">
           <span className="text-foreground/40">•</span>
-          {WHATSAPP_MESSAGES.requirementPhone}
+          {WHATSAPP_MESSAGES.requirementApiKey}
         </li>
       </ul>
 
-      <WhatsAppEmbeddedSignup config={embeddedSignupConfig} />
+      {connectConfig.embeddedSignupEnabled ? (
+        <WhatsAppEmbeddedConnect
+          config={connectConfig}
+          onConnected={handleConnected}
+        />
+      ) : null}
+
+      {connectConfig.embeddedSignupEnabled ? (
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              {WHATSAPP_MESSAGES.manualConnectTitle}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {connectConfig.embeddedSignupEnabled ? (
+        <p className="text-sm text-muted-foreground">
+          {WHATSAPP_MESSAGES.manualConnectDescription}
+        </p>
+      ) : null}
+
+      <WhatsAppConnectPanel
+        config={connectConfig}
+        onConnected={handleConnected}
+      />
     </div>
   );
 }

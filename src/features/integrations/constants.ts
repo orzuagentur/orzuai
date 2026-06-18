@@ -1,7 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 
 import {
-  InstagramIcon,
   TelegramIcon,
   VoiceIcon,
   WebsiteFormsIcon,
@@ -14,7 +13,6 @@ export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
-  "instagram",
   "telegram",
   "website_forms",
 ] as const;
@@ -79,15 +77,8 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "whatsapp",
     label: "WhatsApp",
-    description: "WhatsApp Business Cloud API",
+    description: "WhatsApp Business via 360dialog",
     icon: WhatsAppIcon,
-    available: true,
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    description: "Instagram Direct via Meta",
-    icon: InstagramIcon,
     available: true,
   },
   {

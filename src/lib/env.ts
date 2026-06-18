@@ -1,10 +1,6 @@
 import { SUPPORT_EMAIL } from "@/constants/app-origin";
 import { ENV_KEYS } from "@/constants/env-keys";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
-import {
-  META_APP_ID,
-  WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
-} from "@/lib/whatsapp/constants";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -106,44 +102,6 @@ export function getGoogleClientSecret(): string | undefined {
 
 export function hasGoogleOAuthEnv(): boolean {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
-}
-
-export function getMetaAppId(): string {
-  return process.env[ENV_KEYS.NEXT_PUBLIC_META_APP_ID]?.trim() || META_APP_ID;
-}
-
-export function getWhatsAppEmbeddedSignupConfigId(): string {
-  return (
-    process.env[ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]?.trim() ||
-    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID
-  );
-}
-
-export function hasEmbeddedSignupEnv(): boolean {
-  return Boolean(
-    getMetaAppId() &&
-      getWhatsAppEmbeddedSignupConfigId() &&
-      process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim(),
-  );
-}
-
-export function getInstagramEmbeddedSignupConfigId(): string | undefined {
-  return (
-    process.env[ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]?.trim() ||
-    undefined
-  );
-}
-
-export function getInstagramVerifyToken(): string | undefined {
-  return process.env[ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]?.trim() || undefined;
-}
-
-export function hasInstagramEnv(): boolean {
-  return Boolean(
-    getMetaAppId() &&
-      getInstagramEmbeddedSignupConfigId() &&
-      process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim(),
-  );
 }
 
 export function getTelegramWebhookSecret(): string | undefined {

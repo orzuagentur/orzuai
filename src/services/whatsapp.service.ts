@@ -6,19 +6,19 @@ import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
 import { buildAppUrl } from "@/lib/app-url";
 import {
-  getMetaAppId,
-  getWhatsAppEmbeddedSignupConfigId,
-  hasEmbeddedSignupEnv,
-  hasSupabaseEnv,
-} from "@/lib/env";
+  generateDialog360ChannelApiKey,
+  getDialog360ChannelDetails,
+  getDialog360PartnerId,
+  hasDialog360EmbeddedSignupEnv,
+  isDialog360ChannelReadyEvent,
+  type Dialog360PartnerWebhookPayload,
+} from "@/lib/dialog360/partner";
+import { hasSupabaseEnv } from "@/lib/env";
 import {
-  exchangeEmbeddedSignupCode,
-  getWhatsAppApiVersion,
   sendWhatsAppTextMessage,
-  subscribeAppToWaba,
+  set360DialogWebhook,
   verifyWhatsAppCredentials,
 } from "@/lib/whatsapp/client";
-import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getWorkerConcurrency,
@@ -38,20 +38,19 @@ import {
   incrementMessagingAnalytics,
   scheduleChannelAutoReply,
 } from "@/services/messaging.service";
-import type { WhatsappConnection } from "@/types/database.types";
+import type { WhatsappConnection, TablesInsert } from "@/types/database.types";
 import type {
-  CompleteEmbeddedSignupInput,
-  CompleteEmbeddedSignupResult,
+  Complete360DialogEmbeddedSignupInput,
+  Complete360DialogEmbeddedSignupResult,
   ConnectManualWhatsAppInput,
   ConnectManualWhatsAppResult,
   SyncWhatsAppResult,
   WhatsAppConnectConfig,
   WhatsAppConnectionData,
-  WhatsAppEmbeddedSignupConfig,
   WhatsAppWebhookPayload,
 } from "@/types/whatsapp.types";
 import {
-  completeEmbeddedSignupSchema,
+  complete360DialogEmbeddedSignupSchema,
   connectManualWhatsAppSchema,
 } from "@/types/whatsapp.types";
 import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydration.service";
@@ -117,12 +116,22 @@ export function getWhatsAppWebhookUrl(): string {
   return buildAppUrl("/api/webhooks/whatsapp");
 }
 
+export function getDialog360PartnerWebhookUrl(): string {
+  return buildAppUrl("/api/webhooks/360dialog-partner");
+}
+
 export function getWhatsAppConnectConfig(): WhatsAppConnectConfig {
   const webhookUrl = getWhatsAppWebhookUrl();
+  const integrationsRedirectUrl = buildAppUrl(
+    `${DASHBOARD_ROUTES.integrations}/whatsapp`,
+  );
 
   return {
     isConfigured: hasSupabaseEnv() && webhookUrl.startsWith("https://"),
     webhookUrl,
+    embeddedSignupEnabled: hasDialog360EmbeddedSignupEnv(),
+    partnerId: getDialog360PartnerId(),
+    integrationsRedirectUrl,
   };
 }
 
@@ -150,6 +159,8 @@ export async function disconnectWhatsApp(): Promise<{
       meta_access_token: null,
       meta_waba_id: null,
       meta_business_account_id: null,
+      dialog360_channel_id: null,
+      dialog360_client_id: null,
       connected_at: null,
       last_synced_at: null,
     })
@@ -161,188 +172,6 @@ export async function disconnectWhatsApp(): Promise<{
 
   revalidateWhatsAppPaths();
   return { success: true };
-}
-
-export async function getWhatsAppEmbeddedSignupConfig(): Promise<WhatsAppEmbeddedSignupConfig> {
-  const appId = getMetaAppId();
-  const configId = getWhatsAppEmbeddedSignupConfigId();
-
-  return {
-    appId: appId ?? "",
-    configId: configId ?? "",
-    graphApiVersion: getWhatsAppApiVersion(),
-    isConfigured: hasEmbeddedSignupEnv(),
-  };
-}
-
-export async function completeEmbeddedSignup(
-  input: CompleteEmbeddedSignupInput,
-): Promise<CompleteEmbeddedSignupResult> {
-  if (!hasSupabaseEnv() || !hasEmbeddedSignupEnv()) {
-    return missingConfigError();
-  }
-
-  const parsed = completeEmbeddedSignupSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: parsed.error.issues[0]?.message ?? "Invalid input.",
-      },
-    };
-  }
-
-  if (!isEmbeddedSignupFinishEvent(parsed.data.finishEvent)) {
-    if (parsed.data.finishEvent === "FINISH_ONLY_WABA") {
-      return {
-        success: false,
-        error: {
-          code: "SIGNUP_INCOMPLETE",
-          message: WHATSAPP_MESSAGES.whatsappBusinessRequired,
-        },
-      };
-    }
-
-    return {
-      success: false,
-      error: {
-        code: "SIGNUP_INCOMPLETE",
-        message: WHATSAPP_MESSAGES.signupIncomplete,
-      },
-    };
-  }
-
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return {
-      success: false,
-      error: {
-        code: "NO_BUSINESS",
-        message: WHATSAPP_MESSAGES.noBusinessDescription,
-      },
-    };
-  }
-
-  const supabase = await createClient();
-  const { data: existingConnection } = await supabase
-    .from("whatsapp_connections")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("whatsapp_status", "connected")
-    .maybeSingle();
-
-  if (existingConnection) {
-    return {
-      success: false,
-      error: {
-        code: "ALREADY_CONNECTED",
-        message: WHATSAPP_MESSAGES.alreadyConnected,
-      },
-    };
-  }
-
-  const tokenResult = await exchangeEmbeddedSignupCode(parsed.data.code);
-
-  if (!tokenResult.success) {
-    return {
-      success: false,
-      error: {
-        code: "TOKEN_EXCHANGE_FAILED",
-        message: tokenResult.message,
-      },
-    };
-  }
-
-  const subscribeResult = await subscribeAppToWaba(
-    parsed.data.wabaId,
-    tokenResult.accessToken,
-  );
-
-  if (!subscribeResult.success) {
-    return {
-      success: false,
-      error: {
-        code: "SUBSCRIBE_FAILED",
-        message: subscribeResult.message,
-      },
-    };
-  }
-
-  const credentialCheck = await verifyWhatsAppCredentials(
-    parsed.data.phoneNumberId,
-    tokenResult.accessToken,
-  );
-
-  if (!credentialCheck.success) {
-    return {
-      success: false,
-      error: {
-        code: "INVALID_CREDENTIALS",
-        message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
-      },
-    };
-  }
-
-  const connectedAt = new Date().toISOString();
-  const phoneNumber =
-    credentialCheck.displayPhoneNumber ??
-    normalizePhoneNumber(parsed.data.phoneNumberId);
-
-  const connectionPayload = {
-    business_id: businessId,
-    phone_number: phoneNumber,
-    whatsapp_status: "connected" as const,
-    meta_phone_number_id: parsed.data.phoneNumberId,
-    meta_access_token: tokenResult.accessToken,
-    meta_waba_id: parsed.data.wabaId,
-    meta_business_account_id: parsed.data.businessAccountId ?? null,
-    verification_code_hash: null,
-    verification_expires_at: null,
-    connected_at: connectedAt,
-    last_synced_at: connectedAt,
-  };
-
-  const { data: existingPending } = await supabase
-    .from("whatsapp_connections")
-    .select("id")
-    .eq("business_id", businessId)
-    .neq("whatsapp_status", "connected")
-    .maybeSingle();
-
-  const { data, error } = existingPending
-    ? await supabase
-        .from("whatsapp_connections")
-        .update(connectionPayload)
-        .eq("id", existingPending.id)
-        .select("*")
-        .single()
-    : await supabase
-        .from("whatsapp_connections")
-        .insert(connectionPayload)
-        .select("*")
-        .single();
-
-  if (error || !data) {
-    return {
-      success: false,
-      error: {
-        code: "CONNECT_FAILED",
-        message: error?.message || WHATSAPP_MESSAGES.genericError,
-      },
-    };
-  }
-
-  revalidateWhatsAppPaths();
-
-  return {
-    success: true,
-    data: {
-      connection: mapWhatsAppConnection(data),
-    },
-  };
 }
 
 export async function connectManualWhatsApp(
@@ -394,11 +223,12 @@ export async function connectManualWhatsApp(
     };
   }
 
-  const accessToken = parsed.data.accessToken;
+  const apiKey = parsed.data.apiKey;
+  const webhookUrl = getWhatsAppWebhookUrl();
 
   const credentialCheck = await verifyWhatsAppCredentials(
     parsed.data.phoneNumberId,
-    accessToken,
+    apiKey,
   );
 
   if (!credentialCheck.success) {
@@ -411,34 +241,43 @@ export async function connectManualWhatsApp(
     };
   }
 
-  const subscribeResult = await subscribeAppToWaba(
-    parsed.data.wabaId,
-    accessToken,
-  );
-
-  if (!subscribeResult.success) {
+  if (!webhookUrl.startsWith("https://")) {
     return {
       success: false,
       error: {
-        code: "SUBSCRIBE_FAILED",
-        message: subscribeResult.message,
+        code: "MISSING_CONFIG",
+        message: WHATSAPP_MESSAGES.notConfigured,
+      },
+    };
+  }
+
+  const webhookResult = await set360DialogWebhook(apiKey, webhookUrl);
+
+  if (!webhookResult.success) {
+    return {
+      success: false,
+      error: {
+        code: "WEBHOOK_SETUP_FAILED",
+        message: webhookResult.message || WHATSAPP_MESSAGES.webhookSetupFailed,
       },
     };
   }
 
   const connectedAt = new Date().toISOString();
-  const phoneNumber =
-    credentialCheck.displayPhoneNumber ??
-    normalizePhoneNumber(parsed.data.phoneNumberId);
+  const phoneNumber = parsed.data.displayPhoneNumber
+    ? normalizePhoneNumber(parsed.data.displayPhoneNumber)
+    : parsed.data.phoneNumberId;
 
   const connectionPayload = {
     business_id: businessId,
     phone_number: phoneNumber,
     whatsapp_status: "connected" as const,
     meta_phone_number_id: parsed.data.phoneNumberId,
-    meta_access_token: accessToken,
-    meta_waba_id: parsed.data.wabaId,
-    meta_business_account_id: parsed.data.businessAccountId ?? null,
+    meta_access_token: apiKey,
+    meta_waba_id: null,
+    meta_business_account_id: null,
+    dialog360_channel_id: null,
+    dialog360_client_id: null,
     verification_code_hash: null,
     verification_expires_at: null,
     connected_at: connectedAt,
@@ -483,6 +322,328 @@ export async function connectManualWhatsApp(
       connection: mapWhatsAppConnection(data),
     },
   };
+}
+
+type Activate360DialogChannelResult =
+  | {
+      success: true;
+      activationStatus: "connected" | "pending";
+      connection: WhatsappConnection;
+    }
+  | { success: false; message: string };
+
+async function upsertWhatsAppConnection(
+  supabase:
+    | Awaited<ReturnType<typeof createClient>>
+    | ReturnType<typeof createAdminClient>,
+  businessId: string,
+  payload: Omit<TablesInsert<"whatsapp_connections">, "business_id">,
+): Promise<WhatsappConnection | null> {
+  const { data: existing } = await supabase
+    .from("whatsapp_connections")
+    .select("id")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const { data, error } = existing
+    ? await supabase
+        .from("whatsapp_connections")
+        .update(payload)
+        .eq("id", existing.id)
+        .select("*")
+        .single()
+    : await supabase
+        .from("whatsapp_connections")
+        .insert({
+          ...payload,
+          business_id: businessId,
+          phone_number: payload.phone_number ?? "",
+        })
+        .select("*")
+        .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+async function activate360DialogChannel(input: {
+  supabase:
+    | Awaited<ReturnType<typeof createClient>>
+    | ReturnType<typeof createAdminClient>;
+  businessId: string;
+  clientId: string;
+  channelId: string;
+  phoneHint?: string;
+}): Promise<Activate360DialogChannelResult> {
+  const { supabase, businessId, clientId, channelId, phoneHint } = input;
+  const channelDetails = await getDialog360ChannelDetails(
+    clientId,
+    channelId,
+    phoneHint,
+  );
+
+  if (!channelDetails) {
+    const pendingConnection = await upsertWhatsAppConnection(supabase, businessId, {
+      phone_number: phoneHint ? normalizePhoneNumber(phoneHint) : "Pending",
+      whatsapp_status: "pending",
+      dialog360_channel_id: channelId,
+      dialog360_client_id: clientId,
+      meta_phone_number_id: null,
+      meta_access_token: null,
+      connected_at: null,
+      last_synced_at: null,
+    });
+
+    if (!pendingConnection) {
+      return {
+        success: false,
+        message: WHATSAPP_MESSAGES.genericError,
+      };
+    }
+
+    return {
+      success: true,
+      activationStatus: "pending",
+      connection: pendingConnection,
+    };
+  }
+
+  if (!channelDetails.metaPhoneNumberId) {
+    const pendingConnection = await upsertWhatsAppConnection(supabase, businessId, {
+      phone_number: normalizePhoneNumber(channelDetails.phoneNumber),
+      whatsapp_status: "pending",
+      dialog360_channel_id: channelId,
+      dialog360_client_id: clientId,
+      meta_phone_number_id: null,
+      meta_access_token: null,
+      connected_at: null,
+      last_synced_at: null,
+    });
+
+    if (!pendingConnection) {
+      return {
+        success: false,
+        message: WHATSAPP_MESSAGES.genericError,
+      };
+    }
+
+    return {
+      success: true,
+      activationStatus: "pending",
+      connection: pendingConnection,
+    };
+  }
+
+  const apiKeyResult = await generateDialog360ChannelApiKey(channelId);
+
+  if (!apiKeyResult.success) {
+    return {
+      success: false,
+      message: apiKeyResult.message,
+    };
+  }
+
+  const webhookUrl = getWhatsAppWebhookUrl();
+
+  if (!webhookUrl.startsWith("https://")) {
+    return {
+      success: false,
+      message: WHATSAPP_MESSAGES.notConfigured,
+    };
+  }
+
+  const webhookResult = await set360DialogWebhook(apiKeyResult.apiKey, webhookUrl);
+
+  if (!webhookResult.success) {
+    return {
+      success: false,
+      message: webhookResult.message || WHATSAPP_MESSAGES.webhookSetupFailed,
+    };
+  }
+
+  const credentialCheck = await verifyWhatsAppCredentials(
+    channelDetails.metaPhoneNumberId,
+    apiKeyResult.apiKey,
+  );
+
+  if (!credentialCheck.success) {
+    return {
+      success: false,
+      message: credentialCheck.message || WHATSAPP_MESSAGES.invalidCredentials,
+    };
+  }
+
+  const connectedAt = new Date().toISOString();
+  const connection = await upsertWhatsAppConnection(supabase, businessId, {
+    phone_number: normalizePhoneNumber(channelDetails.phoneNumber),
+    whatsapp_status: "connected",
+    dialog360_channel_id: channelId,
+    dialog360_client_id: clientId,
+    meta_phone_number_id: channelDetails.metaPhoneNumberId,
+    meta_access_token: apiKeyResult.apiKey,
+    meta_waba_id: null,
+    meta_business_account_id: null,
+    verification_code_hash: null,
+    verification_expires_at: null,
+    connected_at: connectedAt,
+    last_synced_at: connectedAt,
+  });
+
+  if (!connection) {
+    return {
+      success: false,
+      message: WHATSAPP_MESSAGES.genericError,
+    };
+  }
+
+  return {
+    success: true,
+    activationStatus: "connected",
+    connection,
+  };
+}
+
+export async function complete360DialogEmbeddedSignup(
+  input: Complete360DialogEmbeddedSignupInput,
+): Promise<Complete360DialogEmbeddedSignupResult> {
+  if (!hasSupabaseEnv()) {
+    return missingConfigError();
+  }
+
+  if (!hasDialog360EmbeddedSignupEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "PARTNER_NOT_CONFIGURED",
+        message: WHATSAPP_MESSAGES.notConfigured,
+      },
+    };
+  }
+
+  const parsed = complete360DialogEmbeddedSignupSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: WHATSAPP_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: existingConnection } = await supabase
+    .from("whatsapp_connections")
+    .select("id, whatsapp_status")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (existingConnection?.whatsapp_status === "connected") {
+    return {
+      success: false,
+      error: {
+        code: "ALREADY_CONNECTED",
+        message: WHATSAPP_MESSAGES.alreadyConnected,
+      },
+    };
+  }
+
+  const channelId = parsed.data.channelIds[0];
+
+  if (!channelId) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "No 360dialog channel ID was returned.",
+      },
+    };
+  }
+
+  const activation = await activate360DialogChannel({
+    supabase,
+    businessId,
+    clientId: parsed.data.clientId,
+    channelId,
+  });
+
+  if (!activation.success) {
+    return {
+      success: false,
+      error: {
+        code: "CONNECT_FAILED",
+        message: activation.message,
+      },
+    };
+  }
+
+  revalidateWhatsAppPaths();
+
+  return {
+    success: true,
+    data: {
+      connection: mapWhatsAppConnection(activation.connection),
+      activationStatus: activation.activationStatus,
+    },
+  };
+}
+
+export async function processDialog360PartnerWebhook(
+  payload: Dialog360PartnerWebhookPayload,
+): Promise<{ processed: boolean }> {
+  if (!hasSupabaseEnv() || !isDialog360ChannelReadyEvent(payload.event)) {
+    return { processed: false };
+  }
+
+  const channelId = payload.data?.id?.trim();
+  const clientId = payload.data?.client_id?.trim();
+
+  if (!channelId || !clientId) {
+    return { processed: false };
+  }
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("whatsapp_connections")
+    .select("*")
+    .eq("dialog360_channel_id", channelId)
+    .neq("whatsapp_status", "connected")
+    .maybeSingle();
+
+  if (!connection) {
+    return { processed: false };
+  }
+
+  const activation = await activate360DialogChannel({
+    supabase: admin,
+    businessId: connection.business_id,
+    clientId,
+    channelId,
+    phoneHint: payload.data?.setup_info?.phone_number,
+  });
+
+  if (!activation.success || activation.activationStatus !== "connected") {
+    return { processed: false };
+  }
+
+  revalidateWhatsAppPaths();
+  return { processed: true };
 }
 
 export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {

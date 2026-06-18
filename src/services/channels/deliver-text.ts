@@ -1,6 +1,5 @@
 import "server-only";
 
-import { sendInstagramTextMessage } from "@/lib/instagram/client";
 import { sendTelegramTextMessage } from "@/lib/telegram/client";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import { deliverEmailTextMessage, deliverFacebookMessengerTextMessage } from "@/services/channels/deliver-email";
@@ -73,29 +72,7 @@ export async function deliverChannelTextMessage(input: {
   }
 
   if (input.channel === "instagram") {
-    const { data: connection } = await input.admin
-      .from("instagram_connections")
-      .select("meta_access_token, meta_page_id")
-      .eq("business_id", input.businessId)
-      .eq("instagram_status", "connected")
-      .maybeSingle();
-
-    if (!connection?.meta_access_token || !connection.meta_page_id) {
-      return { success: false, error: "Instagram is not connected." };
-    }
-
-    const sendResult = await sendInstagramTextMessage(
-      connection.meta_page_id,
-      connection.meta_access_token,
-      input.recipientId,
-      input.content,
-    );
-
-    if (!sendResult.success) {
-      return { success: false, error: sendResult.message };
-    }
-
-    return { success: true, providerMessageId: sendResult.messageId };
+    return { success: false, error: "Instagram is no longer supported." };
   }
 
   if (input.channel === "email") {

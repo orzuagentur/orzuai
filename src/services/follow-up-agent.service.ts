@@ -2,7 +2,6 @@ import "server-only";
 
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateText } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
@@ -43,13 +42,7 @@ async function isChannelConnected(
   }
 
   if (channel === "instagram") {
-    const { data } = await admin
-      .from("instagram_connections")
-      .select("instagram_status")
-      .eq("business_id", businessId)
-      .maybeSingle();
-
-    return data?.instagram_status === "connected";
+    return false;
   }
 
   if (channel === "telegram") {
@@ -229,15 +222,7 @@ async function sendFollowUpOnChannel(input: {
       aiAgentId: input.aiAgentId ?? null,
     });
   } else if (candidate.channel === "instagram") {
-    const sendResult = await sendInstagramChatMessage(
-      candidate.businessId,
-      candidate.conversationId,
-      input.content,
-    );
-
-    if (!sendResult.success) {
-      return false;
-    }
+    return false;
   } else if (candidate.channel === "telegram") {
     const sendResult = await sendTelegramChatMessage(
       candidate.businessId,

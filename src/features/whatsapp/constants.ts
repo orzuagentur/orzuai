@@ -3,62 +3,59 @@ export const WHATSAPP_MESSAGES = {
   pageDescription: "Connect WhatsApp Business and enable AI-powered replies.",
   connectTitle: "WhatsApp Business",
   connectDescription:
-    "Official Meta Embedded Signup. Sign in with Meta, choose your business, and select the WhatsApp number for this workspace.",
-  connectButton: "Connect with Meta",
-  connectWaiting:
-    "Complete the Meta popup — select your business portfolio and WhatsApp phone number.",
-  connectFinishing: "Saving connection…",
+    "Connect your WhatsApp number through 360dialog Embedded Signup — or paste an API key manually from the Hub.",
+  connectButton: "Connect WhatsApp",
+  connectWaiting: "Verifying API key and registering webhook…",
   connectSuccess: "WhatsApp connected.",
+  embeddedConnectButton: "Connect with 360dialog",
+  embeddedConnectWaiting: "Finishing setup…",
+  embeddedConnectSuccess: "WhatsApp connected.",
+  embeddedConnectPending:
+    "Number registered — finishing activation. This usually takes under a minute.",
+  embeddedConnectTitle: "Quick connect",
+  embeddedConnectDescription:
+    "Add a WhatsApp Business number in a few minutes via 360dialog. Billing stays between you and 360dialog.",
+  manualConnectTitle: "Manual connect",
+  manualConnectDescription:
+    "Already have a Number API key? Paste it below instead.",
+  pendingTitle: "Activating your number",
+  pendingDescription:
+    "360dialog is finishing setup. You can leave this page — we will connect automatically when the number is live.",
   disconnectSuccess: "WhatsApp disconnected.",
-  connectCancelled: "Setup cancelled. You can try again.",
-  connectMetaIncomplete:
-    "Meta did not complete the connection. Add this site to App Domains, Allowed domains for the JavaScript SDK, and Valid OAuth Redirect URIs in Meta Developer Console, then try again.",
-  connectMissingCode:
-    "Meta finished setup but did not return an authorization code. Check OAuth and Embedded Signup settings in Meta Developer Console, then try again.",
   connectedNumber: "Connected number",
   connectedAt: "Connected",
   lastActivity: "Last activity",
-  connectedHint: "New messages arrive automatically via Meta webhooks.",
-  requirementsTitle: "You need",
-  requirementMeta: "Meta Business account with WhatsApp Business API access.",
-  requirementPhone: "A verified WhatsApp Business phone number in Meta.",
+  connectedHint: "New messages arrive automatically via 360dialog webhooks.",
+  requirementsTitle: "Before you connect",
+  requirementAccount:
+    "A WhatsApp Business API number onboarded in 360dialog (https://hub.360dialog.com).",
+  requirementApiKey:
+    "Number API key from 360dialog Hub → your number → API Keys.",
   noBusinessTitle: "Business profile required",
   noBusinessDescription: "Create your business profile before connecting WhatsApp.",
-  signupIncomplete: "Setup was not completed in Meta. Please try again.",
-  signupPhoneNumberRequired:
-    "Add and verify a WhatsApp phone number in the Meta popup, then connect again.",
-  whatsappBusinessHelpTitle: "Add a phone number",
-  whatsappBusinessRequired:
-    "Your Meta business is linked, but no WhatsApp number was selected. Open WhatsApp Business on your phone, verify the number in Meta Business Suite, then connect again.",
-  embeddedSignupNotConfigured:
-    "Embedded Signup is not configured. Set NEXT_PUBLIC_META_APP_ID, NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, and WHATSAPP_APP_SECRET.",
   alreadyConnected: "WhatsApp is already connected for this business.",
-  invalidCredentials: "Meta could not verify the WhatsApp connection.",
+  invalidCredentials: "360dialog could not verify this API key.",
+  webhookSetupFailed:
+    "API key is valid but webhook registration failed. Check NEXT_PUBLIC_APP_URL is HTTPS.",
   genericError: "Unable to complete the WhatsApp request. Please try again.",
   syncSuccess: "WhatsApp sync completed successfully.",
   notConfigured:
     "Set NEXT_PUBLIC_APP_URL (HTTPS) and Supabase env vars to enable WhatsApp.",
+  apiKeyLabel: "360dialog API key",
+  apiKeyPlaceholder: "Paste the Number API key from 360dialog Hub",
+  apiKeyHint: "Generated in 360dialog Hub for your WhatsApp number. Keep it secret.",
   phoneNumberIdLabel: "Phone number ID",
-  phoneNumberIdPlaceholder: "From API Setup → Phone number ID",
-  phoneNumberIdHint: "Meta Developer Console → WhatsApp → API Setup.",
-  wabaIdLabel: "WhatsApp Business Account ID",
-  wabaIdPlaceholder: "WABA ID from API Setup",
-  wabaIdHint: "Used to subscribe this app to your WhatsApp Business Account.",
-  accessTokenLabel: "Permanent access token",
-  accessTokenPlaceholder: "System user or permanent token from Meta",
-  accessTokenHint: "Needs whatsapp_business_messaging and manage permissions.",
-  businessAccountIdLabel: "Meta Business Account ID (optional)",
-  businessAccountIdPlaceholder: "Optional",
-  webhookUrlLabel: "Webhook callback URL",
-  verifyTokenLabel: "Webhook verify token",
-  verifyTokenHint:
-    "Use the same value in Meta and as WHATSAPP_VERIFY_TOKEN in your deployment.",
+  phoneNumberIdPlaceholder: "From 360dialog Hub → number details",
+  phoneNumberIdHint:
+    "Used to route inbound webhooks to this workspace. Shown in 360dialog Hub.",
+  displayPhoneLabel: "Display phone number (optional)",
+  displayPhonePlaceholder: "+1234567890",
+  displayPhoneHint: "For your reference in the dashboard. Inbound webhooks update this automatically.",
+  webhookUrlLabel: "Webhook URL (registered automatically)",
   requirements: [
-    "WhatsApp Business API app in Meta Developer Console",
-    "Phone number added and verified in WhatsApp Manager",
-    "Permanent access token with messaging permissions",
-    "Webhook URL and verify token configured in Meta",
-    "WHATSAPP_APP_SECRET set on the server for incoming webhooks",
+    "WhatsApp number onboarded in 360dialog",
+    "Number API key from 360dialog Hub",
+    "Phone number ID from 360dialog Hub",
+    "HTTPS production URL (NEXT_PUBLIC_APP_URL)",
   ] as const,
-  connectWaitingManual: "Verifying credentials with Meta...",
 } as const;

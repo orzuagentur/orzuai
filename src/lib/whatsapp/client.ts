@@ -1,67 +1,91 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
-import { getMetaAppId } from "@/lib/env";
-import {
-  DEFAULT_WHATSAPP_API_VERSION,
-  WHATSAPP_GRAPH_API_BASE,
-} from "@/lib/whatsapp/constants";
+import { DIALOG360_API_BASE } from "@/lib/whatsapp/constants";
 
-export function getWhatsAppApiVersion(): string {
-  return (
-    process.env[ENV_KEYS.WHATSAPP_API_VERSION]?.trim() ||
-    DEFAULT_WHATSAPP_API_VERSION
-  );
+function buildDialog360Url(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${DIALOG360_API_BASE}${normalizedPath}`;
 }
 
-export function getWhatsAppVerifyToken(): string | undefined {
-  return process.env[ENV_KEYS.WHATSAPP_VERIFY_TOKEN]?.trim() || undefined;
+function dialog360Headers(apiKey: string, json = true): HeadersInit {
+  const headers: Record<string, string> = {
+    "D360-API-KEY": apiKey,
+  };
+
+  if (json) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  return headers;
 }
 
-export function getWhatsAppAppSecret(): string | undefined {
-  return process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim() || undefined;
-}
-
-export function buildWhatsAppApiUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
-  return `${WHATSAPP_GRAPH_API_BASE}/${getWhatsAppApiVersion()}/${normalizedPath}`;
-}
+type ApiResult<T> = { success: true; data: T } | { success: false; message: string };
 
 type VerifyCredentialsResult =
   | { success: true; displayPhoneNumber?: string }
   | { success: false; message: string };
 
-export async function verifyWhatsAppCredentials(
-  phoneNumberId: string,
-  accessToken: string,
+export async function verify360DialogApiKey(
+  apiKey: string,
 ): Promise<VerifyCredentialsResult> {
-  const response = await fetch(buildWhatsAppApiUrl(phoneNumberId), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const response = await fetch(buildDialog360Url("/health"), {
+    headers: dialog360Headers(apiKey, false),
     cache: "no-store",
   });
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
+      | { error?: string; message?: string }
       | null;
 
     return {
       success: false,
       message:
-        payload?.error?.message ||
-        "Unable to verify WhatsApp credentials with Meta.",
+        payload?.error ||
+        payload?.message ||
+        "360dialog rejected this API key. Generate a new key in the 360dialog Hub.",
     };
   }
 
-  const payload = (await response.json()) as {
-    display_phone_number?: string;
-  };
+  return { success: true };
+}
+
+export async function verifyWhatsAppCredentials(
+  _phoneNumberId: string,
+  apiKey: string,
+): Promise<VerifyCredentialsResult> {
+  return verify360DialogApiKey(apiKey);
+}
+
+export async function set360DialogWebhook(
+  apiKey: string,
+  webhookUrl: string,
+): Promise<ApiResult<{ url: string }>> {
+  const response = await fetch(buildDialog360Url("/v1/configs/webhook"), {
+    method: "POST",
+    headers: dialog360Headers(apiKey),
+    body: JSON.stringify({ url: webhookUrl }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { url?: string; error?: string; message?: string }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error ||
+        payload?.message ||
+        "Unable to register the webhook URL with 360dialog.",
+    };
+  }
 
   return {
     success: true,
-    displayPhoneNumber: payload.display_phone_number,
+    data: { url: payload?.url ?? webhookUrl },
   };
 }
 
@@ -70,19 +94,17 @@ type SendTextMessageResult =
   | { success: false; message: string };
 
 export async function sendWhatsAppTextMessage(
-  phoneNumberId: string,
-  accessToken: string,
+  _phoneNumberId: string,
+  apiKey: string,
   to: string,
   body: string,
 ): Promise<SendTextMessageResult> {
-  const response = await fetch(buildWhatsAppApiUrl(`${phoneNumberId}/messages`), {
+  const response = await fetch(buildDialog360Url("/messages"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: dialog360Headers(apiKey),
     body: JSON.stringify({
       messaging_product: "whatsapp",
+      recipient_type: "individual",
       to,
       type: "text",
       text: {
@@ -100,7 +122,7 @@ export async function sendWhatsAppTextMessage(
     return {
       success: false,
       message:
-        payload?.error?.message || "Unable to send WhatsApp message via Meta.",
+        payload?.error?.message || "Unable to send WhatsApp message via 360dialog.",
     };
   }
 
@@ -109,7 +131,7 @@ export async function sendWhatsAppTextMessage(
   if (!messageId) {
     return {
       success: false,
-      message: "Meta accepted the request but did not return a message ID.",
+      message: "360dialog accepted the request but did not return a message ID.",
     };
   }
 
@@ -124,8 +146,8 @@ type UploadMediaResult =
   | { success: false; message: string };
 
 export async function uploadWhatsAppMedia(
-  phoneNumberId: string,
-  accessToken: string,
+  _phoneNumberId: string,
+  apiKey: string,
   file: Blob,
   mimeType: string,
   fileName: string,
@@ -135,11 +157,9 @@ export async function uploadWhatsAppMedia(
   formData.append("type", mimeType);
   formData.append("file", file, fileName);
 
-  const response = await fetch(buildWhatsAppApiUrl(`${phoneNumberId}/media`), {
+  const response = await fetch(buildDialog360Url("/media"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: { "D360-API-KEY": apiKey },
     body: formData,
     cache: "no-store",
   });
@@ -167,8 +187,8 @@ type SendMediaMessageResult =
   | { success: false; message: string };
 
 export async function sendWhatsAppMediaMessage(
-  phoneNumberId: string,
-  accessToken: string,
+  _phoneNumberId: string,
+  apiKey: string,
   to: string,
   mediaType: "image" | "audio" | "document" | "video",
   mediaId: string,
@@ -184,14 +204,12 @@ export async function sendWhatsAppMediaMessage(
     mediaPayload.filename = options.filename;
   }
 
-  const response = await fetch(buildWhatsAppApiUrl(`${phoneNumberId}/messages`), {
+  const response = await fetch(buildDialog360Url("/messages"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: dialog360Headers(apiKey),
     body: JSON.stringify({
       messaging_product: "whatsapp",
+      recipient_type: "individual",
       to,
       type: mediaType,
       [mediaType]: mediaPayload,
@@ -216,7 +234,7 @@ export async function sendWhatsAppMediaMessage(
   if (!messageId) {
     return {
       success: false,
-      message: "Meta accepted the media request but did not return a message ID.",
+      message: "360dialog accepted the media request but did not return a message ID.",
     };
   }
 
@@ -227,8 +245,8 @@ export async function sendWhatsAppMediaMessage(
 }
 
 export async function sendWhatsAppMediaMessageByUrl(
-  phoneNumberId: string,
-  accessToken: string,
+  _phoneNumberId: string,
+  apiKey: string,
   to: string,
   mediaType: "image" | "audio" | "document" | "video",
   mediaUrl: string,
@@ -244,14 +262,12 @@ export async function sendWhatsAppMediaMessageByUrl(
     mediaPayload.filename = options.filename;
   }
 
-  const response = await fetch(buildWhatsAppApiUrl(`${phoneNumberId}/messages`), {
+  const response = await fetch(buildDialog360Url("/messages"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: dialog360Headers(apiKey),
     body: JSON.stringify({
       messaging_product: "whatsapp",
+      recipient_type: "individual",
       to,
       type: mediaType,
       [mediaType]: mediaPayload,
@@ -276,93 +292,13 @@ export async function sendWhatsAppMediaMessageByUrl(
   if (!messageId) {
     return {
       success: false,
-      message: "Meta accepted the media request but did not return a message ID.",
+      message: "360dialog accepted the media request but did not return a message ID.",
     };
   }
 
   return {
     success: true,
     messageId,
-  };
-}
-
-type ExchangeTokenResult =
-  | { success: true; accessToken: string }
-  | { success: false; message: string };
-
-export async function exchangeEmbeddedSignupCode(
-  code: string,
-): Promise<ExchangeTokenResult> {
-  const appId = getMetaAppId();
-  const appSecret = getWhatsAppAppSecret();
-
-  if (!appId || !appSecret) {
-    return {
-      success: false,
-      message: "Meta Embedded Signup is not configured on the server.",
-    };
-  }
-
-  const params = new URLSearchParams({
-    client_id: appId,
-    client_secret: appSecret,
-    code,
-  });
-
-  const response = await fetch(
-    `${buildWhatsAppApiUrl("oauth/access_token")}?${params.toString()}`,
-    { cache: "no-store" },
-  );
-
-  const payload = (await response.json().catch(() => null)) as
-    | { access_token?: string; error?: { message?: string } }
-    | null;
-
-  if (!response.ok || !payload?.access_token) {
-    return {
-      success: false,
-      message:
-        payload?.error?.message ||
-        "Unable to exchange the Meta authorization code for an access token.",
-    };
-  }
-
-  return {
-    success: true,
-    accessToken: payload.access_token,
-  };
-}
-
-type SubscribeWabaResult =
-  | { success: true }
-  | { success: false; message: string };
-
-export async function subscribeAppToWaba(
-  wabaId: string,
-  accessToken: string,
-): Promise<SubscribeWabaResult> {
-  const response = await fetch(buildWhatsAppApiUrl(`${wabaId}/subscribed_apps`), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (response.ok) {
-    return { success: true };
-  }
-
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: { message?: string } }
-    | null;
-
-  return {
-    success: false,
-    message:
-      payload?.error?.message ||
-      "Unable to subscribe the app to the WhatsApp Business Account.",
   };
 }
 
@@ -376,14 +312,12 @@ type DownloadMediaResult =
   | { success: false; message: string };
 
 export async function downloadWhatsAppMedia(
-  accessToken: string,
+  apiKey: string,
   mediaId: string,
   fallbackFileName = "file",
 ): Promise<DownloadMediaResult> {
-  const metaResponse = await fetch(buildWhatsAppApiUrl(mediaId), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const metaResponse = await fetch(buildDialog360Url(`/${mediaId}`), {
+    headers: dialog360Headers(apiKey, false),
     cache: "no-store",
   });
 
@@ -400,9 +334,7 @@ export async function downloadWhatsAppMedia(
   }
 
   const fileResponse = await fetch(metaPayload.url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: { "D360-API-KEY": apiKey },
     cache: "no-store",
   });
 
@@ -433,14 +365,19 @@ export async function downloadWhatsAppMedia(
   };
 }
 
+/** Optional Meta app secret — only needed for legacy direct Meta webhooks. */
+export function getWhatsAppWebhookSecret(): string | undefined {
+  return process.env[ENV_KEYS.WHATSAPP_APP_SECRET]?.trim() || undefined;
+}
+
 export function verifyWhatsAppWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
 ): boolean {
-  const appSecret = getWhatsAppAppSecret();
+  const appSecret = getWhatsAppWebhookSecret();
 
   if (!appSecret) {
-    return process.env.NODE_ENV !== "production";
+    return true;
   }
 
   if (!signatureHeader?.startsWith("sha256=")) {

@@ -25,7 +25,6 @@ import {
   getProviderAvailability,
   isProviderConfigured,
 } from "@/services/llm.service";
-import { getInstagramConnection } from "@/services/instagram.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
@@ -269,10 +268,9 @@ export async function syncChannelAnalytics(
 }
 
 export async function getChannelConnectionStatuses(businessId: string) {
-  const [whatsapp, instagram, telegram, websiteForms, websiteKnowledge, voice] =
+  const [whatsapp, telegram, websiteForms, websiteKnowledge, voice] =
     await Promise.all([
       getWhatsAppConnection(businessId),
-      getInstagramConnection(businessId),
       getTelegramConnection(businessId),
       getWebsiteFormConnection(businessId),
       getWebsiteKnowledgeSync(businessId),
@@ -281,7 +279,6 @@ export async function getChannelConnectionStatuses(businessId: string) {
 
   return buildIntegrationChannelStatuses({
     whatsappConnection: whatsapp,
-    instagramConnection: instagram,
     telegramConnection: telegram,
     websiteFormConnection: websiteForms,
     websiteKnowledgeSync: websiteKnowledge,

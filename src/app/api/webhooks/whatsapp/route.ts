@@ -1,31 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWhatsAppVerifyToken, verifyWhatsAppWebhookSignature } from "@/lib/whatsapp/client";
+import { verifyWhatsAppWebhookSignature } from "@/lib/whatsapp/client";
 import {
   buildWebhookIdempotencyKey,
   receiveInboundWebhook,
 } from "@/services/webhook-queue.service";
 import type { WhatsAppWebhookPayload } from "@/types/whatsapp.types";
 
-export async function GET(request: NextRequest) {
-  const verifyToken = getWhatsAppVerifyToken();
-  const searchParams = request.nextUrl.searchParams;
-  const mode = searchParams.get("hub.mode");
-  const token = searchParams.get("hub.verify_token");
-  const challenge = searchParams.get("hub.challenge");
-
-  if (
-    mode === "subscribe" &&
-    token &&
-    verifyToken &&
-    token === verifyToken &&
-    challenge
-  ) {
-    return new NextResponse(challenge, { status: 200 });
-  }
-
-  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function GET() {
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(request: NextRequest) {

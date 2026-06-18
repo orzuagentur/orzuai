@@ -21,9 +21,16 @@ export const PIPELINE_STAGES = [
 
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
+
 export const automationConfigSchema = z.object({
   channels: z
-    .array(z.enum(["whatsapp", "instagram", "telegram", "website_forms"]))
+    .array(
+      z.enum([
+        MESSAGING_INTEGRATION_CHANNELS[0],
+        ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
+      ]),
+    )
     .default([]),
   aiAgentId: z.string().uuid().nullable().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES).optional(),

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { sendInstagramMediaMessage } from "@/lib/instagram/client";
 import { sendTelegramMediaMessageByUrl } from "@/lib/telegram/client";
 import { sendWhatsAppMediaMessageByUrl } from "@/lib/whatsapp/client";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
@@ -97,30 +96,7 @@ export async function deliverChannelMediaMessage(
   }
 
   if (input.channel === "instagram") {
-    const { data: connection } = await input.admin
-      .from("instagram_connections")
-      .select("meta_page_id, meta_access_token")
-      .eq("business_id", input.businessId)
-      .eq("instagram_status", "connected")
-      .maybeSingle();
-
-    if (!connection?.meta_page_id || !connection.meta_access_token) {
-      return { success: false, error: "Instagram is not connected." };
-    }
-
-    const sendResult = await sendInstagramMediaMessage(
-      connection.meta_page_id,
-      connection.meta_access_token,
-      input.recipientId,
-      input.mediaKind,
-      input.mediaUrl,
-    );
-
-    if (!sendResult.success) {
-      return { success: false, error: sendResult.message };
-    }
-
-    return { success: true, providerMessageId: sendResult.messageId };
+    return { success: false, error: "Instagram is no longer supported." };
   }
 
   return { success: false, error: `Unsupported channel: ${input.channel}` };

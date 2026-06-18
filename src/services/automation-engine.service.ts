@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateText } from "@/services/llm.service";
 import {
   incrementMessagingAnalytics,
@@ -206,15 +205,7 @@ async function sendAutomationMessage(
       aiAgentId: input.aiAgentId,
     });
   } else if (input.channel === "instagram") {
-    const sendResult = await sendInstagramChatMessage(
-      input.businessId,
-      input.conversationId,
-      input.content,
-    );
-
-    if (!sendResult.success) {
-      return false;
-    }
+    return false;
   } else if (input.channel === "telegram") {
     const sendResult = await sendTelegramChatMessage(
       input.businessId,

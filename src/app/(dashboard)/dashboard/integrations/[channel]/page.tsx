@@ -9,10 +9,6 @@ import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getChannelContacts } from "@/services/channel-workspace.service";
 import {
-  getInstagramConnection,
-  getInstagramEmbeddedSignupConfig,
-} from "@/services/instagram.service";
-import {
   getTelegramConnection,
   getTelegramConnectConfig,
 } from "@/services/telegram.service";
@@ -29,7 +25,7 @@ import {
 } from "@/services/voice-agent.service";
 import {
   getWhatsAppConnection,
-  getWhatsAppEmbeddedSignupConfig,
+  getWhatsAppConnectConfig,
 } from "@/services/whatsapp.service";
 import {
   buildChannelWorkspaceHref,
@@ -61,6 +57,10 @@ export default async function IntegrationsChannelPage({
     redirect(`${DASHBOARD_ROUTES.knowledgeBase}#website-sync`);
   }
 
+  if (channelParam === "instagram") {
+    notFound();
+  }
+
   if (!isIntegrationChannelId(channelParam)) {
     notFound();
   }
@@ -80,9 +80,7 @@ export default async function IntegrationsChannelPage({
 
   const [
     whatsappConnection,
-    whatsappEmbeddedSignupConfig,
-    instagramConnection,
-    instagramConfig,
+    whatsappConnectConfig,
     telegramConnection,
     telegramConfig,
     websiteFormConnection,
@@ -94,9 +92,7 @@ export default async function IntegrationsChannelPage({
     voiceConnectConfig,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
-    getWhatsAppEmbeddedSignupConfig(),
-    business ? getInstagramConnection(business.id) : Promise.resolve(null),
-    getInstagramEmbeddedSignupConfig(),
+    Promise.resolve(getWhatsAppConnectConfig()),
     business ? getTelegramConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getTelegramConnectConfig()),
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
@@ -112,7 +108,6 @@ export default async function IntegrationsChannelPage({
 
   const channelStatuses = buildIntegrationChannelStatuses({
     whatsappConnection,
-    instagramConnection,
     telegramConnection,
     websiteFormConnection,
     websiteKnowledgeSync,
@@ -147,11 +142,7 @@ export default async function IntegrationsChannelPage({
           channelStatuses={channelStatuses}
           whatsapp={{
             connection: whatsappConnection,
-            embeddedSignupConfig: whatsappEmbeddedSignupConfig,
-          }}
-          instagram={{
-            connection: instagramConnection,
-            embeddedSignupConfig: instagramConfig,
+            connectConfig: whatsappConnectConfig,
           }}
           telegram={{
             connection: telegramConnection,

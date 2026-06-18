@@ -1,9 +1,2 @@
-export const DEFAULT_WHATSAPP_API_VERSION = "v25.0";
-
-export const WHATSAPP_GRAPH_API_BASE = "https://graph.facebook.com";
-
-/** OrzuX Meta app (public — Embedded Signup SDK) */
-export const META_APP_ID = "2417886435376369";
-
-/** Embedded Signup configuration ID from Meta Developer Console */
-export const WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = "1615693772836798";
+/** 360dialog WhatsApp Cloud API (Messaging API). */
+export const DIALOG360_API_BASE = "https://waba-v2.360dialog.io";

@@ -10,7 +10,6 @@ import {
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { sendInstagramChatMessage } from "@/services/instagram.service";
 import { generateAssistantReply } from "@/services/llm.service";
 import {
   createOutboundMessageDelivery,
@@ -328,17 +327,8 @@ async function isWhatsAppConnected(businessId: string): Promise<boolean> {
   return data?.whatsapp_status === "connected";
 }
 
-async function isInstagramConnected(businessId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("instagram_connections")
-    .select("instagram_status")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data?.instagram_status === "connected";
+async function isInstagramConnected(_businessId: string): Promise<boolean> {
+  return false;
 }
 
 async function isTelegramConnected(businessId: string): Promise<boolean> {
@@ -865,26 +855,11 @@ export async function sendChatMessage(
   }
 
   if (conversation.channel === "instagram") {
-    const sendResult = await sendInstagramChatMessage(
-      businessId,
-      parsed.data.conversationId,
-      parsed.data.content,
-    );
-
-    if (!sendResult.success) {
-      return {
-        success: false,
-        error: {
-          code: "SEND_FAILED",
-          message: sendResult.message,
-        },
-      };
-    }
-
     return {
-      success: true,
-      data: {
-        message: buildPendingOutboundChatMessage(sendResult.message),
+      success: false,
+      error: {
+        code: "SEND_FAILED",
+        message: CHAT_MESSAGES.instagramNotConnected,
       },
     };
   } else if (conversation.channel === "telegram") {

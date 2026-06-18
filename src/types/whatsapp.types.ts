@@ -3,35 +3,27 @@ import { z } from "zod";
 import type { WhatsappStatus } from "./database.types";
 
 export const connectManualWhatsAppSchema = z.object({
+  apiKey: z.string().trim().min(1, "360dialog API key is required."),
   phoneNumberId: z
     .string()
     .trim()
-    .min(1, "WhatsApp Phone Number ID is required."),
-  wabaId: z
-    .string()
-    .trim()
-    .min(1, "WhatsApp Business Account ID is required."),
-  accessToken: z
-    .string()
-    .trim()
-    .min(1, "Permanent access token is required."),
-  businessAccountId: z.string().trim().min(1).optional(),
+    .min(1, "Phone number ID from 360dialog Hub is required."),
+  displayPhoneNumber: z.string().trim().min(1).optional(),
 });
+
+export const complete360DialogEmbeddedSignupSchema = z.object({
+  clientId: z.string().trim().min(1, "360dialog client ID is required."),
+  channelIds: z
+    .array(z.string().trim().min(1))
+    .min(1, "At least one 360dialog channel ID is required."),
+});
+
+export type Complete360DialogEmbeddedSignupInput = z.infer<
+  typeof complete360DialogEmbeddedSignupSchema
+>;
 
 export type ConnectManualWhatsAppInput = z.infer<
   typeof connectManualWhatsAppSchema
->;
-
-export const completeEmbeddedSignupSchema = z.object({
-  code: z.string().trim().min(1, "Meta authorization code is required."),
-  phoneNumberId: z.string().trim().min(1, "WhatsApp phone number ID is missing."),
-  wabaId: z.string().trim().min(1, "WhatsApp Business Account ID is missing."),
-  businessAccountId: z.string().trim().min(1).optional(),
-  finishEvent: z.string().trim().min(1, "Embedded Signup event is missing."),
-});
-
-export type CompleteEmbeddedSignupInput = z.infer<
-  typeof completeEmbeddedSignupSchema
 >;
 
 export type WhatsAppConnectionData = {
@@ -54,10 +46,9 @@ export type WhatsAppErrorCode =
   | "SYNC_FAILED"
   | "SEND_FAILED"
   | "INVALID_CREDENTIALS"
-  | "SIGNUP_CANCELLED"
-  | "SIGNUP_INCOMPLETE"
-  | "TOKEN_EXCHANGE_FAILED"
-  | "SUBSCRIBE_FAILED";
+  | "WEBHOOK_SETUP_FAILED"
+  | "CHANNEL_NOT_READY"
+  | "PARTNER_NOT_CONFIGURED";
 
 export type WhatsAppActionError = {
   code: WhatsAppErrorCode;
@@ -68,17 +59,21 @@ export type WhatsAppActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: WhatsAppActionError };
 
-export type CompleteEmbeddedSignupResult = WhatsAppActionResult<{
+export type ConnectManualWhatsAppResult = WhatsAppActionResult<{
   connection: WhatsAppConnectionData;
 }>;
 
-export type ConnectManualWhatsAppResult = WhatsAppActionResult<{
+export type Complete360DialogEmbeddedSignupResult = WhatsAppActionResult<{
   connection: WhatsAppConnectionData;
+  activationStatus: "connected" | "pending";
 }>;
 
 export type WhatsAppConnectConfig = {
   isConfigured: boolean;
   webhookUrl: string;
+  embeddedSignupEnabled: boolean;
+  partnerId?: string;
+  integrationsRedirectUrl: string;
 };
 
 export type SyncWhatsAppResult = WhatsAppActionResult<{
@@ -116,6 +111,7 @@ export type WhatsAppWebhookPayload = {
       value?: {
         metadata?: {
           phone_number_id?: string;
+          display_phone_number?: string;
         };
         contacts?: Array<{
           profile?: {
@@ -170,11 +166,4 @@ export type WhatsAppWebhookPayload = {
       };
     }>;
   }>;
-};
-
-export type WhatsAppEmbeddedSignupConfig = {
-  appId: string;
-  configId: string;
-  graphApiVersion: string;
-  isConfigured: boolean;
 };

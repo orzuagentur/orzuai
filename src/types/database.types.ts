@@ -273,6 +273,8 @@ export type Database = {
           meta_access_token: string | null;
           meta_waba_id: string | null;
           meta_business_account_id: string | null;
+          dialog360_channel_id: string | null;
+          dialog360_client_id: string | null;
           verification_code_hash: string | null;
           verification_expires_at: string | null;
           last_synced_at: string | null;
@@ -288,6 +290,8 @@ export type Database = {
           meta_access_token?: string | null;
           meta_waba_id?: string | null;
           meta_business_account_id?: string | null;
+          dialog360_channel_id?: string | null;
+          dialog360_client_id?: string | null;
           verification_code_hash?: string | null;
           verification_expires_at?: string | null;
           last_synced_at?: string | null;
@@ -303,6 +307,8 @@ export type Database = {
           meta_access_token?: string | null;
           meta_waba_id?: string | null;
           meta_business_account_id?: string | null;
+          dialog360_channel_id?: string | null;
+          dialog360_client_id?: string | null;
           verification_code_hash?: string | null;
           verification_expires_at?: string | null;
           last_synced_at?: string | null;

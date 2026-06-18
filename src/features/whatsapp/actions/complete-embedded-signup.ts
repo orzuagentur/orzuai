@@ -1,13 +1,13 @@
 "use server";
 
-import { completeEmbeddedSignup } from "@/services/whatsapp.service";
+import { complete360DialogEmbeddedSignup } from "@/services/whatsapp.service";
 import type {
-  CompleteEmbeddedSignupInput,
-  CompleteEmbeddedSignupResult,
+  Complete360DialogEmbeddedSignupInput,
+  Complete360DialogEmbeddedSignupResult,
 } from "@/types/whatsapp.types";
 
-export async function completeEmbeddedSignupAction(
-  input: CompleteEmbeddedSignupInput,
-): Promise<CompleteEmbeddedSignupResult> {
-  return completeEmbeddedSignup(input);
+export async function complete360DialogEmbeddedSignupAction(
+  input: Complete360DialogEmbeddedSignupInput,
+): Promise<Complete360DialogEmbeddedSignupResult> {
+  return complete360DialogEmbeddedSignup(input);
 }

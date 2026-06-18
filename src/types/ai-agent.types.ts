@@ -8,6 +8,7 @@ import {
 import type { CommunicationStyleId } from "@/features/ai-assistant/communication-styles";
 import { AI_PROVIDERS } from "@/lib/ai/constants";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { MessagingChannel } from "./database.types";
 
 const communicationStyleSchema = z.enum([
@@ -18,10 +19,8 @@ const communicationStyleSchema = z.enum([
 ] satisfies [CommunicationStyleId, ...CommunicationStyleId[]]);
 
 const messagingChannelSchema = z.enum([
-  "whatsapp",
-  "instagram",
-  "telegram",
-  "website_forms",
+  MESSAGING_INTEGRATION_CHANNELS[0],
+  ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
 ]);
 
 export const createAiAgentSchema = z.object({

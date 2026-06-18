@@ -111,13 +111,7 @@ async function isChannelConnected(
   }
 
   if (channel === "instagram") {
-    const { data } = await supabase
-      .from("instagram_connections")
-      .select("instagram_status")
-      .eq("business_id", businessId)
-      .maybeSingle();
-
-    return data?.instagram_status === "connected";
+    return false;
   }
 
   if (channel === "website_forms") {

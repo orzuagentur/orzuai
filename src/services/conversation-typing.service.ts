@@ -1,7 +1,6 @@
 import "server-only";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
-import { sendInstagramTypingAction } from "@/lib/instagram/client";
 import { sendTelegramChatAction } from "@/lib/telegram/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -135,23 +134,6 @@ export async function sendAgentTypingToChannel(
     return;
   }
 
-  if (conversation.channel === "instagram") {
-    const { data: connection } = await supabase
-      .from("instagram_connections")
-      .select("meta_page_id, meta_access_token")
-      .eq("business_id", business.id)
-      .eq("instagram_status", "connected")
-      .maybeSingle();
-
-    if (connection?.meta_page_id && connection.meta_access_token) {
-      await sendInstagramTypingAction(
-        connection.meta_page_id,
-        connection.meta_access_token,
-        recipientId,
-        "typing_on",
-      );
-    }
-  }
 }
 
 export async function stopAgentTypingBroadcast(

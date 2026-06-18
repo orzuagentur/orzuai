@@ -1,5 +1,4 @@
 import type { VoiceConnectionData } from "@/types/voice-agent.types";
-import type { InstagramConnectionData } from "@/types/instagram.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
@@ -28,7 +27,6 @@ export type IntegrationChannelStatusMap = Partial<
 
 type BuildChannelStatusesInput = {
   whatsappConnection: WhatsAppConnectionData | null;
-  instagramConnection: InstagramConnectionData | null;
   telegramConnection: TelegramConnectionData | null;
   websiteFormConnection: WebsiteFormConnectionData | null;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
@@ -37,7 +35,6 @@ type BuildChannelStatusesInput = {
 
 export function buildIntegrationChannelStatuses({
   whatsappConnection,
-  instagramConnection,
   telegramConnection,
   websiteFormConnection,
   websiteKnowledgeSync,
@@ -51,18 +48,6 @@ export function buildIntegrationChannelStatuses({
     whatsappDetail = whatsappConnection.phoneNumber;
   } else if (whatsappConnection?.status === "pending") {
     whatsappStatus = "pending";
-  }
-
-  let instagramStatus: IntegrationChannelStatus = "disconnected";
-  let instagramDetail: string | undefined;
-
-  if (instagramConnection?.status === "connected") {
-    instagramStatus = "connected";
-    instagramDetail = instagramConnection.username
-      ? `@${instagramConnection.username}`
-      : undefined;
-  } else if (instagramConnection?.status === "pending") {
-    instagramStatus = "pending";
   }
 
   let telegramStatus: IntegrationChannelStatus = "disconnected";
@@ -119,10 +104,6 @@ export function buildIntegrationChannelStatuses({
     whatsapp: {
       status: whatsappStatus,
       detail: whatsappDetail,
-    },
-    instagram: {
-      status: instagramStatus,
-      detail: instagramDetail,
     },
     telegram: {
       status: telegramStatus,

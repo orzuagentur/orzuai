@@ -9,11 +9,9 @@ import {
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { processInstagramWebhook } from "@/services/instagram.service";
 import { processTelegramWebhook } from "@/services/telegram.service";
 import { processWhatsAppWebhook } from "@/services/whatsapp.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
-import type { InstagramWebhookPayload } from "@/types/instagram.types";
 import type { TelegramWebhookPayload } from "@/types/telegram.types";
 import type { WhatsAppWebhookPayload } from "@/types/whatsapp.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -355,11 +353,6 @@ async function processWebhookJob(job: {
       secretToken,
       job.payload as TelegramWebhookPayload,
     );
-    return { success: true };
-  }
-
-  if (job.channel === "instagram") {
-    await processInstagramWebhook(job.payload as InstagramWebhookPayload);
     return { success: true };
   }
 

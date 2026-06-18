@@ -2,7 +2,6 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { fetchInstagramUserProfile } from "@/lib/instagram/client";
 import {
   downloadTelegramFile,
   getTelegramUserProfilePhotoFileId,
@@ -112,55 +111,6 @@ async function syncTelegramContactAvatar(input: {
   });
 }
 
-async function syncInstagramContactAvatar(input: {
-  admin: MessagingDbClient;
-  businessId: string;
-  contactId: string;
-  accessToken: string;
-  instagramUserId: string;
-}): Promise<string | null> {
-  const profileResult = await fetchInstagramUserProfile(
-    input.instagramUserId,
-    input.accessToken,
-  );
-
-  if (!profileResult.success || !profileResult.profile.profilePicUrl) {
-    if (profileResult.success && profileResult.profile.name?.trim()) {
-      await input.admin
-        .from("contacts")
-        .update({
-          name: profileResult.profile.name.trim(),
-          avatar_synced_at: new Date().toISOString(),
-        })
-        .eq("id", input.contactId)
-        .eq("business_id", input.businessId);
-    }
-
-    return null;
-  }
-
-  const response = await fetch(profileResult.profile.profilePicUrl, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const mimeType =
-    response.headers.get("content-type") || "image/jpeg";
-  const buffer = Buffer.from(await response.arrayBuffer());
-
-  return persistContactAvatar({
-    admin: input.admin,
-    businessId: input.businessId,
-    contactId: input.contactId,
-    buffer,
-    mimeType,
-    name: profileResult.profile.name,
-  });
-}
-
 export async function syncContactAvatarOnInboundMessage(input: {
   admin: MessagingDbClient;
   businessId: string;
@@ -171,10 +121,6 @@ export async function syncContactAvatarOnInboundMessage(input: {
   telegram?: {
     botToken: string;
     userId: number;
-  };
-  instagram?: {
-    accessToken: string;
-    userId: string;
   };
 }): Promise<void> {
   if (!shouldSyncAvatar(input.avatarUrl, input.avatarSyncedAt)) {
@@ -192,16 +138,6 @@ export async function syncContactAvatarOnInboundMessage(input: {
       });
       return;
     }
-
-    if (input.channel === "instagram" && input.instagram) {
-      await syncInstagramContactAvatar({
-        admin: input.admin,
-        businessId: input.businessId,
-        contactId: input.contactId,
-        accessToken: input.instagram.accessToken,
-        instagramUserId: input.instagram.userId,
-      });
-    }
   } catch (error) {
     console.error("[contact-avatar] sync failed:", error);
   }
@@ -215,10 +151,6 @@ export async function scheduleContactAvatarSync(input: {
   telegram?: {
     botToken: string;
     userId: number;
-  };
-  instagram?: {
-    accessToken: string;
-    userId: string;
   };
 }): Promise<void> {
   const { data } = await input.admin
@@ -236,6 +168,5 @@ export async function scheduleContactAvatarSync(input: {
     avatarUrl: data?.avatar_url,
     avatarSyncedAt: data?.avatar_synced_at,
     telegram: input.telegram,
-    instagram: input.instagram,
   });
 }

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { dispatchInboundMediaHydrationWorker } from "@/lib/queue/qstash-inbound-media-worker";
-import { fetchInstagramMessageAttachmentUrl } from "@/lib/instagram/client";
 import {
   claimInboundMediaHydrationJob,
   claimInboundMediaHydrationJobs,
@@ -13,7 +12,6 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   downloadAndStoreTelegramInboundMedia,
-  downloadAndStoreUrlInboundMedia,
   downloadAndStoreWhatsAppInboundMedia,
 } from "@/services/inbound-media.service";
 import { recomputeConversationLastMessage } from "@/services/conversation-last-message.service";
@@ -518,85 +516,6 @@ async function resolveInboundMediaContent(
   }
 
   if (message.channel === "instagram") {
-    const { data: connection } = await admin
-      .from("instagram_connections")
-      .select("meta_access_token")
-      .eq("business_id", attachment.business_id)
-      .maybeSingle();
-
-    let sourceUrl = context.sourceUrl;
-
-    if (
-      (attachment.retry_count ?? 0) > 0 &&
-      message.external_message_id &&
-      connection?.meta_access_token
-    ) {
-      const refreshed = await fetchInstagramMessageAttachmentUrl(
-        connection.meta_access_token,
-        message.external_message_id,
-      );
-
-      if (refreshed) {
-        sourceUrl = refreshed;
-        await saveMessageAttachmentHydrationContext(admin, {
-          messageId,
-          context: {
-            ...context,
-            sourceUrl: refreshed,
-          },
-        });
-      }
-    }
-
-    if (!sourceUrl) {
-      throw new Error("Instagram media source URL is missing.");
-    }
-
-    const stored = await downloadAndStoreUrlInboundMedia({
-      messageId,
-      sourceUrl,
-      businessId: attachment.business_id,
-      conversationId: message.conversation_id,
-      kind,
-      fileName: attachment.file_name,
-      mimeType: attachment.mime_type,
-      caption,
-      accessToken: connection?.meta_access_token ?? undefined,
-    });
-
-    if (stored) {
-      return stored;
-    }
-
-    if (message.external_message_id && connection?.meta_access_token) {
-      const refreshed = await fetchInstagramMessageAttachmentUrl(
-        connection.meta_access_token,
-        message.external_message_id,
-      );
-
-      if (refreshed && refreshed !== sourceUrl) {
-        await saveMessageAttachmentHydrationContext(admin, {
-          messageId,
-          context: {
-            ...context,
-            sourceUrl: refreshed,
-          },
-        });
-
-        return downloadAndStoreUrlInboundMedia({
-          messageId,
-          sourceUrl: refreshed,
-          businessId: attachment.business_id,
-          conversationId: message.conversation_id,
-          kind,
-          fileName: attachment.file_name,
-          mimeType: attachment.mime_type,
-          caption,
-          accessToken: connection.meta_access_token,
-        });
-      }
-    }
-
     return null;
   }
 

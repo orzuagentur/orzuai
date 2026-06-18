@@ -20,6 +20,7 @@ import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
 import type { AiAgentItem } from "./ai-agent.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { AiCostMetrics } from "./ai-usage.types";
 import type { BusinessProviderCredential } from "@/services/business-ai-credentials.service";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
@@ -33,7 +34,10 @@ export const AI_LANGUAGE_OPTIONS = [
 ] as const;
 
 export const saveChannelAiSettingsSchema = z.object({
-  channel: z.enum(["whatsapp", "instagram", "telegram", "website_forms"]),
+  channel: z.enum([
+    MESSAGING_INTEGRATION_CHANNELS[0],
+    ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
+  ]),
   aiEnabled: z.boolean(),
   provider: z.enum(AI_PROVIDERS),
   model: z.string().trim().min(1).max(100),
@@ -57,7 +61,10 @@ export const applyGlobalAiDefaultsSchema = z.object({
 export type ApplyGlobalAiDefaultsInput = z.infer<typeof applyGlobalAiDefaultsSchema>;
 
 export const testChannelAiReplySchema = z.object({
-  channel: z.enum(["whatsapp", "instagram", "telegram", "website_forms"]),
+  channel: z.enum([
+    MESSAGING_INTEGRATION_CHANNELS[0],
+    ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
+  ]),
   testMessage: z
     .string()
     .trim()
