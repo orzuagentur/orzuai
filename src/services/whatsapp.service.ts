@@ -29,15 +29,14 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { applyWhatsAppDeliveryStatusUpdates } from "@/services/message-delivery-status.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
-import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import {
+  insertInboundChannelMessage,
+  resolveInboundMessageContext,
+} from "@/services/inbound-ingest.service";
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import {
-  findContactForChannel,
-  findMessageByExternalId,
   incrementMessagingAnalytics,
-  insertChannelMessage,
   scheduleChannelAutoReply,
-  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WhatsappConnection } from "@/types/database.types";
 import type {
@@ -569,64 +568,20 @@ async function ingestIncomingMessage(
   const businessId = connection.business_id;
   const normalizedPhone = normalizePhoneNumber(message.from);
 
-  const existingContact = await findContactForChannel(
-    admin,
+  const context = await resolveInboundMessageContext(admin, {
     businessId,
-    "whatsapp",
-    normalizedPhone,
-  );
-
-  let contactId = existingContact?.id;
-  let createdContact = false;
-
-  if (!contactId) {
-    const { data: createdContactRow } = await admin
-      .from("contacts")
-      .insert({
-        business_id: businessId,
-        channel: "whatsapp",
-        name: message.contactName,
-        phone_number: normalizedPhone,
-        last_message_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-
-    contactId = createdContactRow?.id;
-    createdContact = Boolean(contactId);
-  } else {
-    await admin
-      .from("contacts")
-      .update({
-        name: message.contactName,
-        phone_number: normalizedPhone,
-        last_message_at: new Date().toISOString(),
-      })
-      .eq("id", contactId);
-  }
-
-  if (!contactId) {
-    return;
-  }
-
-  await syncContactChannelIdentity(admin, {
-    businessId,
-    contactId,
     channel: "whatsapp",
+    contactName: message.contactName,
+    contactPhone: normalizedPhone,
     identifier: normalizedPhone,
     displayLabel: message.contactName,
   });
 
-  const conversationId = await resolveInboundConversation(
-    admin,
-    businessId,
-    contactId,
-    "whatsapp",
-  );
-
-  if (!conversationId) {
+  if (!context) {
     return;
   }
+
+  const { contactId, conversationId, createdContact } = context;
 
   let content: string | null = null;
 
@@ -644,25 +599,18 @@ async function ingestIncomingMessage(
     return;
   }
 
-  if (message.messageId) {
-    const existing = await findMessageByExternalId(
-      admin,
-      "whatsapp",
-      message.messageId,
-    );
-
-    if (existing) {
-      return;
-    }
-  }
-
-  const insertedMessage = await insertChannelMessage(admin, {
+  const insertResult = await insertInboundChannelMessage(admin, {
     conversationId,
     channel: "whatsapp",
-    senderType: "client",
     content,
     externalMessageId: message.messageId,
   });
+
+  if (!insertResult || insertResult.isDuplicate) {
+    return;
+  }
+
+  const insertedMessage = insertResult.message;
 
   if (message.kind === "media") {
     await createPendingMessageAttachment(admin, {

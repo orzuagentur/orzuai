@@ -47,6 +47,65 @@ export function buildWebhookIdempotencyKey(
   return `${channel}:${digest}`;
 }
 
+export type ReceiveInboundWebhookResult = {
+  queued: boolean;
+  duplicate: boolean;
+  /** True when the payload was processed in this request (hot path). */
+  processedInline: boolean;
+};
+
+type InboundWebhookJobRow = Pick<
+  Database["public"]["Tables"]["inbound_webhook_queue"]["Row"],
+  "id" | "channel" | "payload" | "metadata" | "attempt_count" | "max_attempts"
+>;
+
+/**
+ * Enqueue + process inbound webhook in the same request (hot path).
+ * Idempotency is preserved via the queue; QStash remains a retry/backlog safety net.
+ */
+export async function receiveInboundWebhook(
+  admin: MessagingDbClient,
+  input: {
+    channel: MessagingChannel;
+    idempotencyKey: string;
+    payload: unknown;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<ReceiveInboundWebhookResult> {
+  const { data: job, error } = await admin
+    .from("inbound_webhook_queue")
+    .insert({
+      channel: input.channel,
+      idempotency_key: input.idempotencyKey,
+      payload:
+        input.payload as Database["public"]["Tables"]["inbound_webhook_queue"]["Insert"]["payload"],
+      metadata: (input.metadata ??
+        {}) as Database["public"]["Tables"]["inbound_webhook_queue"]["Insert"]["metadata"],
+      status: "pending",
+    })
+    .select("id, channel, payload, metadata, attempt_count, max_attempts")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      await drainInboundWebhookQueueHotPath();
+      dispatchInboundWebhookWorker("enqueue");
+      return { queued: false, duplicate: true, processedInline: false };
+    }
+
+    throw error;
+  }
+
+  const processedInline = await processInboundWebhookJobInline(admin, job);
+
+  if (!processedInline) {
+    dispatchInboundWebhookWorker("retry");
+  }
+
+  return { queued: true, duplicate: false, processedInline };
+}
+
+/** @deprecated Use receiveInboundWebhook for provider webhooks. */
 export async function enqueueInboundWebhook(
   admin: MessagingDbClient,
   input: {
@@ -56,25 +115,8 @@ export async function enqueueInboundWebhook(
     metadata?: Record<string, unknown>;
   },
 ): Promise<{ queued: boolean; duplicate: boolean }> {
-  const { error } = await admin.from("inbound_webhook_queue").insert({
-    channel: input.channel,
-    idempotency_key: input.idempotencyKey,
-    payload: input.payload as Database["public"]["Tables"]["inbound_webhook_queue"]["Insert"]["payload"],
-    metadata: (input.metadata ?? {}) as Database["public"]["Tables"]["inbound_webhook_queue"]["Insert"]["metadata"],
-    status: "pending",
-  });
-
-  if (error) {
-    if (error.code === "23505") {
-      dispatchInboundWebhookWorker();
-      return { queued: false, duplicate: true };
-    }
-
-    throw error;
-  }
-
-  dispatchInboundWebhookWorker();
-  return { queued: true, duplicate: false };
+  const result = await receiveInboundWebhook(admin, input);
+  return { queued: result.queued, duplicate: result.duplicate };
 }
 
 let webhookDrainPromise: Promise<WebhookQueueDrainResult> | null = null;
@@ -162,6 +204,96 @@ export async function drainInboundWebhookQueue(): Promise<WebhookQueueDrainResul
   return totals;
 }
 
+/** Processes one pending batch — used when a duplicate webhook arrives. */
+export async function drainInboundWebhookQueueHotPath(): Promise<WebhookQueueDrainResult> {
+  const recoveredStale = await recoverStaleWebhookJobs();
+  const batch = await processPendingInboundWebhooks();
+
+  return {
+    processed: batch.processed,
+    completed: batch.completed,
+    retried: batch.retried,
+    failed: batch.failed,
+    batches: batch.processed > 0 ? 1 : 0,
+    recoveredStale,
+  };
+}
+
+async function processInboundWebhookJobInline(
+  admin: MessagingDbClient,
+  job: InboundWebhookJobRow,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+
+  const { data: claimed } = await admin
+    .from("inbound_webhook_queue")
+    .update({ status: "processing" })
+    .eq("id", job.id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (!claimed) {
+    return false;
+  }
+
+  const result = await processWebhookJob({
+    id: job.id,
+    channel: job.channel,
+    payload: job.payload,
+    metadata: (job.metadata as Record<string, unknown> | null) ?? null,
+  });
+
+  if (result.success) {
+    await admin
+      .from("inbound_webhook_queue")
+      .update({
+        status: "completed",
+        processed_at: now,
+        last_error: result.error ?? null,
+      })
+      .eq("id", job.id);
+    return true;
+  }
+
+  await markWebhookJobRetry(admin, {
+    id: job.id,
+    attempt_count: job.attempt_count,
+    max_attempts: job.max_attempts,
+    error: result.error ?? "Processing failed.",
+  });
+
+  return false;
+}
+
+async function markWebhookJobRetry(
+  admin: MessagingDbClient,
+  input: {
+    id: string;
+    attempt_count: number | null;
+    max_attempts: number | null;
+    error: string;
+  },
+): Promise<"retried" | "failed"> {
+  const attemptCount = (input.attempt_count ?? 0) + 1;
+  const maxAttempts = input.max_attempts ?? 5;
+  const exhausted = attemptCount >= maxAttempts;
+
+  await admin
+    .from("inbound_webhook_queue")
+    .update({
+      status: exhausted ? "failed" : "pending",
+      attempt_count: attemptCount,
+      last_error: input.error,
+      next_attempt_at: new Date(
+        Date.now() + BASE_RETRY_SECONDS * 1000 * 2 ** (attemptCount - 1),
+      ).toISOString(),
+    })
+    .eq("id", input.id);
+
+  return exhausted ? "failed" : "retried";
+}
+
 function scheduleInboundWebhookProcessingInProcess(): void {
   if (webhookDrainPromise) {
     return;
@@ -184,9 +316,11 @@ function scheduleInboundWebhookProcessingInProcess(): void {
     });
 }
 
-export function dispatchInboundWebhookWorker(): void {
+export function dispatchInboundWebhookWorker(
+  source: "enqueue" | "retry" = "enqueue",
+): void {
   scheduleInboundWebhookProcessingInProcess();
-  void dispatchWebhookQueueWorker("enqueue");
+  void dispatchWebhookQueueWorker(source);
 }
 
 /** @deprecated Use dispatchInboundWebhookWorker */
@@ -262,27 +396,18 @@ async function processClaimedWebhookJob(job: {
     return "completed";
   }
 
-  const attemptCount = (job.attempt_count ?? 0) + 1;
-  const maxAttempts = job.max_attempts ?? 5;
-  const exhausted = attemptCount >= maxAttempts;
+  const outcome = await markWebhookJobRetry(admin, {
+    id: job.id,
+    attempt_count: job.attempt_count,
+    max_attempts: job.max_attempts,
+    error: result.error ?? "Processing failed.",
+  });
 
-  await admin
-    .from("inbound_webhook_queue")
-    .update({
-      status: exhausted ? "failed" : "pending",
-      attempt_count: attemptCount,
-      last_error: result.error ?? "Processing failed.",
-      next_attempt_at: new Date(
-        Date.now() + BASE_RETRY_SECONDS * 1000 * 2 ** (attemptCount - 1),
-      ).toISOString(),
-    })
-    .eq("id", job.id);
-
-  if (!exhausted) {
-    dispatchInboundWebhookWorker();
+  if (outcome === "retried") {
+    dispatchInboundWebhookWorker("retry");
   }
 
-  return exhausted ? "failed" : "retried";
+  return outcome;
 }
 
 export async function processPendingInboundWebhooks(): Promise<{

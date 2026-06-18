@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildWebhookIdempotencyKey,
-  enqueueInboundWebhook,
+  receiveInboundWebhook,
 } from "@/services/webhook-queue.service";
 import type { TelegramWebhookPayload } from "@/types/telegram.types";
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const idempotencyKey = buildWebhookIdempotencyKey("telegram", rawBody);
-  const result = await enqueueInboundWebhook(admin, {
+  const result = await receiveInboundWebhook(admin, {
     channel: "telegram",
     idempotencyKey,
     payload,
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     success: true,
     queued: result.queued,
     duplicate: result.duplicate,
+    processedInline: result.processedInline,
   });
 }
 

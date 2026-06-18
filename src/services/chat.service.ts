@@ -18,8 +18,8 @@ import {
   listKnowledgeEntriesForBusiness,
   scheduleMessagingAnalyticsIncrement,
 } from "@/services/messaging.service";
-import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
-import { buildOutboundChatMessage } from "@/services/outbound-message.service";
+import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
+import { buildPendingOutboundChatMessage } from "@/services/outbound-message.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
@@ -884,10 +884,7 @@ export async function sendChatMessage(
     return {
       success: true,
       data: {
-        message: await buildOutboundChatMessage(
-          createAdminClient(),
-          sendResult.message,
-        ),
+        message: buildPendingOutboundChatMessage(sendResult.message),
       },
     };
   } else if (conversation.channel === "telegram") {
@@ -910,10 +907,7 @@ export async function sendChatMessage(
     return {
       success: true,
       data: {
-        message: await buildOutboundChatMessage(
-          createAdminClient(),
-          sendResult.message,
-        ),
+        message: buildPendingOutboundChatMessage(sendResult.message),
       },
     };
   } else if (conversation.channel === "website_forms") {
@@ -984,15 +978,12 @@ export async function sendChatMessage(
       ...contactUpdates,
     ]);
 
-    await deliverOutboundMessageNow(insertedMessage.id);
-
-    const admin = createAdminClient();
-    const message = await buildOutboundChatMessage(admin, insertedMessage);
+    scheduleOutboundMessageDelivery(insertedMessage.id);
 
     return {
       success: true,
       data: {
-        message,
+        message: buildPendingOutboundChatMessage(insertedMessage),
       },
     };
   }

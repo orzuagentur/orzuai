@@ -21,7 +21,7 @@ import { isEmbeddedSignupFinishEvent } from "@/lib/whatsapp/embedded-signup";
 import { getWhatsAppApiVersion } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
+import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
@@ -29,17 +29,17 @@ import {
   resolveConversationIdForChannelSender,
 } from "@/services/conversation-typing.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
-import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import {
+  insertInboundChannelMessage,
+  resolveInboundMessageContext,
+} from "@/services/inbound-ingest.service";
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
-  findContactForChannel,
-  findMessageByExternalId,
+  createOutboundMessageDelivery,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  createOutboundMessageDelivery,
   scheduleChannelAutoReply,
-  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { InstagramConnection } from "@/types/database.types";
@@ -477,52 +477,20 @@ async function ingestInstagramMessage(
   const businessId = connection.business_id;
   const identifier = `ig:${message.from}`;
 
-  const existingContact = await findContactForChannel(
-    admin,
+  const context = await resolveInboundMessageContext(admin, {
     businessId,
-    "instagram",
-    identifier,
-  );
-
-  let contactId = existingContact?.id;
-  let createdContact = false;
-
-  if (!contactId) {
-    const { data: createdContactRow } = await admin
-      .from("contacts")
-      .insert({
-        business_id: businessId,
-        channel: "instagram",
-        name: message.contactName,
-        phone_number: identifier,
-        last_message_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-
-    contactId = createdContactRow?.id;
-    createdContact = Boolean(contactId);
-  } else {
-    await admin
-      .from("contacts")
-      .update({
-        name: message.contactName,
-        last_message_at: new Date().toISOString(),
-      })
-      .eq("id", contactId);
-  }
-
-  if (!contactId) {
-    return;
-  }
-
-  await syncContactChannelIdentity(admin, {
-    businessId,
-    contactId,
     channel: "instagram",
+    contactName: message.contactName,
+    contactPhone: identifier,
     identifier,
     displayLabel: message.contactName,
   });
+
+  if (!context) {
+    return;
+  }
+
+  const { contactId, conversationId, createdContact } = context;
 
   if (connection.meta_access_token) {
     void scheduleContactAvatarSync({
@@ -535,17 +503,6 @@ async function ingestInstagramMessage(
         userId: message.from,
       },
     });
-  }
-
-  const conversationId = await resolveInboundConversation(
-    admin,
-    businessId,
-    contactId,
-    "instagram",
-  );
-
-  if (!conversationId) {
-    return;
   }
 
   let content: string | null = null;
@@ -564,25 +521,18 @@ async function ingestInstagramMessage(
     return;
   }
 
-  if (message.messageId) {
-    const existing = await findMessageByExternalId(
-      admin,
-      "instagram",
-      message.messageId,
-    );
-
-    if (existing) {
-      return;
-    }
-  }
-
-  const insertedMessage = await insertChannelMessage(admin, {
+  const insertResult = await insertInboundChannelMessage(admin, {
     conversationId,
     channel: "instagram",
-    senderType: "client",
     content,
     externalMessageId: message.messageId,
   });
+
+  if (!insertResult || insertResult.isDuplicate) {
+    return;
+  }
+
+  const insertedMessage = insertResult.message;
 
   if (message.kind === "media") {
     await createPendingMessageAttachment(admin, {
@@ -776,7 +726,7 @@ export async function sendInstagramChatMessage(
     channel: "instagram",
   });
 
-  await deliverOutboundMessageNow(insertedMessage.id);
+  scheduleOutboundMessageDelivery(insertedMessage.id);
 
   return { success: true, message: insertedMessage };
 }

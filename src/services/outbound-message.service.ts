@@ -23,6 +23,12 @@ type OutboundMessageRow = {
   is_edited?: boolean;
 };
 
+export function buildPendingOutboundChatMessage(
+  row: OutboundMessageRow,
+): ChatMessageData {
+  return withPendingDeliveryStatus(mapChatMessage(row));
+}
+
 export async function buildOutboundChatMessage(
   admin: MessagingDbClient,
   row: OutboundMessageRow,

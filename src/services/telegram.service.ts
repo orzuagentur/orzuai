@@ -15,21 +15,21 @@ import {
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
+import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
-import { syncContactChannelIdentity } from "@/services/contact-channel-identity.service";
+import {
+  insertInboundChannelMessage,
+  resolveInboundMessageContext,
+} from "@/services/inbound-ingest.service";
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import { scheduleNewLeadPush } from "@/services/push-notifications.service";
 import {
-  findContactForChannel,
-  findMessageByExternalId,
+  createOutboundMessageDelivery,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  createOutboundMessageDelivery,
   scheduleChannelAutoReply,
-  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
@@ -292,52 +292,20 @@ async function ingestTelegramMessage(
   const businessId = connection.business_id;
   const identifier = `tg:${message.chatId}`;
 
-  const existingContact = await findContactForChannel(
-    admin,
+  const context = await resolveInboundMessageContext(admin, {
     businessId,
-    "telegram",
-    identifier,
-  );
-
-  let contactId = existingContact?.id;
-  let createdContact = false;
-
-  if (!contactId) {
-    const { data: createdContactRow } = await admin
-      .from("contacts")
-      .insert({
-        business_id: businessId,
-        channel: "telegram",
-        name: message.contactName,
-        phone_number: identifier,
-        last_message_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-
-    contactId = createdContactRow?.id;
-    createdContact = Boolean(contactId);
-  } else {
-    await admin
-      .from("contacts")
-      .update({
-        name: message.contactName,
-        last_message_at: new Date().toISOString(),
-      })
-      .eq("id", contactId);
-  }
-
-  if (!contactId) {
-    return;
-  }
-
-  await syncContactChannelIdentity(admin, {
-    businessId,
-    contactId,
     channel: "telegram",
+    contactName: message.contactName,
+    contactPhone: identifier,
     identifier,
     displayLabel: message.contactName,
   });
+
+  if (!context) {
+    return;
+  }
+
+  const { contactId, conversationId, createdContact } = context;
 
   if (connection.bot_token) {
     void scheduleContactAvatarSync({
@@ -350,17 +318,6 @@ async function ingestTelegramMessage(
         userId: message.telegramUserId,
       },
     });
-  }
-
-  const conversationId = await resolveInboundConversation(
-    admin,
-    businessId,
-    contactId,
-    "telegram",
-  );
-
-  if (!conversationId) {
-    return;
   }
 
   let content: string | null = null;
@@ -379,25 +336,18 @@ async function ingestTelegramMessage(
     return;
   }
 
-  if (message.externalMessageId) {
-    const existing = await findMessageByExternalId(
-      admin,
-      "telegram",
-      message.externalMessageId,
-    );
-
-    if (existing) {
-      return;
-    }
-  }
-
-  const insertedMessage = await insertChannelMessage(admin, {
+  const insertResult = await insertInboundChannelMessage(admin, {
     conversationId,
     channel: "telegram",
-    senderType: "client",
     content,
     externalMessageId: message.externalMessageId,
   });
+
+  if (!insertResult || insertResult.isDuplicate) {
+    return;
+  }
+
+  const insertedMessage = insertResult.message;
 
   if (message.kind === "media") {
     await createPendingMessageAttachment(admin, {
@@ -592,7 +542,7 @@ export async function sendTelegramChatMessage(
     channel: "telegram",
   });
 
-  await deliverOutboundMessageNow(insertedMessage.id);
+  scheduleOutboundMessageDelivery(insertedMessage.id);
 
   return { success: true, message: insertedMessage };
 }

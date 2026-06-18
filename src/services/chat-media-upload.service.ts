@@ -15,8 +15,8 @@ import {
   createOutboundMessageDelivery,
   insertChannelMessage,
 } from "@/services/messaging.service";
-import { deliverOutboundMessageNow } from "@/services/message-delivery.service";
-import { buildOutboundChatMessage } from "@/services/outbound-message.service";
+import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
+import { buildPendingOutboundChatMessage } from "@/services/outbound-message.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import type { ChatActionError, SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -445,15 +445,12 @@ export async function completeChatMediaUpload(
     });
   }
 
-  await deliverOutboundMessageNow(insertedMessage.id);
-
-  const admin = createAdminClient();
-  const message = await buildOutboundChatMessage(admin, insertedMessage);
+  scheduleOutboundMessageDelivery(insertedMessage.id);
 
   return {
     success: true,
     data: {
-      message,
+      message: buildPendingOutboundChatMessage(insertedMessage),
     },
   };
 }

@@ -7,7 +7,7 @@ import {
 } from "@/lib/instagram/client";
 import {
   buildWebhookIdempotencyKey,
-  enqueueInboundWebhook,
+  receiveInboundWebhook,
 } from "@/services/webhook-queue.service";
 import type { InstagramWebhookPayload } from "@/types/instagram.types";
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const idempotencyKey = buildWebhookIdempotencyKey("instagram", rawBody);
-  const result = await enqueueInboundWebhook(admin, {
+  const result = await receiveInboundWebhook(admin, {
     channel: "instagram",
     idempotencyKey,
     payload,
@@ -59,5 +59,6 @@ export async function POST(request: NextRequest) {
     success: true,
     queued: result.queued,
     duplicate: result.duplicate,
+    processedInline: result.processedInline,
   });
 }

@@ -253,6 +253,13 @@ export async function deliverOutboundMessageNow(
   await dispatchMessageDelivery(messageId);
 }
 
+/** Returns immediately; delivery continues in-process or via QStash worker. */
+export function scheduleOutboundMessageDelivery(messageId: string): void {
+  void dispatchMessageDelivery(messageId).catch((error) => {
+    console.error("[message-delivery] outbound dispatch failed", error);
+  });
+}
+
 async function processPendingMessageDeliveriesBatch(): Promise<{
   processed: number;
   sent: number;

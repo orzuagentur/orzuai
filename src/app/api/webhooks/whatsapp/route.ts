@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppVerifyToken, verifyWhatsAppWebhookSignature } from "@/lib/whatsapp/client";
 import {
   buildWebhookIdempotencyKey,
-  enqueueInboundWebhook,
+  receiveInboundWebhook,
 } from "@/services/webhook-queue.service";
 import type { WhatsAppWebhookPayload } from "@/types/whatsapp.types";
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const idempotencyKey = buildWebhookIdempotencyKey("whatsapp", rawBody);
-  const result = await enqueueInboundWebhook(admin, {
+  const result = await receiveInboundWebhook(admin, {
     channel: "whatsapp",
     idempotencyKey,
     payload,
@@ -56,5 +56,6 @@ export async function POST(request: NextRequest) {
     success: true,
     queued: result.queued,
     duplicate: result.duplicate,
+    processedInline: result.processedInline,
   });
 }

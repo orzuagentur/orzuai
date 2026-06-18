@@ -2021,6 +2021,42 @@ export type Database = {
         };
         Returns: unknown;
       };
+      resolve_inbound_message_context: {
+        Args: {
+          p_business_id: string;
+          p_channel: Database["public"]["Enums"]["messaging_channel"];
+          p_contact_name: string;
+          p_contact_phone: string;
+          p_external_id: string;
+          p_display_label?: string | null;
+        };
+        Returns: {
+          contact_id: string;
+          conversation_id: string;
+          created_contact: boolean;
+        }[];
+      };
+      insert_inbound_channel_message: {
+        Args: {
+          p_conversation_id: string;
+          p_channel: Database["public"]["Enums"]["messaging_channel"];
+          p_sender_type: Database["public"]["Enums"]["message_sender_type"];
+          p_content: string;
+          p_external_message_id?: string | null;
+          p_message_preview?: string | null;
+        };
+        Returns: {
+          id: string;
+          conversation_id: string;
+          channel: Database["public"]["Enums"]["messaging_channel"];
+          sender_type: Database["public"]["Enums"]["message_sender_type"];
+          content: string;
+          ai_generated: boolean;
+          created_at: string;
+          external_message_id: string | null;
+          is_duplicate: boolean;
+        }[];
+      };
     };
     Enums: {
       auth_provider: AuthProvider;
