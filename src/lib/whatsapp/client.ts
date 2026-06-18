@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
-import { getDialog360ApiBase } from "@/lib/whatsapp/constants";
+import { getDialog360ApiBase, isDialog360SandboxMode } from "@/lib/whatsapp/constants";
 
 function buildDialog360Url(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -29,22 +29,29 @@ type VerifyCredentialsResult =
 export async function verify360DialogApiKey(
   apiKey: string,
 ): Promise<VerifyCredentialsResult> {
-  const response = await fetch(buildDialog360Url("/health"), {
+  const verifyPath = isDialog360SandboxMode()
+    ? "/v1/configs/webhook"
+    : "/health";
+
+  const response = await fetch(buildDialog360Url(verifyPath), {
     headers: dialog360Headers(apiKey, false),
     cache: "no-store",
   });
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
-      | { error?: string; message?: string }
+      | { error?: string; message?: string; detail?: string }
       | null;
 
     return {
       success: false,
       message:
+        payload?.detail ||
         payload?.error ||
         payload?.message ||
-        "360dialog rejected this API key. Generate a new key in the 360dialog Hub.",
+        (isDialog360SandboxMode()
+          ? "360dialog sandbox rejected this API key. Send START to +551146733492 on WhatsApp to get a sandbox key."
+          : "360dialog rejected this API key. Generate a new key in the 360dialog Hub."),
     };
   }
 
