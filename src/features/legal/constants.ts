@@ -1,6 +1,8 @@
+import { SUPPORT_EMAIL } from "@/constants/app-origin";
+
 export const LEGAL_COMPANY = {
   name: "OrzuX",
-  contactEmail: "support@orzuai.com",
+  contactEmail: SUPPORT_EMAIL,
   lastUpdated: "May 30, 2026",
 } as const;
 

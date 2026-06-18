@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { APP_ORIGIN } from "@/constants/app-origin";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
@@ -15,6 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(APP_ORIGIN),
   title: "OrzuX",
   description: "AI Business Communication Platform",
   manifest: "/manifest.json",

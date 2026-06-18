@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from "@/constants/app-origin";
 import { ENV_KEYS } from "@/constants/env-keys";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
 import {
@@ -170,7 +171,7 @@ export function getVapidPrivateKey(): string | undefined {
 
 export function getVapidSubject(): string {
   return (
-    process.env[ENV_KEYS.VAPID_SUBJECT]?.trim() || "mailto:support@orzuit.com"
+    process.env[ENV_KEYS.VAPID_SUBJECT]?.trim() || `mailto:${SUPPORT_EMAIL}`
   );
 }
 

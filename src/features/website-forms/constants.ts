@@ -8,7 +8,7 @@ export const WEBSITE_FORMS_MESSAGES = {
   noBusinessDescription: "Complete your business settings before enabling Website Forms.",
   notConfigured: "Set NEXT_PUBLIC_APP_URL to your HTTPS production URL on Vercel.",
   httpsRequired:
-    "Website Forms requires a public HTTPS app URL (e.g. https://orzuaibot.vercel.app).",
+    "Website Forms requires a public HTTPS app URL (e.g. https://orzux.com).",
   genericError: "Something went wrong. Please try again.",
   webhookUrlLabel: "Webhook URL",
   apiKeyLabel: "API Key",

@@ -3,7 +3,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
-import { ENV_KEYS } from "@/constants/env-keys";
+import { buildAppUrl } from "@/lib/app-url";
 import { INSTAGRAM_MESSAGES } from "@/features/instagram/constants";
 import {
   getInstagramEmbeddedSignupConfigId,
@@ -111,13 +111,7 @@ export async function getInstagramConnection(
 }
 
 export function getInstagramWebhookUrl(): string {
-  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
-
-  if (!appUrl) {
-    return "";
-  }
-
-  return `${appUrl.replace(/\/$/, "")}/api/webhooks/instagram`;
+  return buildAppUrl("/api/webhooks/instagram");
 }
 
 export function getInstagramConnectConfig(): InstagramConnectConfig {

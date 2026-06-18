@@ -13,7 +13,7 @@ export const TELEGRAM_MESSAGES = {
   invalidToken:
     "Telegram rejected this bot token. Check the token from @BotFather and try again.",
   notConfigured:
-    "Telegram requires a public HTTPS app URL. Set NEXT_PUBLIC_APP_URL (e.g. https://orzuaibot.vercel.app).",
+    "Telegram requires a public HTTPS app URL. Set NEXT_PUBLIC_APP_URL (e.g. https://orzux.com).",
   requirementsTitle: "Before you connect",
   requirementBotFather: "Create a bot via @BotFather in Telegram and copy the API token.",
   requirementHttps:

@@ -2,8 +2,8 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 
-import { ENV_KEYS } from "@/constants/env-keys";
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
+import { buildAppUrl } from "@/lib/app-url";
 import { WEBSITE_FORMS_MESSAGES } from "@/features/website-forms/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
@@ -52,8 +52,7 @@ import { mapWebsiteFormConnection } from "@/utils/website-forms";
 import { normalizePhoneNumber } from "@/utils/whatsapp";
 
 function getWebsiteFormWebhookBaseUrl(): string {
-  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
-  return appUrl ? `${appUrl}/api/webhooks/website-forms` : "";
+  return buildAppUrl("/api/webhooks/website-forms");
 }
 
 function buildWebhookUrl(token: string): string {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
-import { ENV_KEYS } from "@/constants/env-keys";
+import { buildAppUrl } from "@/lib/app-url";
 import {
   getMetaAppId,
   getWhatsAppEmbeddedSignupConfigId,
@@ -114,13 +114,7 @@ export async function getWhatsAppConnection(
 }
 
 export function getWhatsAppWebhookUrl(): string {
-  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
-
-  if (!appUrl) {
-    return "";
-  }
-
-  return `${appUrl.replace(/\/$/, "")}/api/webhooks/whatsapp`;
+  return buildAppUrl("/api/webhooks/whatsapp");
 }
 
 export function getWhatsAppConnectConfig(): WhatsAppConnectConfig {

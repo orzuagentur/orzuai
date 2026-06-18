@@ -9,7 +9,8 @@ import {
   buildVoiceConversationTwiml,
   isVoiceAiConfigured,
 } from "@/services/voice-ai.service";
-import { getAppUrl, hasSupabaseEnv } from "@/lib/env";
+import { buildAppUrl } from "@/lib/app-url";
+import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -188,10 +189,9 @@ export async function disconnectVoiceAgent(
 }
 
 function buildWebhookUrls(businessId: string) {
-  const base = getAppUrl();
   return {
-    inboundWebhookUrl: `${base}/api/webhooks/voice/inbound?businessId=${businessId}`,
-    outboundWebhookUrl: `${base}/api/webhooks/voice/outbound?businessId=${businessId}`,
+    inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
+    outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
   };
 }
 

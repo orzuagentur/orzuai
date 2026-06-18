@@ -3,7 +3,7 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 
-import { ENV_KEYS } from "@/constants/env-keys";
+import { buildAppUrl } from "@/lib/app-url";
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { TELEGRAM_MESSAGES } from "@/features/telegram/constants";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -75,8 +75,7 @@ async function getOwnedBusinessId(): Promise<string | null> {
 }
 
 function getTelegramWebhookUrl(): string {
-  const appUrl = process.env[ENV_KEYS.NEXT_PUBLIC_APP_URL]?.trim() ?? "";
-  return appUrl ? `${appUrl}/api/webhooks/telegram` : "";
+  return buildAppUrl("/api/webhooks/telegram");
 }
 
 export async function disconnectTelegram(): Promise<{

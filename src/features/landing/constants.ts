@@ -1,3 +1,5 @@
+import { CONTACT_EMAIL } from "@/constants/app-origin";
+
 export const LANDING_COPY = {
   tagline: "The AI inbox for WhatsApp, Instagram, Telegram, and your website.",
   subtitle:
@@ -29,7 +31,7 @@ export const LANDING_HEADER = {
 
 export const LANDING_BOOK_DEMO = {
   label: "Book a demo",
-  href: "mailto:hello@orzuai.com?subject=OrzuX%20demo%20request",
+  href: `mailto:${CONTACT_EMAIL}?subject=OrzuX%20demo%20request`,
 } as const;
 
 export const LANDING_PRODUCT = {
