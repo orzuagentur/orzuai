@@ -26,7 +26,19 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
+    icon: [
+      {
+        url: "/platform-icon-light.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/platform-icon.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
+      { url: "/icon.png", type: "image/png" },
+    ],
     apple: [{ url: "/icon.png", type: "image/png" }],
   },
 };

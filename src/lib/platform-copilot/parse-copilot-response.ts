@@ -8,6 +8,7 @@ const ALLOWED_PATH_PREFIXES = [
   DASHBOARD_ROUTES.chats,
   DASHBOARD_ROUTES.contacts,
   DASHBOARD_ROUTES.aiAssistant,
+  DASHBOARD_ROUTES.aiManager,
   DASHBOARD_ROUTES.automations,
   DASHBOARD_ROUTES.analytics,
   DASHBOARD_ROUTES.integrations,

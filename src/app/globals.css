@@ -223,3 +223,46 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.65 0.24 293);
 }
+
+@keyframes ai-assistant-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes ai-assistant-glow {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.24;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 0.48;
+  }
+}
+
+.ai-assistant-breathe {
+  animation: ai-assistant-breathe 3.2s ease-in-out infinite;
+  transform-origin: center center;
+  backface-visibility: hidden;
+}
+
+.ai-assistant-glow {
+  animation: ai-assistant-glow 3.2s ease-in-out infinite;
+  transform-origin: center center;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-assistant-breathe,
+  .ai-assistant-glow {
+    animation: none;
+  }
+}

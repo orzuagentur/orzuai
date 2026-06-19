@@ -6,6 +6,7 @@ import {
   CreditCard,
   LayoutDashboard,
   MessageSquare,
+  MessagesSquare,
   Plug,
   Settings,
   Users,
@@ -34,6 +35,12 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "CRM",
     href: DASHBOARD_ROUTES.contacts,
     icon: Users,
+  },
+  {
+    id: "ai-manager",
+    label: "My Assistant",
+    href: DASHBOARD_ROUTES.aiManager,
+    icon: MessagesSquare,
   },
   {
     id: "ai-assistant",

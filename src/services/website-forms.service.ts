@@ -24,7 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
-import { scheduleNewLeadPush } from "@/services/push-notifications.service";
+import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReply } from "@/services/llm.service";
@@ -625,15 +625,15 @@ export async function ingestWebsiteFormSubmission(
     totalContacts: createdContact ? 1 : 0,
   });
 
-  if (createdContact) {
-    scheduleNewLeadPush({
-      businessId,
-      contactId,
-      contactName: displayName,
-      channel: "website_forms",
-      preview: body,
-    });
-  }
+  scheduleInboundMessagePush({
+    businessId,
+    contactId,
+    contactName: displayName,
+    conversationId,
+    channel: "website_forms",
+    preview: body,
+    isNewContact: createdContact,
+  });
 
   await admin
     .from("website_form_connections")

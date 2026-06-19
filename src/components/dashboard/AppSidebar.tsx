@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
+import { BRAND_NAME } from "@/constants/brand";
 import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
 import { useDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
@@ -25,6 +26,7 @@ import {
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { UserProfileSection } from "./UserProfileSection";
+import { ThemeToggle } from "./ThemeToggle";
 
 type AppSidebarProps = {
   userProfile: DashboardUserProfile;
@@ -54,10 +56,21 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild className="h-12">
-              <Link href={DASHBOARD_NAV_ITEMS[0].href}>
-                <BrandMark size={36} />
-                <BrandWordmark className="flex-1" />
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              tooltip={BRAND_NAME}
+              className="h-12 text-sidebar-foreground group-data-[collapsible=icon]:justify-center"
+            >
+              <Link
+                href={DASHBOARD_NAV_ITEMS[0].href}
+                className="flex w-full items-center gap-2 overflow-hidden group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+              >
+                <BrandMark
+                  size={36}
+                  className="size-9 shrink-0 transition-[width,height] duration-200 ease-linear group-data-[collapsible=icon]:size-7"
+                />
+                <BrandWordmark className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -104,6 +117,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        <ThemeToggle />
         <UserProfileSection userProfile={userProfile} />
       </SidebarFooter>
       <SidebarRail />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
+import { markConversationReadAction } from "@/features/chats/actions/mark-conversation-read";
 import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
 import { useRealtimeFallbackReady } from "@/hooks/use-realtime-fallback-ready";
@@ -113,7 +114,12 @@ export function useInboxActiveConversation({
   const requestIdRef = useRef(0);
   const skipInitialLoadRef = useRef(bootstrap.skipInitialLoad);
   const selectedConversationIdRef = useRef(selectedConversationId);
+  const lastReadSyncAtRef = useRef(0);
   selectedConversationIdRef.current = selectedConversationId;
+
+  useEffect(() => {
+    lastReadSyncAtRef.current = 0;
+  }, [selectedConversationId]);
 
   const clearConversation = useCallback(() => {
     setConversation(null);
@@ -207,6 +213,68 @@ export function useInboxActiveConversation({
     } finally {
       setIsLoadingOlderMessages(false);
     }
+  }, [conversation]);
+
+  const updateReadProgress = useCallback((readAt: string) => {
+    setConversation((current) => {
+      if (!current) {
+        return current;
+      }
+
+      if (
+        current.lastReadAt &&
+        new Date(readAt).getTime() <= new Date(current.lastReadAt).getTime()
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        lastReadAt: readAt,
+      };
+    });
+  }, []);
+
+  const markConversationViewed = useCallback(() => {
+    if (!conversation) {
+      return;
+    }
+
+    const readAt = new Date().toISOString();
+    const hasUnread = conversation.messages.some(
+      (message) =>
+        message.senderType === "client" &&
+        (!conversation.lastReadAt ||
+          new Date(message.createdAt).getTime() >
+            new Date(conversation.lastReadAt).getTime()),
+    );
+
+    if (!hasUnread && conversation.lastReadAt) {
+      return;
+    }
+
+    setConversation((current) => {
+      if (!current || current.id !== conversation.id) {
+        return current;
+      }
+
+      return {
+        ...current,
+        lastReadAt: readAt,
+      };
+    });
+
+    const now = Date.now();
+
+    if (now - lastReadSyncAtRef.current < 1500) {
+      return;
+    }
+
+    lastReadSyncAtRef.current = now;
+
+    void markConversationReadAction({
+      conversationId: conversation.id,
+    });
   }, [conversation]);
 
   const appendMessage = useCallback((message: ChatMessageData) => {
@@ -603,6 +671,8 @@ export function useInboxActiveConversation({
     isLoadingOlderMessages,
     loadOlderMessages,
     refreshConversation,
+    markConversationViewed,
+    updateReadProgress,
     appendMessage,
     removeMessage,
     reconcileMessage,

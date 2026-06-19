@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -17,6 +18,7 @@ import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
+import { useInboxLayout, InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,6 +32,7 @@ import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-
 import type { ListConversationsMonitorResult } from "@/services/chat-inbox-query.service";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { useInboxPanel, useDebouncedInboxSearch, useSkipInitialListFetch } from "@/hooks/use-inbox-panel";
+import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import {
   getCachedConversationList,
   setCachedConversationList,
@@ -53,7 +56,15 @@ type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData> & {
   favoritesOnly?: boolean;
 };
 
-export function ChatsMonitorPanel({
+export function ChatsMonitorPanel(props: ChatsMonitorPanelProps = {}) {
+  return (
+    <InboxLayoutProvider>
+      <ChatsMonitorPanelContent {...props} />
+    </InboxLayoutProvider>
+  );
+}
+
+function ChatsMonitorPanelContent({
   hasBusiness: initialHasBusiness,
   businessId: initialBusinessId = null,
   channels: initialChannels,
@@ -104,6 +115,10 @@ export function ChatsMonitorPanel({
   );
   const [isFetching, startFetching] = useTransition();
   const { consumeSkipInitialFetch } = useSkipInitialListFetch();
+  const refreshConversationsRef = useRef<() => void>(() => {});
+  const preserveListReadStateRef = useRef<
+    (items: ConversationListItem[]) => ConversationListItem[]
+  >((items) => items);
 
   const fetchConversations = useCallback(
     (
@@ -128,10 +143,10 @@ export function ChatsMonitorPanel({
           return;
         }
 
+        const nextItems = preserveListReadStateRef.current(result.data.items);
+
         setConversations((current) =>
-          append
-            ? [...current, ...result.data.items]
-            : result.data.items,
+          append ? [...current, ...nextItems] : nextItems,
         );
         setTotalCount(result.data.totalCount);
         setHasMore(result.data.hasMore);
@@ -141,7 +156,9 @@ export function ChatsMonitorPanel({
         ).needsAttentionConversations;
 
         if (needsAttention) {
-          setNeedsAttentionConversations(needsAttention);
+          setNeedsAttentionConversations(
+            preserveListReadStateRef.current(needsAttention),
+          );
         } else if (offset === 0 && activeQuickView !== "all") {
           setNeedsAttentionConversations([]);
         }
@@ -161,6 +178,8 @@ export function ChatsMonitorPanel({
     const loadedLimit = Math.max(conversations.length, INBOX_PAGE_SIZE);
     fetchConversations(0, false, true, loadedLimit);
   }, [conversations.length, fetchConversations]);
+
+  refreshConversationsRef.current = refreshConversations;
 
   const hasActiveListFilters =
     Boolean(debouncedSearch) ||
@@ -187,7 +206,10 @@ export function ChatsMonitorPanel({
     suggestReplyOpen,
     setSuggestReplyOpen,
     handleConversationSelect,
+    handleConversationViewed,
+    handleReadProgress,
     selectConversation,
+    preserveListReadState,
   } = useInboxPanel({
     initialConversationId,
     initialActiveConversation,
@@ -200,8 +222,12 @@ export function ChatsMonitorPanel({
     hasActiveListFilters,
     onConversationsChange: setConversations,
     onNeedsAttentionChange: setNeedsAttentionConversations,
-    onRefreshConversations: refreshConversations,
+    onRefreshConversations: () => refreshConversationsRef.current(),
   });
+
+  useEffect(() => {
+    preserveListReadStateRef.current = preserveListReadState;
+  }, [preserveListReadState]);
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -265,6 +291,7 @@ export function ChatsMonitorPanel({
 
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
+  const { detailsOpen } = useInboxLayout();
   const aiChannel = activeConversation?.channel ?? null;
 
   const handleContactFavoriteChange = useCallback(
@@ -379,6 +406,7 @@ export function ChatsMonitorPanel({
   return (
     <InboxShell
       showChatOnMobile={showChatOnMobile}
+      showRightColumn={detailsOpen || suggestReplyOpen}
       channelTabs={
         <InboxChannelTabs
           activeChannel={favoritesOnly ? "favorites" : "all"}
@@ -501,16 +529,26 @@ export function ChatsMonitorPanel({
               fetchConversations(0, false, true);
             }}
             onContactFavoriteChange={handleContactFavoriteChange}
+            onConversationViewed={handleConversationViewed}
+            onReadProgress={handleReadProgress}
           />
         </div>
       }
       detailsColumn={
-        <InboxDetailsPanel
-          conversation={activeConversation}
-          cannedResponses={activeCannedResponses}
-          onUseSuggestedReply={setDraft}
-          onGenerateReply={() => setSuggestReplyOpen(true)}
-        />
+        suggestReplyOpen && activeConversation ? (
+          <AiSuggestReplyPanel
+            conversationId={activeConversation.id}
+            open
+            onOpenChange={setSuggestReplyOpen}
+            onUseSuggestion={setDraft}
+          />
+        ) : (
+          <InboxDetailsPanel
+            conversation={activeConversation}
+            cannedResponses={activeCannedResponses}
+            onUseSuggestedReply={setDraft}
+          />
+        )
       }
     />
   );

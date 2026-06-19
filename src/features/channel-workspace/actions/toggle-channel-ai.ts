@@ -21,6 +21,7 @@ export async function toggleChannelAiAction(
 
   if (result.success) {
     revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+    revalidatePath(DASHBOARD_ROUTES.aiManager);
     revalidatePath(`${DASHBOARD_ROUTES.integrations}/${channel}`);
     revalidatePath(DASHBOARD_ROUTES.integrations);
   }

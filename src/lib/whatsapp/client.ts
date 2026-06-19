@@ -5,7 +5,12 @@ import { getDialog360ApiBase, isDialog360SandboxMode } from "@/lib/whatsapp/cons
 
 function buildDialog360Url(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${getDialog360ApiBase()}${normalizedPath}`;
+  const apiPath =
+    isDialog360SandboxMode() && !normalizedPath.startsWith("/v1/")
+      ? `/v1${normalizedPath}`
+      : normalizedPath;
+
+  return `${getDialog360ApiBase()}${apiPath}`;
 }
 
 function dialog360Headers(apiKey: string, json = true): HeadersInit {

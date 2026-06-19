@@ -1,23 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarIcon,
   Loader2Icon,
-  SparklesIcon,
   UserIcon,
 } from "lucide-react";
 
 import { ContactAdditionalContactsSection } from "@/components/contacts/ContactAdditionalContactsSection";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ContactProfileInfoTable } from "@/components/contacts/ContactProfileInfoTable";
-import { ContactProfileInsightsFooter } from "@/components/contacts/ContactProfileInsightsFooter";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { generateConversationCrmSuggestionAction } from "@/features/chats/actions/generate-conversation-crm-suggestion";
 import { getInboxDetailsPanelAction } from "@/features/chats/actions/get-inbox-details-panel";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { getChannelBadgeLabel } from "@/features/chats/channel-ui";
@@ -46,7 +43,6 @@ type InboxDetailsPanelProps = {
   conversation: ConversationDetail | null;
   cannedResponses: CannedResponseItem[];
   onUseSuggestedReply: (content: string) => void;
-  onGenerateReply?: () => void;
   className?: string;
 };
 
@@ -75,7 +71,6 @@ export function InboxDetailsPanel({
   conversation,
   cannedResponses,
   onUseSuggestedReply,
-  onGenerateReply,
   className,
 }: InboxDetailsPanelProps) {
   const conversationId = conversation?.id ?? null;
@@ -87,31 +82,11 @@ export function InboxDetailsPanel({
   >(() =>
     conversationId && peekCachedCrmDetails(conversationId) ? "ready" : "idle",
   );
-  const [suggestedAction, setSuggestedAction] = useState<string | null>(() => {
-    const cached = conversationId ? peekCachedCrmDetails(conversationId) : null;
-    return cached?.suggestedAction ?? null;
-  });
-  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const loadedConversationIdRef = useRef<string | null>(null);
-
-  const refreshDetails = useCallback(async () => {
-    if (!conversationId) {
-      return;
-    }
-
-    const result = await getInboxDetailsPanelAction({ conversationId });
-
-    if (result.success) {
-      setDetails(result.data);
-      setSuggestedAction(result.data.suggestedAction);
-      setCachedCrmDetails(conversationId, result.data);
-    }
-  }, [conversationId]);
 
   useEffect(() => {
     if (!conversationId) {
       setDetails(null);
-      setSuggestedAction(null);
       setLoadState("idle");
       loadedConversationIdRef.current = null;
       return;
@@ -121,7 +96,6 @@ export function InboxDetailsPanel({
 
     if (cached) {
       setDetails(cached);
-      setSuggestedAction(cached.suggestedAction);
       setLoadState("ready");
       loadedConversationIdRef.current = conversationId;
 
@@ -132,7 +106,6 @@ export function InboxDetailsPanel({
           }
 
           setDetails(result.data);
-          setSuggestedAction(result.data.suggestedAction);
           setCachedCrmDetails(conversationId, result.data);
         });
       }
@@ -144,7 +117,6 @@ export function InboxDetailsPanel({
     let cancelled = false;
     loadedConversationIdRef.current = activeConversationId;
     setDetails(null);
-    setSuggestedAction(null);
     setLoadState("loading");
 
     void getInboxDetailsPanelAction({ conversationId: activeConversationId }).then(
@@ -155,7 +127,6 @@ export function InboxDetailsPanel({
 
         if (result.success) {
           setDetails(result.data);
-          setSuggestedAction(result.data.suggestedAction);
           setCachedCrmDetails(activeConversationId, result.data);
           setLoadState("ready");
           return;
@@ -173,26 +144,6 @@ export function InboxDetailsPanel({
       }
     };
   }, [conversationId]);
-
-  async function handleGenerateSuggestion() {
-    if (!conversationId) {
-      return;
-    }
-
-    setIsGeneratingSuggestion(true);
-
-    try {
-      const result = await generateConversationCrmSuggestionAction({
-        conversationId,
-      });
-
-      if (result.success) {
-        setSuggestedAction(result.data.suggestedAction);
-      }
-    } finally {
-      setIsGeneratingSuggestion(false);
-    }
-  }
 
   if (!conversation) {
     return (
@@ -315,44 +266,6 @@ export function InboxDetailsPanel({
           )}
         </DetailSection>
 
-        <DetailSection title={CHAT_MESSAGES.aiAssistantTitle}>
-          <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
-            <span className="font-medium text-foreground">
-              {CHAT_MESSAGES.crmSuggestedAction}:{" "}
-            </span>
-            {suggestedAction ?? CHAT_MESSAGES.leadSummaryEmpty}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={isGeneratingSuggestion || !conversationId}
-              onClick={() => {
-                void handleGenerateSuggestion();
-              }}
-            >
-              {isGeneratingSuggestion ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <SparklesIcon className="size-3.5" />
-              )}
-              {CHAT_MESSAGES.suggestNextAction}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={onGenerateReply}
-            >
-              <SparklesIcon className="size-3.5" />
-              {CHAT_MESSAGES.generateReply}
-            </Button>
-          </div>
-        </DetailSection>
-
         <DetailSection title={CHAT_MESSAGES.suggestedRepliesTitle}>
           {cannedResponses.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -426,16 +339,6 @@ export function InboxDetailsPanel({
           </dl>
         </DetailSection>
       </div>
-
-      {contact ? (
-        <ContactProfileInsightsFooter
-          contactId={contact.id}
-          aiSummary={contact.aiSummary}
-          onRefresh={refreshDetails}
-          readOnly
-          className="px-4"
-        />
-      ) : null}
     </aside>
   );
 }

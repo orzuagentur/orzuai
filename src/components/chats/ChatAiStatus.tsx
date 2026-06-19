@@ -34,7 +34,7 @@ export function ChatAiStatus({ channel, aiEnabled, onToggle }: ChatAiStatusProps
               ? isEnabled
                 ? `AI is responding on ${getChannelBadgeLabel(channel)}.`
                 : `Manual replies only on ${getChannelBadgeLabel(channel)}.`
-              : `Configure ${getChannelBadgeLabel(channel)} AI in AI Assistant settings.`}
+              : `Configure ${getChannelBadgeLabel(channel)} in My Assistant settings.`}
           </p>
         </div>
       </div>

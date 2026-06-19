@@ -7,6 +7,7 @@ import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistan
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { PlatformCopilotWidget } from "@/components/platform-copilot/PlatformCopilotWidget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
@@ -22,22 +23,24 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
 
   return (
     <PushNotificationsProvider>
-      <InboxChromeProvider>
-        <ContactsChromeProvider>
-          <AiAssistantChromeProvider>
-          <SidebarProvider>
-            <AppSidebar userProfile={userProfile} />
-            <SidebarInset>
-              <DashboardHeader />
-              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                {children}
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
-          <PlatformCopilotWidget />
-          </AiAssistantChromeProvider>
-        </ContactsChromeProvider>
-      </InboxChromeProvider>
+      <DashboardNavBadgesProvider>
+        <InboxChromeProvider>
+          <ContactsChromeProvider>
+            <AiAssistantChromeProvider>
+            <SidebarProvider>
+              <AppSidebar userProfile={userProfile} />
+              <SidebarInset>
+                <DashboardHeader />
+                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                  {children}
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+            <PlatformCopilotWidget />
+            </AiAssistantChromeProvider>
+          </ContactsChromeProvider>
+        </InboxChromeProvider>
+      </DashboardNavBadgesProvider>
     </PushNotificationsProvider>
   );
 }

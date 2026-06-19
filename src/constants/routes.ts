@@ -35,6 +35,7 @@ export const DASHBOARD_ROUTES = {
   knowledgeBase: "/dashboard/knowledge-base",
   integrations: "/dashboard/integrations",
   aiAssistant: "/dashboard/ai-assistant",
+  aiManager: "/dashboard/ai-manager",
   analytics: "/dashboard/analytics",
   settings: "/dashboard/settings",
   subscription: "/dashboard/subscription",

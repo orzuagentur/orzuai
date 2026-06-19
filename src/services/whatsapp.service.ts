@@ -33,7 +33,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { applyWhatsAppDeliveryStatusUpdates } from "@/services/message-delivery-status.service";
-import { scheduleNewLeadPush } from "@/services/push-notifications.service";
+import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
 import {
   insertInboundChannelMessage,
   resolveInboundMessageContext,
@@ -775,6 +775,16 @@ async function ingestIncomingMessage(
 
   const insertedMessage = insertResult.message;
 
+  scheduleInboundMessagePush({
+    businessId,
+    contactId,
+    contactName: message.contactName,
+    conversationId,
+    channel: "whatsapp",
+    preview: getMessagePlainText(content),
+    isNewContact: createdContact,
+  });
+
   if (message.kind === "media") {
     await createPendingMessageAttachment(admin, {
       messageId: insertedMessage.id,
@@ -830,10 +840,8 @@ async function completeInboundWhatsAppMessage(input: {
     businessId,
     connection,
     conversationId,
-    contactId,
     createdContact,
     content,
-    message,
     normalizedPhone,
   } = input;
 
@@ -841,16 +849,6 @@ async function completeInboundWhatsAppMessage(input: {
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
-
-  if (createdContact) {
-    scheduleNewLeadPush({
-      businessId,
-      contactId,
-      contactName: message.contactName,
-      channel: "whatsapp",
-      preview: getMessagePlainText(content),
-    });
-  }
 
   await admin
     .from("whatsapp_connections")

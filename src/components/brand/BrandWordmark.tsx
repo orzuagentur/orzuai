@@ -12,12 +12,25 @@ export function BrandWordmark({ className, size = "md" }: BrandWordmarkProps) {
   return (
     <span
       className={cn(
-        "truncate font-semibold tracking-[0.14em] text-foreground uppercase",
+        "inline-flex items-baseline truncate font-medium tracking-[0.12em] text-inherit uppercase",
         sizeClass,
         className,
       )}
     >
-      Orzu<span className="font-bold tracking-[0.2em]">X</span>
+      <span className="font-semibold">Orzu</span>
+      <span
+        className={cn(
+          "relative -ml-0.5 inline-block font-black leading-none",
+          "bg-gradient-to-br from-sky-400 to-indigo-500 bg-clip-text text-transparent",
+          size === "lg"
+            ? "text-[1.55em] -translate-y-[0.06em]"
+            : size === "sm"
+              ? "text-[1.45em] -translate-y-[0.04em]"
+              : "text-[1.5em] -translate-y-[0.05em]",
+        )}
+      >
+        X
+      </span>
     </span>
   );
 }

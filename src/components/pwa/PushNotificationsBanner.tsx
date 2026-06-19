@@ -34,8 +34,8 @@ export function PushNotificationsBanner() {
       <div className="flex items-center gap-2">
         <BellIcon className="size-4" />
         <span>
-          Enable push notifications to get alerts for new leads when you are
-          away from the site.
+          Enable push notifications to get alerts for new messages from every
+          channel when you are away from the site.
         </span>
       </div>
       <div className="flex items-center gap-2">

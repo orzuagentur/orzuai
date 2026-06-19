@@ -1,12 +1,21 @@
 "use client";
 
-import type { RefObject } from "react";
-import { memo, useMemo } from "react";
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type RefObject,
+} from "react";
 import {
   AlertCircleIcon,
   BookOpenIcon,
   CheckCheckIcon,
   CheckIcon,
+  ChevronDownIcon,
   Clock3Icon,
   Loader2Icon,
   SparklesIcon,
@@ -14,9 +23,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { RelativeTime } from "@/components/ui/relative-time";
+import { MessageDateTime } from "@/components/ui/message-date-time";
 
 import { ChatMediaMessage } from "@/components/chats/inbox/ChatMediaMessage";
+import { ExpandableMessageText } from "@/components/chats/inbox/ExpandableMessageText";
 import { MediaUploadProgressOverlay } from "@/components/chats/inbox/MediaUploadProgressOverlay";
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
 import { TypingIndicator } from "@/components/chats/TypingIndicator";
@@ -56,7 +66,15 @@ type MessageHistoryProps = {
   hasOlderMessages?: boolean;
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
+  onReadProgress?: (readAt: string) => void;
+  showScrollToBottom?: boolean;
+  newMessagesBelow?: number;
+  onScrollToBottom?: () => void;
   className?: string;
+};
+
+export type MessageHistoryHandle = {
+  scrollToEnd: () => void;
 };
 
 function getSenderLabel(message: ChatMessageData): string {
@@ -86,9 +104,8 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
   }
 
   if (
-    message.isPending ||
-    message.deliveryStatus === "pending" ||
-    message.deliveryStatus === "processing"
+    !message.isPending &&
+    (message.deliveryStatus === "pending" || message.deliveryStatus === "processing")
   ) {
     return (
       <Loader2Icon
@@ -219,7 +236,7 @@ function MessageUploadStatus({
           CHAT_MESSAGES.messageSending
         )
       ) : (
-        <RelativeTime value={message.createdAt} />
+        <MessageDateTime value={message.createdAt} />
       )}
       <OutboundDeliveryIndicator message={message} />
     </p>
@@ -236,6 +253,8 @@ type MessageHistoryItemProps = {
   showMessageActions: boolean;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
+  onReadProgress?: (readAt: string) => void;
+  scrollRootRef?: RefObject<HTMLDivElement | null>;
 };
 
 function MessageHistoryItem({
@@ -248,6 +267,8 @@ function MessageHistoryItem({
   showMessageActions,
   onMessageRemoved,
   onMessageUpdated,
+  onReadProgress,
+  scrollRootRef,
 }: MessageHistoryItemProps) {
   const isOutgoing =
     message.senderType === "user" || message.senderType === "ai";
@@ -258,9 +279,50 @@ function MessageHistoryItem({
   const isUnreadMessage =
     isInbox && isUnreadClientMessage(message, lastReadAt);
   const canShowMessageActions = showMessageActions && !message.isPending;
+  const messageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isInbox || !isUnreadMessage || !onReadProgress || message.senderType !== "client") {
+      return;
+    }
+
+    const element = messageRef.current;
+    const root = scrollRootRef?.current;
+
+    if (!element || !root) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+
+        if (entry?.isIntersecting) {
+          onReadProgress(message.createdAt);
+        }
+      },
+      {
+        root,
+        threshold: 0.65,
+      },
+    );
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    isInbox,
+    isUnreadMessage,
+    message.createdAt,
+    message.senderType,
+    onReadProgress,
+    scrollRootRef,
+  ]);
 
   return (
-    <div className="flex min-w-0 w-full flex-col gap-2 pb-2">
+    <div ref={messageRef} className="flex min-w-0 w-full flex-col gap-2 pb-2">
       {showUnreadDivider ? (
         <div
           ref={firstUnreadRef}
@@ -362,9 +424,16 @@ function MessageHistoryItem({
               ) : null}
             </div>
           ) : (
-            <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]">
-              {text}
-            </p>
+            <ExpandableMessageText
+              text={text}
+              mutedActionClassName={
+                isOutgoing
+                  ? isInbox
+                    ? "text-emerald-100"
+                    : "text-primary-foreground/80"
+                  : "text-muted-foreground"
+              }
+            />
           )}
           <MessageUploadStatus
             message={message}
@@ -394,25 +463,37 @@ const MemoMessageHistoryItem = memo(
     previous.showMessageActions === next.showMessageActions &&
     previous.onMessageRemoved === next.onMessageRemoved &&
     previous.onMessageUpdated === next.onMessageUpdated &&
+    previous.onReadProgress === next.onReadProgress &&
+    previous.scrollRootRef === next.scrollRootRef &&
     messageContentEqual(previous.message, next.message),
 );
 
-export function MessageHistory({
-  messages,
-  variant = "default",
-  lastReadAt = null,
-  scrollContainerRef,
-  firstUnreadRef,
-  bottomRef,
-  isClientTyping = false,
-  typingContactName = "Customer",
-  onMessageRemoved,
-  onMessageUpdated,
-  hasOlderMessages = false,
-  isLoadingOlderMessages = false,
-  onLoadOlderMessages,
-  className,
-}: MessageHistoryProps) {
+export const MessageHistory = forwardRef<
+  MessageHistoryHandle,
+  MessageHistoryProps
+>(function MessageHistory(
+  {
+    messages,
+    variant = "default",
+    lastReadAt = null,
+    scrollContainerRef,
+    firstUnreadRef,
+    bottomRef,
+    isClientTyping = false,
+    typingContactName = "Customer",
+    onMessageRemoved,
+    onMessageUpdated,
+    hasOlderMessages = false,
+    isLoadingOlderMessages = false,
+    onLoadOlderMessages,
+    onReadProgress,
+    showScrollToBottom = false,
+    newMessagesBelow = 0,
+    onScrollToBottom,
+    className,
+  },
+  ref,
+) {
   const isInbox = variant === "inbox";
   const showMessageActions = Boolean(onMessageRemoved);
   const firstUnreadIndex = findFirstUnreadClientMessageIndex(
@@ -451,29 +532,80 @@ export function MessageHistory({
     messages.length > 0 && Boolean(visibleRangeKey),
   );
 
+  const scrollToEnd = useCallback(() => {
+    const lastIndex = messages.length - 1;
+
+    const runScroll = () => {
+      if (shouldVirtualize && lastIndex >= 0) {
+        virtualizer.scrollToIndex(lastIndex, { align: "end" });
+      }
+
+      const scrollContainer = scrollContainerRef?.current;
+
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+
+      bottomRef?.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    };
+
+    runScroll();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(runScroll);
+    });
+  }, [
+    bottomRef,
+    messages.length,
+    scrollContainerRef,
+    shouldVirtualize,
+    virtualizer,
+  ]);
+
+  useImperativeHandle(ref, () => ({ scrollToEnd }), [scrollToEnd]);
+
+  function handleScrollToBottomClick() {
+    scrollToEnd();
+    onScrollToBottom?.();
+  }
+
+  const scrollAreaClassName = cn(
+    "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4",
+    isInbox && "bg-muted/20",
+  );
+
   if (messages.length === 0) {
     return (
       <div
         className={cn(
-          "flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8 text-sm text-muted-foreground",
+          "relative flex min-h-0 min-w-0 flex-1 flex-col",
           className,
         )}
       >
-        No messages in this conversation yet.
-        {bottomRef ? <div ref={bottomRef} className="hidden" /> : null}
+        <div
+          ref={scrollContainerRef ? mergeRefs(scrollContainerRef) : undefined}
+          className={cn(
+            scrollAreaClassName,
+            "items-center justify-center text-sm text-muted-foreground",
+          )}
+        >
+          No messages in this conversation yet.
+          {bottomRef ? <div ref={bottomRef} className="hidden" /> : null}
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      ref={scrollContainerRef ? mergeRefs(scrollContainerRef) : undefined}
       className={cn(
-        "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4",
-        isInbox && "bg-muted/20",
+        "relative flex min-h-0 min-w-0 flex-1 flex-col",
         className,
       )}
     >
+      <div
+        ref={scrollContainerRef ? mergeRefs(scrollContainerRef) : undefined}
+        className={scrollAreaClassName}
+      >
       {hasOlderMessages && onLoadOlderMessages ? (
         <div className="flex shrink-0 justify-center pb-1">
           <Button
@@ -522,6 +654,8 @@ export function MessageHistory({
                   showMessageActions={showMessageActions}
                   onMessageRemoved={onMessageRemoved}
                   onMessageUpdated={onMessageUpdated}
+                  onReadProgress={onReadProgress}
+                  scrollRootRef={scrollContainerRef}
                 />
               </div>
             );
@@ -541,6 +675,8 @@ export function MessageHistory({
               showMessageActions={showMessageActions}
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
+              onReadProgress={onReadProgress}
+              scrollRootRef={scrollContainerRef}
             />
           ))}
         </div>
@@ -552,6 +688,31 @@ export function MessageHistory({
         />
       ) : null}
       {bottomRef ? <div ref={bottomRef} className="shrink-0" /> : null}
+      </div>
+
+      {showScrollToBottom && isInbox ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            className="pointer-events-auto relative size-9 rounded-full shadow-md"
+            aria-label={
+              newMessagesBelow > 0
+                ? CHAT_MESSAGES.newMessagesBelow(newMessagesBelow)
+                : CHAT_MESSAGES.scrollToBottom
+            }
+            onClick={handleScrollToBottomClick}
+          >
+            <ChevronDownIcon className="size-4" />
+            {newMessagesBelow > 0 ? (
+              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                {newMessagesBelow > 9 ? "9+" : newMessagesBelow}
+              </span>
+            ) : null}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
-}
+});

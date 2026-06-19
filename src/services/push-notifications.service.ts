@@ -3,6 +3,7 @@ import "server-only";
 import webpush from "web-push";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { isChatChannelId } from "@/features/chats/channel-config";
 import { INTEGRATION_CHANNEL_LIST } from "@/features/integrations/constants";
 import {
   getAppUrl,
@@ -34,49 +35,60 @@ function ensureVapidConfigured(): boolean {
   return true;
 }
 
-export type NewLeadPushInput = {
+export type InboundMessagePushInput = {
   businessId: string;
   contactId: string;
   contactName: string;
+  conversationId: string;
   channel: MessagingChannel;
   preview?: string;
+  isNewContact?: boolean;
 };
 
-export async function notifyNewLeadPush(input: NewLeadPushInput): Promise<void> {
+type PushDeliveryResult = {
+  sent: number;
+  failed: number;
+  skipped: boolean;
+};
+
+function getChannelLabel(channel: MessagingChannel): string {
+  return (
+    INTEGRATION_CHANNEL_LIST.find((item) => item.id === channel)?.label ??
+    channel
+  );
+}
+
+function buildConversationUrl(
+  channel: MessagingChannel,
+  conversationId: string,
+): string {
+  const appUrl = getAppUrl();
+  const path = isChatChannelId(channel)
+    ? `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`
+    : `${DASHBOARD_ROUTES.chats}?conversation=${conversationId}`;
+
+  return `${appUrl}${path}`;
+}
+
+async function deliverPushToBusiness(
+  businessId: string,
+  payload: string,
+): Promise<PushDeliveryResult> {
   if (!ensureVapidConfigured()) {
-    return;
+    return { sent: 0, failed: 0, skipped: true };
   }
 
   const admin = createAdminClient();
   const { data: subscriptions } = await admin
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")
-    .eq("business_id", input.businessId);
+    .eq("business_id", businessId);
 
   if (!subscriptions?.length) {
-    return;
+    return { sent: 0, failed: 0, skipped: true };
   }
 
-  const channelLabel =
-    INTEGRATION_CHANNEL_LIST.find((channel) => channel.id === input.channel)
-      ?.label ?? input.channel;
-  const contactName = input.contactName.trim() || "New lead";
-  const preview = input.preview ? getMessagePreviewText(input.preview, 120) : "";
-  const appUrl = getAppUrl();
-  const url = `${appUrl}${DASHBOARD_ROUTES.contacts}?contact=${input.contactId}`;
-  const body = preview
-    ? `${channelLabel}: ${preview}`
-    : `New lead from ${channelLabel}`;
-
-  const payload = JSON.stringify({
-    title: `New lead — ${contactName}`,
-    body,
-    url,
-    tag: `new-lead-${input.contactId}`,
-    sound: "/sounds/new-lead.wav",
-  });
-
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     subscriptions.map(async (subscription) => {
       try {
         await webpush.sendNotification(
@@ -89,6 +101,7 @@ export async function notifyNewLeadPush(input: NewLeadPushInput): Promise<void> 
           },
           payload,
         );
+        return true;
       } catch (error) {
         const statusCode = (error as { statusCode?: number }).statusCode;
 
@@ -98,13 +111,109 @@ export async function notifyNewLeadPush(input: NewLeadPushInput): Promise<void> 
             .delete()
             .eq("id", subscription.id);
         }
+
+        return false;
       }
     }),
   );
+
+  const sent = results.filter(
+    (result) => result.status === "fulfilled" && result.value,
+  ).length;
+  const failed = results.length - sent;
+
+  return { sent, failed, skipped: false };
 }
 
-export function scheduleNewLeadPush(input: NewLeadPushInput): void {
-  void notifyNewLeadPush(input).catch((error) => {
-    console.error("[push] failed to notify new lead", error);
+export async function notifyInboundMessagePush(
+  input: InboundMessagePushInput,
+): Promise<PushDeliveryResult> {
+  const channelLabel = getChannelLabel(input.channel);
+  const contactName = input.contactName.trim() || "Customer";
+  const preview = input.preview ? getMessagePreviewText(input.preview, 120) : "";
+  const title = input.isNewContact
+    ? `New lead — ${contactName}`
+    : `New message — ${contactName}`;
+  const body = preview
+    ? `${channelLabel}: ${preview}`
+    : input.isNewContact
+      ? `New lead from ${channelLabel}`
+      : `New message on ${channelLabel}`;
+
+  const payload = JSON.stringify({
+    title,
+    body,
+    url: buildConversationUrl(input.channel, input.conversationId),
+    tag: `inbound-${input.conversationId}`,
+    sound: "/sounds/new-lead.wav",
   });
+
+  try {
+    return await deliverPushToBusiness(input.businessId, payload);
+  } catch (error) {
+    console.error("[push] failed to notify inbound message", error);
+    return { sent: 0, failed: 0, skipped: true };
+  }
+}
+
+export function scheduleInboundMessagePush(input: InboundMessagePushInput): void {
+  void notifyInboundMessagePush(input).catch((error) => {
+    console.error("[push] failed to schedule inbound message", error);
+  });
+}
+
+/** @deprecated Use notifyInboundMessagePush */
+export type NewLeadPushInput = Omit<
+  InboundMessagePushInput,
+  "conversationId"
+> & {
+  conversationId?: string;
+};
+
+/** @deprecated Use notifyInboundMessagePush */
+export async function notifyNewLeadPush(
+  input: NewLeadPushInput,
+): Promise<PushDeliveryResult> {
+  return notifyInboundMessagePush({
+    businessId: input.businessId,
+    contactId: input.contactId,
+    contactName: input.contactName,
+    conversationId: input.conversationId ?? input.contactId,
+    channel: input.channel,
+    preview: input.preview,
+    isNewContact: true,
+  });
+}
+
+/** @deprecated Use scheduleInboundMessagePush */
+export function scheduleNewLeadPush(input: NewLeadPushInput): void {
+  scheduleInboundMessagePush({
+    businessId: input.businessId,
+    contactId: input.contactId,
+    contactName: input.contactName,
+    conversationId: input.conversationId ?? input.contactId,
+    channel: input.channel,
+    preview: input.preview,
+    isNewContact: true,
+  });
+}
+
+export async function sendTestPushNotification(
+  businessId: string,
+): Promise<PushDeliveryResult> {
+  const appUrl = getAppUrl();
+  const payload = JSON.stringify({
+    title: "OrzuX test notification",
+    body: "Push notifications are working on this device.",
+    url: `${appUrl}${DASHBOARD_ROUTES.chats}`,
+    tag: "push-test",
+    sound: "/sounds/new-lead.wav",
+  });
+
+  try {
+    return await deliverPushToBusiness(businessId, payload);
+  } catch (error) {
+    console.error("[push] failed to send test notification", error);
+    return { sent: 0, failed: 0, skipped: true };
+  }
 }

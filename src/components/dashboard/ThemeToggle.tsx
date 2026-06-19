@@ -4,54 +4,36 @@ import { MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon-sm" aria-label="Theme" disabled>
-        <SunIcon className="size-4" />
-      </Button>
-    );
-  }
-
-  const isDark = (resolvedTheme ?? theme) === "dark";
+  const isDark = mounted && resolvedTheme === "dark";
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Toggle theme">
-          {isDark ? (
-            <MoonIcon className="size-4" />
-          ) : (
-            <SunIcon className="size-4" />
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          type="button"
+          disabled={!mounted}
+          tooltip={isDark ? "Light theme" : "Dark theme"}
+          className="h-10 text-[15px] [&_svg]:size-5"
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+        >
+          {isDark ? <SunIcon /> : <MoonIcon />}
+          <span>{isDark ? "Light theme" : "Dark theme"}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }

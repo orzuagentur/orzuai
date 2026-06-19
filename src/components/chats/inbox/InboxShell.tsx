@@ -2,10 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import {
-  InboxLayoutProvider,
-  useInboxLayout,
-} from "@/components/chats/inbox/inbox-layout-context";
+import { useInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
 import { cn } from "@/lib/utils";
 
 type InboxShellProps = {
@@ -14,6 +11,7 @@ type InboxShellProps = {
   chatColumn: ReactNode;
   detailsColumn: ReactNode;
   showChatOnMobile?: boolean;
+  showRightColumn?: boolean;
   className?: string;
 };
 
@@ -23,9 +21,11 @@ function InboxShellContent({
   chatColumn,
   detailsColumn,
   showChatOnMobile = false,
+  showRightColumn,
   className,
 }: InboxShellProps) {
   const { detailsOpen, chatFullscreen } = useInboxLayout();
+  const rightColumnOpen = showRightColumn ?? detailsOpen;
 
   return (
     <div
@@ -36,40 +36,31 @@ function InboxShellContent({
     >
       {!chatFullscreen ? channelTabs : null}
 
-      <div
-        className={cn(
-          "grid min-h-0 min-w-0 flex-1 overflow-hidden",
-          chatFullscreen
-            ? "grid-cols-1"
-            : detailsOpen
-              ? "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)_minmax(0,20rem)]"
-              : "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
-        )}
-      >
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {!chatFullscreen ? (
-          <div
+          <aside
             className={cn(
-              "flex min-h-0 min-w-0 flex-col overflow-hidden border-r",
+              "flex w-full min-h-0 min-w-0 shrink-0 flex-col overflow-hidden border-r lg:w-[22rem]",
               showChatOnMobile && "hidden lg:flex",
             )}
           >
             {listColumn}
-          </div>
+          </aside>
         ) : null}
 
-        <div
+        <main
           className={cn(
-            "flex min-h-0 min-w-0 flex-col overflow-hidden",
+            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
             chatFullscreen || showChatOnMobile ? "flex" : "hidden lg:flex",
           )}
         >
           {chatColumn}
-        </div>
+        </main>
 
-        {!chatFullscreen && detailsOpen ? (
-          <div className="hidden min-h-0 min-w-0 flex-col overflow-hidden border-l xl:flex">
+        {!chatFullscreen && rightColumnOpen ? (
+          <aside className="hidden min-h-0 w-[20rem] min-w-0 shrink-0 flex-col overflow-hidden border-l bg-background xl:flex">
             {detailsColumn}
-          </div>
+          </aside>
         ) : null}
       </div>
     </div>
@@ -77,9 +68,5 @@ function InboxShellContent({
 }
 
 export function InboxShell(props: InboxShellProps) {
-  return (
-    <InboxLayoutProvider>
-      <InboxShellContent {...props} />
-    </InboxLayoutProvider>
-  );
+  return <InboxShellContent {...props} />;
 }

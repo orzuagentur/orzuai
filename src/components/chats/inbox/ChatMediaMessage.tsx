@@ -23,11 +23,14 @@ import {
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retryInboundMediaAttachmentAction } from "@/features/chats/actions/retry-inbound-media-attachment";
 import { useChatImageMediaUrls, useChatMediaUrl } from "@/hooks/use-chat-media-url";
+import { resolveCachedMediaUrl } from "@/lib/client-cache/inbox-messenger-cache";
 import { VoiceMessagePlayer } from "@/components/chats/inbox/VoiceMessagePlayer";
 import { cn } from "@/lib/utils";
 import {
   formatMediaFileSize,
+  buildMediaUrlCacheKey,
   isMediaPendingHydration,
+  resolveMediaStoragePath,
   type ChatMediaKind,
   type ChatMediaPayload,
 } from "@/utils/chat-media";
@@ -44,6 +47,99 @@ type ChatMediaMessageProps = {
     attachmentFailed: boolean;
   }) => void;
 };
+
+function getMediaCacheKeys(
+  media: ChatMediaPayload,
+  messageId?: string,
+): string[] {
+  const keys: string[] = [];
+  const storagePath = resolveMediaStoragePath(media);
+  const cacheKey = buildMediaUrlCacheKey(media, messageId);
+
+  if (storagePath) {
+    keys.push(storagePath);
+  }
+
+  if (cacheKey && !keys.includes(cacheKey)) {
+    keys.push(cacheKey);
+  }
+
+  return keys;
+}
+
+function hasCachedMediaUrl(
+  media: ChatMediaPayload,
+  messageId?: string,
+): boolean {
+  if (media.url?.startsWith("blob:")) {
+    return true;
+  }
+
+  if (isMediaPendingHydration(media)) {
+    return false;
+  }
+
+  return Boolean(resolveCachedMediaUrl(getMediaCacheKeys(media, messageId)));
+}
+
+function shouldAutoLoadMedia(
+  media: ChatMediaPayload,
+  messageId?: string,
+): boolean {
+  return (
+    media.kind === "audio" ||
+    media.url?.startsWith("blob:") ||
+    hasCachedMediaUrl(media, messageId)
+  );
+}
+
+function MediaLoadPrompt({
+  kind,
+  fileName,
+  isOutgoing,
+  onLoad,
+  className,
+}: {
+  kind: ChatMediaKind;
+  fileName: string;
+  isOutgoing?: boolean;
+  onLoad: () => void;
+  className?: string;
+}) {
+  const Icon = getMediaHydratingIcon(kind);
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg px-4 py-5 text-center",
+        isOutgoing ? "bg-emerald-800/25 text-emerald-50" : "bg-black/5 text-muted-foreground",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "flex size-11 items-center justify-center rounded-full",
+          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+        )}
+      >
+        <Icon className="size-5 opacity-80" aria-hidden />
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs font-medium">{fileName || "Attachment"}</p>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant={isOutgoing ? "secondary" : "outline"}
+        className="h-8 gap-1.5"
+        onClick={onLoad}
+      >
+        <DownloadIcon className="size-3.5" aria-hidden />
+        {CHAT_MESSAGES.loadMediaAttachment}
+      </Button>
+    </div>
+  );
+}
 
 function getMediaHydratingLabel(kind: ChatMediaKind): string {
   if (kind === "image") {
@@ -674,14 +770,18 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
   onRetryStateChange,
 }: ChatMediaMessageProps) {
   const [isRetrying, startRetryTransition] = useTransition();
+  const [loadRequested, setLoadRequested] = useState(() =>
+    shouldAutoLoadMedia(media, messageId),
+  );
   const isHydrating =
     isHydratingProp ?? isMediaPendingHydration(media);
   const isFailed = isFailedProp ?? false;
   const showFailed = isFailed && !isHydrating;
+  const shouldFetchMedia = loadRequested && !isHydrating && !showFailed;
   const hasThumb = Boolean(media.thumbPath && media.kind === "image");
   const imageUrls = useChatImageMediaUrls(media, {
     messageId,
-    enabled: !isHydrating && !showFailed && media.kind === "image",
+    enabled: shouldFetchMedia && media.kind === "image",
     isHydrating,
   });
   const {
@@ -690,7 +790,7 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
     error: fullError,
   } = useChatMediaUrl(media, {
     messageId,
-    enabled: !isHydrating && !hasThumb && !showFailed,
+    enabled: shouldFetchMedia && !hasThumb && media.kind !== "image",
   });
 
   const handleRetry = () => {
@@ -724,6 +824,27 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
           isOutgoing={isOutgoing}
           isRetrying={isRetrying}
           onRetry={messageId ? handleRetry : undefined}
+          className="max-w-[min(300px,100%)]"
+        />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
+
+  const needsLoadPrompt =
+    !isHydrating &&
+    media.kind !== "audio" &&
+    !loadRequested &&
+    !media.url?.startsWith("blob:");
+
+  if (needsLoadPrompt) {
+    return (
+      <div className="space-y-1">
+        <MediaLoadPrompt
+          kind={media.kind}
+          fileName={media.fileName}
+          isOutgoing={isOutgoing}
+          onLoad={() => setLoadRequested(true)}
           className="max-w-[min(300px,100%)]"
         />
         <CaptionText caption={caption} isOutgoing={isOutgoing} />

@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import { useInboxPanel, useDebouncedInboxSearch, useSkipInitialListFetch } from "@/hooks/use-inbox-panel";
+import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import {
   getCachedConversationList,
   setCachedConversationList,
@@ -17,6 +18,7 @@ import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
+import { useInboxLayout, InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,7 +57,15 @@ type ChatsChannelPanelProps = {
     }
 >;
 
-export function ChatsChannelPanel({
+export function ChatsChannelPanel(props: ChatsChannelPanelProps) {
+  return (
+    <InboxLayoutProvider>
+      <ChatsChannelPanelContent {...props} />
+    </InboxLayoutProvider>
+  );
+}
+
+function ChatsChannelPanelContent({
   channelId,
   hasBusiness: initialHasBusiness,
   businessId: initialBusinessId = null,
@@ -109,6 +119,10 @@ export function ChatsChannelPanel({
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [, startFetching] = useTransition();
   const { consumeSkipInitialFetch } = useSkipInitialListFetch();
+  const refreshConversationsRef = useRef<() => void>(() => {});
+  const preserveListReadStateRef = useRef<
+    (items: ConversationListItem[]) => ConversationListItem[]
+  >((items) => items);
 
   const fetchConversations = useCallback(
     (silent = false) => {
@@ -124,7 +138,9 @@ export function ChatsChannelPanel({
         });
 
         if (result.success) {
-          setConversations(result.data.items);
+          setConversations(
+            preserveListReadStateRef.current(result.data.items),
+          );
         }
       };
 
@@ -141,6 +157,8 @@ export function ChatsChannelPanel({
   const refreshConversations = useCallback(() => {
     fetchConversations(true);
   }, [fetchConversations]);
+
+  refreshConversationsRef.current = refreshConversations;
 
   const hasActiveListFilters =
     Boolean(debouncedSearch) || activeFilter !== "all";
@@ -165,6 +183,9 @@ export function ChatsChannelPanel({
     suggestReplyOpen,
     setSuggestReplyOpen,
     handleConversationSelect,
+    handleConversationViewed,
+    handleReadProgress,
+    preserveListReadState,
   } = useInboxPanel({
     initialConversationId,
     initialActiveConversation,
@@ -177,8 +198,14 @@ export function ChatsChannelPanel({
     channelFilter: channelId,
     hasActiveListFilters,
     onConversationsChange: setConversations,
-    onRefreshConversations: refreshConversations,
+    onRefreshConversations: () => refreshConversationsRef.current(),
   });
+
+  useEffect(() => {
+    preserveListReadStateRef.current = preserveListReadState;
+  }, [preserveListReadState]);
+
+  const { detailsOpen } = useInboxLayout();
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -292,6 +319,7 @@ export function ChatsChannelPanel({
   return (
     <InboxShell
       showChatOnMobile={showChatOnMobile}
+      showRightColumn={detailsOpen || suggestReplyOpen}
       channelTabs={
         <InboxChannelTabs
           activeChannel={channelId}
@@ -377,16 +405,26 @@ export function ChatsChannelPanel({
               void refreshConversations();
             }}
             onContactFavoriteChange={handleContactFavoriteChange}
+            onConversationViewed={handleConversationViewed}
+            onReadProgress={handleReadProgress}
           />
         </div>
       }
       detailsColumn={
-        <InboxDetailsPanel
-          conversation={activeConversation}
-          cannedResponses={cannedResponses}
-          onUseSuggestedReply={setDraft}
-          onGenerateReply={() => setSuggestReplyOpen(true)}
-        />
+        suggestReplyOpen && activeConversation ? (
+          <AiSuggestReplyPanel
+            conversationId={activeConversation.id}
+            open
+            onOpenChange={setSuggestReplyOpen}
+            onUseSuggestion={setDraft}
+          />
+        ) : (
+          <InboxDetailsPanel
+            conversation={activeConversation}
+            cannedResponses={cannedResponses}
+            onUseSuggestedReply={setDraft}
+          />
+        )
       }
     />
   );

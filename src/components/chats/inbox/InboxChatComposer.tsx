@@ -1,16 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2Icon,
   MessageSquareQuoteIcon,
   MicIcon,
   PaperclipIcon,
+  PlusIcon,
   SendIcon,
   SmileIcon,
   SparklesIcon,
   SquareIcon,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 import {
@@ -29,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants";
 import { CHAT_ATTACHMENT_ACCEPT } from "@/features/chats/chat-attachments";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
@@ -358,7 +362,10 @@ export function InboxChatComposer({
   }
 
   return (
-    <div className="mt-auto shrink-0 border-t bg-muted/20">
+    <div
+      className="mt-auto shrink-0 border-t bg-muted/20"
+      data-inbox-chat-composer
+    >
       <div className="flex gap-1 border-b px-3 pt-2">
         <Button
           type="button"
@@ -422,6 +429,39 @@ export function InboxChatComposer({
                 void handleSendPendingAttachment();
               }}
             />
+          ) : null}
+
+          {canSend ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {cannedResponses.length === 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  asChild
+                >
+                  <Link href={DASHBOARD_ROUTES.settings}>
+                    <PlusIcon className="size-3.5" />
+                    {CANNED_RESPONSES_MESSAGES.addButton}
+                  </Link>
+                </Button>
+              ) : (
+                cannedResponses.slice(0, 4).map((item) => (
+                  <Button
+                    key={item.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 max-w-[10rem] truncate text-xs"
+                    disabled={isBusy || isRecording || hasPendingAttachment}
+                    onClick={() => onDraftChange(item.content)}
+                  >
+                    {item.title}
+                  </Button>
+                ))
+              )}
+            </div>
           ) : null}
 
           <div className="flex items-end gap-2">
@@ -511,9 +551,21 @@ export function InboxChatComposer({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {cannedResponses.length === 0 ? (
-                    <p className="px-2 py-3 text-xs text-muted-foreground">
-                      {CANNED_RESPONSES_MESSAGES.pickerEmpty}
-                    </p>
+                    <>
+                      <p className="px-2 py-2 text-xs text-muted-foreground">
+                        {CANNED_RESPONSES_MESSAGES.pickerEmpty}
+                      </p>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href={DASHBOARD_ROUTES.settings}
+                          className="gap-2 font-medium"
+                        >
+                          <PlusIcon className="size-4" />
+                          {CANNED_RESPONSES_MESSAGES.addButton}
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   ) : (
                     cannedResponses.map((item) => (
                       <DropdownMenuItem
@@ -544,7 +596,7 @@ export function InboxChatComposer({
               </Button>
             </div>
 
-            <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm">
+            <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-border/60 bg-background px-3 py-2">
               <Textarea
                 ref={textareaRef}
                 value={draft}
@@ -554,8 +606,9 @@ export function InboxChatComposer({
                 rows={1}
                 disabled={isBusy || !canSend || isRecording}
                 className={cn(
-                  "min-h-[24px] flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 shadow-none",
-                  "focus-visible:ring-0",
+                  "min-h-[24px] flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 shadow-none outline-none",
+                  "focus-visible:border-0 focus-visible:ring-0",
+                  "dark:bg-transparent dark:disabled:bg-transparent",
                 )}
                 style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
               />

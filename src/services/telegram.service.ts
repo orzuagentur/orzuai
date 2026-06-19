@@ -24,7 +24,7 @@ import {
   resolveInboundMessageContext,
 } from "@/services/inbound-ingest.service";
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
-import { scheduleNewLeadPush } from "@/services/push-notifications.service";
+import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
 import {
   createOutboundMessageDelivery,
   incrementMessagingAnalytics,
@@ -348,6 +348,16 @@ async function ingestTelegramMessage(
 
   const insertedMessage = insertResult.message;
 
+  scheduleInboundMessagePush({
+    businessId,
+    contactId,
+    contactName: message.contactName,
+    conversationId,
+    channel: "telegram",
+    preview: getMessagePlainText(content),
+    isNewContact: createdContact,
+  });
+
   if (message.kind === "media") {
     await createPendingMessageAttachment(admin, {
       messageId: insertedMessage.id,
@@ -401,7 +411,6 @@ async function completeInboundTelegramMessage(input: {
     businessId,
     connection,
     conversationId,
-    contactId,
     createdContact,
     content,
     message,
@@ -411,16 +420,6 @@ async function completeInboundTelegramMessage(input: {
     totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
   });
-
-  if (createdContact) {
-    scheduleNewLeadPush({
-      businessId,
-      contactId,
-      contactName: message.contactName,
-      channel: "telegram",
-      preview: getMessagePlainText(content),
-    });
-  }
 
   await admin
     .from("telegram_connections")

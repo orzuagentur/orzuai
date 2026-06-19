@@ -75,14 +75,7 @@ export function ContactRecordWorkspace({
   }
 
   return (
-    <div
-      className={cn(
-        "flex h-full min-h-0 min-w-0 overflow-hidden",
-        profileOpen &&
-          "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]",
-        className,
-      )}
-    >
+    <div className={cn("flex h-full min-h-0 min-w-0 overflow-hidden", className)}>
       <ContactWorkPanel
         profile={profile}
         isLoading={isLoading}
@@ -90,24 +83,24 @@ export function ContactRecordWorkspace({
         profileOpen={profileOpen}
         onToggleProfile={onToggleProfile}
         onBack={onBack}
-        className="min-w-0"
+        className="min-w-0 flex-1"
       />
 
       {profileOpen && profile && !isLoading ? (
-        <div className="hidden min-h-0 min-w-0 xl:flex">
+        <aside className="hidden min-h-0 w-[20rem] min-w-0 shrink-0 flex-col overflow-hidden border-l xl:flex">
           <ContactFullProfilePanel
             profile={profile}
             onRefresh={refreshProfile}
             onContactDeleted={onContactDeleted}
             className="w-full"
           />
-        </div>
+        </aside>
       ) : null}
 
       {isLoading && profileOpen ? (
-        <div className="hidden items-center justify-center border-l xl:flex xl:w-[20rem]">
+        <aside className="hidden min-h-0 w-[20rem] shrink-0 items-center justify-center border-l xl:flex">
           <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-        </div>
+        </aside>
       ) : null}
     </div>
   );

@@ -9,7 +9,7 @@ import {
   incrementMessagingAnalytics,
   insertChannelMessage,
 } from "@/services/messaging.service";
-import { notifyNewLeadPush } from "@/services/push-notifications.service";
+import { notifyInboundMessagePush } from "@/services/push-notifications.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import type {
   AutomationActionType,
@@ -310,10 +310,11 @@ async function executeWorkflowAction(
   }
 
   if (action === "notify") {
-    await notifyNewLeadPush({
+    await notifyInboundMessagePush({
       businessId: context.businessId,
       contactId: context.contactId,
       contactName: context.contactName,
+      conversationId: context.conversationId,
       channel: context.channel,
       preview: config.notifyTitle?.trim() || workflow.name,
     });

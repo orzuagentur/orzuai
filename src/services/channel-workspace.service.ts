@@ -8,6 +8,7 @@ import {
   DEFAULT_AI_SYSTEM_PROMPT,
 } from "@/features/business/constants";
 import type { IntegrationChannelId, MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
@@ -72,6 +73,7 @@ export async function enableAiForChannels(
 
 function revalidateChannelWorkspacePaths(channel: MessagingIntegrationChannelId): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.aiManager);
   revalidatePath(DASHBOARD_ROUTES.analytics);
   revalidatePath(DASHBOARD_ROUTES.onboarding);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/${channel}`);
@@ -656,6 +658,38 @@ export async function isChannelWorkspaceReady(
 ): Promise<boolean> {
   const statuses = await getChannelConnectionStatuses(businessId);
   return isChannelConnectedForWorkspace(channel, statuses);
+}
+
+export async function setMessagingChannelsAiEnabled(
+  enabled: boolean,
+): Promise<{ success: boolean; message?: string }> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const supabase = await createClient();
+
+  for (const channel of MESSAGING_INTEGRATION_CHANNELS) {
+    await ensureChannelAiSettings(supabase, businessId, channel);
+  }
+
+  const { error } = await supabase
+    .from("ai_settings")
+    .update({ ai_enabled: enabled })
+    .eq("business_id", businessId)
+    .in("channel", [...MESSAGING_INTEGRATION_CHANNELS]);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  for (const channel of MESSAGING_INTEGRATION_CHANNELS) {
+    revalidateChannelWorkspacePaths(channel);
+  }
+
+  return { success: true };
 }
 
 export async function updateChannelAiEnabled(

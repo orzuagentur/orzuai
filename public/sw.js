@@ -10,10 +10,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   let data = {
-    title: "New lead",
-    body: "You have a new lead in OrzuX.",
-    url: "/dashboard/contacts",
-    tag: "new-lead",
+    title: "New message",
+    body: "You have a new message in OrzuX.",
+    url: "/dashboard/chats",
+    tag: "inbound-message",
     sound: LEAD_SOUND_PATH,
   };
 

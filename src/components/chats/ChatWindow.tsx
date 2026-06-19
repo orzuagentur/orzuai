@@ -12,7 +12,6 @@ import {
   StarIcon,
 } from "lucide-react";
 
-import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
@@ -24,7 +23,7 @@ import {
 } from "@/lib/client/message-upload-progress-store";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
-import { MessageHistory } from "@/components/chats/MessageHistory";
+import { MessageHistory, type MessageHistoryHandle } from "@/components/chats/MessageHistory";
 import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleton";
 import { Button } from "@/components/ui/button";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
@@ -79,6 +78,8 @@ type ChatWindowProps = {
   hasOlderMessages?: boolean;
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
+  onConversationViewed?: () => void;
+  onReadProgress?: (readAt: string) => void;
   className?: string;
 };
 
@@ -121,6 +122,8 @@ export function ChatWindow({
   hasOlderMessages = false,
   isLoadingOlderMessages = false,
   onLoadOlderMessages,
+  onConversationViewed,
+  onReadProgress,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -133,9 +136,13 @@ export function ChatWindow({
   const setSuggestOpen = onSuggestReplyOpenChange ?? setInternalSuggestOpen;
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messageHistoryRef = useRef<MessageHistoryHandle>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const pinnedConversationIdRef = useRef<string | null>(null);
   const scrollHeightBeforeOlderLoadRef = useRef(0);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [newMessagesBelow, setNewMessagesBelow] = useState(0);
   const draft = controlledDraft ?? internalDraft;
   const setDraft = onDraftChange ?? setInternalDraft;
   const inboxLayout = useOptionalInboxLayout();
@@ -215,8 +222,68 @@ export function ChatWindow({
   ]);
 
   useEffect(() => {
+    lastMessageIdRef.current = null;
+    setShowScrollToBottom(false);
+    setNewMessagesBelow(0);
+  }, [conversation?.id]);
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+
+    if (!scrollContainer || !conversation) {
+      return;
+    }
+
+    function handleScroll() {
+      const pinned = isChatScrollPinnedToBottom(scrollContainer!);
+      setShowScrollToBottom(!pinned);
+
+      if (pinned) {
+        setNewMessagesBelow(0);
+        lastMessageIdRef.current =
+          conversation!.messages.at(-1)?.id ?? null;
+        onConversationViewed?.();
+      }
+    }
+
+    handleScroll();
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll);
+    };
+  }, [conversation, onConversationViewed]);
+
+  useEffect(() => {
     if (!conversation) {
       pinnedConversationIdRef.current = null;
+      return;
+    }
+
+    const lastMessage = conversation.messages.at(-1);
+
+    if (!lastMessage) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    const isNewMessage = lastMessageIdRef.current !== lastMessage.id;
+
+    if (!isNewMessage) {
+      return;
+    }
+
+    const wasKnownMessage = lastMessageIdRef.current !== null;
+    lastMessageIdRef.current = lastMessage.id;
+
+    if (
+      wasKnownMessage &&
+      lastMessage.senderType === "client" &&
+      scrollContainer &&
+      !isChatScrollPinnedToBottom(scrollContainer)
+    ) {
+      setNewMessagesBelow((current) => current + 1);
+      setShowScrollToBottom(true);
       return;
     }
 
@@ -239,8 +306,6 @@ export function ChatWindow({
         return;
       }
 
-      const scrollContainer = scrollContainerRef.current;
-
       if (
         !isOpeningChat &&
         scrollContainer &&
@@ -250,14 +315,14 @@ export function ChatWindow({
       }
 
       if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        messageHistoryRef.current?.scrollToEnd();
+        setShowScrollToBottom(false);
+        setNewMessagesBelow(0);
+        onConversationViewed?.();
         return;
       }
 
-      bottomRef.current?.scrollIntoView({
-        behavior: isOpeningChat ? "instant" : "smooth",
-        block: "end",
-      });
+      messageHistoryRef.current?.scrollToEnd();
     };
 
     scrollToTarget();
@@ -265,8 +330,17 @@ export function ChatWindow({
   }, [
     conversation?.id,
     conversation?.messages.at(-1)?.id,
+    conversation?.lastReadAt,
     isClientTyping,
+    onConversationViewed,
   ]);
+
+  function handleScrolledToBottom() {
+    setShowScrollToBottom(false);
+    setNewMessagesBelow(0);
+    lastMessageIdRef.current = conversation?.messages.at(-1)?.id ?? null;
+    onConversationViewed?.();
+  }
 
   function handleToggleFavorite() {
     if (!conversation?.contactId || isFavoritePending) {
@@ -478,8 +552,11 @@ export function ChatWindow({
                       ? CHAT_MESSAGES.hideContactDetails
                       : CHAT_MESSAGES.showContactDetails
                   }
-                  aria-pressed={inboxLayout.detailsOpen}
-                  onClick={inboxLayout.toggleDetails}
+                  aria-pressed={inboxLayout.detailsOpen && !suggestOpen}
+                  onClick={() => {
+                    setSuggestOpen(false);
+                    inboxLayout.toggleDetails();
+                  }}
                 >
                   {inboxLayout.detailsOpen ? (
                     <PanelRightCloseIcon className="size-4" />
@@ -495,10 +572,11 @@ export function ChatWindow({
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
             <MessageHistory
+              ref={messageHistoryRef}
               messages={conversation.messages}
               variant="inbox"
               lastReadAt={conversation.lastReadAt}
-              className="min-h-0 flex-1 overflow-y-auto"
+              className="min-h-0 flex-1"
               scrollContainerRef={scrollContainerRef}
               firstUnreadRef={firstUnreadRef}
               bottomRef={bottomRef}
@@ -509,6 +587,10 @@ export function ChatWindow({
               hasOlderMessages={hasOlderMessages}
               isLoadingOlderMessages={isLoadingOlderMessages}
               onLoadOlderMessages={onLoadOlderMessages}
+              onReadProgress={onReadProgress}
+              showScrollToBottom={showScrollToBottom}
+              newMessagesBelow={newMessagesBelow}
+              onScrollToBottom={handleScrolledToBottom}
             />
 
             <InboxChatComposer
@@ -529,7 +611,10 @@ export function ChatWindow({
               onSubmit={() => {
                 void handleInboxSend();
               }}
-              onOpenAiSuggest={() => setSuggestOpen(true)}
+              onOpenAiSuggest={() => {
+                inboxLayout?.setDetailsOpen(false);
+                setSuggestOpen(true);
+              }}
               onSendMedia={(file, caption) => {
                 const pendingId = createOptimisticMessageId();
                 const optimisticMessage = createOptimisticMediaChatMessage({
@@ -579,13 +664,6 @@ export function ChatWindow({
               }}
             />
           </div>
-
-          <AiSuggestReplyPanel
-            conversationId={conversation.id}
-            open={suggestOpen}
-            onOpenChange={setSuggestOpen}
-            onUseSuggestion={setDraft}
-          />
         </div>
       </div>
     );

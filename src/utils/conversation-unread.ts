@@ -1,5 +1,9 @@
-import type { ConversationListItem } from "@/types/chat.types";
+import type {
+  ChatMessageData,
+  ConversationListItem,
+} from "@/types/chat.types";
 import type { ConversationStatus, MessagingChannel } from "@/types/database.types";
+import { isUnreadClientMessage } from "@/utils/message-unread";
 
 const OPEN_STATUSES = new Set<ConversationStatus>([
   "open",
@@ -76,12 +80,61 @@ export function countChannelsWithUnread(
     .length;
 }
 
+export function countUnreadClientMessages(
+  messages: ChatMessageData[],
+  lastReadAt: string | null,
+): number {
+  return messages.filter((message) =>
+    isUnreadClientMessage(message, lastReadAt),
+  ).length;
+}
+
+export function updateConversationReadProgress(
+  conversations: ConversationListItem[],
+  conversationId: string,
+  lastReadAt: string,
+  unreadMessageCount: number,
+): ConversationListItem[] {
+  return conversations.map((conversation) =>
+    conversation.id === conversationId
+      ? {
+          ...conversation,
+          lastReadAt,
+          unreadMessageCount,
+          isUnread: unreadMessageCount > 0,
+        }
+      : conversation,
+  );
+}
+
 export function markConversationListItemRead(
   conversations: ConversationListItem[],
   conversationId: string,
 ): ConversationListItem[] {
   return conversations.map((conversation) =>
     conversation.id === conversationId
+      ? { ...conversation, isUnread: false, unreadMessageCount: 0 }
+      : conversation,
+  );
+}
+
+export function preserveLocallyReadConversations(
+  conversations: ConversationListItem[],
+  locallyReadConversationIds: ReadonlySet<string>,
+  activeConversationId: string | null = null,
+): ConversationListItem[] {
+  const readIds = new Set(locallyReadConversationIds);
+
+  if (activeConversationId) {
+    readIds.add(activeConversationId);
+  }
+
+  if (readIds.size === 0) {
+    return conversations;
+  }
+
+  return conversations.map((conversation) =>
+    readIds.has(conversation.id)
       ? { ...conversation, isUnread: false, unreadMessageCount: 0 }
       : conversation,
   );

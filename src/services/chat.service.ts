@@ -404,8 +404,13 @@ export async function getActiveConversationContext(
     markConversationRead(businessId, conversationId, user.id),
   ]);
 
+  const readAt = new Date().toISOString();
+
   return {
-    conversation,
+    conversation: {
+      ...conversation,
+      lastReadAt: readAt,
+    },
     channelConnected,
     aiEnabled,
     cannedResponses,

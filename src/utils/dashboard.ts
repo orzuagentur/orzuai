@@ -129,3 +129,36 @@ export function formatRelativeTime(isoDate: string): string {
     day: "numeric",
   });
 }
+
+export function formatMessageDateTime(isoDate: string): string {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  const now = new Date();
+  const timeLabel = date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (date.toDateString() === now.toDateString()) {
+    return `Today, ${timeLabel}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${timeLabel}`;
+  }
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

@@ -8,13 +8,21 @@ import {
 } from "@/hooks/use-inbox-list-polling";
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
+import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import type { ChatChannelId } from "@/features/chats";
 import type {
   ConversationDetail,
   ConversationListItem,
 } from "@/types/chat.types";
 import type { CannedResponseItem } from "@/types/canned-response.types";
-import { markConversationListItemRead } from "@/utils/conversation-unread";
+import type { MessagingChannel } from "@/types/database.types";
+import {
+  countUnreadClientMessages,
+  markConversationListItemRead,
+  preserveLocallyReadConversations,
+} from "@/utils/conversation-unread";
+
+const LOCALLY_READ_TTL_MS = 60_000;
 
 type UseInboxPanelOptions = {
   initialConversationId: string | null;
@@ -35,6 +43,23 @@ type UseInboxPanelOptions = {
   >;
   onRefreshConversations: () => void;
 };
+
+function getConversationUnreadCount(
+  conversations: ConversationListItem[],
+  conversationId: string,
+): number {
+  const conversation = conversations.find((item) => item.id === conversationId);
+
+  if (!conversation) {
+    return 0;
+  }
+
+  if (conversation.unreadMessageCount > 0) {
+    return conversation.unreadMessageCount;
+  }
+
+  return conversation.isUnread ? 1 : 0;
+}
 
 export function useDebouncedInboxSearch(delayMs = 350) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,6 +98,8 @@ export function useInboxPanel({
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
+  const locallyReadConversationIdsRef = useRef<Map<string, number>>(new Map());
+  const navBadges = useOptionalDashboardNavBadges();
 
   const activeConversation = useInboxActiveConversation({
     initialConversationId,
@@ -82,16 +109,57 @@ export function useInboxPanel({
     initialCannedResponses,
   });
 
-  const markConversationReadInLists = useCallback(
+  const rememberLocallyReadConversation = useCallback((conversationId: string) => {
+    locallyReadConversationIdsRef.current.set(conversationId, Date.now());
+
+    for (const [id, readAt] of locallyReadConversationIdsRef.current.entries()) {
+      if (Date.now() - readAt > LOCALLY_READ_TTL_MS) {
+        locallyReadConversationIdsRef.current.delete(id);
+      }
+    }
+  }, []);
+
+  const clearConversationUnread = useCallback(
     (conversationId: string) => {
-      onConversationsChange((current) =>
-        markConversationListItemRead(current, conversationId),
-      );
-      onNeedsAttentionChange?.((current) =>
-        markConversationListItemRead(current, conversationId),
-      );
+      let clearedUnreadCount = 0;
+      let clearedChannel: MessagingChannel | null = null;
+
+      onConversationsChange((current) => {
+        clearedUnreadCount = getConversationUnreadCount(current, conversationId);
+        const conversation = current.find((item) => item.id === conversationId);
+        clearedChannel = conversation?.channel ?? null;
+        rememberLocallyReadConversation(conversationId);
+        return markConversationListItemRead(current, conversationId);
+      });
+
+      onNeedsAttentionChange?.((current) => {
+        rememberLocallyReadConversation(conversationId);
+        return markConversationListItemRead(current, conversationId);
+      });
+
+      if (clearedUnreadCount > 0 && clearedChannel && navBadges) {
+        navBadges.markConversationReadOptimistic({
+          channel: clearedChannel,
+          unreadCount: clearedUnreadCount,
+        });
+      }
     },
-    [onConversationsChange, onNeedsAttentionChange],
+    [
+      navBadges,
+      onConversationsChange,
+      onNeedsAttentionChange,
+      rememberLocallyReadConversation,
+    ],
+  );
+
+  const preserveListReadState = useCallback(
+    (conversations: ConversationListItem[]) =>
+      preserveLocallyReadConversations(
+        conversations,
+        new Set(locallyReadConversationIdsRef.current.keys()),
+        activeConversation.selectedConversationId,
+      ),
+    [activeConversation.selectedConversationId],
   );
 
   const handleConversationSelect = useCallback(
@@ -102,9 +170,59 @@ export function useInboxPanel({
         return;
       }
 
-      markConversationReadInLists(conversationId);
+      clearConversationUnread(conversationId);
     },
-    [activeConversation, markConversationReadInLists],
+    [activeConversation, clearConversationUnread],
+  );
+
+  const handleConversationViewed = useCallback(() => {
+    if (!activeConversation.selectedConversationId) {
+      return;
+    }
+
+    clearConversationUnread(activeConversation.selectedConversationId);
+    activeConversation.markConversationViewed();
+  }, [
+    activeConversation.markConversationViewed,
+    activeConversation.selectedConversationId,
+    clearConversationUnread,
+  ]);
+
+  const handleReadProgress = useCallback(
+    (readAt: string) => {
+      const conversation = activeConversation.conversation;
+      const conversationId = activeConversation.selectedConversationId;
+
+      if (!conversation || !conversationId) {
+        return;
+      }
+
+      if (
+        conversation.lastReadAt &&
+        new Date(readAt).getTime() <= new Date(conversation.lastReadAt).getTime()
+      ) {
+        return;
+      }
+
+      activeConversation.updateReadProgress(readAt);
+      clearConversationUnread(conversationId);
+
+      const remainingUnread = countUnreadClientMessages(
+        conversation.messages,
+        readAt,
+      );
+
+      if (remainingUnread === 0) {
+        activeConversation.markConversationViewed();
+      }
+    },
+    [
+      activeConversation.conversation,
+      activeConversation.markConversationViewed,
+      activeConversation.selectedConversationId,
+      activeConversation.updateReadProgress,
+      clearConversationUnread,
+    ],
   );
 
   useInboxListRealtime({
@@ -138,6 +256,9 @@ export function useInboxPanel({
     suggestReplyOpen,
     setSuggestReplyOpen,
     handleConversationSelect,
+    handleConversationViewed,
+    handleReadProgress,
+    preserveListReadState,
     ...activeConversation,
   };
 }

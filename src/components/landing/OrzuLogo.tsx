@@ -20,12 +20,12 @@ export function OrzuLogo({
   return (
     <div
       className={cn(
-        "flex items-center gap-3",
+        "flex items-center gap-3 text-inherit",
         align === "center" && "flex-col text-center",
         className,
       )}
     >
-      <BrandMark size={markSize} priority />
+      <BrandMark size={markSize} priority tone="on-dark" />
       {showWordmark ? (
         <BrandWordmark size={size === "lg" ? "lg" : "md"} />
       ) : null}
