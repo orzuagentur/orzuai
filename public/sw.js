@@ -33,6 +33,7 @@ self.addEventListener("push", (event) => {
         badge: "/icon.png",
         tag: data.tag,
         renotify: true,
+        silent: false,
         vibrate: [180, 80, 180],
         data: {
           url: data.url,
@@ -45,10 +46,12 @@ self.addEventListener("push", (event) => {
         includeUncontrolled: true,
       });
 
+      const sound = data.sound || LEAD_SOUND_PATH;
+
       for (const client of clients) {
         client.postMessage({
           type: "PLAY_LEAD_SOUND",
-          sound: data.sound || LEAD_SOUND_PATH,
+          sound,
         });
       }
     })(),

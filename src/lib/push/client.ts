@@ -1,6 +1,7 @@
 "use client";
 
 const SW_PATH = "/sw.js";
+const SW_SCOPE = "/";
 
 export function isPushSupported(): boolean {
   return (
@@ -24,26 +25,49 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-export async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+/** Register the push service worker and wait until it is active. */
+export async function ensurePushServiceWorkerReady(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) {
     return null;
   }
 
-  return navigator.serviceWorker.register(SW_PATH, { scope: "/" });
+  const existing = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+
+  if (!existing) {
+    await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
+  }
+
+  return navigator.serviceWorker.ready;
+}
+
+/** @deprecated Use ensurePushServiceWorkerReady */
+export async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  return ensurePushServiceWorkerReady();
 }
 
 export async function getPushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
-  if (!isPushSupported()) {
-    return null;
+  return ensurePushServiceWorkerReady();
+}
+
+/** Keep the server subscription in sync with this browser's push endpoint. */
+export async function syncPushSubscriptionToServer(): Promise<boolean> {
+  if (!isPushSupported() || Notification.permission !== "granted") {
+    return false;
   }
 
-  const existing = await navigator.serviceWorker.getRegistration(SW_PATH);
+  const registration = await ensurePushServiceWorkerReady();
 
-  if (existing) {
-    return existing;
+  if (!registration) {
+    return false;
   }
 
-  return registerPushServiceWorker();
+  const subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    return false;
+  }
+
+  return savePushSubscription(subscription);
 }
 
 export async function fetchPushConfig(): Promise<{

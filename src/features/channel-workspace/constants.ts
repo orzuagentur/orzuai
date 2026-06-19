@@ -7,7 +7,8 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   contactsCount: (count: number) =>
     count === 1 ? "1 contact" : `${count} contacts`,
   aiTitle: "AI Assistant",
-  aiDescription: "Control automated replies for this channel.",
+  aiDescription:
+    "My Assistant replies to customers on this channel when enabled. AI Agents are optional for routing and automations.",
   aiEnabledLabel: "AI auto-replies",
   aiEnabledOn: "AI auto-replies are enabled for this channel.",
   aiEnabledOff: "AI auto-replies are disabled for this channel.",

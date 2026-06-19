@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from "next-themes";
 
+import { PushServiceWorkerBootstrap } from "@/components/pwa/PushServiceWorkerBootstrap";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -18,6 +19,7 @@ export function Providers({ children }: ProvidersProps) {
       disableTransitionOnChange
     >
       <TooltipProvider delayDuration={0}>
+        <PushServiceWorkerBootstrap />
         {children}
         <Toaster richColors closeButton position="top-right" />
       </TooltipProvider>

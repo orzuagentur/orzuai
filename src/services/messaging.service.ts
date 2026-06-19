@@ -11,8 +11,7 @@ import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
-import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
-import { resolveAgentMatch } from "@/utils/ai-agent-routing";
+import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -475,27 +474,20 @@ export async function processChannelAutoReply(input: {
     updatedAt: row.updated_at,
   }));
 
-  const matchedAgent = resolveAgentMatch({
+  const { agent: matchedAgent, systemPrompt } = resolveAgentSystemPrompt({
     agents: routableAgents,
     channel,
     message: clientMessage,
+    fallbackPrompt: aiSettings.system_prompt,
   });
 
-  if (!matchedAgent) {
-    return;
-  }
-
-  const systemPrompt = buildEffectiveAgentPrompt({
-    systemPrompt: matchedAgent.systemPrompt,
-    communicationStyle: matchedAgent.communicationStyle,
-  });
-  const provider = (matchedAgent.provider ?? "gemini") as AiProvider;
+  const provider = (matchedAgent?.provider ?? aiSettings.provider ?? "gemini") as AiProvider;
   const model = resolveAgentModel(
     provider,
-    matchedAgent.model ?? aiSettings.model,
-    matchedAgent.useCustomModel ?? false,
+    matchedAgent?.model ?? aiSettings.model,
+    matchedAgent?.useCustomModel ?? false,
   );
-  const language = matchedAgent.language ?? aiSettings.language;
+  const language = matchedAgent?.language ?? aiSettings.language;
 
   const { data: history } = await admin
     .from("messages")
@@ -545,7 +537,7 @@ export async function processChannelAutoReply(input: {
     senderType: "ai",
     content: reply.data.text,
     aiGenerated: true,
-    aiAgentId: matchedAgent.id,
+    aiAgentId: matchedAgent?.id ?? null,
   });
 
   await incrementMessagingAnalytics(admin, businessId, channel, {

@@ -25,10 +25,9 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
-import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReply } from "@/services/llm.service";
-import { resolveAgentMatch } from "@/utils/ai-agent-routing";
+import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
@@ -401,7 +400,7 @@ async function processWebsiteFormFollowUp(input: {
     .eq("business_id", businessId)
     .eq("enabled", true);
 
-  const matchedAgent = resolveAgentMatch({
+  const { agent: matchedAgent, systemPrompt } = resolveAgentSystemPrompt({
     agents: (agentRows ?? []).map((row) => ({
       id: row.id,
       name: row.name,
@@ -418,23 +417,16 @@ async function processWebsiteFormFollowUp(input: {
     })),
     channel: "website_forms",
     message: clientMessage,
+    fallbackPrompt: aiSettings.system_prompt,
   });
 
-  if (!matchedAgent) {
-    return;
-  }
-
-  const systemPrompt = buildEffectiveAgentPrompt({
-    systemPrompt: matchedAgent.systemPrompt,
-    communicationStyle: matchedAgent.communicationStyle,
-  });
-  const provider = (matchedAgent.provider ?? "gemini") as AiProvider;
+  const provider = (matchedAgent?.provider ?? aiSettings.provider ?? "gemini") as AiProvider;
   const model = resolveAgentModel(
     provider,
-    matchedAgent.model ?? aiSettings.model,
-    matchedAgent.useCustomModel ?? false,
+    matchedAgent?.model ?? aiSettings.model,
+    matchedAgent?.useCustomModel ?? false,
   );
-  const language = matchedAgent.language ?? aiSettings.language;
+  const language = matchedAgent?.language ?? aiSettings.language;
 
   const { data: history } = await admin
     .from("messages")

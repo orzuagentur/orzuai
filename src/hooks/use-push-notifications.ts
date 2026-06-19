@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  ensurePushServiceWorkerReady,
   fetchPushConfig,
   isPushSupported,
-  playLeadNotificationSound,
-  registerPushServiceWorker,
   savePushSubscription,
   subscribeToPushNotifications,
+  syncPushSubscriptionToServer,
   unsubscribeFromPushNotifications,
 } from "@/lib/push/client";
 
@@ -38,8 +38,13 @@ export function usePushNotifications() {
     setEnabledOnServer(config.enabled);
     setPermission(Notification.permission);
 
-    const registration = await registerPushServiceWorker();
+    const registration = await ensurePushServiceWorkerReady();
     const subscription = await registration?.pushManager.getSubscription();
+
+    if (subscription && config.enabled) {
+      await syncPushSubscriptionToServer();
+    }
+
     setSubscribed(Boolean(subscription && config.enabled));
     setLoading(false);
   }, []);
@@ -47,35 +52,6 @@ export function usePushNotifications() {
   useEffect(() => {
     void refreshState();
   }, [refreshState]);
-
-  useEffect(() => {
-    if (!supported) {
-      return;
-    }
-
-    function handleServiceWorkerMessage(event: MessageEvent) {
-      const data = event.data as
-        | { type?: string; sound?: string; url?: string }
-        | undefined;
-
-      if (data?.type === "PLAY_LEAD_SOUND") {
-        playLeadNotificationSound(data.sound);
-      }
-
-      if (data?.type === "OPEN_URL" && typeof data.url === "string") {
-        window.location.assign(data.url);
-      }
-    }
-
-    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener(
-        "message",
-        handleServiceWorkerMessage,
-      );
-    };
-  }, [supported]);
 
   const enable = useCallback(async () => {
     if (!supported || busy) {

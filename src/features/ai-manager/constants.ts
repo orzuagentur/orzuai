@@ -1,7 +1,7 @@
 export const AI_MANAGER_MESSAGES = {
   pageTitle: "My Assistant",
   pageDescription:
-    "Connect your assistant to talk with customers automatically. Turn it on or off for each channel.",
+    "Connect your assistant to talk with customers automatically. Turn it on or off for each channel. AI Agents are optional and used for lead capture, tasks, and automations.",
   setupTitle: "Set up your business",
   setupDescription:
     "Create your business profile to enable My Assistant for your channels.",

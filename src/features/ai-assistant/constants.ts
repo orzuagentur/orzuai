@@ -205,7 +205,8 @@ export const AI_ASSISTANT_MESSAGES = {
   deleteFailed: "Unable to delete agent. Please try again.",
   testMatchTitle: "Routing preview",
   testMatchAgent: (name: string) => `Matched agent: ${name}`,
-  testMatchFallback: "No agent match — live chats will not get an AI reply.",
+  testMatchFallback:
+    "No agent match — My Assistant channel instructions will handle the reply.",
   testMessage: "Sample customer message",
   testRun: "Preview routing",
   usageTitle: "AI usage limits",

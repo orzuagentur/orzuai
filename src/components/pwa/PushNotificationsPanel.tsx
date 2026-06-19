@@ -92,8 +92,9 @@ export function PushNotificationsPanel() {
         </CardTitle>
         <CardDescription>
           Get notified about new WhatsApp, Telegram, and website form messages
-          with a custom sound, even when OrzuX is closed or you are on another
-          tab.
+          even when OrzuX is closed or you are on another tab. The system
+          notification sound plays immediately; the custom OrzuX sound plays
+          when a browser tab with OrzuX is open in the background.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-3">

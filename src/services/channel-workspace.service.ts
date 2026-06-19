@@ -500,15 +500,7 @@ export async function testChannelAiReply(
     fallbackPrompt: settings.system_prompt,
   });
 
-  if (!agent) {
-    return {
-      success: false,
-      message:
-        "No matching agent for this message. Create and enable an agent on this channel to send auto-replies.",
-    };
-  }
-
-  const provider = resolveStoredProvider(agent.provider ?? settings.provider);
+  const provider = resolveStoredProvider(agent?.provider ?? settings.provider);
 
   if (!isProviderConfigured(provider)) {
     return {
@@ -522,11 +514,11 @@ export async function testChannelAiReply(
     provider,
     model: resolveAgentModel(
       provider,
-      agent.model ?? settings.model,
-      agent.useCustomModel ?? false,
+      agent?.model ?? settings.model,
+      agent?.useCustomModel ?? false,
     ),
     systemPrompt,
-    language: agent.language ?? settings.language,
+    language: agent?.language ?? settings.language,
     userMessage: parsed.data.testMessage,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       title: entry.title,
@@ -543,7 +535,7 @@ export async function testChannelAiReply(
   return {
     success: true,
     reply: reply.data.text,
-    matchedAgentName: agent.name,
+    matchedAgentName: agent?.name ?? null,
   };
 }
 
