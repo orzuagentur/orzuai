@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
 import { fetchOlderConversationMessagesAction } from "@/features/chats/actions/fetch-older-conversation-messages";
 import { markConversationReadAction } from "@/features/chats/actions/mark-conversation-read";
+import { fetchCannedResponsesAction } from "@/features/canned-responses/actions/fetch-canned-responses";
+import { isInboxMessagingChannel } from "@/features/integrations/constants";
+import type { MessagingChannel } from "@/types/database.types";
 import { useActiveConversationPolling } from "@/hooks/use-active-conversation-polling";
 import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
 import { useRealtimeFallbackReady } from "@/hooks/use-realtime-fallback-ready";
@@ -130,6 +133,19 @@ export function useInboxActiveConversation({
     setIsLoadingOlderMessages(false);
   }, []);
 
+  const refreshCannedResponses = useCallback(
+    async (channel?: MessagingChannel | null) => {
+      const result = await fetchCannedResponsesAction(
+        channel && isInboxMessagingChannel(channel) ? { channel } : {},
+      );
+
+      if (result.success) {
+        setCannedResponses(result.data.cannedResponses);
+      }
+    },
+    [],
+  );
+
   const loadConversation = useCallback(
     async (conversationId: string, silent = false) => {
       const requestId = ++requestIdRef.current;
@@ -233,6 +249,16 @@ export function useInboxActiveConversation({
         lastReadAt: readAt,
       };
     });
+  }, []);
+
+  const syncConversationReadNow = useCallback(async (conversationId: string) => {
+    lastReadSyncAtRef.current = Date.now();
+
+    const result = await markConversationReadAction({
+      conversationId,
+    });
+
+    return result.success;
   }, []);
 
   const markConversationViewed = useCallback(() => {
@@ -600,6 +626,19 @@ export function useInboxActiveConversation({
         return;
       }
 
+      const cached = peekCachedConversationDetail(conversationId);
+
+      if (cached) {
+        setConversation(cached.conversation);
+        setChannelConnected(cached.channelConnected);
+        setAiEnabled(cached.aiEnabled);
+        setCannedResponses(cached.cannedResponses);
+        setIsLoadingConversation(false);
+      } else {
+        setConversation(null);
+        setIsLoadingConversation(true);
+      }
+
       if (nextUrl.searchParams.get("conversation") !== conversationId) {
         nextUrl.searchParams.set("conversation", conversationId);
         window.history.replaceState(null, "", nextUrl.toString());
@@ -660,6 +699,30 @@ export function useInboxActiveConversation({
     selectedConversationId,
   ]);
 
+  useEffect(() => {
+    if (!selectedConversationId || !conversation?.channel) {
+      return;
+    }
+
+    void refreshCannedResponses(conversation.channel);
+  }, [conversation?.channel, refreshCannedResponses, selectedConversationId]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible" || !conversation?.channel) {
+        return;
+      }
+
+      void refreshCannedResponses(conversation.channel);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [conversation?.channel, refreshCannedResponses]);
+
   return {
     selectedConversationId,
     selectConversation,
@@ -678,5 +741,7 @@ export function useInboxActiveConversation({
     reconcileMessage,
     updateMessage,
     isClientTyping,
+    refreshCannedResponses,
+    syncConversationReadNow,
   };
 }

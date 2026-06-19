@@ -17,6 +17,7 @@ export function Providers({ children }: ProvidersProps) {
       defaultTheme="system"
       enableSystem
       disableTransitionOnChange
+      enableColorScheme
     >
       <TooltipProvider delayDuration={0}>
         <PushServiceWorkerBootstrap />

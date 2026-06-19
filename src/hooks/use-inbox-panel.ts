@@ -22,7 +22,7 @@ import {
   preserveLocallyReadConversations,
 } from "@/utils/conversation-unread";
 
-const LOCALLY_READ_TTL_MS = 60_000;
+const LOCALLY_READ_TTL_MS = 300_000;
 
 type UseInboxPanelOptions = {
   initialConversationId: string | null;
@@ -59,6 +59,12 @@ function getConversationUnreadCount(
   }
 
   return conversation.isUnread ? 1 : 0;
+}
+
+function isConversationMarkedUnread(
+  conversation: ConversationListItem,
+): boolean {
+  return conversation.unreadMessageCount > 0 || conversation.isUnread;
 }
 
 export function useDebouncedInboxSearch(delayMs = 350) {
@@ -99,6 +105,7 @@ export function useInboxPanel({
   const [draft, setDraft] = useState("");
   const [suggestReplyOpen, setSuggestReplyOpen] = useState(false);
   const locallyReadConversationIdsRef = useRef<Map<string, number>>(new Map());
+  const syncedReadConversationIdRef = useRef<string | null>(null);
   const navBadges = useOptionalDashboardNavBadges();
 
   const activeConversation = useInboxActiveConversation({
@@ -125,9 +132,13 @@ export function useInboxPanel({
       let clearedChannel: MessagingChannel | null = null;
 
       onConversationsChange((current) => {
-        clearedUnreadCount = getConversationUnreadCount(current, conversationId);
         const conversation = current.find((item) => item.id === conversationId);
-        clearedChannel = conversation?.channel ?? null;
+
+        if (conversation && isConversationMarkedUnread(conversation)) {
+          clearedUnreadCount = getConversationUnreadCount(current, conversationId);
+          clearedChannel = conversation.channel;
+        }
+
         rememberLocallyReadConversation(conversationId);
         return markConversationListItemRead(current, conversationId);
       });
@@ -164,6 +175,7 @@ export function useInboxPanel({
 
   const handleConversationSelect = useCallback(
     (conversationId: string | null) => {
+      syncedReadConversationIdRef.current = null;
       activeConversation.selectConversation(conversationId);
 
       if (!conversationId) {
@@ -171,9 +183,52 @@ export function useInboxPanel({
       }
 
       clearConversationUnread(conversationId);
+
+      void activeConversation.syncConversationReadNow(conversationId).then(
+        (success) => {
+          if (success) {
+            syncedReadConversationIdRef.current = conversationId;
+            void navBadges?.refresh({ force: true });
+          }
+        },
+      );
     },
-    [activeConversation, clearConversationUnread],
+    [activeConversation, clearConversationUnread, navBadges],
   );
+
+  useEffect(() => {
+    const conversationId = activeConversation.selectedConversationId;
+
+    if (!conversationId) {
+      syncedReadConversationIdRef.current = null;
+      return;
+    }
+
+    if (!activeConversation.conversation) {
+      return;
+    }
+
+    if (syncedReadConversationIdRef.current === conversationId) {
+      return;
+    }
+
+    syncedReadConversationIdRef.current = conversationId;
+    clearConversationUnread(conversationId);
+
+    void activeConversation.syncConversationReadNow(conversationId).then(
+      (success) => {
+        if (success) {
+          void navBadges?.refresh({ force: true });
+        }
+      },
+    );
+  }, [
+    activeConversation.conversation,
+    activeConversation.selectedConversationId,
+    activeConversation.syncConversationReadNow,
+    clearConversationUnread,
+    navBadges,
+  ]);
 
   const handleConversationViewed = useCallback(() => {
     if (!activeConversation.selectedConversationId) {

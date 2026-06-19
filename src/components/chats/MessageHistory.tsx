@@ -35,6 +35,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMessageUploadProgress } from "@/hooks/use-message-upload-progress";
 import { usePrefetchVisibleConversationMedia } from "@/hooks/use-prefetch-conversation-media";
 import { cn } from "@/lib/utils";
+import { scrollChatToBottom } from "@/utils/chat-scroll";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage, isMediaPendingHydration } from "@/utils/chat-media";
 import {
@@ -543,18 +544,16 @@ export const MessageHistory = forwardRef<
       const scrollContainer = scrollContainerRef?.current;
 
       if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        scrollChatToBottom(scrollContainer, "auto");
       }
-
-      bottomRef?.current?.scrollIntoView({ behavior: "auto", block: "end" });
     };
 
     runScroll();
+    requestAnimationFrame(runScroll);
     requestAnimationFrame(() => {
       requestAnimationFrame(runScroll);
     });
   }, [
-    bottomRef,
     messages.length,
     scrollContainerRef,
     shouldVirtualize,

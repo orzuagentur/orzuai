@@ -15,7 +15,7 @@ import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import type { DashboardNavBadgeCounts } from "@/services/conversation-read.service";
 import type { MessagingChannel } from "@/types/database.types";
-import { countChannelsWithUnread } from "@/utils/conversation-unread";
+import { sumUnreadByChannel } from "@/utils/conversation-unread";
 import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
 const DEFAULT_COUNTS: DashboardNavBadgeCounts = {
@@ -26,17 +26,26 @@ const DEFAULT_COUNTS: DashboardNavBadgeCounts = {
 
 const POLL_MS = 60_000;
 const REALTIME_REFRESH_DEBOUNCE_MS = 500;
+const OPTIMISTIC_READ_SUPPRESS_MS = 4_000;
 
 type MarkConversationReadOptimisticInput = {
   channel: MessagingChannel;
   unreadCount: number;
 };
 
+type IncrementInboundMessageOptimisticInput = {
+  channel: MessagingChannel;
+};
+
 type DashboardNavBadgesContextValue = {
   counts: DashboardNavBadgeCounts;
-  refresh: () => Promise<void>;
+  refresh: (options?: { force?: boolean }) => Promise<void>;
+  scheduleRefresh: () => void;
   markConversationReadOptimistic: (
     input: MarkConversationReadOptimisticInput,
+  ) => void;
+  incrementInboundMessageOptimistic: (
+    input: IncrementInboundMessageOptimisticInput,
   ) => void;
 };
 
@@ -50,8 +59,13 @@ export function DashboardNavBadgesProvider({
 }) {
   const [counts, setCounts] = useState<DashboardNavBadgeCounts>(DEFAULT_COUNTS);
   const refreshTimeoutRef = useRef<number | null>(null);
+  const optimisticReadUntilRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && Date.now() < optimisticReadUntilRef.current) {
+      return;
+    }
+
     const result = await fetchNavBadgeCountsAction();
 
     if (result.success) {
@@ -60,20 +74,44 @@ export function DashboardNavBadgesProvider({
   }, []);
 
   const scheduleRefresh = useCallback(() => {
+    if (Date.now() < optimisticReadUntilRef.current) {
+      return;
+    }
+
     if (refreshTimeoutRef.current !== null) {
       window.clearTimeout(refreshTimeoutRef.current);
     }
 
     refreshTimeoutRef.current = window.setTimeout(() => {
-      void refresh();
+      void refresh({ force: true });
     }, REALTIME_REFRESH_DEBOUNCE_MS);
   }, [refresh]);
+
+  const incrementInboundMessageOptimistic = useCallback(
+    ({ channel }: IncrementInboundMessageOptimisticInput) => {
+      setCounts((current) => {
+        const unreadByChannel = {
+          ...current.unreadByChannel,
+          [channel]: (current.unreadByChannel[channel] ?? 0) + 1,
+        };
+
+        return {
+          unreadByChannel,
+          inboxUnread: sumUnreadByChannel(unreadByChannel),
+          crmUnread: current.crmUnread,
+        };
+      });
+    },
+    [],
+  );
 
   const markConversationReadOptimistic = useCallback(
     ({ channel, unreadCount }: MarkConversationReadOptimisticInput) => {
       if (unreadCount <= 0) {
         return;
       }
+
+      optimisticReadUntilRef.current = Date.now() + OPTIMISTIC_READ_SUPPRESS_MS;
 
       setCounts((current) => {
         const previousChannelCount = current.unreadByChannel[channel] ?? 0;
@@ -88,8 +126,8 @@ export function DashboardNavBadgesProvider({
 
         return {
           unreadByChannel,
-          inboxUnread: countChannelsWithUnread(unreadByChannel),
-          crmUnread: Math.max(0, current.crmUnread - 1),
+          inboxUnread: sumUnreadByChannel(unreadByChannel),
+          crmUnread: current.crmUnread,
         };
       });
     },
@@ -141,9 +179,20 @@ export function DashboardNavBadgesProvider({
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "*",
             schema: "public",
-            table: "messages",
+            table: "conversation_reads",
+          },
+          () => {
+            scheduleRefresh();
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "contacts",
           },
           () => {
             scheduleRefresh();
@@ -167,7 +216,13 @@ export function DashboardNavBadgesProvider({
 
   return (
     <DashboardNavBadgesContext.Provider
-      value={{ counts, refresh, markConversationReadOptimistic }}
+      value={{
+        counts,
+        refresh,
+        scheduleRefresh,
+        markConversationReadOptimistic,
+        incrementInboundMessageOptimistic,
+      }}
     >
       {children}
     </DashboardNavBadgesContext.Provider>

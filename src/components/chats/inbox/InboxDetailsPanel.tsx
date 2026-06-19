@@ -26,7 +26,6 @@ import {
 } from "@/lib/client-cache/inbox-messenger-cache";
 import type { InboxDetailsPanelData } from "@/services/inbox-details.service";
 import { cn } from "@/lib/utils";
-import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { ConversationDetail } from "@/types/chat.types";
 import { buildContactProfileInfoRows } from "@/utils/contact-profile-info";
 import { formatRelativeTime } from "@/utils/dashboard";
@@ -41,8 +40,6 @@ import {
 
 type InboxDetailsPanelProps = {
   conversation: ConversationDetail | null;
-  cannedResponses: CannedResponseItem[];
-  onUseSuggestedReply: (content: string) => void;
   className?: string;
 };
 
@@ -69,8 +66,6 @@ function DetailSection({
 
 export function InboxDetailsPanel({
   conversation,
-  cannedResponses,
-  onUseSuggestedReply,
   className,
 }: InboxDetailsPanelProps) {
   const conversationId = conversation?.id ?? null;
@@ -263,30 +258,6 @@ export function InboxDetailsPanel({
             <p className="text-sm text-muted-foreground">
               {CHAT_MESSAGES.notAvailable}
             </p>
-          )}
-        </DetailSection>
-
-        <DetailSection title={CHAT_MESSAGES.suggestedRepliesTitle}>
-          {cannedResponses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {CHAT_MESSAGES.suggestedRepliesEmpty}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {cannedResponses.slice(0, 4).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onUseSuggestedReply(item.content)}
-                  className="w-full rounded-lg border bg-card px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/50"
-                >
-                  <p className="font-medium">{item.title}</p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {item.content}
-                  </p>
-                </button>
-              ))}
-            </div>
           )}
         </DetailSection>
 

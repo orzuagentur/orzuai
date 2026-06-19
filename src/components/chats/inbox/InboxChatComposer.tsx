@@ -72,6 +72,7 @@ type InboxChatComposerProps = {
   onComposerTabChange: (tab: "reply" | "note") => void;
   onSubmit: () => void;
   onOpenAiSuggest: () => void;
+  onQuickRepliesOpen?: () => void;
   onSendMedia?: (file: File, caption?: string) => Promise<boolean> | boolean;
 };
 
@@ -125,6 +126,7 @@ export function InboxChatComposer({
   onComposerTabChange,
   onSubmit,
   onOpenAiSuggest,
+  onQuickRepliesOpen,
   onSendMedia,
 }: InboxChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -431,39 +433,6 @@ export function InboxChatComposer({
             />
           ) : null}
 
-          {canSend ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {cannedResponses.length === 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs"
-                  asChild
-                >
-                  <Link href={DASHBOARD_ROUTES.settings}>
-                    <PlusIcon className="size-3.5" />
-                    {CANNED_RESPONSES_MESSAGES.addButton}
-                  </Link>
-                </Button>
-              ) : (
-                cannedResponses.slice(0, 4).map((item) => (
-                  <Button
-                    key={item.id}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 max-w-[10rem] truncate text-xs"
-                    disabled={isBusy || isRecording || hasPendingAttachment}
-                    onClick={() => onDraftChange(item.content)}
-                  >
-                    {item.title}
-                  </Button>
-                ))
-              )}
-            </div>
-          ) : null}
-
           <div className="flex items-end gap-2">
             <div className="flex shrink-0 items-center gap-0.5 pb-1">
               <DropdownMenu>
@@ -532,7 +501,13 @@ export function InboxChatComposer({
                 )}
               </Button>
 
-              <DropdownMenu>
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (open) {
+                    onQuickRepliesOpen?.();
+                  }
+                }}
+              >
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"

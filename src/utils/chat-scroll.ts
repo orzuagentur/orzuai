@@ -6,3 +6,13 @@ export function isChatScrollPinnedToBottom(container: HTMLElement): boolean {
 
   return distance <= CHAT_SCROLL_PIN_THRESHOLD_PX;
 }
+
+export function scrollChatToBottom(
+  container: HTMLElement,
+  behavior: ScrollBehavior = "auto",
+): void {
+  container.scrollTo({
+    top: container.scrollHeight,
+    behavior,
+  });
+}

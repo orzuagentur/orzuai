@@ -42,7 +42,6 @@ import { formatContactIdentifier } from "@/utils/contact-display";
 import { cacheChatMessageMediaUrl } from "@/utils/cache-chat-media-url";
 import { isChatScrollPinnedToBottom } from "@/utils/chat-scroll";
 import { throttle } from "@/utils/throttle";
-import { findFirstUnreadClientMessageIndex } from "@/utils/message-unread";
 import {
   createOptimisticChatMessage,
   createOptimisticMediaChatMessage,
@@ -80,6 +79,7 @@ type ChatWindowProps = {
   onLoadOlderMessages?: () => void;
   onConversationViewed?: () => void;
   onReadProgress?: (readAt: string) => void;
+  onQuickRepliesOpen?: () => void;
   className?: string;
 };
 
@@ -124,6 +124,7 @@ export function ChatWindow({
   onLoadOlderMessages,
   onConversationViewed,
   onReadProgress,
+  onQuickRepliesOpen,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -141,6 +142,7 @@ export function ChatWindow({
   const pinnedConversationIdRef = useRef<string | null>(null);
   const scrollHeightBeforeOlderLoadRef = useRef(0);
   const lastMessageIdRef = useRef<string | null>(null);
+  const wasLoadingConversationRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [newMessagesBelow, setNewMessagesBelow] = useState(0);
   const draft = controlledDraft ?? internalDraft;
@@ -228,6 +230,23 @@ export function ChatWindow({
   }, [conversation?.id]);
 
   useEffect(() => {
+    if (wasLoadingConversationRef.current && !isLoadingConversation && conversation) {
+      const scrollToBottom = () => {
+        messageHistoryRef.current?.scrollToEnd();
+        setShowScrollToBottom(false);
+        setNewMessagesBelow(0);
+        onConversationViewed?.();
+      };
+
+      scrollToBottom();
+      requestAnimationFrame(scrollToBottom);
+      requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
+    }
+
+    wasLoadingConversationRef.current = isLoadingConversation;
+  }, [conversation, isLoadingConversation, onConversationViewed]);
+
+  useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
 
     if (!scrollContainer || !conversation) {
@@ -291,21 +310,7 @@ export function ChatWindow({
       pinnedConversationIdRef.current !== conversation.id;
     pinnedConversationIdRef.current = conversation.id;
 
-    const firstUnreadIndex = findFirstUnreadClientMessageIndex(
-      conversation.messages,
-      conversation.lastReadAt ?? null,
-    );
-    const hasUnreadMessages = firstUnreadIndex >= 0;
-
     const scrollToTarget = () => {
-      if (isOpeningChat && hasUnreadMessages && firstUnreadRef.current) {
-        firstUnreadRef.current.scrollIntoView({
-          behavior: "instant",
-          block: "start",
-        });
-        return;
-      }
-
       if (
         !isOpeningChat &&
         scrollContainer &&
@@ -314,24 +319,21 @@ export function ChatWindow({
         return;
       }
 
-      if (scrollContainer) {
-        messageHistoryRef.current?.scrollToEnd();
-        setShowScrollToBottom(false);
-        setNewMessagesBelow(0);
-        onConversationViewed?.();
-        return;
-      }
-
       messageHistoryRef.current?.scrollToEnd();
+      setShowScrollToBottom(false);
+      setNewMessagesBelow(0);
+
+      if (isOpeningChat || !scrollContainer || isChatScrollPinnedToBottom(scrollContainer)) {
+        onConversationViewed?.();
+      }
     };
 
     scrollToTarget();
     requestAnimationFrame(scrollToTarget);
+    requestAnimationFrame(() => requestAnimationFrame(scrollToTarget));
   }, [
     conversation?.id,
     conversation?.messages.at(-1)?.id,
-    conversation?.lastReadAt,
-    isClientTyping,
     onConversationViewed,
   ]);
 
@@ -615,6 +617,7 @@ export function ChatWindow({
                 inboxLayout?.setDetailsOpen(false);
                 setSuggestOpen(true);
               }}
+              onQuickRepliesOpen={onQuickRepliesOpen}
               onSendMedia={(file, caption) => {
                 const pendingId = createOptimisticMessageId();
                 const optimisticMessage = createOptimisticMediaChatMessage({

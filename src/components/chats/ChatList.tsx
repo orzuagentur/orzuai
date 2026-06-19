@@ -89,7 +89,8 @@ function ConversationListRow({
   const isActive = conversation.id === activeConversationId;
   const needsAttention = isConversationNeedsAttention(conversation);
   const isUnread =
-    conversation.unreadMessageCount > 0 || conversation.isUnread;
+    !isActive &&
+    (conversation.unreadMessageCount > 0 || conversation.isUnread);
   const unreadCount = conversation.unreadMessageCount;
 
   const rowClassName = cn(

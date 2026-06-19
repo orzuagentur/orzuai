@@ -7,6 +7,7 @@ import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistan
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardInboundAlerts } from "@/components/dashboard/DashboardInboundAlerts";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { PlatformCopilotWidget } from "@/components/platform-copilot/PlatformCopilotWidget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -24,6 +25,7 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
   return (
     <PushNotificationsProvider>
       <DashboardNavBadgesProvider>
+        <DashboardInboundAlerts />
         <InboxChromeProvider>
           <ContactsChromeProvider>
             <AiAssistantChromeProvider>

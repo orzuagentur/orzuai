@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { APP_ORIGIN } from "@/constants/app-origin";
@@ -58,6 +59,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{var t=localStorage.getItem("theme");var d=window.matchMedia("(prefers-color-scheme: dark)").matches;if(t==="dark"||(!t||t==="system")&&d){document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark";}else{document.documentElement.style.colorScheme="light";}}catch(e){}})();`}
+        </Script>
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>{children}</Providers>
       </body>

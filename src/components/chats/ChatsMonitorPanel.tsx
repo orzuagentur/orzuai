@@ -210,6 +210,7 @@ function ChatsMonitorPanelContent({
     handleReadProgress,
     selectConversation,
     preserveListReadState,
+    refreshCannedResponses,
   } = useInboxPanel({
     initialConversationId,
     initialActiveConversation,
@@ -531,6 +532,9 @@ function ChatsMonitorPanelContent({
             onContactFavoriteChange={handleContactFavoriteChange}
             onConversationViewed={handleConversationViewed}
             onReadProgress={handleReadProgress}
+            onQuickRepliesOpen={() => {
+              void refreshCannedResponses(activeConversation?.channel ?? null);
+            }}
           />
         </div>
       }
@@ -543,11 +547,7 @@ function ChatsMonitorPanelContent({
             onUseSuggestion={setDraft}
           />
         ) : (
-          <InboxDetailsPanel
-            conversation={activeConversation}
-            cannedResponses={activeCannedResponses}
-            onUseSuggestedReply={setDraft}
-          />
+          <InboxDetailsPanel conversation={activeConversation} />
         )
       }
     />

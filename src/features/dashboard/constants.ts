@@ -109,6 +109,11 @@ export const OVERVIEW_MESSAGES = {
     "Create your business profile to start tracking messages, contacts, and AI performance.",
 } as const;
 
+export const INBOUND_ALERT_MESSAGES = {
+  newMessageTitle: "New message",
+  openChat: "Open",
+} as const;
+
 export const ANALYTICS_CARD_LABELS = {
   totalMessages: "Total Messages",
   uniqueContacts: "Unique Contacts",

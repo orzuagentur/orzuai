@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { LayoutGridIcon, StarIcon } from "lucide-react";
 
+import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
 import type { ChatChannelId } from "@/features/chats";
@@ -22,14 +25,27 @@ type InboxChannelTabsProps = {
 
 export function InboxChannelTabs({
   activeChannel,
-  unreadByChannel = {},
+  unreadByChannel: localUnreadByChannel = {},
   visibleChannelIds = [],
   className,
 }: InboxChannelTabsProps) {
+  const router = useRouter();
+  const navBadges = useOptionalDashboardNavBadges();
+  const unreadByChannel = navBadges?.counts.unreadByChannel ?? localUnreadByChannel;
+
   const visibleChannels = CHAT_CHANNEL_LIST.filter((channel) =>
     visibleChannelIds.includes(channel.id),
   );
   const channelsWithUnread = countChannelsWithUnread(unreadByChannel);
+
+  useEffect(() => {
+    router.prefetch(DASHBOARD_ROUTES.chats);
+    router.prefetch(DASHBOARD_ROUTES.chatsFavorites);
+
+    for (const channel of visibleChannels) {
+      router.prefetch(`${DASHBOARD_ROUTES.chats}/${channel.id}`);
+    }
+  }, [router, visibleChannels]);
 
   return (
     <div
@@ -40,6 +56,7 @@ export function InboxChannelTabs({
     >
       <Link
         href={DASHBOARD_ROUTES.chats}
+        prefetch
         title={CHAT_MESSAGES.viewAll}
         aria-label={`${CHAT_MESSAGES.viewAll}${channelsWithUnread > 0 ? ` (${channelsWithUnread} channels with unread)` : ""}`}
         className={cn(
@@ -59,6 +76,7 @@ export function InboxChannelTabs({
 
       <Link
         href={DASHBOARD_ROUTES.chatsFavorites}
+        prefetch
         title={CHAT_MESSAGES.favoritesTabLabel}
         aria-label={CHAT_MESSAGES.favoritesTabLabel}
         className={cn(
@@ -85,8 +103,10 @@ export function InboxChannelTabs({
           <Link
             key={channel.id}
             href={href}
+            prefetch
             title={`${channel.label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
             aria-label={`${channel.label}${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
               "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
               isActive

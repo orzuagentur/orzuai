@@ -80,6 +80,15 @@ export function countChannelsWithUnread(
     .length;
 }
 
+export function sumUnreadByChannel(
+  unreadByChannel: Partial<Record<MessagingChannel, number>>,
+): number {
+  return Object.values(unreadByChannel).reduce(
+    (total, count) => total + (count ?? 0),
+    0,
+  );
+}
+
 export function countUnreadClientMessages(
   messages: ChatMessageData[],
   lastReadAt: string | null,
@@ -111,9 +120,16 @@ export function markConversationListItemRead(
   conversations: ConversationListItem[],
   conversationId: string,
 ): ConversationListItem[] {
+  const readAt = new Date().toISOString();
+
   return conversations.map((conversation) =>
     conversation.id === conversationId
-      ? { ...conversation, isUnread: false, unreadMessageCount: 0 }
+      ? {
+          ...conversation,
+          isUnread: false,
+          unreadMessageCount: 0,
+          lastReadAt: readAt,
+        }
       : conversation,
   );
 }

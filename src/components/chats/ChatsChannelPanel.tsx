@@ -186,6 +186,7 @@ function ChatsChannelPanelContent({
     handleConversationViewed,
     handleReadProgress,
     preserveListReadState,
+    refreshCannedResponses,
   } = useInboxPanel({
     initialConversationId,
     initialActiveConversation,
@@ -229,8 +230,18 @@ function ChatsChannelPanelContent({
     );
     setChannelConnected(initialChannelConnected ?? false);
     setChannelAiEnabled(initialAiEnabled ?? null);
-    setConversations(initialConversations ?? []);
     setBootstrapCannedResponses(initialCannedResponses ?? []);
+
+    const cachedList = getCachedConversationList({
+      scope: "channel",
+      channel: channelId,
+    });
+    const nextConversations =
+      Array.isArray(initialConversations) && initialConversations.length > 0
+        ? initialConversations
+        : (cachedList?.items ?? []);
+
+    setConversations(preserveListReadStateRef.current(nextConversations));
   }, [
     channelId,
     initialAiEnabled,
@@ -407,6 +418,9 @@ function ChatsChannelPanelContent({
             onContactFavoriteChange={handleContactFavoriteChange}
             onConversationViewed={handleConversationViewed}
             onReadProgress={handleReadProgress}
+            onQuickRepliesOpen={() => {
+              void refreshCannedResponses(activeConversation?.channel ?? null);
+            }}
           />
         </div>
       }
@@ -419,11 +433,7 @@ function ChatsChannelPanelContent({
             onUseSuggestion={setDraft}
           />
         ) : (
-          <InboxDetailsPanel
-            conversation={activeConversation}
-            cannedResponses={cannedResponses}
-            onUseSuggestedReply={setDraft}
-          />
+          <InboxDetailsPanel conversation={activeConversation} />
         )
       }
     />
