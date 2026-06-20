@@ -1,5 +1,6 @@
 export const CONVERSATION_TYPING_EVENT = "typing";
 export const CONVERSATION_MESSAGE_UPDATED_EVENT = "message_updated";
+export const CONVERSATION_AUTO_REPLY_STATUS_EVENT = "auto_reply_status";
 
 /** Delivery status updates use postgres_changes on message_deliveries only. */
 
@@ -14,6 +15,15 @@ export type ConversationTypingSender = "agent" | "client";
 export type ConversationTypingPayload = {
   sender: ConversationTypingSender;
   isTyping: boolean;
+  at: number;
+};
+
+export type AutoReplyInboxStatus = "typing" | "idle" | "error";
+
+export type AutoReplyStatusPayload = {
+  status: AutoReplyInboxStatus;
+  errorCode?: string;
+  errorMessage?: string;
   at: number;
 };
 

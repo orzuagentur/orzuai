@@ -6,7 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
-import { useInboxPanel, useDebouncedInboxSearch, useSkipInitialListFetch } from "@/hooks/use-inbox-panel";
+import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
+import {
+  useInboxPanel,
+  useDebouncedInboxSearch,
+  useSkipInitialListFetch,
+} from "@/hooks/use-inbox-panel";
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import {
   getCachedConversationList,
@@ -168,6 +173,7 @@ function ChatsChannelPanelContent({
     conversation: activeConversation,
     channelConnected: activeChannelConnected,
     aiEnabled,
+    setAiEnabled,
     cannedResponses,
     isLoadingConversation,
     isLoadingOlderMessages,
@@ -177,6 +183,9 @@ function ChatsChannelPanelContent({
     reconcileMessage,
     updateMessage,
     isClientTyping,
+    isReplyTyping,
+    autoReplyError,
+    dismissAutoReplyError,
     refreshConversation,
     draft,
     setDraft,
@@ -205,6 +214,12 @@ function ChatsChannelPanelContent({
   useEffect(() => {
     preserveListReadStateRef.current = preserveListReadState;
   }, [preserveListReadState]);
+
+  const syncedChannelAiEnabled = useChannelAiEnabled(channel, channelAiEnabled);
+  const syncedConversationAiEnabled = useChannelAiEnabled(
+    activeConversation?.channel ?? channel,
+    aiEnabled ?? channelAiEnabled,
+  );
 
   const { detailsOpen } = useInboxLayout();
 
@@ -300,7 +315,7 @@ function ChatsChannelPanelContent({
           activeFilter,
           onFilterChange: setActiveFilter,
           aiChannel: channel,
-          aiEnabled: aiEnabled ?? channelAiEnabled,
+          aiEnabled: syncedChannelAiEnabled,
         }
       : null,
   );
@@ -375,7 +390,14 @@ function ChatsChannelPanelContent({
           <ChatWindow
             conversation={activeConversation}
             isClientTyping={isClientTyping}
-            aiEnabled={aiEnabled ?? channelAiEnabled}
+            isReplyTyping={isReplyTyping}
+            autoReplyError={autoReplyError}
+            onDismissAutoReplyError={dismissAutoReplyError}
+            aiEnabled={syncedConversationAiEnabled}
+            onAiEnabledChange={(enabled) => {
+              setAiEnabled(enabled);
+              setChannelAiEnabled(enabled);
+            }}
             channelConnected={resolvedChannelConnected}
             channel={channel}
             cannedResponses={cannedResponses}

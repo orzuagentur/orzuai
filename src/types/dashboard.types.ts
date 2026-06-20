@@ -55,6 +55,9 @@ export type AiPerformanceMetrics = {
   estimatedMinutesSaved: number;
   aiReplies: number;
   humanReplies: number;
+  assistantOnlyReplies: number;
+  delegatedAgentReplies: number;
+  delegatedSharePercent: number;
 };
 
 export type LeadSourceEntry = {

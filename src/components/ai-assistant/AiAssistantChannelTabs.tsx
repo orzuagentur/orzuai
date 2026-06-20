@@ -11,12 +11,10 @@ import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import {
   buildAiAssistantHref,
-  type AiAssistantTab,
 } from "@/utils/ai-assistant-url";
 
 type AiAssistantChannelTabsProps = {
   activeChannel: MessagingChannel | null;
-  activeTab: AiAssistantTab;
   activeAgentId: string | null;
   searchQuery: string;
   visibleChannelIds: MessagingChannel[];
@@ -26,7 +24,6 @@ type AiAssistantChannelTabsProps = {
 
 export function AiAssistantChannelTabs({
   activeChannel,
-  activeTab,
   activeAgentId,
   searchQuery,
   visibleChannelIds,
@@ -42,8 +39,8 @@ export function AiAssistantChannelTabs({
 
   function hrefForChannel(channel: MessagingChannel | null) {
     return buildAiAssistantHref({
+      section: "agents",
       channel,
-      tab: activeTab,
       agent: activeAgentId,
       q: searchQuery || null,
     });

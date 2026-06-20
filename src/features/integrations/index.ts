@@ -1,6 +1,7 @@
 export {
   buildChannelWorkspaceHref,
   buildIntegrationActivateHref,
+  buildIntegrationAiSettingsHref,
   DEFAULT_INTEGRATION_CHANNEL,
   DEFAULT_INTEGRATION_SECTION,
   INTEGRATION_CHANNEL_LIST,

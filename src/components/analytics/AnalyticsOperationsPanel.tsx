@@ -25,6 +25,16 @@ export function AnalyticsOperationsPanel({
 }: AnalyticsOperationsPanelProps) {
   const items = [
     {
+      label: ANALYTICS_MESSAGES.aiAssistantOnlyReplies,
+      value: String(aiPerformance.assistantOnlyReplies),
+      hint: ANALYTICS_MESSAGES.aiAssistantOnlyDescription,
+    },
+    {
+      label: ANALYTICS_MESSAGES.aiDelegatedReplies,
+      value: `${aiPerformance.delegatedAgentReplies} (${aiPerformance.delegatedSharePercent}%)`,
+      hint: ANALYTICS_MESSAGES.aiDelegatedDescription,
+    },
+    {
       label: ANALYTICS_MESSAGES.aiResolutionRate,
       value: `${aiPerformance.aiResolutionRate}%`,
       hint: ANALYTICS_MESSAGES.aiResolutionDescription,

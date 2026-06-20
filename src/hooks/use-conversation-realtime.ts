@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { requestConversationGapSyncWithRetry } from "@/lib/client/conversation-gap-sync";
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import {
+  CONVERSATION_AUTO_REPLY_STATUS_EVENT,
   CONVERSATION_MESSAGE_UPDATED_EVENT,
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
+  type AutoReplyStatusPayload,
   type ConversationDeliveryStatusPayload,
   type ConversationGapSyncPayload,
   type ConversationMessageUpdatedPayload,
@@ -24,6 +26,12 @@ import type {
 import { mapChatMessage } from "@/utils/chat";
 
 const CLIENT_TYPING_TIMEOUT_MS = 4_000;
+const REPLY_TYPING_TIMEOUT_MS = 90_000;
+
+export type AutoReplyInboxError = {
+  code: string;
+  message: string;
+};
 
 type UseConversationRealtimeOptions = {
   conversationId: string | null;
@@ -78,6 +86,10 @@ export function useConversationRealtime({
   onReconnectCursorChange,
 }: UseConversationRealtimeOptions) {
   const [isClientTyping, setIsClientTyping] = useState(false);
+  const [isReplyTyping, setIsReplyTyping] = useState(false);
+  const [autoReplyError, setAutoReplyError] = useState<AutoReplyInboxError | null>(
+    null,
+  );
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [reconnectNonce, setReconnectNonce] = useState(0);
   const onMessageRef = useRef(onMessage);
@@ -92,6 +104,7 @@ export function useConversationRealtime({
   const isSubscribedRef = useRef(false);
   const reconnectCursorPropRef = useRef(reconnectCursor);
   const typingTimeoutRef = useRef<number | null>(null);
+  const replyTypingTimeoutRef = useRef<number | null>(null);
   onMessageRef.current = onMessage;
   onMessageUpdatedRef.current = onMessageUpdated;
   onDeliveryStatusUpdatedRef.current = onDeliveryStatusUpdated;
@@ -100,6 +113,10 @@ export function useConversationRealtime({
   getReconnectCursorRef.current = getReconnectCursor;
   onReconnectCursorChangeRef.current = onReconnectCursorChange;
   reconnectCursorPropRef.current = reconnectCursor;
+
+  const dismissAutoReplyError = useCallback(() => {
+    setAutoReplyError(null);
+  }, []);
 
   useEffect(() => {
     const onVisible = () => {
@@ -118,6 +135,8 @@ export function useConversationRealtime({
   useEffect(() => {
     if (!conversationId) {
       setIsClientTyping(false);
+      setIsReplyTyping(false);
+      setAutoReplyError(null);
       setIsRealtimeConnected(false);
       gapSyncPendingRef.current = false;
       isSubscribedRef.current = false;
@@ -146,6 +165,20 @@ export function useConversationRealtime({
       typingTimeoutRef.current = window.setTimeout(() => {
         setIsClientTyping(false);
       }, CLIENT_TYPING_TIMEOUT_MS);
+    };
+
+    const clearReplyTypingTimeout = () => {
+      if (replyTypingTimeoutRef.current !== null) {
+        window.clearTimeout(replyTypingTimeoutRef.current);
+        replyTypingTimeoutRef.current = null;
+      }
+    };
+
+    const scheduleReplyTypingClear = () => {
+      clearReplyTypingTimeout();
+      replyTypingTimeoutRef.current = window.setTimeout(() => {
+        setIsReplyTyping(false);
+      }, REPLY_TYPING_TIMEOUT_MS);
     };
 
     const resolveCursor = (): ConversationReconnectCursor | null => {
@@ -241,6 +274,12 @@ export function useConversationRealtime({
               clearTypingTimeout();
               setIsClientTyping(false);
             }
+
+            if (row.sender_type === "ai" || row.ai_generated) {
+              clearReplyTypingTimeout();
+              setIsReplyTyping(false);
+              setAutoReplyError(null);
+            }
           },
         )
         .on(
@@ -330,6 +369,32 @@ export function useConversationRealtime({
         )
         .on(
           "broadcast",
+          { event: CONVERSATION_AUTO_REPLY_STATUS_EVENT },
+          (payload) => {
+            const event = payload.payload as AutoReplyStatusPayload;
+
+            if (event.status === "typing") {
+              setAutoReplyError(null);
+              setIsReplyTyping(true);
+              scheduleReplyTypingClear();
+              return;
+            }
+
+            clearReplyTypingTimeout();
+            setIsReplyTyping(false);
+
+            if (event.status === "error") {
+              setAutoReplyError({
+                code: event.errorCode ?? "unknown",
+                message:
+                  event.errorMessage?.trim() ||
+                  "Could not generate an automatic reply.",
+              });
+            }
+          },
+        )
+        .on(
+          "broadcast",
           { event: CONVERSATION_MESSAGE_UPDATED_EVENT },
           (payload) => {
             const row = payload.payload as ConversationMessageUpdatedPayload;
@@ -379,7 +444,9 @@ export function useConversationRealtime({
     return () => {
       cancelled = true;
       clearTypingTimeout();
+      clearReplyTypingTimeout();
       setIsClientTyping(false);
+      setIsReplyTyping(false);
       setIsRealtimeConnected(false);
       isSubscribedRef.current = false;
       gapSyncPendingRef.current = false;
@@ -441,5 +508,11 @@ export function useConversationRealtime({
     reconnectCursor?.afterMessageId,
   ]);
 
-  return { isClientTyping, isRealtimeConnected };
+  return {
+    isClientTyping,
+    isReplyTyping,
+    autoReplyError,
+    dismissAutoReplyError,
+    isRealtimeConnected,
+  };
 }

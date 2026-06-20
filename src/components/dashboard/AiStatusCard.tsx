@@ -9,8 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BotIcon } from "lucide-react";
+import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiStatusCardProps = {
   aiEnabled: boolean | null;
@@ -43,7 +43,12 @@ export function AiStatusCard({ aiEnabled }: AiStatusCardProps) {
             : "Configure your AI assistant to start automating responses."}
         </p>
         <Button asChild variant="outline" size="sm">
-          <Link href={`${DASHBOARD_ROUTES.aiAssistant}?channel=whatsapp`}>
+          <Link
+            href={buildAiAssistantHref({
+              section: "assistant",
+              channel: "whatsapp",
+            })}
+          >
             Configure AI
           </Link>
         </Button>

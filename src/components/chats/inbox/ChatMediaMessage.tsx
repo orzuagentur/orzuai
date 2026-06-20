@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useTransition } from "react";
+import { memo, useEffect, useState, useTransition } from "react";
 import {
   DownloadIcon,
   FileIcon,
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retryInboundMediaAttachmentAction } from "@/features/chats/actions/retry-inbound-media-attachment";
+import { hasPersistedMediaBlob } from "@/lib/client-cache/chat-media-blob-cache";
 import { useChatImageMediaUrls, useChatMediaUrl } from "@/hooks/use-chat-media-url";
 import { resolveCachedMediaUrl } from "@/lib/client-cache/inbox-messenger-cache";
 import { VoiceMessagePlayer } from "@/components/chats/inbox/VoiceMessagePlayer";
@@ -40,6 +41,7 @@ type ChatMediaMessageProps = {
   messageId?: string;
   caption?: string;
   isOutgoing?: boolean;
+  showDownloadButton?: boolean;
   isHydrating?: boolean;
   isFailed?: boolean;
   onRetryStateChange?: (state: {
@@ -390,6 +392,7 @@ function ChatMediaImage({
   media,
   caption,
   isOutgoing,
+  showDownloadButton = true,
   previewUrl,
   fullUrl,
   isPreviewLoading,
@@ -401,6 +404,7 @@ function ChatMediaImage({
   media: ChatMediaPayload;
   caption?: string;
   isOutgoing?: boolean;
+  showDownloadButton?: boolean;
   previewUrl: string | null;
   fullUrl: string | null;
   isPreviewLoading: boolean;
@@ -501,7 +505,7 @@ function ChatMediaImage({
             </div>
           ) : null}
         </button>
-        {!isLoading ? (
+        {!isLoading && showDownloadButton ? (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <MediaDownloadButton
               url={resolvedFullUrl ?? displayUrl}
@@ -520,11 +524,13 @@ function ChatMediaImage({
         >
           <DialogTitle className="sr-only">{media.fileName}</DialogTitle>
           <div className="absolute top-2 right-2 z-10 flex gap-1">
-            <MediaDownloadButton
-              url={resolvedFullUrl ?? displayUrl}
-              fileName={media.fileName}
-              className="bg-white/10 text-white hover:bg-white/20"
-            />
+            {showDownloadButton ? (
+              <MediaDownloadButton
+                url={resolvedFullUrl ?? displayUrl}
+                fileName={media.fileName}
+                className="bg-white/10 text-white hover:bg-white/20"
+              />
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -554,6 +560,7 @@ function ChatMediaVideo({
   media,
   caption,
   isOutgoing,
+  showDownloadButton = true,
   resolvedUrl,
   isLoading,
   hasError,
@@ -562,6 +569,7 @@ function ChatMediaVideo({
   media: ChatMediaPayload;
   caption?: string;
   isOutgoing?: boolean;
+  showDownloadButton?: boolean;
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
@@ -617,11 +625,14 @@ function ChatMediaVideo({
           {formatMediaFileSize(media.sizeBytes) || "Video"}
         </div>
         <div className="absolute top-2 right-2">
-          <MediaDownloadButton
-            url={resolvedUrl}
-            fileName={media.fileName}
-            className="bg-black/55 text-white hover:bg-black/70"
-          />
+          {showDownloadButton && resolvedUrl && !hasError && !isLoading ? (
+            <MediaDownloadButton
+              url={resolvedUrl}
+              fileName={media.fileName}
+              isOutgoing={isOutgoing}
+              className="bg-black/55 text-white hover:bg-black/70"
+            />
+          ) : null}
         </div>
       </div>
       <CaptionText caption={caption} isOutgoing={isOutgoing} />
@@ -692,6 +703,7 @@ function ChatMediaDocument({
   media,
   caption,
   isOutgoing,
+  showDownloadButton = true,
   resolvedUrl,
   isLoading,
   hasError,
@@ -700,6 +712,7 @@ function ChatMediaDocument({
   media: ChatMediaPayload;
   caption?: string;
   isOutgoing?: boolean;
+  showDownloadButton?: boolean;
   resolvedUrl: string | null;
   isLoading: boolean;
   hasError: boolean;
@@ -745,13 +758,13 @@ function ChatMediaDocument({
         </div>
         {isLoading ? (
           <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-        ) : resolvedUrl && !hasError ? (
+        ) : showDownloadButton && resolvedUrl && !hasError ? (
           <MediaDownloadButton
             url={resolvedUrl}
             fileName={media.fileName}
             isOutgoing={isOutgoing}
           />
-        ) : (
+        ) : !isLoading && !showDownloadButton ? null : (
           <PlayIcon className="size-4 shrink-0 opacity-30" />
         )}
       </div>
@@ -765,13 +778,17 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
   messageId,
   caption,
   isOutgoing = false,
+  showDownloadButton = true,
   isHydrating: isHydratingProp,
   isFailed: isFailedProp,
   onRetryStateChange,
 }: ChatMediaMessageProps) {
   const [isRetrying, startRetryTransition] = useTransition();
   const [loadRequested, setLoadRequested] = useState(() =>
-    shouldAutoLoadMedia(media, messageId),
+    shouldAutoLoadMedia(media, messageId) || isOutgoing,
+  );
+  const [persistedChecked, setPersistedChecked] = useState(
+    () => shouldAutoLoadMedia(media, messageId) || isOutgoing,
   );
   const isHydrating =
     isHydratingProp ?? isMediaPendingHydration(media);
@@ -779,6 +796,39 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
   const showFailed = isFailed && !isHydrating;
   const shouldFetchMedia = loadRequested && !isHydrating && !showFailed;
   const hasThumb = Boolean(media.thumbPath && media.kind === "image");
+
+  useEffect(() => {
+    if (loadRequested || isOutgoing || isHydrating) {
+      setPersistedChecked(true);
+      return;
+    }
+
+    let cancelled = false;
+    const keys = getMediaCacheKeys(media, messageId);
+
+    void (async () => {
+      for (const key of keys) {
+        if (cancelled) {
+          return;
+        }
+
+        if (await hasPersistedMediaBlob(key)) {
+          if (!cancelled) {
+            setLoadRequested(true);
+          }
+          break;
+        }
+      }
+
+      if (!cancelled) {
+        setPersistedChecked(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isHydrating, isOutgoing, loadRequested, media, messageId]);
   const imageUrls = useChatImageMediaUrls(media, {
     messageId,
     enabled: shouldFetchMedia && media.kind === "image",
@@ -832,10 +882,21 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
   }
 
   const needsLoadPrompt =
+    persistedChecked &&
+    !isOutgoing &&
     !isHydrating &&
     media.kind !== "audio" &&
     !loadRequested &&
     !media.url?.startsWith("blob:");
+
+  if (!persistedChecked && !loadRequested && !isOutgoing && !isHydrating) {
+    return (
+      <div className="space-y-1">
+        <MediaLoadingPlaceholder className="max-w-[min(300px,100%)]" />
+        <CaptionText caption={caption} isOutgoing={isOutgoing} />
+      </div>
+    );
+  }
 
   if (needsLoadPrompt) {
     return (
@@ -873,6 +934,7 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
         media={media}
         caption={caption}
         isOutgoing={isOutgoing}
+        showDownloadButton={showDownloadButton}
         previewUrl={hasThumb ? imageUrls.previewUrl : imageUrls.fullUrl}
         fullUrl={imageUrls.fullUrl}
         isPreviewLoading={showLoading}
@@ -888,6 +950,7 @@ export const ChatMediaMessage = memo(function ChatMediaMessage({
     media,
     caption,
     isOutgoing,
+    showDownloadButton,
     resolvedUrl,
     previewUrl: resolvedUrl,
     isLoading: showLoading,

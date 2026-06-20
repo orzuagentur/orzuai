@@ -52,6 +52,20 @@ export function getDashboardPageHeaderMeta(
     };
   }
 
+  if (pathname === DASHBOARD_ROUTES.aiAssistantSection) {
+    return {
+      title: AI_ASSISTANT_MESSAGES.sectionAssistantTitle,
+      description: AI_ASSISTANT_MESSAGES.sectionAssistantSubtitle,
+    };
+  }
+
+  if (pathname === DASHBOARD_ROUTES.aiAgentsSection) {
+    return {
+      title: AI_ASSISTANT_MESSAGES.sectionAgentsTitle,
+      description: AI_ASSISTANT_MESSAGES.sectionAgentsSubtitle,
+    };
+  }
+
   if (pathname === DASHBOARD_ROUTES.automations) {
     return {
       title: AUTOMATIONS_MESSAGES.pageTitle,

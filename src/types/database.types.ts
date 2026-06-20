@@ -1298,6 +1298,7 @@ export type Database = {
           communication_style: string;
           icon: string;
           use_custom_model: boolean;
+          goal: string;
           created_at: string;
           updated_at: string;
         };
@@ -1315,6 +1316,7 @@ export type Database = {
           communication_style?: string;
           icon?: string;
           use_custom_model?: boolean;
+          goal?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1332,6 +1334,7 @@ export type Database = {
           communication_style?: string;
           icon?: string;
           use_custom_model?: boolean;
+          goal?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1340,6 +1343,155 @@ export type Database = {
             foreignKeyName: "ai_agents_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_runs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string | null;
+          contact_id: string | null;
+          agent_id: string | null;
+          channel: string;
+          client_message: string;
+          routing_method: string | null;
+          actions: unknown;
+          success: boolean;
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          agent_id?: string | null;
+          channel: string;
+          client_message: string;
+          routing_method?: string | null;
+          actions?: unknown;
+          success?: boolean;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          agent_id?: string | null;
+          channel?: string;
+          client_message?: string;
+          routing_method?: string | null;
+          actions?: unknown;
+          success?: boolean;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_human_requests: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          contact_id: string | null;
+          channel: string;
+          contact_name: string;
+          reason: string;
+          message_preview: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          contact_id?: string | null;
+          channel: string;
+          contact_name?: string;
+          reason: string;
+          message_preview?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          contact_id?: string | null;
+          channel?: string;
+          contact_name?: string;
+          reason?: string;
+          message_preview?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_human_requests_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_human_requests_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_human_requests_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_assistant_profile: {
+        Row: {
+          business_id: string;
+          name: string;
+          system_prompt: string;
+          communication_style: string;
+          language: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          name?: string;
+          system_prompt: string;
+          communication_style?: string;
+          language?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          name?: string;
+          system_prompt?: string;
+          communication_style?: string;
+          language?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_profile_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },

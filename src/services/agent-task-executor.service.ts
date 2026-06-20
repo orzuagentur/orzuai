@@ -1,0 +1,905 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
+import { generateText } from "@/services/llm.service";
+import type {
+  AgentExecutorResult,
+  ExecutorAction,
+  ExecutorContactUpdates,
+  ExecutorPlan,
+} from "@/types/agent-executor.types";
+import { executorPlanSchema } from "@/types/agent-executor.types";
+import type { ContactCustomFields, PipelineStage } from "@/types/contact.types";
+import { PIPELINE_STAGES } from "@/types/contact.types";
+import type { Database } from "@/types/database.types";
+import type { AgentRoutingMethod } from "@/types/intent-router.types";
+import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
+import {
+  createAdditionalContactId,
+  parseAdditionalContacts,
+  type AdditionalContactEntry,
+} from "@/utils/contact-additional-contacts";
+import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
+
+type MessagingDbClient = SupabaseClient<Database>;
+
+type ConversationTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type ContactSnapshot = {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  email: string | null;
+  tags: string[];
+  customFields: ContactCustomFields;
+  pipelineStage: PipelineStage;
+  dealValue: number | null;
+  expectedCloseDate: string | null;
+};
+
+const GENERIC_CONTACT_NAMES = new Set([
+  "customer",
+  "client",
+  "guest",
+  "unknown",
+  "user",
+  "contact",
+]);
+
+function parseJsonObject(text: string): unknown | null {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() ?? trimmed;
+
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    const objectMatch = candidate.match(/\{[\s\S]*\}/);
+
+    if (!objectMatch) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(objectMatch[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function parseCustomFields(value: unknown): ContactCustomFields {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  const additionalContacts = parseAdditionalContacts(record.additionalContacts);
+
+  return {
+    company:
+      typeof record.company === "string" && record.company.trim()
+        ? record.company.trim()
+        : undefined,
+    notes:
+      typeof record.notes === "string" && record.notes.trim()
+        ? record.notes.trim()
+        : undefined,
+    location:
+      typeof record.location === "string" && record.location.trim()
+        ? record.location.trim()
+        : undefined,
+    additionalContacts:
+      additionalContacts.length > 0 ? additionalContacts : undefined,
+  };
+}
+
+function phoneDigitsMatch(a: string, b: string): boolean {
+  const left = phoneDigitsOnly(a);
+  const right = phoneDigitsOnly(b);
+
+  return Boolean(left && right && left === right);
+}
+
+function mergeAdditionalPhone(
+  existing: AdditionalContactEntry[] | undefined,
+  phone: string,
+  label = "Alternate",
+): AdditionalContactEntry[] {
+  const normalized = canonicalPhoneNumber(phone) || phone.trim();
+  const entries = [...(existing ?? [])];
+
+  if (
+    entries.some(
+      (entry) =>
+        entry.type === "phone" && phoneDigitsMatch(entry.value, normalized),
+    )
+  ) {
+    return entries;
+  }
+
+  entries.push({
+    id: createAdditionalContactId(),
+    type: "phone",
+    value: normalized,
+    label,
+  });
+
+  return entries.slice(0, 20);
+}
+
+function isPlaceholderContactName(name: string, phoneNumber: string): boolean {
+  const trimmed = name.trim().toLowerCase();
+
+  if (!trimmed || GENERIC_CONTACT_NAMES.has(trimmed)) {
+    return true;
+  }
+
+  const nameDigits = trimmed.replace(/\D/g, "");
+  const phoneDigits = phoneNumber.replace(/\D/g, "");
+
+  return Boolean(nameDigits && phoneDigits && nameDigits === phoneDigits);
+}
+
+function parsePipelineStage(value: string | null | undefined): PipelineStage {
+  if (PIPELINE_STAGES.includes(value as PipelineStage)) {
+    return value as PipelineStage;
+  }
+
+  return "new";
+}
+
+function mapDealStatus(stage: PipelineStage): string {
+  if (stage === "won") {
+    return "won";
+  }
+
+  if (stage === "lost") {
+    return "lost";
+  }
+
+  return "open";
+}
+
+function getAllowedActionTypes(
+  goal: AgentWizardGoalId | null,
+): Set<ExecutorAction["type"]> {
+  if (!goal) {
+    return new Set(["add_note"]);
+  }
+
+  switch (goal) {
+    case "sales":
+      return new Set(["create_deal", "create_task", "add_note"]);
+    case "booking":
+      return new Set(["create_task", "add_note"]);
+    case "support":
+      return new Set(["create_task", "add_note"]);
+    case "custom":
+    default:
+      return new Set(["create_deal", "create_task", "add_note"]);
+  }
+}
+
+function buildExecutorPrompt(input: {
+  contact: ContactSnapshot;
+  message: string;
+  conversationHistory: ConversationTurn[];
+  agent: RoutableAiAgent | null;
+  goal: AgentWizardGoalId | null;
+}): string {
+  const historySection =
+    input.conversationHistory.length > 0
+      ? input.conversationHistory
+          .slice(-8)
+          .map(
+            (turn) =>
+              `${turn.role === "user" ? "Customer" : "Assistant"}: ${turn.content}`,
+          )
+          .join("\n")
+      : "No prior messages.";
+
+  const allowed = [...getAllowedActionTypes(input.goal), "contactUpdates"];
+
+  return [
+    "Extract customer data and plan CRM updates from the latest message.",
+    input.agent
+      ? `Active specialized agent: ${input.agent.name} (goal: ${input.goal ?? "custom"}).`
+      : "No specialized agent matched — only update contact profile when the customer shares new details.",
+    "",
+    "Current CRM contact:",
+    JSON.stringify(
+      {
+        name: input.contact.name,
+        phone: input.contact.phoneNumber,
+        alternatePhones:
+          input.contact.customFields.additionalContacts
+            ?.filter((entry) => entry.type === "phone")
+            .map((entry) => entry.value) ?? [],
+        email: input.contact.email,
+        company: input.contact.customFields.company ?? null,
+        location: input.contact.customFields.location ?? null,
+        pipelineStage: input.contact.pipelineStage,
+        dealValue: input.contact.dealValue,
+        tags: input.contact.tags,
+      },
+      null,
+      2,
+    ),
+    "",
+    "Recent conversation:",
+    historySection,
+    "",
+    "Latest customer message:",
+    input.message,
+    "",
+    `Allowed action types: ${allowed.join(", ")}`,
+    "",
+    "Rules:",
+    "- Put name, email, phone, company, location, tags, pipelineStage, dealValue, expectedCloseDate in contactUpdates only when clearly stated in the message.",
+    "- Put alternate phone numbers in contactUpdates.phone when the customer shares a number different from their channel/WhatsApp number.",
+    "- Do not invent data. Omit fields you are unsure about.",
+    "- create_task: for appointments, follow-ups, callbacks (booking/support).",
+    "- create_deal: for sales interest, quotes, orders (sales goal).",
+    "- add_note: short internal note summarizing new facts from the message.",
+    "- clientSummary: one sentence in the business language describing what was saved (for the assistant reply).",
+    "",
+    "Return JSON only:",
+    '{"contactUpdates":{"name":"...","email":"...","phone":"...","company":"..."},"actions":[{"type":"create_task","title":"...","dueAt":"2025-06-03T10:00:00Z"}],"clientSummary":"..."}',
+  ].join("\n");
+}
+
+export async function loadContactSnapshot(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+): Promise<ContactSnapshot | null> {
+  const { data } = await admin
+    .from("contacts")
+    .select(
+      "id, name, phone_number, email, tags, custom_fields, pipeline_stage, deal_value, expected_close_date",
+    )
+    .eq("id", contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    phoneNumber: data.phone_number,
+    email: data.email,
+    tags: data.tags ?? [],
+    customFields: parseCustomFields(data.custom_fields),
+    pipelineStage: parsePipelineStage(data.pipeline_stage),
+    dealValue: data.deal_value,
+    expectedCloseDate: data.expected_close_date,
+  };
+}
+
+async function syncPrimaryDeal(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  input: {
+    dealValue: number | null;
+    pipelineStage: PipelineStage;
+    expectedCloseDate: string | null;
+  },
+): Promise<void> {
+  const { data: primaryDeal } = await admin
+    .from("crm_deals")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("is_primary", true)
+    .maybeSingle();
+
+  const payload = {
+    value: input.dealValue,
+    stage: input.pipelineStage,
+    expected_close_date: input.expectedCloseDate,
+    status: mapDealStatus(input.pipelineStage),
+  };
+
+  if (primaryDeal?.id) {
+    await admin
+      .from("crm_deals")
+      .update(payload)
+      .eq("id", primaryDeal.id)
+      .eq("business_id", businessId);
+    return;
+  }
+
+  if (input.dealValue === null && input.pipelineStage === "new") {
+    return;
+  }
+
+  await admin.from("crm_deals").insert({
+    business_id: businessId,
+    contact_id: contactId,
+    title: "Primary deal",
+    is_primary: true,
+    ...payload,
+  });
+}
+
+async function applyContactUpdates(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  updates: ExecutorContactUpdates,
+): Promise<string[]> {
+  const applied: string[] = [];
+  const patch: Database["public"]["Tables"]["contacts"]["Update"] = {};
+  const customFields: ContactCustomFields = { ...contact.customFields };
+
+  if (updates.name?.trim()) {
+    const nextName = updates.name.trim();
+
+    if (
+      isPlaceholderContactName(contact.name, contact.phoneNumber) ||
+      nextName.length > contact.name.trim().length
+    ) {
+      patch.name = nextName;
+      applied.push(`Contact name → ${nextName}`);
+    }
+  }
+
+  if (updates.email?.trim()) {
+    const nextEmail = updates.email.trim();
+
+    if (!contact.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      patch.email = nextEmail;
+      applied.push(`Email → ${nextEmail}`);
+    }
+  }
+
+  if (updates.phone?.trim()) {
+    const nextPhone = updates.phone.trim();
+
+    if (
+      phoneDigitsOnly(nextPhone).length >= 7 &&
+      !phoneDigitsMatch(nextPhone, contact.phoneNumber)
+    ) {
+      customFields.additionalContacts = mergeAdditionalPhone(
+        customFields.additionalContacts ?? contact.customFields.additionalContacts,
+        nextPhone,
+      );
+      applied.push(`Alternate phone → ${canonicalPhoneNumber(nextPhone) || nextPhone}`);
+    }
+  }
+
+  if (updates.company?.trim()) {
+    customFields.company = updates.company.trim();
+    applied.push(`Company → ${updates.company.trim()}`);
+  }
+
+  if (updates.location?.trim()) {
+    customFields.location = updates.location.trim();
+    applied.push(`Location → ${updates.location.trim()}`);
+  }
+
+  if (updates.tags?.length) {
+    const mergedTags = [...new Set([...contact.tags, ...updates.tags])].slice(
+      0,
+      20,
+    );
+
+    if (mergedTags.length > contact.tags.length) {
+      patch.tags = mergedTags;
+      applied.push(`Tags updated`);
+    }
+  }
+
+  if (updates.pipelineStage) {
+    patch.pipeline_stage = updates.pipelineStage;
+    applied.push(`Pipeline → ${updates.pipelineStage}`);
+  }
+
+  if (updates.dealValue !== undefined) {
+    patch.deal_value = updates.dealValue;
+    applied.push(`Deal value → ${updates.dealValue}`);
+  }
+
+  if (updates.expectedCloseDate?.trim()) {
+    patch.expected_close_date = updates.expectedCloseDate.trim();
+    applied.push(`Expected close date saved`);
+  }
+
+  if (Object.keys(customFields).length > 0) {
+    patch.custom_fields = customFields as unknown as Record<string, string>;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return applied;
+  }
+
+  const { error } = await admin
+    .from("contacts")
+    .update(patch)
+    .eq("id", contact.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (
+    updates.dealValue !== undefined ||
+    updates.pipelineStage ||
+    updates.expectedCloseDate
+  ) {
+    await syncPrimaryDeal(admin, businessId, contact.id, {
+      dealValue: updates.dealValue ?? contact.dealValue,
+      pipelineStage: updates.pipelineStage ?? contact.pipelineStage,
+      expectedCloseDate:
+        updates.expectedCloseDate?.trim() ?? contact.expectedCloseDate,
+    });
+  }
+
+  return applied;
+}
+
+async function hasRecentTask(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  title: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await admin
+    .from("crm_tasks")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("title", title)
+    .gte("created_at", since)
+    .limit(1);
+
+  return Boolean(data?.length);
+}
+
+async function applyCreateTask(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "create_task" }>,
+): Promise<string | null> {
+  const title = action.title.trim();
+
+  if (await hasRecentTask(admin, businessId, contactId, title)) {
+    return null;
+  }
+
+  const dueAt = action.dueAt?.trim() || null;
+  const { error } = await admin.from("crm_tasks").insert({
+    business_id: businessId,
+    contact_id: contactId,
+    title,
+    due_at: dueAt,
+    status: "open",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return `Task created: ${title}`;
+}
+
+async function hasRecentDeal(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  title: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await admin
+    .from("crm_deals")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("title", title)
+    .gte("created_at", since)
+    .limit(1);
+
+  return Boolean(data?.length);
+}
+
+async function applyCreateDeal(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "create_deal" }>,
+): Promise<string | null> {
+  const title = action.title.trim();
+
+  if (await hasRecentDeal(admin, businessId, contactId, title)) {
+    return null;
+  }
+
+  const stage = action.stage ?? "new";
+  const { error } = await admin.from("crm_deals").insert({
+    business_id: businessId,
+    contact_id: contactId,
+    title,
+    value: action.value ?? null,
+    stage,
+    status: mapDealStatus(stage),
+    notes: action.notes?.trim() || null,
+    is_primary: false,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return `Deal created: ${title}`;
+}
+
+async function applyAddNote(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "add_note" }>,
+): Promise<string | null> {
+  const noteLine = action.content.trim();
+  const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const existingNotes = contact.customFields.notes?.trim() ?? "";
+  const nextNotes = existingNotes
+    ? `${existingNotes}\n\n[${timestamp}] ${noteLine}`
+    : `[${timestamp}] ${noteLine}`;
+
+  const customFields: ContactCustomFields = {
+    ...contact.customFields,
+    notes: nextNotes.slice(0, 4000),
+  };
+
+  const { error } = await admin
+    .from("contacts")
+    .update({
+      custom_fields: customFields as unknown as Record<string, string>,
+    })
+    .eq("id", contact.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return "Note saved on contact";
+}
+
+async function applyExecutorPlan(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  plan: ExecutorPlan,
+  goal: AgentWizardGoalId | null,
+): Promise<string[]> {
+  const applied: string[] = [];
+  const allowed = getAllowedActionTypes(goal);
+
+  if (plan.contactUpdates && Object.keys(plan.contactUpdates).length > 0) {
+    applied.push(
+      ...(await applyContactUpdates(
+        admin,
+        businessId,
+        contact,
+        plan.contactUpdates,
+      )),
+    );
+  }
+
+  for (const action of plan.actions) {
+    if (!allowed.has(action.type)) {
+      continue;
+    }
+
+    let result: string | null = null;
+
+    if (action.type === "create_task") {
+      result = await applyCreateTask(admin, businessId, contact.id, action);
+    } else if (action.type === "create_deal") {
+      result = await applyCreateDeal(admin, businessId, contact.id, action);
+    } else if (action.type === "add_note") {
+      const refreshed = await loadContactSnapshot(admin, businessId, contact.id);
+      result = await applyAddNote(
+        admin,
+        businessId,
+        refreshed ?? contact,
+        action,
+      );
+    }
+
+    if (result) {
+      applied.push(result);
+    }
+  }
+
+  return applied;
+}
+
+async function logAgentRun(
+  admin: MessagingDbClient,
+  input: {
+    businessId: string;
+    conversationId: string | null;
+    contactId: string;
+    agentId: string | null;
+    channel: string;
+    clientMessage: string;
+    routingMethod: AgentRoutingMethod | null;
+    actionsApplied: string[];
+    success: boolean;
+    errorMessage?: string;
+  },
+): Promise<void> {
+  await admin.from("agent_runs").insert({
+    business_id: input.businessId,
+    conversation_id: input.conversationId,
+    contact_id: input.contactId,
+    agent_id: input.agentId,
+    channel: input.channel,
+    client_message: input.clientMessage.slice(0, 2000),
+    routing_method: input.routingMethod,
+    actions: input.actionsApplied,
+    success: input.success,
+    error_message: input.errorMessage ?? null,
+  });
+}
+
+export async function planAgentCrmActions(input: {
+  businessId: string;
+  contact: ContactSnapshot;
+  message: string;
+  conversationHistory: ConversationTurn[];
+  agent: RoutableAiAgent | null;
+  goal: AgentWizardGoalId | null;
+}): Promise<ExecutorPlan | null> {
+  const result = await generateText({
+    businessId: input.businessId,
+    provider: "gemini",
+    skipUsageLog: true,
+    skipUsageLimit: true,
+    systemInstruction:
+      "You extract structured CRM data from customer messages. Reply with valid JSON only. Never invent contact details.",
+    prompt: buildExecutorPrompt(input),
+  });
+
+  if (!result.success) {
+    return null;
+  }
+
+  const parsed = parseJsonObject(result.data.text);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const validated = executorPlanSchema.safeParse(parsed);
+
+  return validated.success ? validated.data : null;
+}
+
+async function executePlanOnContact(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  contact: ContactSnapshot;
+  contactId: string;
+  conversationId?: string | null;
+  channel: string;
+  clientMessage: string;
+  agent: RoutableAiAgent | null;
+  goal: AgentWizardGoalId | null;
+  routingMethod?: AgentRoutingMethod | null;
+  plan: ExecutorPlan;
+}): Promise<AgentExecutorResult> {
+  try {
+    const actionsApplied = await applyExecutorPlan(
+      input.admin,
+      input.businessId,
+      input.contact,
+      input.plan,
+      input.goal,
+    );
+
+    const clientSummary =
+      input.plan.clientSummary?.trim() ||
+      (actionsApplied.length > 0
+        ? `Saved to CRM: ${actionsApplied.join("; ")}`
+        : "");
+
+    await logAgentRun(input.admin, {
+      businessId: input.businessId,
+      conversationId: input.conversationId ?? null,
+      contactId: input.contactId,
+      agentId: input.agent?.id ?? null,
+      channel: input.channel,
+      clientMessage: input.clientMessage,
+      routingMethod: input.routingMethod ?? null,
+      actionsApplied,
+      success: true,
+    });
+
+    console.info(
+      "[agent-executor]",
+      JSON.stringify({
+        contactId: input.contactId,
+        agentId: input.agent?.id ?? null,
+        goal: input.goal,
+        actionsApplied,
+      }),
+    );
+
+    return {
+      success: true,
+      actionsApplied,
+      clientSummary,
+      rawPlan: input.plan,
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "CRM action failed";
+
+    await logAgentRun(input.admin, {
+      businessId: input.businessId,
+      conversationId: input.conversationId ?? null,
+      contactId: input.contactId,
+      agentId: input.agent?.id ?? null,
+      channel: input.channel,
+      clientMessage: input.clientMessage,
+      routingMethod: input.routingMethod ?? null,
+      actionsApplied: [],
+      success: false,
+      errorMessage,
+    });
+
+    return {
+      success: false,
+      actionsApplied: [],
+      clientSummary: "",
+      rawPlan: null,
+      errorMessage,
+    };
+  }
+}
+
+export async function applyPreparedExecutorPlan(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  contactId: string;
+  conversationId?: string | null;
+  channel: string;
+  clientMessage: string;
+  agent: RoutableAiAgent | null;
+  goal: AgentWizardGoalId | null;
+  routingMethod?: AgentRoutingMethod | null;
+  plan: ExecutorPlan;
+}): Promise<AgentExecutorResult> {
+  const contact = await loadContactSnapshot(
+    input.admin,
+    input.businessId,
+    input.contactId,
+  );
+
+  if (!contact) {
+    return {
+      success: false,
+      actionsApplied: [],
+      clientSummary: "",
+      rawPlan: null,
+      errorMessage: "Contact not found",
+    };
+  }
+
+  return executePlanOnContact({
+    admin: input.admin,
+    businessId: input.businessId,
+    contact,
+    contactId: input.contactId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    clientMessage: input.clientMessage,
+    agent: input.agent,
+    goal: input.goal,
+    routingMethod: input.routingMethod,
+    plan: input.plan,
+  });
+}
+
+export async function executeAgentCrmActions(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  contactId: string;
+  conversationId?: string | null;
+  channel: string;
+  clientMessage: string;
+  conversationHistory?: ConversationTurn[];
+  agent: RoutableAiAgent | null;
+  goal: AgentWizardGoalId | null;
+  routingMethod?: AgentRoutingMethod | null;
+}): Promise<AgentExecutorResult> {
+  const conversationHistory = input.conversationHistory ?? [];
+  const contact = await loadContactSnapshot(
+    input.admin,
+    input.businessId,
+    input.contactId,
+  );
+
+  if (!contact) {
+    return {
+      success: false,
+      actionsApplied: [],
+      clientSummary: "",
+      rawPlan: null,
+      errorMessage: "Contact not found",
+    };
+  }
+
+  const plan = await planAgentCrmActions({
+    businessId: input.businessId,
+    contact,
+    message: input.clientMessage,
+    conversationHistory,
+    agent: input.agent,
+    goal: input.goal,
+  });
+
+  if (!plan) {
+    await logAgentRun(input.admin, {
+      businessId: input.businessId,
+      conversationId: input.conversationId ?? null,
+      contactId: input.contactId,
+      agentId: input.agent?.id ?? null,
+      channel: input.channel,
+      clientMessage: input.clientMessage,
+      routingMethod: input.routingMethod ?? null,
+      actionsApplied: [],
+      success: true,
+    });
+
+    return {
+      success: true,
+      actionsApplied: [],
+      clientSummary: "",
+      rawPlan: null,
+    };
+  }
+
+  return executePlanOnContact({
+    admin: input.admin,
+    businessId: input.businessId,
+    contact,
+    contactId: input.contactId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    clientMessage: input.clientMessage,
+    agent: input.agent,
+    goal: input.goal,
+    routingMethod: input.routingMethod,
+    plan,
+  });
+}
+
+export function buildCrmActionsReplyContext(clientSummary: string): string {
+  if (!clientSummary.trim()) {
+    return "";
+  }
+
+  return [
+    "",
+    "CRM actions completed for this customer message:",
+    clientSummary.trim(),
+    "Confirm what was saved in CRM naturally in your reply when relevant. Do not mention internal systems.",
+  ].join("\n");
+}

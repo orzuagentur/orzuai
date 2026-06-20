@@ -17,15 +17,16 @@ import { cn } from "@/lib/utils";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
-type AiAgentsHubProps = {
+type AiAgentsSectionProps = {
   data: AiAssistantPageData;
 };
 
-function buildHubHref(
+function buildAgentsHref(
   data: AiAssistantPageData,
   overrides: Parameters<typeof buildAiAssistantHref>[0] = {},
 ) {
   return buildAiAssistantHref({
+    section: "agents",
     channel: data.activeChannelFilter,
     agent: data.isNewAgent ? "new" : data.activeAgentId,
     step: data.isNewAgent ? data.createWizardStep : null,
@@ -37,7 +38,7 @@ function buildHubHref(
   });
 }
 
-export function AiAgentsHub({ data }: AiAgentsHubProps) {
+export function AiAgentsSection({ data }: AiAgentsSectionProps) {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState(data.searchQuery);
   const showEditorOnMobile = Boolean(
@@ -83,7 +84,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
     const timeout = window.setTimeout(() => {
       router.replace(
-        buildHubHref(data, {
+        buildAgentsHref(data, {
           q: trimmed || null,
           agent: data.isNewAgent ? "new" : data.activeAgentId,
         }),
@@ -95,7 +96,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleNewAgent = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: "new",
         step: 1,
         goal: null,
@@ -106,7 +107,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleCancelCreate = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: null,
         step: null,
         goal: null,
@@ -118,7 +119,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
   const handleWizardStepChange = useCallback(
     (step: 1 | 2 | 3 | 4, goal?: AgentWizardGoalId | null) => {
       router.push(
-        buildHubHref(data, {
+        buildAgentsHref(data, {
           agent: "new",
           step,
           goal: goal ?? data.createWizardGoal,
@@ -131,7 +132,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleDismissSetupBanner = useCallback(() => {
     router.replace(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: data.activeAgentId,
         setup: false,
         edit: false,
@@ -141,7 +142,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleEditAgent = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: data.activeAgentId,
         edit: true,
         analytics: false,
@@ -152,7 +153,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleOpenAnalytics = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: data.activeAgentId,
         edit: false,
         analytics: true,
@@ -163,7 +164,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleCloseAnalytics = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: data.activeAgentId,
         edit: false,
         analytics: false,
@@ -174,7 +175,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   const handleCancelEdit = useCallback(() => {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: data.activeAgentId,
         edit: false,
         analytics: false,
@@ -193,7 +194,7 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
 
   function clearAgentSelection() {
     router.push(
-      buildHubHref(data, {
+      buildAgentsHref(data, {
         agent: null,
         setup: false,
       }),
@@ -230,7 +231,6 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
       <AiAssistantChannelTabs
         activeChannel={data.activeChannelFilter}
-        activeTab="agents"
         activeAgentId={data.activeAgentId}
         searchQuery={data.searchQuery}
         visibleChannelIds={data.visibleChannelIds}
@@ -257,7 +257,6 @@ export function AiAgentsHub({ data }: AiAgentsHubProps) {
                 activeAgentId={data.activeAgentId}
                 isNewAgent={data.isNewAgent}
                 searchQuery={data.searchQuery}
-                activeTab="agents"
               />
             </div>
           </aside>

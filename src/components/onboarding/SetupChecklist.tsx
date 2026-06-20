@@ -12,6 +12,7 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { OnboardingProgressRing } from "@/components/onboarding/OnboardingProgressRing";
 import { ONBOARDING_MESSAGES } from "@/features/onboarding/constants";
+import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 import type { OnboardingProgress } from "@/services/onboarding.service";
 
 type SetupChecklistProps = {
@@ -36,10 +37,13 @@ export function SetupChecklist({ progress }: SetupChecklistProps) {
       href: DASHBOARD_ROUTES.knowledgeBase,
     },
     {
-      label: "Create an AI agent",
+      label: "Enable AI Assistant",
       done: progress.hasAiEnabled,
       href: progress.connectedChannel
-        ? `${DASHBOARD_ROUTES.aiAssistant}?channel=${progress.connectedChannel}`
+        ? buildAiAssistantHref({
+            section: "assistant",
+            channel: progress.connectedChannel,
+          })
         : DASHBOARD_ROUTES.onboarding,
     },
   ];

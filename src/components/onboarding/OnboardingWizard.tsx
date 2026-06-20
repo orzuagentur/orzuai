@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Loader2Icon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { BusinessProfileForm } from "@/components/business/BusinessProfileForm";
@@ -29,6 +29,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { testChannelAiReplyAction } from "@/features/channel-workspace";
+import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
+import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 import {
   ONBOARDING_MESSAGES,
@@ -67,22 +69,40 @@ export function OnboardingWizard({
   const [testMessage, setTestMessage] = useState("");
   const [testReply, setTestReply] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const aiEnabled = useChannelAiEnabled(
+    aiSettings?.channel ?? null,
+    aiSettings?.aiEnabled ?? null,
+  );
+  const { toggleAi, isLoading: isTogglingAi } = useToggleChatAi();
+  const isAiOn = aiEnabled === true;
+  const assistantHref = aiSettings?.channel
+    ? buildAiAssistantHref({ section: "assistant", channel: aiSettings.channel })
+    : buildAiAssistantHref({ section: "assistant" });
+  const assistantEditHref = aiSettings?.channel
+    ? buildAiAssistantHref({
+        section: "assistant",
+        channel: aiSettings.channel,
+        assistantEdit: true,
+      })
+    : buildAiAssistantHref({ section: "assistant", assistantEdit: true });
   const activeStep = Math.min(
     5,
     Math.max(1, Number(searchParams.get("step")) || step),
   );
 
-  function handleOpenAiAssistant() {
-    if (!aiSettings?.channel) {
+  async function handleToggleAi() {
+    if (!aiSettings?.channel || aiEnabled === null) {
       return;
     }
 
-    router.push(
-      buildAiAssistantHref({
-        agent: "new",
-        channel: aiSettings.channel,
-      }),
-    );
+    const result = await toggleAi({
+      channel: aiSettings.channel,
+      enabled: !isAiOn,
+    });
+
+    if (result.success) {
+      router.refresh();
+    }
   }
 
   async function handleTest() {
@@ -228,14 +248,50 @@ export function OnboardingWizard({
             <CardDescription>{ONBOARDING_MESSAGES.stepAiDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {progress.hasAiEnabled ? (
-              <p className="text-sm text-muted-foreground">
-                Channel auto-replies are enabled. Make sure an agent is active on this channel.
-              </p>
+            {aiSettings?.channel ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {isAiOn
+                    ? ONBOARDING_MESSAGES.stepAiEnabled
+                    : ONBOARDING_MESSAGES.stepAiDescription}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={isAiOn ? "outline" : "default"}
+                    disabled={isTogglingAi || aiEnabled === null}
+                    onClick={() => {
+                      void handleToggleAi();
+                    }}
+                  >
+                    {isTogglingAi ? (
+                      <>
+                        <Loader2Icon className="size-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : isAiOn ? (
+                      ONBOARDING_MESSAGES.stepAiTurnOff
+                    ) : (
+                      ONBOARDING_MESSAGES.stepAiTurnOn
+                    )}
+                  </Button>
+                  <Button type="button" variant="secondary" asChild>
+                    <Link href={assistantEditHref}>
+                      {ONBOARDING_MESSAGES.stepAiCustomize}
+                      <ArrowRightIcon className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button type="button" variant="ghost" asChild>
+                    <Link href={assistantHref}>
+                      {ONBOARDING_MESSAGES.stepAiOpenSettings}
+                    </Link>
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Button type="button" onClick={handleOpenAiAssistant}>
-                {ONBOARDING_MESSAGES.stepAiEnable}
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Connect a channel first, then enable AI Assistant here.
+              </p>
             )}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => goToStep(router, 3)}>

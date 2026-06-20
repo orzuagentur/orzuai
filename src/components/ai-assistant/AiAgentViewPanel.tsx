@@ -118,8 +118,8 @@ export function AiAgentViewPanel({
       toast.success(AI_ASSISTANT_MESSAGES.agentDeleted);
       router.push(
         buildAiAssistantHref({
+          section: "agents",
           channel: activeChannelFilter,
-          tab: "agents",
           q: searchQuery || null,
         }),
       );

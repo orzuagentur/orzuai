@@ -1,18 +1,15 @@
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
-import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
+/** @deprecated Use DASHBOARD_ROUTES.aiAssistantSection */
 export function buildAiManagerHref(input?: {
   channel?: MessagingIntegrationChannelId | null;
 }): string {
-  const channel = input?.channel;
-
-  if (
-    channel &&
-    (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)
-  ) {
-    return `${DASHBOARD_ROUTES.aiManager}?channel=${channel}`;
+  if (!input?.channel) {
+    return DASHBOARD_ROUTES.aiAssistantSection;
   }
 
-  return DASHBOARD_ROUTES.aiManager;
+  const params = new URLSearchParams();
+  params.set("channel", input.channel);
+  return `${DASHBOARD_ROUTES.aiAssistantSection}?${params.toString()}`;
 }

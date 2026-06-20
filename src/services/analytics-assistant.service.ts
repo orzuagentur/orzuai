@@ -3,9 +3,11 @@ import "server-only";
 import { SUBSCRIPTION_PLANS } from "@/features/subscription/plans";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
-  getAutomationOpsMetrics,
-  listAgentsAnalyticsRollup,
-} from "@/services/analytics-ai-ops.service";
+    getAutomationOpsMetrics,
+    getAgentRunsMetrics,
+    listAgentsAnalyticsRollup,
+    listRecentAgentRuns,
+  } from "@/services/analytics-ai-ops.service";
 import {
   getAiPerformanceMetrics,
   getCrmFunnelMetrics,
@@ -57,6 +59,8 @@ export async function askAnalyticsAssistant(input: {
     sentiment,
     agentsRollup,
     automationOps,
+    agentRuns,
+    recentAgentRuns,
   ] = await Promise.all([
     getAiPerformanceMetrics(business.id),
     getLeadSourceAttribution(business.id),
@@ -69,6 +73,8 @@ export async function askAnalyticsAssistant(input: {
     getSentimentBreakdown(business.id),
     listAgentsAnalyticsRollup(business.id),
     getAutomationOpsMetrics(business.id),
+    getAgentRunsMetrics(business.id),
+    listRecentAgentRuns(business.id),
   ]);
 
   const context = {
@@ -84,6 +90,8 @@ export async function askAnalyticsAssistant(input: {
     usage,
     agentsRollup,
     automationOps,
+    agentRuns,
+    recentAgentRuns,
   };
 
   const aiResult = await generateText({

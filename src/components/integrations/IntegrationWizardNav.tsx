@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
-  buildChannelWorkspaceHref,
+  buildIntegrationAiSettingsHref,
   INTEGRATION_WIZARD_STEPS,
   isChannelConnectedForWorkspace,
+  isMessagingIntegrationChannel,
   type IntegrationChannelId,
   type IntegrationChannelStatusMap,
   type IntegrationWizardStepId,
@@ -26,12 +27,16 @@ function getStepHref(
     return `${DASHBOARD_ROUTES.integrations}/${channel}?section=activate`;
   }
 
+  if (!isMessagingIntegrationChannel(channel)) {
+    return `${DASHBOARD_ROUTES.integrations}/${channel}?section=activate`;
+  }
+
   if (stepId === "configure-ai") {
-    return buildChannelWorkspaceHref(channel, "ai-assistant");
+    return buildIntegrationAiSettingsHref(channel);
   }
 
   if (stepId === "test") {
-    return `${buildChannelWorkspaceHref(channel, "ai-assistant")}#ai-test`;
+    return buildIntegrationAiSettingsHref(channel);
   }
 
   return `${DASHBOARD_ROUTES.chats}/${channel}`;

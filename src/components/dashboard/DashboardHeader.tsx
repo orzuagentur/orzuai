@@ -25,7 +25,7 @@ function isContactsPath(pathname: string): boolean {
 }
 
 function isAiAssistantPath(pathname: string): boolean {
-  return pathname === DASHBOARD_ROUTES.aiAssistant;
+  return pathname === DASHBOARD_ROUTES.aiAgentsSection;
 }
 
 export function DashboardHeader() {

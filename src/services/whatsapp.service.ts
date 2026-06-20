@@ -41,7 +41,7 @@ import {
 import { createPendingMessageAttachment } from "@/services/message-attachment.service";
 import {
   incrementMessagingAnalytics,
-  scheduleChannelAutoReply,
+  scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
 import type { WhatsappConnection, TablesInsert } from "@/types/database.types";
 import type {
@@ -855,7 +855,7 @@ async function completeInboundWhatsAppMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  scheduleChannelAutoReply({
+  scheduleInboundMessageProcessing({
     admin,
     businessId,
     channel: "whatsapp",

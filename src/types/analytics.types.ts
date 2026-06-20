@@ -60,3 +60,29 @@ export type AutomationOpsMetrics = {
   failedRunsLast30Days: number;
   topTriggers: AutomationOpsTriggerStat[];
 };
+
+export type AgentRunsMetrics = {
+  runsToday: number;
+  runsLast30Days: number;
+  successRatePercent: number;
+  failedRunsLast30Days: number;
+  intentRoutesLast30Days: number;
+  keywordRoutesLast30Days: number;
+  assistantOnlyLast30Days: number;
+  actionsAppliedLast30Days: number;
+};
+
+export type AgentRunListItem = {
+  id: string;
+  createdAt: string;
+  channel: string;
+  contactId: string | null;
+  contactName: string | null;
+  agentId: string | null;
+  agentName: string | null;
+  routingMethod: string | null;
+  actions: string[];
+  success: boolean;
+  errorMessage: string | null;
+  messagePreview: string;
+};

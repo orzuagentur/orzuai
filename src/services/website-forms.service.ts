@@ -25,14 +25,12 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
-import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
-import { generateAssistantReply } from "@/services/llm.service";
-import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
+import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
+import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  listKnowledgeEntriesForBusiness,
   scheduleChannelAutoReply,
   resolveInboundConversation,
 } from "@/services/messaging.service";
@@ -383,7 +381,7 @@ async function processWebsiteFormFollowUp(input: {
 
   const { data: aiSettings } = await admin
     .from("ai_settings")
-    .select("*")
+    .select("ai_enabled")
     .eq("business_id", businessId)
     .eq("channel", "website_forms")
     .maybeSingle();
@@ -392,76 +390,19 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
-  const { data: agentRows } = await admin
-    .from("ai_agents")
-    .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
-    )
-    .eq("business_id", businessId)
-    .eq("enabled", true);
-
-  const { agent: matchedAgent, systemPrompt } = resolveAgentSystemPrompt({
-    agents: (agentRows ?? []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      systemPrompt: row.system_prompt,
-      channels: row.channels ?? [],
-      triggerKeywords: row.trigger_keywords ?? [],
-      enabled: row.enabled,
-      provider: row.provider ?? undefined,
-      model: row.model ?? undefined,
-      useCustomModel: row.use_custom_model ?? false,
-      language: row.language ?? undefined,
-      communicationStyle: row.communication_style ?? undefined,
-      updatedAt: row.updated_at,
-    })),
-    channel: "website_forms",
-    message: clientMessage,
-    fallbackPrompt: aiSettings.system_prompt,
-  });
-
-  const provider = (matchedAgent?.provider ?? aiSettings.provider ?? "gemini") as AiProvider;
-  const model = resolveAgentModel(
-    provider,
-    matchedAgent?.model ?? aiSettings.model,
-    matchedAgent?.useCustomModel ?? false,
-  );
-  const language = matchedAgent?.language ?? aiSettings.language;
-
-  const { data: history } = await admin
-    .from("messages")
-    .select("sender_type, content")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(20);
-
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
-
-  const reply = await generateAssistantReply({
+  const reply = await generateChannelAutoReply({
+    admin,
     businessId,
+    channel: "website_forms",
     conversationId,
-    provider,
-    model,
-    systemPrompt,
-    language,
-    userMessage: clientMessage,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
-      title: entry.title,
-      content: entry.content,
-      category: entry.category,
-    })),
-    conversationHistory:
-      history?.map((message) => ({
-        role: message.sender_type === "client" ? "user" : "assistant",
-        content: message.content,
-      })) ?? [],
+    clientMessage,
   });
 
   if (!reply.success) {
     return;
   }
 
-  const followUpText = reply.data.text;
+  const followUpText = reply.text;
   const channel = connection.follow_up_channel as WebsiteFormFollowUpChannel;
   let outboundSent = false;
 
@@ -625,6 +566,14 @@ export async function ingestWebsiteFormSubmission(
     channel: "website_forms",
     preview: body,
     isNewContact: createdContact,
+  });
+
+  scheduleInboundMessageEffects({
+    admin,
+    businessId,
+    channel: "website_forms",
+    conversationId,
+    clientMessage: body,
   });
 
   await admin

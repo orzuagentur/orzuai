@@ -15,6 +15,7 @@ import {
 } from "@/features/channel-workspace";
 import {
   buildChannelWorkspaceHref,
+  INTEGRATIONS_MESSAGES,
   type IntegrationChannelId,
 } from "@/features/integrations";
 import type { ChannelWorkspaceSummary } from "@/types/channel-workspace.types";
@@ -65,7 +66,11 @@ export function ChannelWorkspacePreview({
       </CardHeader>
       <CardContent>
         <Button asChild>
-          <Link href={href}>Open full view</Link>
+          <Link href={href}>
+            {kind === "ai-assistant"
+              ? INTEGRATIONS_MESSAGES.openAiSettings
+              : "Open full view"}
+          </Link>
         </Button>
       </CardContent>
     </Card>

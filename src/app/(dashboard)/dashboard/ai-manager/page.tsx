@@ -1,10 +1,24 @@
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { AiManagerHub } from "@/components/ai-manager/AiManagerHub";
-import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
-import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { AI_MANAGER_MESSAGES } from "@/features/ai-manager/constants";
-import { getAiManagerPageData } from "@/services/ai-manager.service";
+import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
+import { buildAiManagerHref } from "@/utils/ai-manager-url";
+import { parseMessagingChannel } from "@/utils/ai-assistant-url";
+
+function resolveChannelsTabChannel(
+  value: string | undefined,
+): MessagingIntegrationChannelId | null {
+  const channel = parseMessagingChannel(value);
+
+  if (
+    channel &&
+    (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)
+  ) {
+    return channel as MessagingIntegrationChannelId;
+  }
+
+  return null;
+}
 
 type AiManagerPageProps = {
   searchParams: Promise<{
@@ -12,26 +26,11 @@ type AiManagerPageProps = {
   }>;
 };
 
-export default function AiManagerPage({ searchParams }: AiManagerPageProps) {
-  return (
-    <Suspense fallback={<DashboardPageSkeleton cards={3} />}>
-      <AiManagerPageContent searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function AiManagerPageContent({ searchParams }: AiManagerPageProps) {
+export default async function AiManagerPage({ searchParams }: AiManagerPageProps) {
   const params = await searchParams;
-  const data = await getAiManagerPageData({ channel: params.channel });
-
-  if (!data.hasBusiness) {
-    return (
-      <DashboardSetupPrompt
-        title={AI_MANAGER_MESSAGES.pageTitle}
-        description={AI_MANAGER_MESSAGES.setupDescription}
-      />
-    );
-  }
-
-  return <AiManagerHub data={data} />;
+  redirect(
+    buildAiManagerHref({
+      channel: resolveChannelsTabChannel(params.channel),
+    }),
+  );
 }

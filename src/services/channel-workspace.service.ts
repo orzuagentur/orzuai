@@ -13,7 +13,7 @@ import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
 } from "@/features/integrations/channel-status";
-import { resolveAgentModel, resolveAiModel, type AiProvider } from "@/lib/ai/constants";
+import { resolveAiModel, type AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { resolveGeminiModel } from "@/lib/gemini/constants";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -22,11 +22,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import {
-  generateAssistantReply,
   getProviderAvailability,
   isProviderConfigured,
 } from "@/services/llm.service";
-import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
+import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
@@ -44,7 +43,6 @@ import {
   saveChannelAiSettingsSchema,
   testChannelAiReplySchema,
 } from "@/types/channel-workspace.types";
-import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
 import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
@@ -457,85 +455,42 @@ export async function testChannelAiReply(
     return { success: false, message: "Configuration missing." };
   }
 
-  const supabase = await createClient();
-  const { data: settings } = await supabase
-    .from("ai_settings")
-    .select("provider, model, language, system_prompt")
-    .eq("business_id", businessId)
-    .eq("channel", parsed.data.channel)
-    .maybeSingle();
-
-  if (!settings) {
-    return { success: false, message: "Save AI settings for this channel first." };
-  }
-
   const admin = createAdminClient();
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(admin, businessId);
 
-  const { data: agentRows } = await admin
-    .from("ai_agents")
-    .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
-    )
-    .eq("business_id", businessId)
-    .eq("enabled", true);
-
-  const { agent, systemPrompt } = resolveAgentSystemPrompt({
-    agents: (agentRows ?? []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      systemPrompt: row.system_prompt,
-      channels: row.channels ?? [],
-      triggerKeywords: row.trigger_keywords ?? [],
-      enabled: row.enabled,
-      provider: row.provider ?? undefined,
-      model: row.model ?? undefined,
-      useCustomModel: row.use_custom_model ?? false,
-      language: row.language ?? undefined,
-      communicationStyle: row.communication_style ?? undefined,
-      updatedAt: row.updated_at,
-    })),
-    channel: parsed.data.channel,
-    message: parsed.data.testMessage,
-    fallbackPrompt: settings.system_prompt,
-  });
-
-  const provider = resolveStoredProvider(agent?.provider ?? settings.provider);
-
-  if (!isProviderConfigured(provider)) {
-    return {
-      success: false,
-      message: `${provider} API is not configured for this environment.`,
-    };
-  }
-
-  const reply = await generateAssistantReply({
+  const reply = await generateChannelAutoReply({
+    admin,
     businessId,
-    provider,
-    model: resolveAgentModel(
-      provider,
-      agent?.model ?? settings.model,
-      agent?.useCustomModel ?? false,
-    ),
-    systemPrompt,
-    language: agent?.language ?? settings.language,
-    userMessage: parsed.data.testMessage,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
-      title: entry.title,
-      content: entry.content,
-      category: entry.category,
-    })),
+    channel: parsed.data.channel,
+    clientMessage: parsed.data.testMessage,
     conversationHistory: [],
+    requireAiEnabled: false,
   });
 
   if (!reply.success) {
-    return { success: false, message: reply.error.message };
+    if (reply.reason === "settings_missing") {
+      return {
+        success: false,
+        message: "Connect this channel in Integrations first.",
+      };
+    }
+
+    return {
+      success: false,
+      message: reply.message ?? "Unable to generate test reply.",
+    };
+  }
+
+  if (!isProviderConfigured(reply.provider)) {
+    return {
+      success: false,
+      message: `${reply.provider} API is not configured for this environment.`,
+    };
   }
 
   return {
     success: true,
-    reply: reply.data.text,
-    matchedAgentName: agent?.name ?? null,
+    reply: reply.text,
+    matchedAgentName: reply.matchedAgentName,
   };
 }
 
@@ -579,21 +534,30 @@ export async function getChannelAnalytics(
   let recentMessages: ChannelAnalyticsData["recentMessages"] = [];
 
   if (conversationIds.length > 0) {
-    const { data: messageRows } = await admin
-      .from("messages")
-      .select(
-        "id, conversation_id, sender_type, content, created_at",
-      )
-      .in("conversation_id", conversationIds)
-      .order("created_at", { ascending: false })
-      .limit(80);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const timestamps =
-      messageRows?.map((message) => message.created_at) ?? [];
-    activity = buildLastSevenDaysActivity(timestamps);
+    const [{ data: activityRows }, { data: recentRows }] = await Promise.all([
+      admin
+        .from("messages")
+        .select("created_at")
+        .in("conversation_id", conversationIds)
+        .gte("created_at", sevenDaysAgo.toISOString()),
+      admin
+        .from("messages")
+        .select("id, conversation_id, sender_type, content, created_at")
+        .in("conversation_id", conversationIds)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+    activity = buildLastSevenDaysActivity(
+      activityRows?.map((message) => message.created_at) ?? [],
+    );
 
     recentMessages =
-      messageRows?.slice(0, 8).map((message) => ({
+      recentRows?.map((message) => ({
         id: message.id,
         preview: message.content.trim().slice(0, 120),
         senderType: message.sender_type,

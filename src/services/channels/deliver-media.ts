@@ -1,11 +1,20 @@
 import "server-only";
 
-import { sendTelegramMediaMessageByUrl } from "@/lib/telegram/client";
-import { sendWhatsAppMediaMessageByUrl } from "@/lib/whatsapp/client";
+import { sendTelegramMediaMessage, sendTelegramMediaMessageByUrl } from "@/lib/telegram/client";
+import {
+  sendWhatsAppMediaMessage,
+  sendWhatsAppMediaMessageByUrl,
+  uploadWhatsAppMedia,
+} from "@/lib/whatsapp/client";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
+import { transcodeRemoteVoiceNoteToOggOpus } from "@/services/voice-note-transcode.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseMediaMessage, type ChatMediaKind } from "@/utils/chat-media";
+import {
+  buildVoiceNoteOggFileName,
+  needsVoiceNoteTranscode,
+} from "@/utils/voice-note";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -49,9 +58,64 @@ export async function deliverChannelMediaMessage(
       return { success: false, error: "WhatsApp is not connected." };
     }
 
+    const phoneNumberId = connection.meta_phone_number_id;
+    const apiKey = connection.meta_access_token;
+
+    if (
+      needsVoiceNoteTranscode({
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        kind: input.mediaKind,
+      })
+    ) {
+      try {
+        const oggBuffer = await transcodeRemoteVoiceNoteToOggOpus(
+          input.mediaUrl,
+          input.mimeType,
+        );
+        const oggFileName = buildVoiceNoteOggFileName(input.fileName);
+        const oggBlob = new Blob([new Uint8Array(oggBuffer)], {
+          type: "audio/ogg",
+        });
+        const uploadResult = await uploadWhatsAppMedia(
+          phoneNumberId,
+          apiKey,
+          oggBlob,
+          "audio/ogg",
+          oggFileName,
+        );
+
+        if (!uploadResult.success) {
+          return { success: false, error: uploadResult.message };
+        }
+
+        const sendResult = await sendWhatsAppMediaMessage(
+          phoneNumberId,
+          apiKey,
+          input.recipientId,
+          "audio",
+          uploadResult.mediaId,
+          { caption: caption || undefined },
+        );
+
+        if (!sendResult.success) {
+          return { success: false, error: sendResult.message };
+        }
+
+        return { success: true, providerMessageId: sendResult.messageId };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to transcode voice note for WhatsApp.";
+
+        return { success: false, error: message };
+      }
+    }
+
     const sendResult = await sendWhatsAppMediaMessageByUrl(
-      connection.meta_phone_number_id,
-      connection.meta_access_token,
+      phoneNumberId,
+      apiKey,
       input.recipientId,
       input.mediaKind,
       input.mediaUrl,
@@ -80,8 +144,50 @@ export async function deliverChannelMediaMessage(
       return { success: false, error: "Telegram is not connected." };
     }
 
+    const botToken = connection.bot_token;
+
+    if (
+      needsVoiceNoteTranscode({
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        kind: input.mediaKind,
+      })
+    ) {
+      try {
+        const oggBuffer = await transcodeRemoteVoiceNoteToOggOpus(
+          input.mediaUrl,
+          input.mimeType,
+        );
+        const oggFileName = buildVoiceNoteOggFileName(input.fileName);
+        const oggBlob = new Blob([new Uint8Array(oggBuffer)], {
+          type: "audio/ogg",
+        });
+        const sendResult = await sendTelegramMediaMessage(
+          botToken,
+          input.recipientId,
+          oggBlob,
+          oggFileName,
+          "audio/ogg",
+          { caption: caption || undefined },
+        );
+
+        if (!sendResult.success) {
+          return { success: false, error: sendResult.message };
+        }
+
+        return { success: true };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to transcode voice note for Telegram.";
+
+        return { success: false, error: message };
+      }
+    }
+
     const sendResult = await sendTelegramMediaMessageByUrl(
-      connection.bot_token,
+      botToken,
       input.recipientId,
       input.mediaUrl,
       input.mimeType,

@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
+import {
+  getPersistedMediaObjectUrl,
+  persistMediaBlobFromKeys,
+} from "@/lib/client-cache/chat-media-blob-cache";
 import {
   resolveCachedMediaUrl,
   setCachedMediaUrl,
@@ -59,6 +63,28 @@ function getInitialMediaUrl(
   return resolveCachedMediaUrl(getCandidateCacheKeys(media, messageId));
 }
 
+async function resolvePersistedMediaUrl(
+  cacheKeys: string[],
+): Promise<string | null> {
+  for (const key of cacheKeys) {
+    const objectUrl = await getPersistedMediaObjectUrl(key);
+
+    if (objectUrl) {
+      return objectUrl;
+    }
+  }
+
+  return null;
+}
+
+function scheduleMediaBlobPersistence(
+  cacheKeys: string[],
+  sourceUrl: string,
+  mimeType?: string,
+): void {
+  void persistMediaBlobFromKeys(cacheKeys, sourceUrl, mimeType);
+}
+
 export function useChatMediaUrl(
   media: ChatMediaPayload,
   options: UseChatMediaUrlOptions = {},
@@ -66,6 +92,7 @@ export function useChatMediaUrl(
   const enabled = options.enabled ?? true;
   const storagePath = resolveMediaStoragePath(media);
   const cacheKeys = getCandidateCacheKeys(media, options.messageId);
+  const managedBlobUrlRef = useRef<string | null>(null);
 
   const [url, setUrl] = useState<string | null>(() =>
     getInitialMediaUrl(media, options.messageId),
@@ -79,7 +106,41 @@ export function useChatMediaUrl(
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    return () => {
+      if (managedBlobUrlRef.current) {
+        URL.revokeObjectURL(managedBlobUrlRef.current);
+        managedBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
+
+    function applyUrl(nextUrl: string | null, fromManagedBlob = false) {
+      if (cancelled) {
+        if (fromManagedBlob && nextUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(nextUrl);
+        }
+        return;
+      }
+
+      if (fromManagedBlob && nextUrl?.startsWith("blob:")) {
+        if (
+          managedBlobUrlRef.current &&
+          managedBlobUrlRef.current !== nextUrl
+        ) {
+          URL.revokeObjectURL(managedBlobUrlRef.current);
+        }
+
+        managedBlobUrlRef.current = nextUrl;
+      } else if (managedBlobUrlRef.current) {
+        URL.revokeObjectURL(managedBlobUrlRef.current);
+        managedBlobUrlRef.current = null;
+      }
+
+      setUrl(nextUrl);
+    }
 
     async function load() {
       if (!enabled) {
@@ -88,21 +149,21 @@ export function useChatMediaUrl(
       }
 
       if (media.url?.startsWith("blob:")) {
-        setUrl(media.url);
+        applyUrl(media.url);
         setError(false);
         setIsLoading(false);
         return;
       }
 
       if (isMediaPendingHydration(media)) {
-        setUrl(null);
+        applyUrl(null);
         setError(false);
         setIsLoading(true);
         return;
       }
 
       if (!storagePath && !media.url) {
-        setUrl(null);
+        applyUrl(null);
         setIsLoading(false);
         setError(true);
         return;
@@ -111,7 +172,24 @@ export function useChatMediaUrl(
       const cachedSignedUrl = resolveCachedMediaUrl(cacheKeys);
 
       if (cachedSignedUrl) {
-        setUrl(cachedSignedUrl);
+        applyUrl(cachedSignedUrl);
+        setError(false);
+        setIsLoading(false);
+        scheduleMediaBlobPersistence(cacheKeys, cachedSignedUrl, media.mimeType);
+        return;
+      }
+
+      const persistedUrl = await resolvePersistedMediaUrl(cacheKeys);
+
+      if (cancelled) {
+        if (persistedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(persistedUrl);
+        }
+        return;
+      }
+
+      if (persistedUrl) {
+        applyUrl(persistedUrl, true);
         setError(false);
         setIsLoading(false);
         return;
@@ -130,7 +208,7 @@ export function useChatMediaUrl(
       }
 
       if (!result.success) {
-        setUrl(null);
+        applyUrl(null);
         setError(true);
         setIsLoading(false);
         return;
@@ -144,7 +222,8 @@ export function useChatMediaUrl(
         setCachedMediaUrl(storagePath, result.url);
       }
 
-      setUrl(result.url);
+      scheduleMediaBlobPersistence(cacheKeys, result.url, media.mimeType);
+      applyUrl(result.url);
       setError(false);
       setIsLoading(false);
     }
@@ -157,6 +236,7 @@ export function useChatMediaUrl(
   }, [
     cacheKeys.join("|"),
     enabled,
+    media.mimeType,
     media.path,
     media.url,
     options.messageId,

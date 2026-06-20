@@ -7,14 +7,13 @@ import {
   CHAT_MESSAGES,
   CONVERSATION_MESSAGES_PAGE_SIZE,
 } from "@/features/chats/constants";
-import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
+import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { generateAssistantReply } from "@/services/llm.service";
+import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
 import {
   createOutboundMessageDelivery,
   insertChannelMessage,
-  listKnowledgeEntriesForBusiness,
   scheduleMessagingAnalyticsIncrement,
 } from "@/services/messaging.service";
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
@@ -26,7 +25,7 @@ import {
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations";
 import { isInboxMessagingChannel } from "@/features/integrations/constants";
-import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
+import { getChannelConnectionStatuses, updateChannelAiEnabled } from "@/services/channel-workspace.service";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getAccessibleBusiness } from "@/services/business-access.service";
@@ -100,12 +99,16 @@ function missingConfigError(): {
 
 function revalidateChatPaths(channel?: DbMessagingChannel): void {
   revalidatePath(DASHBOARD_ROUTES.chats);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.aiManager);
+  revalidatePath(DASHBOARD_ROUTES.integrations);
 
   if (
     channel &&
     (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel)
   ) {
     revalidatePath(`${DASHBOARD_ROUTES.chats}/${channel}`);
+    revalidatePath(`${DASHBOARD_ROUTES.integrations}/${channel}`);
   }
 }
 
@@ -1062,19 +1065,27 @@ export async function toggleChatAi(input: unknown): Promise<ToggleChatAiResult> 
     };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("ai_settings")
-    .update({ ai_enabled: parsed.data.enabled })
-    .eq("business_id", businessId)
-    .eq("channel", parsed.data.channel);
+  if (!isInboxMessagingChannel(parsed.data.channel)) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: CHAT_MESSAGES.genericError,
+      },
+    };
+  }
 
-  if (error) {
+  const result = await updateChannelAiEnabled(
+    parsed.data.channel,
+    parsed.data.enabled,
+  );
+
+  if (!result.success) {
     return {
       success: false,
       error: {
         code: "UPDATE_FAILED",
-        message: CHAT_MESSAGES.aiToggleFailed,
+        message: result.message ?? CHAT_MESSAGES.aiToggleFailed,
       },
     };
   }
@@ -1094,16 +1105,6 @@ export async function suggestConversationReply(
 ): Promise<SuggestConversationReplyResult> {
   if (!hasSupabaseEnv()) {
     return missingConfigError();
-  }
-
-  if (!hasGeminiEnv()) {
-    return {
-      success: false,
-      error: {
-        code: "MISSING_CONFIG",
-        message: CHAT_MESSAGES.suggestReplyFailed,
-      },
-    };
   }
 
   const parsed = suggestConversationReplySchema.safeParse(input);
@@ -1159,50 +1160,18 @@ export async function suggestConversationReply(
     };
   }
 
-  const supabase = await createClient();
-  const { data: settings } = await supabase
-    .from("ai_settings")
-    .select("provider, model, language, system_prompt")
-    .eq("business_id", businessId)
-    .eq("channel", conversation.channel)
-    .maybeSingle();
-
-  if (!settings) {
-    return {
-      success: false,
-      error: {
-        code: "UPDATE_FAILED",
-        message: CHAT_MESSAGES.suggestReplyFailed,
-      },
-    };
-  }
-
   const admin = createAdminClient();
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(
+  const reply = await generateChannelAutoReply({
     admin,
     businessId,
-  );
-
-  const reply = await generateAssistantReply({
-    businessId,
+    channel: conversation.channel,
     conversationId: parsed.data.conversationId,
-    provider:
-      settings.provider === "openai" || settings.provider === "claude"
-        ? settings.provider
-        : "gemini",
-    model: settings.model,
-    systemPrompt: settings.system_prompt,
-    language: settings.language,
-    userMessage: lastClientMessage.content,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
-      title: entry.title,
-      content: entry.content,
-      category: entry.category,
-    })),
+    clientMessage: lastClientMessage.content,
     conversationHistory: conversation.messages.map((message) => ({
-      role: message.senderType === "client" ? "user" : "assistant",
+      role: message.senderType === "client" ? ("user" as const) : ("assistant" as const),
       content: message.content,
     })),
+    requireAiEnabled: false,
   });
 
   if (!reply.success) {
@@ -1210,7 +1179,7 @@ export async function suggestConversationReply(
       success: false,
       error: {
         code: "UPDATE_FAILED",
-        message: reply.error.message || CHAT_MESSAGES.suggestReplyFailed,
+        message: reply.message ?? CHAT_MESSAGES.suggestReplyFailed,
       },
     };
   }
@@ -1218,7 +1187,7 @@ export async function suggestConversationReply(
   return {
     success: true,
     data: {
-      suggestion: reply.data.text,
+      suggestion: reply.text,
     },
   };
 }

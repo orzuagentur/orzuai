@@ -6,9 +6,9 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
     "Contacts appear when customers message you on this channel. WhatsApp contacts sync from incoming messages.",
   contactsCount: (count: number) =>
     count === 1 ? "1 contact" : `${count} contacts`,
-  aiTitle: "AI Assistant",
+  aiTitle: "AI",
   aiDescription:
-    "My Assistant replies to customers on this channel when enabled. AI Agents are optional for routing and automations.",
+    "AI Assistant replies to customers on this channel when enabled. AI Agents are optional for routing and automations.",
   aiEnabledLabel: "AI auto-replies",
   aiEnabledOn: "AI auto-replies are enabled for this channel.",
   aiEnabledOff: "AI auto-replies are disabled for this channel.",

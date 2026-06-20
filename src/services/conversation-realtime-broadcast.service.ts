@@ -2,9 +2,11 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  CONVERSATION_AUTO_REPLY_STATUS_EVENT,
   CONVERSATION_MESSAGE_UPDATED_EVENT,
   CONVERSATION_TYPING_EVENT,
   getConversationRealtimeChannelName,
+  type AutoReplyStatusPayload,
   type ConversationMessageUpdatedPayload,
   type ConversationTypingPayload,
   type ConversationTypingSender,
@@ -82,5 +84,16 @@ export async function broadcastConversationMessageUpdated(
     conversationId,
     CONVERSATION_MESSAGE_UPDATED_EVENT,
     message,
+  );
+}
+
+export async function broadcastAutoReplyStatus(
+  conversationId: string,
+  payload: AutoReplyStatusPayload,
+): Promise<void> {
+  await broadcastConversationEvent(
+    conversationId,
+    CONVERSATION_AUTO_REPLY_STATUS_EVENT,
+    payload,
   );
 }

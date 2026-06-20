@@ -124,8 +124,10 @@ export async function ChannelWorkspacePage({
 
   if (section === "ai-assistant") {
     const { redirect } = await import("next/navigation");
-    const { DASHBOARD_ROUTES } = await import("@/constants/routes");
-    redirect(`${DASHBOARD_ROUTES.aiAssistant}?channel=${channel}`);
+    const { buildIntegrationAiSettingsHref } = await import(
+      "@/features/integrations"
+    );
+    redirect(buildIntegrationAiSettingsHref(channel));
   }
 
   const data = await getChannelAnalytics(channel);

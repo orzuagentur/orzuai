@@ -7,7 +7,7 @@ import { IntegrationChannelShell } from "@/components/integrations/IntegrationCh
 import { IntegrationSectionPanels } from "@/components/integrations/IntegrationSectionPanels";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { getChannelContacts } from "@/services/channel-workspace.service";
+import { getChannelContacts, getChannelAiSettings } from "@/services/channel-workspace.service";
 import {
   getTelegramConnection,
   getTelegramConnectConfig,
@@ -119,6 +119,10 @@ export default async function IntegrationsChannelPage({
     business && isMessagingIntegrationChannel(channel)
       ? await getChannelContacts(channel)
       : null;
+  const channelAiSettings =
+    business && isMessagingIntegrationChannel(channel) && isActivated
+      ? await getChannelAiSettings(channel)
+      : null;
 
   return (
     <Suspense fallback={<IntegrationChannelFallback channel={channel} />}>
@@ -163,6 +167,7 @@ export default async function IntegrationsChannelPage({
               : undefined
           }
           channelContacts={channelContacts}
+          channelAiSettings={channelAiSettings}
         />
       </IntegrationChannelShell>
     </Suspense>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AiSidebarNavGroup } from "@/components/dashboard/AiSidebarNavGroup";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { BRAND_NAME } from "@/constants/brand";
@@ -26,6 +27,7 @@ import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { UserProfileSection } from "./UserProfileSection";
 import { ThemeToggle } from "./ThemeToggle";
+import { AiHumanRequestsButton } from "./AiHumanRequestsButton";
 
 type AppSidebarProps = {
   userProfile: DashboardUserProfile;
@@ -82,6 +84,10 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {DASHBOARD_NAV_ITEMS.map((item) => {
+                if (item.id === "ai-assistant") {
+                  return <AiSidebarNavGroup key={item.id} pathname={pathname} />;
+                }
+
                 const isActive =
                   item.href === DASHBOARD_NAV_ITEMS[0].href
                     ? pathname === item.href
@@ -116,6 +122,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        <AiHumanRequestsButton />
         <ThemeToggle />
         <UserProfileSection userProfile={userProfile} />
       </SidebarFooter>

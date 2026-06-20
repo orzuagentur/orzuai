@@ -1,4 +1,5 @@
 import { setCachedMediaUrl } from "@/lib/client-cache/inbox-messenger-cache";
+import { persistMediaBlobFromKeys } from "@/lib/client-cache/chat-media-blob-cache";
 import type { ChatMessageData } from "@/types/chat.types";
 import {
   buildMediaUrlCacheKey,
@@ -27,4 +28,10 @@ export function cacheChatMessageMediaUrl(
   if (cacheKey) {
     setCachedMediaUrl(cacheKey, signedUrl);
   }
+
+  void persistMediaBlobFromKeys(
+    [path, cacheKey].filter((value): value is string => Boolean(value)),
+    signedUrl,
+    media.mimeType,
+  );
 }

@@ -8,6 +8,7 @@ import {
 } from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import type { MessagingChannel } from "@/types/database.types";
+import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -44,7 +45,7 @@ export const INTEGRATION_SECTIONS = ["activate", "contacts"] as const;
 
 export const INTEGRATION_WIZARD_STEPS = [
   { id: "connect", label: "Connect" },
-  { id: "configure-ai", label: "Configure AI" },
+  { id: "configure-ai", label: "AI Assistant" },
   { id: "test", label: "Test" },
   { id: "go-live", label: "Go live" },
 ] as const;
@@ -126,7 +127,7 @@ export const INTEGRATION_SECTION_LIST: Array<{
 export const INTEGRATIONS_MESSAGES = {
   pageTitle: "Integrations",
   pageDescription:
-    "Connect messaging channels and manage activation, contacts, AI, and analytics per product.",
+    "Connect messaging channels and manage activation and contacts per product.",
   indexDescription:
     "Your connected channels. Add more from the Marketplace.",
   indexEmptyTitle: "No active integrations yet",
@@ -147,17 +148,22 @@ export const INTEGRATIONS_MESSAGES = {
     "This channel is prepared in the integrations hub. API connection will be enabled in the next release phase.",
   sectionActivate: "Activate",
   sectionContacts: "Contacts",
-  sectionAiAssistant: "AI Assistant",
+  sectionAiAssistant: "AI",
   sectionAnalytics: "Analytics",
   contactsHint: "Contacts received on this channel.",
-  aiHint: "Turn channel auto-replies on or off. Replies are sent only when a matching agent is enabled.",
+  aiPreviewTitle: "AI auto-reply",
+  aiPreviewDescription:
+    "Turn on the AI Assistant for this channel. Customize behavior in AI settings.",
+  aiPreviewEnabled: "AI Assistant is on for this channel.",
+  aiPreviewDisabled: "AI Assistant is off for this channel.",
+  openAiSettings: "Open AI Assistant",
   analyticsHint: "Messages, contacts, and AI metrics for this channel.",
   openGlobalContacts: "Open Contacts",
-  openGlobalAi: "Open AI Assistant",
+  openGlobalAi: "Open AI",
   openGlobalAnalytics: "Open Analytics",
   activateFirstTitle: "Connect this channel first",
   activateFirstDescription:
-    "Open Activate and complete the connection before using Contacts, AI Assistant, or Analytics for this channel.",
+    "Open Activate and complete the connection before using Contacts or AI for this channel.",
   goToActivate: "Go to Activate",
   dangerZoneTitle: "Disconnect channel",
   dangerZoneDescription:
@@ -182,8 +188,14 @@ export const INTEGRATIONS_MESSAGES = {
   webhookDisconnected: "Not connected",
   wizardTitle: "Setup flow",
   wizardDescription:
-    "Connect your channel, configure AI, test a reply, then open the inbox.",
+    "Connect your channel, enable AI Assistant, test a reply, then open the inbox.",
 } as const;
+
+export function buildIntegrationAiSettingsHref(
+  channel: MessagingIntegrationChannelId,
+): string {
+  return buildAiAssistantHref({ section: "assistant", channel });
+}
 
 export function buildChannelWorkspaceHref(
   channel: IntegrationChannelId,
@@ -195,6 +207,10 @@ export function buildChannelWorkspaceHref(
       : workspace === "ai-assistant"
         ? DASHBOARD_ROUTES.aiAssistant
         : DASHBOARD_ROUTES.analytics;
+
+  if (workspace === "ai-assistant" && isMessagingIntegrationChannel(channel)) {
+    return buildIntegrationAiSettingsHref(channel);
+  }
 
   return `${base}?channel=${channel}`;
 }

@@ -6,8 +6,10 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type RefObject,
 } from "react";
 import {
@@ -35,7 +37,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMessageUploadProgress } from "@/hooks/use-message-upload-progress";
 import { usePrefetchVisibleConversationMedia } from "@/hooks/use-prefetch-conversation-media";
 import { cn } from "@/lib/utils";
-import { scrollChatToBottom } from "@/utils/chat-scroll";
+import { scrollChatToBottom, setChatScrollToBottomInstant } from "@/utils/chat-scroll";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage, isMediaPendingHydration } from "@/utils/chat-media";
 import {
@@ -54,6 +56,7 @@ const MESSAGE_MEDIA_ROW_ESTIMATE_PX = 220;
 const MESSAGE_VIRTUALIZE_THRESHOLD = 25;
 
 type MessageHistoryProps = {
+  conversationId?: string;
   messages: ChatMessageData[];
   variant?: "default" | "inbox";
   lastReadAt?: string | null;
@@ -61,6 +64,9 @@ type MessageHistoryProps = {
   firstUnreadRef?: RefObject<HTMLDivElement | null>;
   bottomRef?: RefObject<HTMLDivElement | null>;
   isClientTyping?: boolean;
+  isReplyTyping?: boolean;
+  autoReplyError?: { code: string; message: string } | null;
+  onDismissAutoReplyError?: () => void;
   typingContactName?: string;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
@@ -75,7 +81,7 @@ type MessageHistoryProps = {
 };
 
 export type MessageHistoryHandle = {
-  scrollToEnd: () => void;
+  scrollToEnd: (options?: { instant?: boolean }) => void;
 };
 
 function getSenderLabel(message: ChatMessageData): string {
@@ -206,6 +212,10 @@ function MessageUploadStatus({
     message.id,
     Boolean(message.isPending),
   );
+  const showInstantSent =
+    message.isPending &&
+    message.senderType === "user" &&
+    !uploadProgress;
 
   return (
     <p
@@ -218,10 +228,10 @@ function MessageUploadStatus({
           : "text-muted-foreground",
       )}
     >
-      {message.isPending ? (
+      {message.isPending && !showInstantSent ? (
         <Clock3Icon className="size-3 shrink-0" aria-hidden />
       ) : null}
-      {message.isPending ? (
+      {message.isPending && !showInstantSent ? (
         uploadProgress?.phase === "uploading" ? (
           <>
             {formatUploadPercent(uploadProgress.percent)}
@@ -359,7 +369,7 @@ function MessageHistoryItem({
                 ? "px-2 py-1"
                 : "px-1.5 py-1.5"
               : "px-3 py-2",
-            message.isPending && "opacity-80",
+            message.isPending && media && "opacity-80",
             isDeleted
               ? "border border-dashed bg-muted/40 text-muted-foreground"
               : isOutgoing
@@ -403,6 +413,10 @@ function MessageHistoryItem({
                 messageId={message.id}
                 caption={text}
                 isOutgoing={isOutgoing}
+                showDownloadButton={
+                  !isOutgoing ||
+                  (!message.isPending && !message.attachmentPending)
+                }
                 isHydrating={
                   Boolean(message.attachmentPending) ||
                   isMediaPendingHydration(media)
@@ -474,6 +488,7 @@ export const MessageHistory = forwardRef<
   MessageHistoryProps
 >(function MessageHistory(
   {
+    conversationId,
     messages,
     variant = "default",
     lastReadAt = null,
@@ -481,6 +496,7 @@ export const MessageHistory = forwardRef<
     firstUnreadRef,
     bottomRef,
     isClientTyping = false,
+    isReplyTyping = false,
     typingContactName = "Customer",
     onMessageRemoved,
     onMessageUpdated,
@@ -497,6 +513,9 @@ export const MessageHistory = forwardRef<
 ) {
   const isInbox = variant === "inbox";
   const showMessageActions = Boolean(onMessageRemoved);
+  const [isScrollAnchored, setIsScrollAnchored] = useState(false);
+  const anchoredConversationIdRef = useRef<string | null>(null);
+
   const firstUnreadIndex = findFirstUnreadClientMessageIndex(
     messages,
     lastReadAt,
@@ -504,12 +523,22 @@ export const MessageHistory = forwardRef<
 
   const shouldVirtualize = messages.length >= MESSAGE_VIRTUALIZE_THRESHOLD;
 
+  const estimatedScrollOffset = useMemo(
+    () =>
+      messages.reduce(
+        (total, message) => total + estimateMessageRowSize(message),
+        0,
+      ),
+    [messages],
+  );
+
   const virtualizer = useVirtualizer({
     count: shouldVirtualize ? messages.length : 0,
     getScrollElement: () => scrollContainerRef?.current ?? null,
     estimateSize: (index) => estimateMessageRowSize(messages[index]!),
     overscan: 6,
     getItemKey: (index) => messages[index]?.id ?? index,
+    initialOffset: shouldVirtualize ? estimatedScrollOffset : undefined,
   });
 
   const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
@@ -533,32 +562,68 @@ export const MessageHistory = forwardRef<
     messages.length > 0 && Boolean(visibleRangeKey),
   );
 
-  const scrollToEnd = useCallback(() => {
-    const lastIndex = messages.length - 1;
+  const scrollToEnd = useCallback(
+    (options?: { instant?: boolean }) => {
+      const instant = options?.instant ?? false;
+      const lastIndex = messages.length - 1;
 
-    const runScroll = () => {
-      if (shouldVirtualize && lastIndex >= 0) {
-        virtualizer.scrollToIndex(lastIndex, { align: "end" });
+      const runScroll = () => {
+        if (shouldVirtualize && lastIndex >= 0) {
+          if (instant) {
+            virtualizer.scrollToEnd({ behavior: "auto" });
+          } else {
+            virtualizer.scrollToIndex(lastIndex, { align: "end", behavior: "auto" });
+          }
+        }
+
+        const scrollContainer = scrollContainerRef?.current;
+
+        if (scrollContainer) {
+          if (instant) {
+            setChatScrollToBottomInstant(scrollContainer);
+          } else {
+            scrollChatToBottom(scrollContainer, "auto");
+          }
+        }
+      };
+
+      runScroll();
+
+      if (!instant) {
+        requestAnimationFrame(runScroll);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(runScroll);
+        });
       }
+    },
+    [
+      messages.length,
+      scrollContainerRef,
+      shouldVirtualize,
+      virtualizer,
+    ],
+  );
 
-      const scrollContainer = scrollContainerRef?.current;
+  useLayoutEffect(() => {
+    if (messages.length === 0) {
+      anchoredConversationIdRef.current = conversationId ?? null;
+      setIsScrollAnchored(true);
+      return;
+    }
 
-      if (scrollContainer) {
-        scrollChatToBottom(scrollContainer, "auto");
-      }
-    };
+    const shouldAnchorToBottom =
+      Boolean(conversationId) &&
+      anchoredConversationIdRef.current !== conversationId;
 
-    runScroll();
-    requestAnimationFrame(runScroll);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(runScroll);
-    });
-  }, [
-    messages.length,
-    scrollContainerRef,
-    shouldVirtualize,
-    virtualizer,
-  ]);
+    if (!shouldAnchorToBottom) {
+      setIsScrollAnchored(true);
+      return;
+    }
+
+    scrollToEnd({ instant: true });
+    anchoredConversationIdRef.current = conversationId ?? null;
+    setIsScrollAnchored(true);
+  }, [conversationId, messages.length, scrollToEnd]);
 
   useImperativeHandle(ref, () => ({ scrollToEnd }), [scrollToEnd]);
 
@@ -570,6 +635,7 @@ export const MessageHistory = forwardRef<
   const scrollAreaClassName = cn(
     "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4",
     isInbox && "bg-muted/20",
+    !isScrollAnchored && "invisible",
   );
 
   if (messages.length === 0) {
@@ -684,6 +750,12 @@ export const MessageHistory = forwardRef<
       {isClientTyping && isInbox ? (
         <TypingIndicator
           label={CHAT_MESSAGES.customerTyping(typingContactName)}
+        />
+      ) : null}
+      {isReplyTyping && isInbox ? (
+        <TypingIndicator
+          label={CHAT_MESSAGES.replyTypingLabel}
+          variant="outgoing"
         />
       ) : null}
       {bottomRef ? <div ref={bottomRef} className="shrink-0" /> : null}

@@ -32,7 +32,7 @@ const QUICK_ACTIONS = [
   {
     id: "ai",
     label: "Configure AI",
-    href: DASHBOARD_ROUTES.aiAssistant,
+    href: DASHBOARD_ROUTES.aiAssistantSection,
     icon: BotIcon,
   },
   {

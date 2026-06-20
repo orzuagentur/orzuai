@@ -5,6 +5,7 @@ import {
   DEFAULT_AGENT_ICON,
   type AgentIconId,
 } from "@/features/ai-assistant/agent-icons";
+import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import type { CommunicationStyleId } from "@/features/ai-assistant/communication-styles";
 import { AI_PROVIDERS } from "@/lib/ai/constants";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
@@ -23,6 +24,13 @@ const messagingChannelSchema = z.enum([
   ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
 ]);
 
+const agentGoalSchema = z.enum([
+  "sales",
+  "support",
+  "booking",
+  "custom",
+] satisfies [AgentWizardGoalId, ...AgentWizardGoalId[]]);
+
 export const createAiAgentSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(120),
   systemPrompt: z
@@ -33,6 +41,7 @@ export const createAiAgentSchema = z.object({
   channels: z.array(messagingChannelSchema).min(1, "Select at least one channel."),
   triggerKeywords: z.array(z.string().trim().min(1).max(40)).max(20),
   enabled: z.boolean().default(true),
+  goal: agentGoalSchema.default("custom"),
   provider: z.enum(AI_PROVIDERS).default("gemini"),
   model: z.string().trim().min(1).max(100),
   language: z.string().trim().min(1).max(32),
@@ -60,6 +69,7 @@ export type AiAgentItem = {
   channels: MessagingIntegrationChannelId[];
   triggerKeywords: string[];
   enabled: boolean;
+  goal: AgentWizardGoalId;
   provider: string;
   model: string;
   language: string;

@@ -1,6 +1,9 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getChannelLabel } from "@/features/channel-workspace/constants";
-import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
+import {
+  DASHBOARD_AI_NAV_ITEMS,
+  DASHBOARD_NAV_ITEMS,
+} from "@/features/dashboard/constants";
 
 export function resolveDashboardPageTitle(pathname: string): string {
   if (pathname === DASHBOARD_ROUTES.overview) {
@@ -9,6 +12,12 @@ export function resolveDashboardPageTitle(pathname: string): string {
 
   if (pathname === DASHBOARD_ROUTES.onboarding) {
     return "Setup";
+  }
+
+  for (const item of DASHBOARD_AI_NAV_ITEMS) {
+    if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+      return item.label;
+    }
   }
 
   for (const item of DASHBOARD_NAV_ITEMS) {

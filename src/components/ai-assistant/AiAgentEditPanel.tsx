@@ -220,6 +220,7 @@ export function AiAgentEditPanel({
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         enabled: draft.enabled,
+        goal: agent.goal,
         provider: draft.provider,
         model: draft.model,
         language: draft.language,
@@ -236,8 +237,8 @@ export function AiAgentEditPanel({
       toast.success(AI_ASSISTANT_MESSAGES.agentUpdated);
       router.push(
         buildAiAssistantHref({
+          section: "agents",
           channel: activeChannelFilter,
-          tab: "agents",
           agent: agent.id,
           q: searchQuery || null,
           edit: false,

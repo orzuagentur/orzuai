@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  BotIcon,
-  FilterIcon,
-  Loader2Icon,
-  SearchIcon,
-} from "lucide-react";
+import { FilterIcon, SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CHAT_MESSAGES, type ChatInboxFilter } from "@/features/chats/constants";
-import { isInboxMessagingChannel } from "@/features/integrations/constants";
-import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
 import { cn } from "@/lib/utils";
 import type { InboxChromeConfig } from "@/components/chats/inbox/inbox-chrome-context";
 
@@ -42,18 +35,8 @@ export function InboxToolbar({
   onSearchChange,
   activeFilter,
   onFilterChange,
-  aiChannel,
-  aiEnabled,
-  onAiToggle,
   className,
 }: InboxToolbarProps) {
-  const { toggleAi, isLoading: isAiLoading } = useToggleChatAi({
-    onSuccess: onAiToggle,
-  });
-
-  const isAiOn = aiEnabled === true;
-  const canToggleAi = aiChannel !== null && aiEnabled !== null;
-
   return (
     <div className={cn("flex min-w-0 items-center gap-1.5 sm:gap-2", className)}>
       <div className="relative min-w-0 flex-1 sm:max-w-[9rem] md:max-w-xs lg:max-w-sm">
@@ -66,28 +49,6 @@ export function InboxToolbar({
           aria-label={CHAT_MESSAGES.searchMessagesPlaceholder}
         />
       </div>
-
-      <Button
-        type="button"
-        variant={isAiOn ? "default" : "outline"}
-        size="sm"
-        className="h-8 gap-1 px-2 sm:px-2.5"
-        disabled={!canToggleAi || isAiLoading}
-        onClick={() => {
-          if (!aiChannel || !isInboxMessagingChannel(aiChannel)) {
-            return;
-          }
-
-          void toggleAi({ enabled: !isAiOn, channel: aiChannel });
-        }}
-      >
-        {isAiLoading ? (
-          <Loader2Icon className="size-3.5 animate-spin" />
-        ) : (
-          <BotIcon className="size-3.5" />
-        )}
-        <span className="hidden md:inline">{CHAT_MESSAGES.aiAutoReply}</span>
-      </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

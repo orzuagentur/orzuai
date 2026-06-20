@@ -217,3 +217,43 @@ export async function sendTestPushNotification(
     return { sent: 0, failed: 0, skipped: true };
   }
 }
+
+export type AiHumanRequestPushInput = {
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  contactName: string;
+  reason: string;
+  requestId: string;
+};
+
+export async function notifyAiHumanRequestPush(
+  input: AiHumanRequestPushInput,
+): Promise<PushDeliveryResult> {
+  const channelLabel = getChannelLabel(input.channel);
+  const contactName = input.contactName.trim() || "Customer";
+  const reason = input.reason.trim() || "Customer needs human help";
+  const title = `AI needs you — ${contactName}`;
+  const body = `${channelLabel}: ${reason}`;
+
+  const payload = JSON.stringify({
+    title,
+    body,
+    url: buildConversationUrl(input.channel, input.conversationId),
+    tag: `human-request-${input.requestId}`,
+    sound: "/sounds/new-lead.wav",
+  });
+
+  try {
+    return await deliverPushToBusiness(input.businessId, payload);
+  } catch (error) {
+    console.error("[push] failed to notify ai human request", error);
+    return { sent: 0, failed: 0, skipped: true };
+  }
+}
+
+export function scheduleAiHumanRequestPush(input: AiHumanRequestPushInput): void {
+  void notifyAiHumanRequestPush(input).catch((error) => {
+    console.error("[push] failed to schedule ai human request", error);
+  });
+}

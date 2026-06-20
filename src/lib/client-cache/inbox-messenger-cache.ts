@@ -36,7 +36,7 @@ const conversationListCache = createSessionCache<CachedConversationList>(
   CONVERSATION_LIST_TTL_MS,
 );
 
-/** Client media URL cache: session memory only (signed URLs from server). */
+/** Client media URL cache: in-memory signed URLs + IndexedDB blobs (survives reload). */
 export function getCachedMediaUrl(key: string): string | null {
   return mediaUrlCache.get(key);
 }

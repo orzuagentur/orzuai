@@ -14,6 +14,7 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { enableAiForChannels } from "@/services/channel-workspace.service";
 import { resolveAgentIconId } from "@/features/ai-assistant/agent-icons";
+import { inferAgentGoalFromIcon, isAgentGoalId } from "@/lib/ai-assistant/infer-agent-goal";
 import type {
   AiAgentActionResult,
   AiAgentItem,
@@ -52,9 +53,12 @@ function mapAiAgent(row: {
   communication_style?: string | null;
   icon?: string | null;
   use_custom_model?: boolean | null;
+  goal?: string | null;
   created_at: string;
   updated_at: string;
 }): AiAgentItem {
+  const icon = resolveAgentIconId(row.icon);
+
   return {
     id: row.id,
     name: row.name,
@@ -62,6 +66,10 @@ function mapAiAgent(row: {
     channels: (row.channels ?? []).filter(isInboxMessagingChannel),
     triggerKeywords: row.trigger_keywords ?? [],
     enabled: row.enabled,
+    goal:
+      row.goal && isAgentGoalId(row.goal)
+        ? row.goal
+        : inferAgentGoalFromIcon(icon),
     provider: row.provider ?? "gemini",
     model: row.model ?? getDefaultGeminiModel(),
     language: row.language ?? "English",
@@ -84,7 +92,7 @@ export async function listAiAgents(): Promise<AiAgentItem[]> {
   const { data } = await supabase
     .from("ai_agents")
     .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, language, communication_style, icon, use_custom_model, created_at, updated_at",
+      "id, name, system_prompt, channels, trigger_keywords, enabled, goal, provider, model, language, communication_style, icon, use_custom_model, created_at, updated_at",
     )
     .eq("business_id", businessId)
     .order("updated_at", { ascending: false });
@@ -159,6 +167,7 @@ export async function createAiAgent(
       channels: parsed.data.channels,
       trigger_keywords: parsed.data.triggerKeywords,
       enabled: parsed.data.enabled,
+      goal: parsed.data.goal,
       provider: parsed.data.provider,
       model: parsed.data.model ?? getDefaultGeminiModel(),
       language: parsed.data.language ?? "English",

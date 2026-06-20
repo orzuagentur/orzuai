@@ -1,5 +1,6 @@
 import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
+import { IntegrationChannelAiPreview } from "@/components/integrations/IntegrationChannelAiPreview";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
@@ -29,7 +30,10 @@ import type {
   WebsiteFormConnectConfig,
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
-import type { ChannelContactsData } from "@/types/channel-workspace.types";
+import type {
+  ChannelAiSettingsData,
+  ChannelContactsData,
+} from "@/types/channel-workspace.types";
 import type {
   VoiceAgentSettings,
   VoiceCallLogItem,
@@ -65,6 +69,7 @@ type IntegrationSectionPanelsProps = {
     connectConfig: VoiceConnectConfig;
   };
   channelContacts?: ChannelContactsData | null;
+  channelAiSettings?: ChannelAiSettingsData | null;
 };
 
 export function IntegrationSectionPanels({
@@ -77,20 +82,26 @@ export function IntegrationSectionPanels({
   websiteForms,
   voice,
   channelContacts,
+  channelAiSettings,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
   const isMessagingChannel = isMessagingIntegrationChannel(channel);
 
   if (section === "activate") {
     return (
-      <ActivateSection
-        channel={channel}
-        hasBusiness={hasBusiness}
-        whatsapp={whatsapp}
-        telegram={telegram}
-        websiteForms={websiteForms}
-        voice={voice}
-      />
+      <div className="flex max-w-2xl flex-col gap-6">
+        <ActivateSection
+          channel={channel}
+          hasBusiness={hasBusiness}
+          whatsapp={whatsapp}
+          telegram={telegram}
+          websiteForms={websiteForms}
+          voice={voice}
+        />
+        {isMessagingChannel && isConnected && channelAiSettings ? (
+          <IntegrationChannelAiPreview settings={channelAiSettings} />
+        ) : null}
+      </div>
     );
   }
 

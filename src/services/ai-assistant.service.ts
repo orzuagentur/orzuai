@@ -11,6 +11,7 @@ import type { MessagingIntegrationChannelId } from "@/features/integrations/cons
 import { isInboxMessagingChannel } from "@/features/integrations/constants";
 import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
+import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
 import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
 import { mergeProviderAvailability } from "@/features/ai-assistant/provider-availability";
@@ -24,6 +25,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { listAiAgents } from "@/services/ai-agents.service";
+import { getAiAssistantProfileForBusiness } from "@/services/ai-assistant-profile.service";
 import {
   getChannelAiSettingsForBusiness,
   getChannelConnectionStatuses,
@@ -38,6 +40,8 @@ const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
 
 function revalidateAiAssistantPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistantSection);
+  revalidatePath(DASHBOARD_ROUTES.aiAgentsSection);
   revalidatePath(APP_ROUTES.dashboard);
   for (const channel of MESSAGING_CHANNELS) {
     revalidatePath(`${DASHBOARD_ROUTES.integrations}/${channel}`);
@@ -51,19 +55,25 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-export async function getAiAssistantPageData(input?: {
-  channel?: string;
-  tab?: string;
-  agent?: string;
-  step?: string;
-  goal?: string;
-  q?: string;
-  setup?: string;
-  edit?: string;
-  analytics?: string;
-}): Promise<AiAssistantPageData> {
+export async function getAiAssistantPageData(
+  input?: {
+    channel?: string;
+    tab?: string;
+    agent?: string;
+    step?: string;
+    goal?: string;
+    q?: string;
+    setup?: string;
+    edit?: string;
+    analytics?: string;
+    assistantEdit?: string;
+  },
+  options?: { section?: AiAssistantTab },
+): Promise<AiAssistantPageData> {
   const defaultModel = getDefaultGeminiModel();
-  const parsed = parseAiAssistantSearchParams(input ?? {});
+  const parsed = parseAiAssistantSearchParams(input ?? {}, {
+    section: options?.section,
+  });
   const businessId = await getOwnedBusinessId();
   const platformProviderAvailability = getProviderAvailability();
 
@@ -90,20 +100,30 @@ export async function getAiAssistantPageData(input?: {
       showSetupBanner: parsed.showSetupBanner,
       isEditingAgent: parsed.isEditingAgent,
       isViewingAnalytics: parsed.isViewingAnalytics,
+      isEditingAssistant: parsed.isEditingAssistant,
       visibleChannelIds: [],
       channelStatuses: {},
       channels: [],
       agents: [],
+      enabledChannelCount: 0,
+      connectedChannelCount: 0,
+      assistantProfile: null,
     };
   }
 
-  const [channelStatuses, agents, businessProviderCredentials, preferCustomerAiKeys] =
-    await Promise.all([
-      getChannelConnectionStatuses(businessId),
-      listAiAgents(),
-      listBusinessProviderCredentials(businessId),
-      getBusinessPreferCustomerAiKeys(businessId),
-    ]);
+  const [
+    channelStatuses,
+    agents,
+    businessProviderCredentials,
+    preferCustomerAiKeys,
+    assistantProfile,
+  ] = await Promise.all([
+    getChannelConnectionStatuses(businessId),
+    listAiAgents(),
+    listBusinessProviderCredentials(businessId),
+    getBusinessPreferCustomerAiKeys(businessId),
+    getAiAssistantProfileForBusiness(businessId),
+  ]);
 
   const providerAvailability = mergeProviderAvailability(
     platformProviderAvailability,
@@ -151,10 +171,16 @@ export async function getAiAssistantPageData(input?: {
     showSetupBanner: parsed.showSetupBanner,
     isEditingAgent: parsed.isEditingAgent,
     isViewingAnalytics: parsed.isViewingAnalytics,
+    isEditingAssistant: parsed.isEditingAssistant,
     visibleChannelIds,
     channelStatuses,
     channels,
     agents,
+    enabledChannelCount: channels.filter((entry) => entry.settings.aiEnabled).length,
+    connectedChannelCount: channels.filter(
+      (entry) => entry.settings.isChannelConnected,
+    ).length,
+    assistantProfile,
   };
 }
 

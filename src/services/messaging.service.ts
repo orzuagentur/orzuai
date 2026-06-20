@@ -3,15 +3,15 @@ import "server-only";
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { resolveAgentModel, type AiProvider } from "@/lib/ai/constants";
-import { generateAssistantReply } from "@/services/llm.service";
-import { processInboundMessageAutomations } from "@/services/automation-engine.service";
-import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
-import { processSalesAgentRules } from "@/services/sales-agent.service";
-import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
+import { generateChannelAutoReply, isChannelAutoReplyEnabled } from "@/services/auto-reply-pipeline.service";
+import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
+import { scheduleDebouncedChannelAutoReply } from "@/services/auto-reply-queue.service";
+import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
+import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
+import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
-import { resolveAgentSystemPrompt } from "@/utils/ai-agent-routing";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -376,15 +376,42 @@ export function scheduleMessagingAnalyticsIncrement(
 export async function listKnowledgeEntriesForBusiness(
   admin: MessagingDbClient,
   businessId: string,
+  query = "",
 ) {
-  const { data } = await admin
-    .from("knowledge_base")
-    .select("title, content, category")
-    .eq("business_id", businessId)
-    .order("updated_at", { ascending: false })
-    .limit(25);
+  return retrieveKnowledgeForMessage({
+    admin,
+    businessId,
+    query,
+  });
+}
 
-  return data ?? [];
+function resolveAutoReplyErrorMessage(
+  failure: AutoReplyGenerationFailure,
+): { code: string; message: string } {
+  if (failure.reason === "llm_failed") {
+    const detail = failure.message?.trim() ?? "";
+    const isQuota =
+      /limit|quota|monthly/i.test(detail);
+
+    return {
+      code: failure.reason,
+      message: isQuota
+        ? CHAT_MESSAGES.autoReplyErrorQuota
+        : detail || CHAT_MESSAGES.autoReplyErrorGeneric,
+    };
+  }
+
+  if (failure.reason === "ai_disabled") {
+    return {
+      code: failure.reason,
+      message: CHAT_MESSAGES.autoReplyErrorAiDisabled,
+    };
+  }
+
+  return {
+    code: failure.reason,
+    message: CHAT_MESSAGES.autoReplyErrorSettings,
+  };
 }
 
 export async function processChannelAutoReply(input: {
@@ -398,136 +425,40 @@ export async function processChannelAutoReply(input: {
   const { admin, businessId, channel, conversationId, clientMessage, sendReply } =
     input;
 
-  const { data: aiSettings } = await admin
-    .from("ai_settings")
-    .select("*")
-    .eq("business_id", businessId)
-    .eq("channel", channel)
-    .maybeSingle();
+  const aiEnabled = await isChannelAutoReplyEnabled({
+    admin,
+    businessId,
+    channel,
+  });
 
-  if (!aiSettings?.ai_enabled) {
+  if (!aiEnabled) {
     return;
   }
 
-  const { data: conversation } = await admin
-    .from("conversations")
-    .select("contact_id, contact:contacts(name)")
-    .eq("id", conversationId)
-    .maybeSingle();
-
-  if (conversation?.contact_id) {
-    const contact = Array.isArray(conversation.contact)
-      ? conversation.contact[0]
-      : conversation.contact;
-
-    await processInboundMessageAutomations({
-      admin,
-      businessId,
-      channel,
-      conversationId,
-      contactId: conversation.contact_id,
-      contactName: contact?.name ?? "Customer",
-      message: clientMessage,
-    });
-    await analyzeAndStoreSentiment({
-      admin,
-      businessId,
-      contactId: conversation.contact_id,
-      message: clientMessage,
-    });
-
-    await processSalesAgentRules({
-      admin,
-      businessId,
-      contactId: conversation.contact_id,
-      message: clientMessage,
-    });
-
-    await processHighIntentTaskRule({
-      admin,
-      businessId,
-      contactId: conversation.contact_id,
-      message: clientMessage,
-    });
-  }
-
-  const { data: agentRows } = await admin
-    .from("ai_agents")
-    .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, provider, model, use_custom_model, language, communication_style, updated_at",
-    )
-    .eq("business_id", businessId)
-    .eq("enabled", true);
-
-  const routableAgents = (agentRows ?? []).map((row) => ({
-    id: row.id,
-    name: row.name,
-    systemPrompt: row.system_prompt,
-    channels: row.channels ?? [],
-    triggerKeywords: row.trigger_keywords ?? [],
-    enabled: row.enabled,
-    provider: row.provider ?? undefined,
-    model: row.model ?? undefined,
-    useCustomModel: row.use_custom_model ?? false,
-    language: row.language ?? undefined,
-    communicationStyle: row.communication_style ?? undefined,
-    updatedAt: row.updated_at,
-  }));
-
-  const { agent: matchedAgent, systemPrompt } = resolveAgentSystemPrompt({
-    agents: routableAgents,
-    channel,
-    message: clientMessage,
-    fallbackPrompt: aiSettings.system_prompt,
-  });
-
-  const provider = (matchedAgent?.provider ?? aiSettings.provider ?? "gemini") as AiProvider;
-  const model = resolveAgentModel(
-    provider,
-    matchedAgent?.model ?? aiSettings.model,
-    matchedAgent?.useCustomModel ?? false,
-  );
-  const language = matchedAgent?.language ?? aiSettings.language;
-
-  const { data: history } = await admin
-    .from("messages")
-    .select("sender_type, content")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(20);
-
-  const knowledgeEntries = await listKnowledgeEntriesForBusiness(
+  const reply = await generateChannelAutoReply({
     admin,
     businessId,
-  );
-
-  const reply = await generateAssistantReply({
-    businessId,
+    channel,
     conversationId,
-    provider,
-    model,
-    systemPrompt,
-    language,
-    userMessage: clientMessage,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
-      title: entry.title,
-      content: entry.content,
-      category: entry.category,
-    })),
-    conversationHistory:
-      history?.map((message) => ({
-        role: message.sender_type === "client" ? "user" : "assistant",
-        content: message.content,
-      })) ?? [],
+    clientMessage,
   });
 
   if (!reply.success) {
+    const error = resolveAutoReplyErrorMessage(reply);
+    await notifyAutoReplyError(conversationId, {
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
     return;
   }
 
-  const sendResult = await sendReply(reply.data.text);
+  const sendResult = await sendReply(reply.text);
 
   if (!sendResult.success) {
+    await notifyAutoReplyError(conversationId, {
+      errorCode: "send_failed",
+      errorMessage: CHAT_MESSAGES.autoReplyErrorSendFailed,
+    });
     return;
   }
 
@@ -535,9 +466,9 @@ export async function processChannelAutoReply(input: {
     conversationId,
     channel,
     senderType: "ai",
-    content: reply.data.text,
+    content: reply.text,
     aiGenerated: true,
-    aiAgentId: matchedAgent?.id ?? null,
+    aiAgentId: reply.matchedAgentId,
   });
 
   await incrementMessagingAnalytics(admin, businessId, channel, {
@@ -549,7 +480,18 @@ export async function processChannelAutoReply(input: {
 export function scheduleChannelAutoReply(
   input: Parameters<typeof processChannelAutoReply>[0],
 ): void {
-  void processChannelAutoReply(input).catch((error) => {
-    console.error("[auto-reply] failed", error);
+  scheduleDebouncedChannelAutoReply(input);
+}
+
+export function scheduleInboundMessageProcessing(
+  input: Parameters<typeof processChannelAutoReply>[0],
+): void {
+  scheduleInboundMessageEffects({
+    admin: input.admin,
+    businessId: input.businessId,
+    channel: input.channel,
+    conversationId: input.conversationId,
+    clientMessage: input.clientMessage,
   });
+  scheduleChannelAutoReply(input);
 }

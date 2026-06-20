@@ -1,45 +1,17 @@
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { AiAgentsHub } from "@/components/ai-assistant/AiAgentsHub";
-import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
-import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import { getAiAssistantPageData } from "@/services/ai-assistant.service";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { buildLegacyAiAssistantRedirectHref } from "@/utils/ai-assistant-url";
 
 type AiAssistantPageProps = {
-  searchParams: Promise<{
-    channel?: string;
-    tab?: string;
-    agent?: string;
-    step?: string;
-    goal?: string;
-    q?: string;
-    setup?: string;
-    edit?: string;
-    analytics?: string;
-  }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 };
 
-export default function AiAssistantPage({ searchParams }: AiAssistantPageProps) {
-  return (
-    <Suspense fallback={<DashboardPageSkeleton />}>
-      <AiAssistantPageContent searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function AiAssistantPageContent({ searchParams }: AiAssistantPageProps) {
+export default async function AiAssistantPage({
+  searchParams,
+}: AiAssistantPageProps) {
   const params = await searchParams;
-  const data = await getAiAssistantPageData(params);
+  const legacyRedirect = buildLegacyAiAssistantRedirectHref(params);
 
-  if (!data.hasBusiness) {
-    return (
-      <DashboardSetupPrompt
-        title={AI_ASSISTANT_MESSAGES.pageTitle}
-        description={AI_ASSISTANT_MESSAGES.pageDescription}
-      />
-    );
-  }
-
-  return <AiAgentsHub data={data} />;
+  redirect(legacyRedirect ?? DASHBOARD_ROUTES.aiAssistantSection);
 }

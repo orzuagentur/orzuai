@@ -326,7 +326,7 @@ export function AutomationsRuleDetailPanel({
         <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           {AUTOMATIONS_MESSAGES.selectRuleHint}{" "}
           <Link
-            href={DASHBOARD_ROUTES.aiAssistant}
+            href={DASHBOARD_ROUTES.aiAgentsSection}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             {AUTOMATIONS_MESSAGES.configureAgentsLink}

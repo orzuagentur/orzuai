@@ -9,6 +9,7 @@ import {
   DEFAULT_AI_LANGUAGE,
   DEFAULT_AI_SYSTEM_PROMPT,
 } from "@/features/business/constants";
+import { DEFAULT_COMMUNICATION_STYLE } from "@/features/ai-assistant/communication-styles";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -97,6 +98,17 @@ async function bootstrapBusinessDefaults(businessId: string): Promise<void> {
       ),
     ]);
   }
+
+  await supabase.from("ai_assistant_profile").upsert(
+    {
+      business_id: businessId,
+      name: "AI Assistant",
+      system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
+      communication_style: DEFAULT_COMMUNICATION_STYLE,
+      language: DEFAULT_AI_LANGUAGE,
+    },
+    { onConflict: "business_id" },
+  );
 }
 
 function mapPayloadToRow(payload: BusinessPayload) {

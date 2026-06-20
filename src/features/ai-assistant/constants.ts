@@ -1,13 +1,67 @@
 export const AI_ASSISTANT_MESSAGES = {
-  pageTitle: "AI Agents",
-  pageSubtitle: "Build agents, route by keywords, and customize replies per channel.",
+  pageTitle: "AI",
+  pageSubtitle: "Choose how AI supports your customers and your team.",
   pageDescription:
-    "Create AI agents with custom prompts, communication style, and keyword routing.",
+    "Create your business profile to enable the AI Assistant and agents.",
+  hubAssistantTitle: "AI Assistant",
+  hubAssistantDescription:
+    "24/7 customer support on your messaging channels.",
+  hubAssistantInfoTitle: "What the AI Assistant does",
+  hubAssistantInfoBody:
+    "The AI Assistant replies to customers around the clock on WhatsApp, Instagram, and Telegram. It answers questions, shares information from your knowledge base, and keeps conversations moving when your team is offline. Turn it on per channel — no agents required.",
+  hubAgentsTitle: "AI Agents",
+  hubAgentsDescription:
+    "Specialized assistants that take action in your CRM.",
+  hubAgentsInfoTitle: "What AI Agents do",
+  hubAgentsInfoBody:
+    "AI Agents understand customer intent and work in the background on CRM tasks: creating follow-up tasks, deals, and notes, and updating contact details from conversations. Create agents with clear goals and enable them when you are ready.",
+  sectionAssistantTitle: "AI Assistant",
+  sectionAssistantSubtitle:
+    "Enable 24/7 auto-reply on each connected channel.",
+  sectionAgentsTitle: "AI Agents",
+  sectionAgentsSubtitle:
+    "Create and manage agents that handle specialized CRM work.",
+  backToAiHub: "Back to AI",
+  tabAssistant: "AI Assistant",
+  tabAgents: "AI Agents",
+  assistantTabDescription:
+    "Turn the assistant on for each channel. It works independently of agents.",
+  assistantEdit: "Edit",
+  assistantEditTitle: "AI Assistant settings",
+  assistantEditFormDescription:
+    "Set how your assistant introduces itself and replies to customers.",
+  assistantEditDescription:
+    "Name, behavior, and communication style — available in the next update.",
+  assistantEditBack: "Back to channels",
+  assistantEditSave: "Save assistant",
+  assistantEditSaved: "AI Assistant settings saved.",
+  assistantNameLabel: "Assistant name",
+  assistantNamePlaceholder: "e.g. Anna from Orzu Clinic",
+  assistantBehaviorLabel: "Behavior & instructions",
+  assistantBehaviorPlaceholder:
+    "Describe what your business does and how the assistant should help customers…",
+  assistantBehaviorHint:
+    "This guides every auto-reply. Add FAQs and policies in Knowledge Base for accuracy.",
+  assistantLanguageLabel: "Reply language",
+  assistantChannelConnected: "Connected",
+  assistantChannelNotConnected: "Not connected",
+  assistantConnectChannel: "Connect",
   channelsTitle: "Channels",
   channelAgentActive: "AI agent enabled on this channel",
   channelAgentInactive: "No enabled AI agent on this channel",
   searchPlaceholder: "Search agents…",
-  tabAgents: "Agents",
+  channelsTabDescription:
+    "Turn AI auto-reply on or off for each channel and configure model settings.",
+  channelsSummaryTitle: "Overview",
+  channelsSummaryEnabled: (count: number, total: number) =>
+    `${count} of ${total} channels active`,
+  channelsSummaryAllOff: "AI auto-reply is off on all channels.",
+  channelsEnableAll: "Enable all channels",
+  channelsDisableAll: "Disable all channels",
+  channelsKnowledgeHint:
+    "Add FAQs and policies in Knowledge Base so AI answers accurately.",
+  channelsAgentsHint:
+    "Need keyword routing or multiple agents? Open AI Agents for advanced setup.",
   newAgent: "New agent",
   wizardTitle: "Create AI agent",
   wizardSubtitle:
@@ -204,9 +258,11 @@ export const AI_ASSISTANT_MESSAGES = {
   saveFailed: "Unable to save agent. Please try again.",
   deleteFailed: "Unable to delete agent. Please try again.",
   testMatchTitle: "Routing preview",
+  testMatchHint:
+    "Live messages use AI intent matching first; keywords are a fallback.",
   testMatchAgent: (name: string) => `Matched agent: ${name}`,
   testMatchFallback:
-    "No agent match — My Assistant channel instructions will handle the reply.",
+    "No agent match — the AI Assistant profile will handle the reply.",
   testMessage: "Sample customer message",
   testRun: "Preview routing",
   usageTitle: "AI usage limits",

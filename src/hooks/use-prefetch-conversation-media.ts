@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import { prefetchChatMediaUrlsAction } from "@/features/chats/actions/prefetch-chat-media-urls";
+import { persistMediaBlob } from "@/lib/client-cache/chat-media-blob-cache";
 import { setCachedMediaUrl } from "@/lib/client-cache/inbox-messenger-cache";
 import type { ChatMessageData } from "@/types/chat.types";
 import { isOptimisticMessageId } from "@/utils/optimistic-chat-message";
@@ -113,6 +114,7 @@ export function usePrefetchVisibleConversationMedia(
 
         for (const [path, url] of Object.entries(result.urls)) {
           setCachedMediaUrl(path, url);
+          void persistMediaBlob(path, url);
         }
       });
     }, PREFETCH_THROTTLE_MS);

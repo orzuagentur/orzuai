@@ -6,7 +6,10 @@ import {
 } from "@/features/integrations";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
+import {
+  getChannelAiSettings,
+  getChannelConnectionStatuses,
+} from "@/services/channel-workspace.service";
 
 export type OnboardingProgress = {
   hasBusiness: boolean;
@@ -50,28 +53,22 @@ export async function getOnboardingProgress(
   }
 
   const supabase = await createClient();
-  const [channelStatuses, knowledgeResult, agentsResult] = await Promise.all([
+  const [channelStatuses, knowledgeResult] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     supabase
       .from("knowledge_base")
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId),
-    supabase
-      .from("ai_agents")
-      .select("channels")
-      .eq("business_id", businessId)
-      .eq("enabled", true),
   ]);
 
   const connectedChannel = getFirstConnectedChannel(channelStatuses);
   const hasConnectedChannel = connectedChannel !== null;
   const hasKnowledgeEntry = (knowledgeResult.count ?? 0) > 0;
-  const hasAiEnabled =
-    connectedChannel !== null &&
-    (agentsResult.data?.some((agent) =>
-      (agent.channels ?? []).includes(connectedChannel),
-    ) ??
-      false);
+  const channelAiSettings =
+    connectedChannel !== null
+      ? await getChannelAiSettings(connectedChannel)
+      : null;
+  const hasAiEnabled = channelAiSettings?.aiEnabled === true;
 
   let completedSteps = 1;
 

@@ -96,6 +96,8 @@ export function AnalyticsCommandCenter({ data }: AnalyticsCommandCenterProps) {
           aiCost={data.aiCost}
           agentsRollup={data.agentsRollup}
           automationOps={data.automationOps}
+          agentRuns={data.agentRuns}
+          recentAgentRuns={data.recentAgentRuns}
         />
       ) : null}
 

@@ -1,4 +1,5 @@
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
+import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import type { MessagingChannel } from "@/types/database.types";
 
 export type RoutableAiAgent = {
@@ -8,6 +9,7 @@ export type RoutableAiAgent = {
   channels: MessagingChannel[];
   triggerKeywords: string[];
   enabled: boolean;
+  goal?: AgentWizardGoalId;
   provider?: string;
   model?: string;
   useCustomModel?: boolean;

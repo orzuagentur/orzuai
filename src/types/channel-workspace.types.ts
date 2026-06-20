@@ -5,6 +5,8 @@ import type { IntegrationChannelStatusMap } from "@/features/integrations/channe
 import type {
   AgentAnalyticsRollupItem,
   AnalyticsPulseData,
+  AgentRunListItem,
+  AgentRunsMetrics,
   AutomationOpsMetrics,
 } from "./analytics.types";
 import type {
@@ -18,6 +20,7 @@ import type {
 } from "./dashboard.types";
 import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
 import type { AiAgentItem } from "./ai-agent.types";
+import type { AiAssistantProfileData } from "./ai-assistant-profile.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
@@ -134,10 +137,14 @@ export type AiAssistantPageData = {
   showSetupBanner: boolean;
   isEditingAgent: boolean;
   isViewingAnalytics: boolean;
+  isEditingAssistant: boolean;
   visibleChannelIds: MessagingIntegrationChannelId[];
   channelStatuses: IntegrationChannelStatusMap;
   channels: AiAssistantChannelEntry[];
   agents: AiAgentItem[];
+  enabledChannelCount: number;
+  connectedChannelCount: number;
+  assistantProfile: AiAssistantProfileData | null;
 };
 
 export type ChannelAnalyticsActivityPoint = {
@@ -198,6 +205,8 @@ export type AnalyticsPageData = {
   sentiment: SentimentBreakdown;
   agentsRollup: AgentAnalyticsRollupItem[];
   automationOps: AutomationOpsMetrics;
+  agentRuns: AgentRunsMetrics;
+  recentAgentRuns: AgentRunListItem[];
 };
 
 export type ChannelWorkspaceSummary = {

@@ -29,7 +29,7 @@ import {
   createOutboundMessageDelivery,
   incrementMessagingAnalytics,
   insertChannelMessage,
-  scheduleChannelAutoReply,
+  scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
 import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
@@ -426,7 +426,7 @@ async function completeInboundTelegramMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  scheduleChannelAutoReply({
+  scheduleInboundMessageProcessing({
     admin,
     businessId,
     channel: "telegram",

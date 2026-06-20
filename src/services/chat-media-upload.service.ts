@@ -18,6 +18,7 @@ import {
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { buildPendingOutboundChatMessage } from "@/services/outbound-message.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
+import { normalizeStoredVoiceNoteAsset } from "@/services/voice-note-transcode.service";
 import type { ChatActionError, SendChatMessageResult } from "@/types/chat.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { resolveContactFromRow } from "@/utils/chat";
@@ -378,13 +379,42 @@ export async function completeChatMediaUpload(
     };
   }
 
-  const mediaKind = resolveMediaKind(mimeType);
+  let normalizedPath = path;
+  let normalizedFileName = fileName;
+  let normalizedMimeType = mimeType;
+  let normalizedSizeBytes = input.sizeBytes;
+
+  try {
+    const normalizedVoice = await normalizeStoredVoiceNoteAsset({
+      path,
+      fileName,
+      mimeType,
+      sizeBytes: input.sizeBytes,
+    });
+
+    normalizedPath = normalizedVoice.path;
+    normalizedFileName = normalizedVoice.fileName;
+    normalizedMimeType = normalizedVoice.mimeType;
+    normalizedSizeBytes = normalizedVoice.sizeBytes;
+  } catch (error) {
+    console.error("[chat-media-upload] voice note transcode failed", error);
+
+    return {
+      success: false,
+      error: {
+        code: "SEND_FAILED",
+        message: CHAT_MESSAGES.mediaSendFailed,
+      },
+    };
+  }
+
+  const mediaKind = resolveMediaKind(normalizedMimeType);
   const mediaPayload = buildMediaPayloadFromUpload({
     kind: mediaKind,
-    fileName,
-    mimeType,
-    path,
-    sizeBytes: input.sizeBytes,
+    fileName: normalizedFileName,
+    mimeType: normalizedMimeType,
+    path: normalizedPath,
+    sizeBytes: normalizedSizeBytes,
     thumbPath: hasClientThumbnail ? thumbPath : undefined,
     thumbWidth: hasClientThumbnail ? input.thumbWidth : undefined,
     thumbHeight: hasClientThumbnail ? input.thumbHeight : undefined,

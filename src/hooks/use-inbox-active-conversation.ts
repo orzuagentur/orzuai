@@ -18,8 +18,11 @@ import {
   peekCachedConversationDetail,
   setCachedConversationDetail,
 } from "@/lib/client-cache/inbox-messenger-cache";
+import {
+  getSyncedChannelAiEnabled,
+  subscribeChannelAiSync,
+} from "@/lib/client/channel-ai-sync-store";
 import { revokeOptimisticMediaContent } from "@/utils/optimistic-chat-message";
-import { withPendingDeliveryStatus } from "@/utils/chat";
 import {
   buildMediaUrlCacheKey,
   encodeMediaMessage,
@@ -31,6 +34,9 @@ import type { MessageDeliveryStatus } from "@/types/database.types";
 import {
   applyMessageMetadataPatch,
   hasMessageMetadataChanged,
+  mergeIncomingChatMessage,
+  normalizeOutboundDeliveryStatus,
+  shouldIgnoreOutboundDeliveryDowngrade,
 } from "@/utils/message-metadata";
 
 type UseInboxActiveConversationOptions = {
@@ -118,11 +124,31 @@ export function useInboxActiveConversation({
   const skipInitialLoadRef = useRef(bootstrap.skipInitialLoad);
   const selectedConversationIdRef = useRef(selectedConversationId);
   const lastReadSyncAtRef = useRef(0);
+  const conversationChannelRef = useRef<MessagingChannel | null>(
+    bootstrap.conversation?.channel ?? null,
+  );
   selectedConversationIdRef.current = selectedConversationId;
+  conversationChannelRef.current = conversation?.channel ?? null;
 
   useEffect(() => {
     lastReadSyncAtRef.current = 0;
   }, [selectedConversationId]);
+
+  useEffect(() => {
+    return subscribeChannelAiSync(() => {
+      const channel = conversationChannelRef.current;
+
+      if (!channel) {
+        return;
+      }
+
+      const synced = getSyncedChannelAiEnabled(channel);
+
+      if (synced !== undefined) {
+        setAiEnabled(synced);
+      }
+    });
+  }, []);
 
   const clearConversation = useCallback(() => {
     setConversation(null);
@@ -326,10 +352,22 @@ export function useInboxActiveConversation({
           : current.messages;
       const removedPendingCount =
         current.messages.length - withoutMatchingPending.length;
+      const normalizedMessage =
+        message.senderType === "user"
+          ? mergeIncomingChatMessage(
+              withoutMatchingPending.find(
+                (item) =>
+                  item.isPending &&
+                  item.senderType === "user" &&
+                  item.content === message.content,
+              ) ?? null,
+              message,
+            )
+          : message;
 
       return {
         ...current,
-        messages: [...withoutMatchingPending, message],
+        messages: [...withoutMatchingPending, normalizedMessage],
         totalMessageCount:
           current.totalMessageCount - removedPendingCount + 1,
         updatedAt: message.createdAt,
@@ -422,7 +460,7 @@ export function useInboxActiveConversation({
           };
         }
 
-        resolvedMessage = withPendingDeliveryStatus(resolvedMessage);
+        resolvedMessage = mergeIncomingChatMessage(pendingMessage, resolvedMessage);
 
         const hadPending = current.messages.some((item) => item.id === pendingId);
 
@@ -448,22 +486,28 @@ export function useInboxActiveConversation({
       const index = current.messages.findIndex((item) => item.id === message.id);
 
       if (index === -1) {
+        const normalizedMessage =
+          message.senderType === "user"
+            ? normalizeOutboundDeliveryStatus(message)
+            : message;
+
         return {
           ...current,
-          messages: [...current.messages, message],
+          messages: [...current.messages, normalizedMessage],
           totalMessageCount: current.totalMessageCount + 1,
           updatedAt: message.editedAt ?? message.createdAt,
         };
       }
 
       const previous = current.messages[index]!;
+      const mergedMessage = mergeIncomingChatMessage(previous, message);
 
-      if (!hasMessageMetadataChanged(previous, message)) {
+      if (!hasMessageMetadataChanged(previous, mergedMessage)) {
         return current;
       }
 
       const messages = [...current.messages];
-      messages[index] = message;
+      messages[index] = mergedMessage;
 
       return {
         ...current,
@@ -477,6 +521,18 @@ export function useInboxActiveConversation({
     (messageId: string, deliveryStatus: MessageDeliveryStatus) => {
       setConversation((current) => {
         if (!current) {
+          return current;
+        }
+
+        const existing = current.messages.find((item) => item.id === messageId);
+
+        if (
+          existing?.senderType === "user" &&
+          shouldIgnoreOutboundDeliveryDowngrade(
+            existing.deliveryStatus,
+            deliveryStatus,
+          )
+        ) {
           return current;
         }
 
@@ -536,7 +592,13 @@ export function useInboxActiveConversation({
     };
   }, [latestMessageAt, latestMessageId]);
 
-  const { isClientTyping, isRealtimeConnected } = useConversationRealtime({
+  const {
+    isClientTyping,
+    isReplyTyping,
+    autoReplyError,
+    dismissAutoReplyError,
+    isRealtimeConnected,
+  } = useConversationRealtime({
     conversationId: selectedConversationId,
     reconnectCursor,
     getReconnectCursor: () => reconnectCursorRef.current,
@@ -729,6 +791,7 @@ export function useInboxActiveConversation({
     conversation,
     channelConnected,
     aiEnabled,
+    setAiEnabled,
     cannedResponses,
     isLoadingConversation,
     isLoadingOlderMessages,
@@ -741,6 +804,9 @@ export function useInboxActiveConversation({
     reconcileMessage,
     updateMessage,
     isClientTyping,
+    isReplyTyping,
+    autoReplyError,
+    dismissAutoReplyError,
     refreshCannedResponses,
     syncConversationReadNow,
   };

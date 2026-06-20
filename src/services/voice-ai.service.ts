@@ -122,7 +122,7 @@ async function loadBusinessContext(businessId: string) {
     systemPrompt:
       aiSettingsResult.data?.system_prompt ?? DEFAULT_AI_SYSTEM_PROMPT,
     knowledgeContext: knowledgeEntries.map((entry) => ({
-      category: entry.category,
+      category: entry.category ?? "",
       title: entry.title,
       content: entry.content,
     })),

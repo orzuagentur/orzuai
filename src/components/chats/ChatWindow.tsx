@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Maximize2Icon,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
+import { ChatAiToggle } from "@/components/chats/inbox/ChatAiToggle";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
 import { useAgentTypingIndicator } from "@/hooks/use-agent-typing-indicator";
@@ -57,6 +58,7 @@ type ChatLoadingPreview = {
 type ChatWindowProps = {
   conversation: ConversationDetail | null;
   aiEnabled: boolean | null;
+  onAiEnabledChange?: (enabled: boolean) => void;
   channelConnected: boolean;
   channel: MessagingChannel;
   cannedResponses: CannedResponseItem[];
@@ -74,6 +76,9 @@ type ChatWindowProps = {
   onContactDeleted?: () => void;
   onContactFavoriteChange?: (contactId: string, isFavorite: boolean) => void;
   isClientTyping?: boolean;
+  isReplyTyping?: boolean;
+  autoReplyError?: { code: string; message: string } | null;
+  onDismissAutoReplyError?: () => void;
   hasOlderMessages?: boolean;
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
@@ -101,7 +106,8 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
 
 export function ChatWindow({
   conversation,
-  aiEnabled: _aiEnabled,
+  aiEnabled,
+  onAiEnabledChange,
   channelConnected,
   channel,
   cannedResponses,
@@ -119,6 +125,9 @@ export function ChatWindow({
   onContactDeleted,
   onContactFavoriteChange,
   isClientTyping = false,
+  isReplyTyping = false,
+  autoReplyError = null,
+  onDismissAutoReplyError,
   hasOlderMessages = false,
   isLoadingOlderMessages = false,
   onLoadOlderMessages,
@@ -142,7 +151,6 @@ export function ChatWindow({
   const pinnedConversationIdRef = useRef<string | null>(null);
   const scrollHeightBeforeOlderLoadRef = useRef(0);
   const lastMessageIdRef = useRef<string | null>(null);
-  const wasLoadingConversationRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [newMessagesBelow, setNewMessagesBelow] = useState(0);
   const draft = controlledDraft ?? internalDraft;
@@ -193,6 +201,12 @@ export function ChatWindow({
     }, 200),
   );
 
+  const scrollToLatestMessage = useCallback(() => {
+    messageHistoryRef.current?.scrollToEnd({ instant: true });
+    setShowScrollToBottom(false);
+    setNewMessagesBelow(0);
+  }, []);
+
   useEffect(() => {
     if (!isLoadingOlderMessages) {
       return;
@@ -228,23 +242,6 @@ export function ChatWindow({
     setShowScrollToBottom(false);
     setNewMessagesBelow(0);
   }, [conversation?.id]);
-
-  useEffect(() => {
-    if (wasLoadingConversationRef.current && !isLoadingConversation && conversation) {
-      const scrollToBottom = () => {
-        messageHistoryRef.current?.scrollToEnd();
-        setShowScrollToBottom(false);
-        setNewMessagesBelow(0);
-        onConversationViewed?.();
-      };
-
-      scrollToBottom();
-      requestAnimationFrame(scrollToBottom);
-      requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
-    }
-
-    wasLoadingConversationRef.current = isLoadingConversation;
-  }, [conversation, isLoadingConversation, onConversationViewed]);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -310,31 +307,33 @@ export function ChatWindow({
       pinnedConversationIdRef.current !== conversation.id;
     pinnedConversationIdRef.current = conversation.id;
 
-    const scrollToTarget = () => {
+    if (isOpeningChat) {
       if (
-        !isOpeningChat &&
-        scrollContainer &&
-        !isChatScrollPinnedToBottom(scrollContainer)
+        lastMessage.senderType === "user" ||
+        lastMessage.senderType === "ai"
       ) {
-        return;
+        scrollToLatestMessage();
       }
+      onConversationViewed?.();
+      return;
+    }
 
-      messageHistoryRef.current?.scrollToEnd();
-      setShowScrollToBottom(false);
-      setNewMessagesBelow(0);
+    const shouldFollowLatestMessage =
+      lastMessage.senderType === "user" ||
+      lastMessage.senderType === "ai" ||
+      Boolean(
+        scrollContainer && isChatScrollPinnedToBottom(scrollContainer),
+      );
 
-      if (isOpeningChat || !scrollContainer || isChatScrollPinnedToBottom(scrollContainer)) {
-        onConversationViewed?.();
-      }
-    };
-
-    scrollToTarget();
-    requestAnimationFrame(scrollToTarget);
-    requestAnimationFrame(() => requestAnimationFrame(scrollToTarget));
+    if (shouldFollowLatestMessage) {
+      scrollToLatestMessage();
+      onConversationViewed?.();
+    }
   }, [
     conversation?.id,
     conversation?.messages.at(-1)?.id,
     onConversationViewed,
+    scrollToLatestMessage,
   ]);
 
   function handleScrolledToBottom() {
@@ -447,6 +446,8 @@ export function ChatWindow({
       }),
     );
     setDraft("");
+    scrollToLatestMessage();
+    requestAnimationFrame(scrollToLatestMessage);
 
     void (async () => {
       const result = await sendMessage({
@@ -499,6 +500,13 @@ export function ChatWindow({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {inboxLayout ? (
+                <ChatAiToggle
+                  channel={conversation.channel}
+                  aiEnabled={aiEnabled}
+                  onEnabledChange={onAiEnabledChange}
+                />
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"
@@ -574,7 +582,9 @@ export function ChatWindow({
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
             <MessageHistory
+              key={conversation.id}
               ref={messageHistoryRef}
+              conversationId={conversation.id}
               messages={conversation.messages}
               variant="inbox"
               lastReadAt={conversation.lastReadAt}
@@ -583,6 +593,7 @@ export function ChatWindow({
               firstUnreadRef={firstUnreadRef}
               bottomRef={bottomRef}
               isClientTyping={isClientTyping}
+              isReplyTyping={isReplyTyping}
               typingContactName={conversation.contactName}
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
@@ -594,6 +605,32 @@ export function ChatWindow({
               newMessagesBelow={newMessagesBelow}
               onScrollToBottom={handleScrolledToBottom}
             />
+
+            {autoReplyError && inboxLayout ? (
+              <div className="shrink-0 border-t bg-destructive/5 px-4 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium text-destructive">
+                      {CHAT_MESSAGES.autoReplyErrorTitle}
+                    </p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      {autoReplyError.message}
+                    </p>
+                  </div>
+                  {onDismissAutoReplyError ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 px-2 text-xs"
+                      onClick={onDismissAutoReplyError}
+                    >
+                      {CHAT_MESSAGES.autoReplyErrorDismiss}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <InboxChatComposer
               conversationId={conversation.id}
@@ -629,6 +666,8 @@ export function ChatWindow({
                 });
 
                 onOptimisticMessage?.(optimisticMessage);
+                scrollToLatestMessage();
+                requestAnimationFrame(scrollToLatestMessage);
 
                 void (async () => {
                   const result = await sendMedia(

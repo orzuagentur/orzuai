@@ -6,7 +6,6 @@ import {
   CreditCard,
   LayoutDashboard,
   MessageSquare,
-  MessagesSquare,
   Plug,
   Settings,
   Users,
@@ -14,6 +13,24 @@ import {
 } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
+
+export const DASHBOARD_AI_NAV_ITEMS = [
+  {
+    id: "ai-assistant-section",
+    label: AI_ASSISTANT_MESSAGES.tabAssistant,
+    href: DASHBOARD_ROUTES.aiAssistantSection,
+    infoTitle: AI_ASSISTANT_MESSAGES.hubAssistantInfoTitle,
+    infoBody: AI_ASSISTANT_MESSAGES.hubAssistantInfoBody,
+  },
+  {
+    id: "ai-agents-section",
+    label: AI_ASSISTANT_MESSAGES.tabAgents,
+    href: DASHBOARD_ROUTES.aiAgentsSection,
+    infoTitle: AI_ASSISTANT_MESSAGES.hubAgentsInfoTitle,
+    infoBody: AI_ASSISTANT_MESSAGES.hubAgentsInfoBody,
+  },
+] as const;
 
 export const DEFAULT_SUBSCRIPTION_PLAN = "Free Plan";
 
@@ -37,15 +54,9 @@ export const DASHBOARD_NAV_ITEMS = [
     icon: Users,
   },
   {
-    id: "ai-manager",
-    label: "My Assistant",
-    href: DASHBOARD_ROUTES.aiManager,
-    icon: MessagesSquare,
-  },
-  {
     id: "ai-assistant",
-    label: "AI Agents",
-    href: DASHBOARD_ROUTES.aiAssistant,
+    label: "AI",
+    href: DASHBOARD_ROUTES.aiAssistantSection,
     icon: Bot,
   },
   {
@@ -112,6 +123,19 @@ export const OVERVIEW_MESSAGES = {
 export const INBOUND_ALERT_MESSAGES = {
   newMessageTitle: "New message",
   openChat: "Open",
+} as const;
+
+export const AI_HUMAN_REQUEST_MESSAGES = {
+  buttonLabel: "Notifications",
+  panelTitle: "Human help requests",
+  panelDescription:
+    "When AI cannot handle a conversation, it calls you here — not as a new message.",
+  emptyState: "No human help requests from AI",
+  connect: "Connect",
+  dismiss: "Dismiss",
+  toastTitle: "AI needs a real person",
+  toastReasonFallback: "Customer needs human help",
+  relativeJustNow: "Just now",
 } as const;
 
 export const ANALYTICS_CARD_LABELS = {

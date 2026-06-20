@@ -4,6 +4,8 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   AgentAnalyticsRollupItem,
+  AgentRunListItem,
+  AgentRunsMetrics,
   AutomationOpsMetrics,
 } from "@/types/analytics.types";
 
@@ -13,6 +15,17 @@ const EMPTY_AUTOMATION_OPS: AutomationOpsMetrics = {
   successRatePercent: 0,
   failedRunsLast30Days: 0,
   topTriggers: [],
+};
+
+const EMPTY_AGENT_RUNS: AgentRunsMetrics = {
+  runsToday: 0,
+  runsLast30Days: 0,
+  successRatePercent: 0,
+  failedRunsLast30Days: 0,
+  intentRoutesLast30Days: 0,
+  keywordRoutesLast30Days: 0,
+  assistantOnlyLast30Days: 0,
+  actionsAppliedLast30Days: 0,
 };
 
 function startOfDaysAgo(days: number): Date {
@@ -183,4 +196,144 @@ export async function getAutomationOpsMetrics(
     failedRunsLast30Days: failedCount,
     topTriggers,
   };
+}
+
+function parseAgentRunActions(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+export async function getAgentRunsMetrics(
+  businessId: string,
+): Promise<AgentRunsMetrics> {
+  if (!hasSupabaseEnv()) {
+    return EMPTY_AGENT_RUNS;
+  }
+
+  const admin = createAdminClient();
+  const todayStart = startOfDaysAgo(0);
+  const thirtyDaysAgo = startOfDaysAgo(30);
+
+  const { data: runs } = await admin
+    .from("agent_runs")
+    .select("routing_method, actions, success, created_at")
+    .eq("business_id", businessId)
+    .gte("created_at", thirtyDaysAgo.toISOString());
+
+  const rows = runs ?? [];
+  let runsToday = 0;
+  let successCount = 0;
+  let failedCount = 0;
+  let intentRoutesLast30Days = 0;
+  let keywordRoutesLast30Days = 0;
+  let assistantOnlyLast30Days = 0;
+  let actionsAppliedLast30Days = 0;
+
+  for (const row of rows) {
+    const createdAt = new Date(row.created_at);
+
+    if (createdAt >= todayStart) {
+      runsToday += 1;
+    }
+
+    if (row.success) {
+      successCount += 1;
+    } else {
+      failedCount += 1;
+    }
+
+    if (row.routing_method === "intent") {
+      intentRoutesLast30Days += 1;
+    } else if (row.routing_method === "keyword") {
+      keywordRoutesLast30Days += 1;
+    } else if (row.routing_method === "none") {
+      assistantOnlyLast30Days += 1;
+    }
+
+    actionsAppliedLast30Days += parseAgentRunActions(row.actions).length;
+  }
+
+  const measured = successCount + failedCount;
+  const successRatePercent =
+    measured > 0 ? Math.round((successCount / measured) * 100) : 0;
+
+  return {
+    runsToday,
+    runsLast30Days: rows.length,
+    successRatePercent,
+    failedRunsLast30Days: failedCount,
+    intentRoutesLast30Days,
+    keywordRoutesLast30Days,
+    assistantOnlyLast30Days,
+    actionsAppliedLast30Days,
+  };
+}
+
+export async function listRecentAgentRuns(
+  businessId: string,
+  limit = 20,
+): Promise<AgentRunListItem[]> {
+  if (!hasSupabaseEnv()) {
+    return [];
+  }
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("agent_runs")
+    .select(
+      "id, channel, client_message, routing_method, actions, success, error_message, created_at, contact_id, agent_id",
+    )
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const rows = data ?? [];
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const contactIds = [
+    ...new Set(rows.map((row) => row.contact_id).filter(Boolean)),
+  ] as string[];
+  const agentIds = [
+    ...new Set(rows.map((row) => row.agent_id).filter(Boolean)),
+  ] as string[];
+
+  const [contactsResult, agentsResult] = await Promise.all([
+    contactIds.length > 0
+      ? admin.from("contacts").select("id, name").in("id", contactIds)
+      : Promise.resolve({ data: [] }),
+    agentIds.length > 0
+      ? admin.from("ai_agents").select("id, name").in("id", agentIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const contactNames = new Map(
+    (contactsResult.data ?? []).map((row) => [row.id, row.name]),
+  );
+  const agentNames = new Map(
+    (agentsResult.data ?? []).map((row) => [row.id, row.name]),
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    channel: row.channel,
+    contactId: row.contact_id,
+    contactName: row.contact_id ? contactNames.get(row.contact_id) ?? null : null,
+    agentId: row.agent_id,
+    agentName: row.agent_id ? agentNames.get(row.agent_id) ?? null : null,
+    routingMethod: row.routing_method,
+    actions: parseAgentRunActions(row.actions),
+    success: row.success,
+    errorMessage: row.error_message,
+    messagePreview: row.client_message.slice(0, 120),
+  }));
 }

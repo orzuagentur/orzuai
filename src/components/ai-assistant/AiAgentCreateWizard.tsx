@@ -251,6 +251,7 @@ export function AiAgentCreateWizard({
       channels: draft.channels,
       triggerKeywords: keywords,
       enabled: true,
+      goal: goal!,
       provider: draft.provider,
       model: draft.model,
       language: channelDefaults.language,
@@ -459,6 +460,7 @@ export function AiAgentCreateWizard({
           .map((keyword) => keyword.trim())
           .filter(Boolean),
         enabled: enableAfterCreate,
+        goal: goal!,
         provider: draft.provider,
         model: draft.model,
         language: channelDefaults.language,
@@ -477,8 +479,8 @@ export function AiAgentCreateWizard({
 
       router.push(
         buildAiAssistantHref({
+          section: "agents",
           channel: activeChannelFilter,
-          tab: "agents",
           agent: result.id ?? null,
           q: searchQuery || null,
           edit: true,

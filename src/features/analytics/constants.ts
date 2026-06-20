@@ -104,6 +104,26 @@ export const ANALYTICS_MESSAGES = {
   aiOpsViewAutomations: "View Automations",
   aiOpsFailedRuns: (count: number) =>
     `${count} failed run${count === 1 ? "" : "s"} in the last 30 days`,
+  aiOpsAgentRunsTitle: "CRM agent runs",
+  aiOpsAgentRunsDescription:
+    "AI Assistant CRM actions on inbound messages — contact updates, tasks, deals, and notes.",
+  aiOpsAgentRunsEmpty:
+    "No CRM agent runs yet. Enable AI on a channel and send a message with contact details or a booking request.",
+  aiOpsAgentRunsActions30d: "CRM actions (30 days)",
+  aiOpsAgentRunsRouteIntent: "AI intent",
+  aiOpsAgentRunsRouteKeyword: "Keyword",
+  aiOpsAgentRunsRouteAssistant: "Assistant only",
+  aiOpsAgentRunsIntentCount: (count: number) =>
+    `${count} intent route${count === 1 ? "" : "s"}`,
+  aiOpsAgentRunsKeywordCount: (count: number) =>
+    `${count} keyword route${count === 1 ? "" : "s"}`,
+  aiOpsAgentRunsAssistantCount: (count: number) =>
+    `${count} assistant-only`,
+  aiOpsAgentRunsNoActions: "No CRM fields changed",
+  aiOpsAgentRunsFailed: "Failed",
+  aiOpsAgentRunsAssistantOnly: "AI Assistant",
+  aiOpsAgentRunsViewContact: "View contact",
+  aiOpsViewAiAssistant: "Open AI Assistant",
   askPanelTitle: "Ask AI",
   askPanelDescription:
     "Ask questions about Pulse, channels, sales, AI performance, and automations.",
@@ -129,6 +149,12 @@ export const ANALYTICS_MESSAGES = {
     "How often AI handles replies vs. when your team takes over.",
   aiResolutionRate: "AI resolution rate",
   aiResolutionDescription: "Share of outbound replies sent by AI.",
+  aiAssistantOnlyReplies: "Assistant-only replies",
+  aiAssistantOnlyDescription:
+    "AI replies without a matched specialized agent (profile-only handling).",
+  aiDelegatedReplies: "Delegated agent replies",
+  aiDelegatedDescription:
+    "AI replies routed to a specialized agent for CRM actions or goal handling.",
   handoffRate: "Human handoff rate",
   handoffDescription: "Outbound replies sent manually by your team.",
   timeSaved: "Estimated time saved",

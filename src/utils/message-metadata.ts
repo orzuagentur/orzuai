@@ -1,4 +1,5 @@
 import type { ChatMessageData } from "@/types/chat.types";
+import type { MessageDeliveryStatus } from "@/types/database.types";
 
 /** Fields that can change without a messages.content update. */
 export type ChatMessageMetadataPatch = Partial<
@@ -18,6 +19,69 @@ export type ChatMessageMetadataPatch = Partial<
     | "content"
   >
 >;
+
+const STABLE_OUTBOUND_DELIVERY_STATUSES = new Set<MessageDeliveryStatus>([
+  "sent",
+  "delivered",
+  "read",
+]);
+
+export function shouldIgnoreOutboundDeliveryDowngrade(
+  currentStatus: MessageDeliveryStatus | null | undefined,
+  nextStatus: MessageDeliveryStatus,
+): boolean {
+  if (!currentStatus || !STABLE_OUTBOUND_DELIVERY_STATUSES.has(currentStatus)) {
+    return false;
+  }
+
+  return nextStatus === "pending" || nextStatus === "processing";
+}
+
+export function normalizeOutboundDeliveryStatus(
+  message: ChatMessageData,
+): ChatMessageData {
+  if (message.senderType !== "user" || message.hiddenForBusiness) {
+    return message;
+  }
+
+  if (message.deliveryStatus === "failed") {
+    return { ...message, isPending: false };
+  }
+
+  if (
+    !message.deliveryStatus ||
+    message.deliveryStatus === "pending" ||
+    message.deliveryStatus === "processing"
+  ) {
+    return {
+      ...message,
+      isPending: false,
+      deliveryStatus: "sent",
+    };
+  }
+
+  return { ...message, isPending: false };
+}
+
+export function mergeIncomingChatMessage(
+  previous: ChatMessageData | null | undefined,
+  incoming: ChatMessageData,
+): ChatMessageData {
+  const merged: ChatMessageData = {
+    ...incoming,
+    deliveryStatus: incoming.deliveryStatus ?? previous?.deliveryStatus,
+    attachmentPending:
+      incoming.attachmentPending ?? previous?.attachmentPending,
+    attachmentFailed: incoming.attachmentFailed ?? previous?.attachmentFailed,
+    isPending: false,
+  };
+
+  if (merged.senderType === "user") {
+    return normalizeOutboundDeliveryStatus(merged);
+  }
+
+  return merged;
+}
 
 export function hasMessageMetadataChanged(
   previous: ChatMessageData,

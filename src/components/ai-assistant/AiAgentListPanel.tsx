@@ -18,7 +18,6 @@ type AiAgentListPanelProps = {
   activeAgentId: string | null;
   isNewAgent: boolean;
   searchQuery: string;
-  activeTab: "agents";
 };
 
 function matchesSearch(agent: AiAgentItem, query: string): boolean {
@@ -55,7 +54,6 @@ export function AiAgentListPanel({
   activeAgentId,
   isNewAgent,
   searchQuery,
-  activeTab,
 }: AiAgentListPanelProps) {
   const filteredAgents = agents.filter(
     (agent) =>
@@ -65,8 +63,8 @@ export function AiAgentListPanel({
 
   function hrefForAgent(agentId: string | null) {
     return buildAiAssistantHref({
+      section: "agents",
       channel: activeChannelFilter,
-      tab: activeTab,
       agent: agentId,
       q: searchQuery || null,
     });

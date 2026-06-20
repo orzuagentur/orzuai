@@ -32,8 +32,10 @@ import type {
 } from "@/types/dashboard.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
+  getAgentRunsMetrics,
   getAutomationOpsMetrics,
   listAgentsAnalyticsRollup,
+  listRecentAgentRuns,
 } from "@/services/analytics-ai-ops.service";
 import {
   buildAnalyticsAttentionFeed,
@@ -72,6 +74,9 @@ const EMPTY_AI_PERFORMANCE: AiPerformanceMetrics = {
   estimatedMinutesSaved: 0,
   aiReplies: 0,
   humanReplies: 0,
+  assistantOnlyReplies: 0,
+  delegatedAgentReplies: 0,
+  delegatedSharePercent: 0,
 };
 
 const EMPTY_AI_COST: AiCostMetrics = {
@@ -177,11 +182,13 @@ export async function getAiPerformanceMetrics(
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("sender_type, ai_generated")
+    .select("sender_type, ai_generated, ai_agent_id")
     .in("conversation_id", conversationIds);
 
   let aiReplies = 0;
   let humanReplies = 0;
+  let assistantOnlyReplies = 0;
+  let delegatedAgentReplies = 0;
 
   for (const message of messages ?? []) {
     if (message.sender_type === "client") {
@@ -190,6 +197,12 @@ export async function getAiPerformanceMetrics(
 
     if (message.ai_generated || message.sender_type === "ai") {
       aiReplies += 1;
+
+      if (message.ai_agent_id) {
+        delegatedAgentReplies += 1;
+      } else {
+        assistantOnlyReplies += 1;
+      }
     } else if (message.sender_type === "user") {
       humanReplies += 1;
     }
@@ -200,6 +213,10 @@ export async function getAiPerformanceMetrics(
     outboundTotal > 0 ? Math.round((aiReplies / outboundTotal) * 100) : 0;
   const handoffRate =
     outboundTotal > 0 ? Math.round((humanReplies / outboundTotal) * 100) : 0;
+  const delegatedSharePercent =
+    aiReplies > 0
+      ? Math.round((delegatedAgentReplies / aiReplies) * 100)
+      : 0;
 
   return {
     aiResolutionRate,
@@ -207,6 +224,9 @@ export async function getAiPerformanceMetrics(
     estimatedMinutesSaved: aiReplies * 2,
     aiReplies,
     humanReplies,
+    assistantOnlyReplies,
+    delegatedAgentReplies,
+    delegatedSharePercent,
   };
 }
 
@@ -720,6 +740,17 @@ const EMPTY_AUTOMATION_OPS = {
   topTriggers: [],
 };
 
+const EMPTY_AGENT_RUNS = {
+  runsToday: 0,
+  runsLast30Days: 0,
+  successRatePercent: 0,
+  failedRunsLast30Days: 0,
+  intentRoutesLast30Days: 0,
+  keywordRoutesLast30Days: 0,
+  assistantOnlyLast30Days: 0,
+  actionsAppliedLast30Days: 0,
+};
+
 export async function getAnalyticsPageData(input?: {
   tab?: string;
   period?: string;
@@ -755,6 +786,8 @@ export async function getAnalyticsPageData(input?: {
       sentiment: EMPTY_SENTIMENT,
       agentsRollup: [],
       automationOps: EMPTY_AUTOMATION_OPS,
+      agentRuns: EMPTY_AGENT_RUNS,
+      recentAgentRuns: [],
     };
   }
 
@@ -771,6 +804,8 @@ export async function getAnalyticsPageData(input?: {
     pulseBase,
     agentsRollup,
     automationOps,
+    agentRuns,
+    recentAgentRuns,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     getAiPerformanceMetrics(businessId),
@@ -784,6 +819,8 @@ export async function getAnalyticsPageData(input?: {
     getAnalyticsPulseData(businessId, activePeriod),
     listAgentsAnalyticsRollup(businessId),
     getAutomationOpsMetrics(businessId),
+    getAgentRunsMetrics(businessId),
+    listRecentAgentRuns(businessId),
   ]);
 
   const attention = await buildAnalyticsAttentionFeed({
@@ -829,5 +866,7 @@ export async function getAnalyticsPageData(input?: {
     sentiment,
     agentsRollup,
     automationOps,
+    agentRuns,
+    recentAgentRuns,
   };
 }

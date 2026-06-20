@@ -11,13 +11,9 @@ import {
   type ReactNode,
 } from "react";
 
-import type { AiAssistantTab } from "@/utils/ai-assistant-url";
-
 export type AiAssistantChromeConfig = {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  activeTab?: AiAssistantTab;
-  onTabChange?: (tab: AiAssistantTab) => void;
   onNewAgent?: () => void;
   showSearch: boolean;
   showNewAgent: boolean;
@@ -37,7 +33,6 @@ function chromePrimitivesEqual(
 ): boolean {
   return (
     a.searchQuery === b.searchQuery &&
-    a.activeTab === b.activeTab &&
     a.showSearch === b.showSearch &&
     a.showNewAgent === b.showNewAgent
   );
@@ -64,7 +59,6 @@ export function AiAssistantChromeProvider({ children }: { children: ReactNode })
 
       if (
         prev.onSearchChange !== next.onSearchChange ||
-        prev.onTabChange !== next.onTabChange ||
         prev.onNewAgent !== next.onNewAgent
       ) {
         return next;
@@ -105,11 +99,9 @@ export function useAiAssistantChromeRegistration(
     config !== null && typeof config.onSearchChange === "function";
 
   const searchQuery = config?.searchQuery ?? "";
-  const activeTab = config?.activeTab ?? "agents";
   const showSearch = config?.showSearch ?? false;
   const showNewAgent = config?.showNewAgent ?? false;
   const onSearchChange = config?.onSearchChange;
-  const onTabChange = config?.onTabChange;
   const onNewAgent = config?.onNewAgent;
 
   useEffect(() => {
@@ -127,8 +119,6 @@ export function useAiAssistantChromeRegistration(
     setChrome({
       searchQuery,
       onSearchChange,
-      activeTab,
-      ...(onTabChange ? { onTabChange } : {}),
       onNewAgent,
       showSearch,
       showNewAgent,
@@ -140,11 +130,9 @@ export function useAiAssistantChromeRegistration(
   }, [
     enabled,
     searchQuery,
-    activeTab,
     showSearch,
     showNewAgent,
     onSearchChange,
-    onTabChange,
     onNewAgent,
   ]);
 }

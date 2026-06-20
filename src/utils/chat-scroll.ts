@@ -16,3 +16,8 @@ export function scrollChatToBottom(
     behavior,
   });
 }
+
+/** Sets scroll position synchronously — no visible scroll animation. */
+export function setChatScrollToBottomInstant(container: HTMLElement): void {
+  container.scrollTop = container.scrollHeight;
+}

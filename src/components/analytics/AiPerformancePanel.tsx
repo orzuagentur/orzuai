@@ -34,6 +34,16 @@ export function AiPerformancePanel({ metrics }: AiPerformancePanelProps) {
       value: `${metrics.aiReplies} / ${metrics.humanReplies}`,
       description: ANALYTICS_MESSAGES.aiVsHumanDescription,
     },
+    {
+      label: ANALYTICS_MESSAGES.aiAssistantOnlyReplies,
+      value: String(metrics.assistantOnlyReplies),
+      description: ANALYTICS_MESSAGES.aiAssistantOnlyDescription,
+    },
+    {
+      label: ANALYTICS_MESSAGES.aiDelegatedReplies,
+      value: `${metrics.delegatedAgentReplies} (${metrics.delegatedSharePercent}%)`,
+      description: ANALYTICS_MESSAGES.aiDelegatedDescription,
+    },
   ];
 
   return (
