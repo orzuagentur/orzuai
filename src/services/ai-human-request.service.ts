@@ -3,6 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { scheduleAiHumanRequestPush } from "@/services/push-notifications.service";
+import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
+import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
+import {
+  incrementMessagingAnalytics,
+  insertChannelMessage,
+} from "@/services/messaging.service";
 import type { AiHumanRequest } from "@/types/ai-human-request.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { getMessagePreviewText } from "@/utils/chat-media";
@@ -181,6 +187,119 @@ export async function dismissAiHumanRequest(input: {
   }
 
   return (count ?? 0) > 0;
+}
+
+function buildManagerUnavailableMessage(language: string): string {
+  const normalized = language.trim().toLowerCase();
+
+  if (normalized.includes("russian") || normalized === "ru") {
+    return "К сожалению, сейчас нет свободного менеджера. Я продолжу помогать вам здесь — или попробуйте связаться чуть позже.";
+  }
+
+  if (normalized.includes("uzbek") || normalized === "uz") {
+    return "Afsuski, hozir bo'sh menejer yo'q. Men sizga shu yerda yordam berishda davom etaman — yoki biroz keyinroq qayta urinib ko'ring.";
+  }
+
+  return "Sorry, no team member is available right now. I'll keep helping you here — or you can try again a bit later.";
+}
+
+async function resolveAssistantLanguage(
+  admin: MessagingDbClient,
+  businessId: string,
+): Promise<string> {
+  const { data } = await admin
+    .from("ai_assistant_profile")
+    .select("language")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data?.language?.trim() || "English";
+}
+
+async function sendManagerUnavailableNotice(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+}): Promise<boolean> {
+  const recipientId = await resolveChannelRecipient(input.admin, {
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+  });
+
+  if (!recipientId) {
+    return false;
+  }
+
+  const language = await resolveAssistantLanguage(input.admin, input.businessId);
+  const content = buildManagerUnavailableMessage(language);
+
+  const delivery = await deliverChannelTextMessage({
+    admin: input.admin,
+    businessId: input.businessId,
+    channel: input.channel,
+    recipientId,
+    content,
+  });
+
+  if (!delivery.success) {
+    console.error(
+      "[ai-human-request] failed to notify customer about decline",
+      delivery.error,
+    );
+    return false;
+  }
+
+  await insertChannelMessage(input.admin, {
+    conversationId: input.conversationId,
+    channel: input.channel,
+    senderType: "ai",
+    content,
+    aiGenerated: true,
+  });
+
+  await incrementMessagingAnalytics(input.admin, input.businessId, input.channel, {
+    totalMessages: 1,
+    aiReplies: 1,
+  });
+
+  return true;
+}
+
+export async function declineAiHumanRequestWithNotice(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  requestId: string;
+}): Promise<{ success: boolean; customerNotified: boolean }> {
+  const { data: request } = await input.admin
+    .from("ai_human_requests")
+    .select("id, conversation_id, channel")
+    .eq("id", input.requestId)
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (!request) {
+    return { success: false, customerNotified: false };
+  }
+
+  const customerNotified = await sendManagerUnavailableNotice({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: request.conversation_id,
+    channel: request.channel as MessagingChannel,
+  });
+
+  const removed = await dismissAiHumanRequest({
+    admin: input.admin,
+    businessId: input.businessId,
+    requestId: input.requestId,
+  });
+
+  return {
+    success: removed,
+    customerNotified,
+  };
 }
 
 export function buildHumanRequestReplyContext(reason: string): string {

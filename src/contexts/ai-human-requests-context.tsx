@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { dismissAiHumanRequestAction } from "@/features/dashboard/actions/dismiss-ai-human-request";
+import { declineAiHumanRequestAction } from "@/features/dashboard/actions/decline-ai-human-request";
 import { fetchAiHumanRequestsAction } from "@/features/dashboard/actions/fetch-ai-human-requests";
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
@@ -27,6 +28,9 @@ type AiHumanRequestsContextValue = {
   refresh: () => Promise<void>;
   scheduleRefresh: () => void;
   dismissRequest: (requestId: string) => Promise<boolean>;
+  declineRequest: (
+    requestId: string,
+  ) => Promise<{ success: boolean; customerNotified: boolean }>;
 };
 
 const AiHumanRequestsContext = createContext<AiHumanRequestsContextValue | null>(
@@ -93,6 +97,20 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
 
     setRequests((current) => current.filter((item) => item.id !== requestId));
     return true;
+  }, []);
+
+  const declineRequest = useCallback(async (requestId: string) => {
+    const result = await declineAiHumanRequestAction(requestId);
+
+    if (!result.success) {
+      return { success: false, customerNotified: false };
+    }
+
+    setRequests((current) => current.filter((item) => item.id !== requestId));
+    return {
+      success: true,
+      customerNotified: result.customerNotified,
+    };
   }, []);
 
   const upsertRequest = useCallback((request: AiHumanRequest) => {
@@ -208,6 +226,7 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
         refresh,
         scheduleRefresh,
         dismissRequest,
+        declineRequest,
       }}
     >
       {children}

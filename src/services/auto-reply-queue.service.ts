@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import type { MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
@@ -25,7 +27,8 @@ type PendingAutoReply = {
   conversationId: string;
   messages: string[];
   sendReply: (text: string) => Promise<{ success: boolean }>;
-  timer: ReturnType<typeof setTimeout>;
+  debounceUntil: number;
+  backgroundTaskStarted: boolean;
 };
 
 const pendingByConversation = new Map<string, PendingAutoReply>();
@@ -42,6 +45,30 @@ function combineClientMessages(messages: string[]): string {
     .map((message) => message.trim())
     .filter(Boolean)
     .join("\n");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForDebounceQuiet(key: string): Promise<void> {
+  while (true) {
+    const pending = pendingByConversation.get(key);
+
+    if (!pending) {
+      return;
+    }
+
+    const remaining = pending.debounceUntil - Date.now();
+
+    if (remaining <= 0) {
+      return;
+    }
+
+    await sleep(Math.min(remaining, 250));
+  }
 }
 
 async function flushPendingAutoReply(key: string): Promise<void> {
@@ -76,6 +103,31 @@ async function flushPendingAutoReply(key: string): Promise<void> {
   }
 }
 
+function ensureBackgroundFlush(key: string): void {
+  const pending = pendingByConversation.get(key);
+
+  if (!pending || pending.backgroundTaskStarted) {
+    return;
+  }
+
+  pending.backgroundTaskStarted = true;
+
+  after(async () => {
+    try {
+      await waitForDebounceQuiet(key);
+      await flushPendingAutoReply(key);
+    } catch (error) {
+      console.error("[auto-reply-queue] background flush failed", error);
+
+      const stillPending = pendingByConversation.get(key);
+
+      if (stillPending) {
+        await notifyAutoReplyTyping(stillPending.conversationId, false);
+      }
+    }
+  });
+}
+
 export function scheduleDebouncedChannelAutoReply(
   input: ChannelAutoReplyJob,
 ): void {
@@ -89,15 +141,12 @@ export function scheduleDebouncedChannelAutoReply(
   const existing = pendingByConversation.get(key);
 
   if (existing) {
-    clearTimeout(existing.timer);
     existing.messages.push(trimmedMessage);
     existing.sendReply = input.sendReply;
-    existing.timer = setTimeout(() => {
-      void flushPendingAutoReply(key).catch((error) => {
-        console.error("[auto-reply-queue] flush failed", error);
-      });
-    }, AUTO_REPLY_DEBOUNCE_MS);
+    existing.admin = input.admin;
+    existing.debounceUntil = Date.now() + AUTO_REPLY_DEBOUNCE_MS;
     void notifyAutoReplyTyping(input.conversationId, true);
+    ensureBackgroundFlush(key);
     return;
   }
 
@@ -108,15 +157,13 @@ export function scheduleDebouncedChannelAutoReply(
     conversationId: input.conversationId,
     messages: [trimmedMessage],
     sendReply: input.sendReply,
-    timer: setTimeout(() => {
-      void flushPendingAutoReply(key).catch((error) => {
-        console.error("[auto-reply-queue] flush failed", error);
-      });
-    }, AUTO_REPLY_DEBOUNCE_MS),
+    debounceUntil: Date.now() + AUTO_REPLY_DEBOUNCE_MS,
+    backgroundTaskStarted: false,
   };
 
   pendingByConversation.set(key, pending);
   void notifyAutoReplyTyping(input.conversationId, true);
+  ensureBackgroundFlush(key);
 }
 
 export function getAutoReplyDebounceMs(): number {

@@ -8,6 +8,7 @@ import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-co
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardInboundAlerts } from "@/components/dashboard/DashboardInboundAlerts";
+import { AiHumanRequestOverlay } from "@/components/dashboard/AiHumanRequestOverlay";
 import { DashboardAiHumanAlerts } from "@/components/dashboard/DashboardAiHumanAlerts";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { AiHumanRequestsProvider } from "@/contexts/ai-human-requests-context";
@@ -43,6 +44,7 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
               </SidebarInset>
             </SidebarProvider>
             <PlatformCopilotWidget />
+            <AiHumanRequestOverlay />
             </AiAssistantChromeProvider>
           </ContactsChromeProvider>
         </InboxChromeProvider>
