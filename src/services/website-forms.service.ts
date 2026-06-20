@@ -25,7 +25,7 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
-import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
+import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import {
   findContactForChannel,
@@ -390,7 +390,7 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
-  const reply = await generateChannelAutoReply({
+  const reply = await generateFastAssistantReply({
     admin,
     businessId,
     channel: "website_forms",

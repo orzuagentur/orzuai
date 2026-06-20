@@ -6,12 +6,11 @@ import { getDefaultGeminiModel } from "@/lib/env";
 import { buildAssistantSystemPrompt } from "@/lib/ai-assistant/build-assistant-system-prompt";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
-  buildHumanRequestReplyContext,
+  buildHumanHandoffFollowUpMessage,
   createAiHumanRequest,
 } from "@/services/ai-human-request.service";
 import {
   applyPreparedExecutorPlan,
-  buildCrmActionsReplyContext,
   loadContactSnapshot,
 } from "@/services/agent-task-executor.service";
 import { generateAssistantReply } from "@/services/llm.service";
@@ -22,8 +21,6 @@ import {
   resolveAgentRoutingFromClassification,
 } from "@/services/intent-router.service";
 import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
-import type { AgentExecutorResult } from "@/types/agent-executor.types";
-import type { AgentRoutingResult } from "@/services/intent-router.service";
 import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import { isAgentGoalId } from "@/lib/ai-assistant/infer-agent-goal";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
@@ -54,6 +51,21 @@ export type AutoReplyGenerationFailure = {
 export type AutoReplyGenerationResult =
   | AutoReplyGenerationSuccess
   | AutoReplyGenerationFailure;
+
+type AutoReplyPrep = {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  clientMessage: string;
+  conversationId?: string | null;
+  conversationHistory: ConversationTurn[];
+  profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
+  systemPrompt: string;
+  provider: "gemini";
+  model: string;
+  language: string;
+  knowledgeEntries: Awaited<ReturnType<typeof retrieveKnowledgeForMessage>>;
+};
 
 async function fetchConversationHistory(
   admin: MessagingDbClient,
@@ -154,7 +166,7 @@ function resolveAgentGoal(
   return agent.goal;
 }
 
-export async function generateChannelAutoReply(input: {
+async function prepareAutoReplyContext(input: {
   admin: MessagingDbClient;
   businessId: string;
   channel: MessagingChannel;
@@ -162,7 +174,10 @@ export async function generateChannelAutoReply(input: {
   conversationId?: string | null;
   conversationHistory?: ConversationTurn[];
   requireAiEnabled?: boolean;
-}): Promise<AutoReplyGenerationResult> {
+}): Promise<
+  | { success: true; prep: AutoReplyPrep }
+  | { success: false; failure: AutoReplyGenerationFailure }
+> {
   const requireAiEnabled = input.requireAiEnabled ?? true;
 
   const { data: aiSettings } = await input.admin
@@ -173,11 +188,17 @@ export async function generateChannelAutoReply(input: {
     .maybeSingle();
 
   if (!aiSettings) {
-    return { success: false, reason: "settings_missing" };
+    return {
+      success: false,
+      failure: { success: false, reason: "settings_missing" },
+    };
   }
 
   if (requireAiEnabled && !aiSettings.ai_enabled) {
-    return { success: false, reason: "ai_disabled" };
+    return {
+      success: false,
+      failure: { success: false, reason: "ai_disabled" },
+    };
   }
 
   const profile = await resolveAssistantProfile(input.admin, input.businessId);
@@ -197,114 +218,54 @@ export async function generateChannelAutoReply(input: {
     businessId: input.businessId,
     query: input.clientMessage,
   });
-  const agents = await fetchRoutableAgents(input.admin, input.businessId);
 
-  const contactId =
-    input.conversationId != null
-      ? await resolveConversationContactId(input.admin, input.conversationId)
-      : null;
-
-  const contact =
-    contactId != null
-      ? await loadContactSnapshot(input.admin, input.businessId, contactId)
-      : null;
-
-  const orchestration = await runAutoReplyOrchestrator({
-    businessId: input.businessId,
-    message: input.clientMessage,
-    conversationHistory,
-    contact,
-  });
-
-  let routing: AgentRoutingResult;
-  let executorResult: AgentExecutorResult;
-
-  let humanRequestReason = "";
-
-  if (orchestration) {
-    routing = resolveAgentRoutingFromClassification({
-      agents,
+  return {
+    success: true,
+    prep: {
+      admin: input.admin,
+      businessId: input.businessId,
       channel: input.channel,
-      message: input.clientMessage,
-      classification: {
-        intent: orchestration.intent,
-        confidence: orchestration.confidence,
-      },
-    });
+      clientMessage: input.clientMessage,
+      conversationId: input.conversationId,
+      conversationHistory,
+      profile,
+      systemPrompt,
+      provider,
+      model,
+      language,
+      knowledgeEntries,
+    },
+  };
+}
 
-    const agentGoal =
-      resolveAgentGoal(routing.agent) ??
-      mapIntentToAgentGoal(orchestration.intent);
+/** Fast path: one Gemini call, reply text only — no CRM/orchestrator wait. */
+export async function generateFastAssistantReply(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  clientMessage: string;
+  conversationId?: string | null;
+  conversationHistory?: ConversationTurn[];
+  requireAiEnabled?: boolean;
+}): Promise<AutoReplyGenerationResult> {
+  const prepared = await prepareAutoReplyContext(input);
 
-    executorResult =
-      contactId != null
-        ? await applyPreparedExecutorPlan({
-            admin: input.admin,
-            businessId: input.businessId,
-            contactId,
-            conversationId: input.conversationId,
-            channel: input.channel,
-            clientMessage: input.clientMessage,
-            agent: routing.agent,
-            goal: agentGoal,
-            routingMethod: routing.method,
-            plan: orchestratorResponseToExecutorPlan(orchestration),
-          })
-        : {
-            success: true,
-            actionsApplied: [],
-            clientSummary: "",
-            rawPlan: null,
-          };
-
-    if (
-      orchestration.needsHuman &&
-      input.conversationId != null
-    ) {
-      humanRequestReason =
-        orchestration.humanReason?.trim() ||
-        "Customer needs a real person";
-
-      await createAiHumanRequest({
-        admin: input.admin,
-        businessId: input.businessId,
-        conversationId: input.conversationId,
-        channel: input.channel,
-        contactId,
-        contactName: contact?.name,
-        reason: humanRequestReason,
-        messagePreview: input.clientMessage,
-      });
-    }
-  } else {
-    routing = resolveAgentRoutingFromClassification({
-      agents,
-      channel: input.channel,
-      message: input.clientMessage,
-      classification: null,
-    });
-
-    executorResult = {
-      success: true,
-      actionsApplied: [],
-      clientSummary: "",
-      rawPlan: null,
-    };
+  if (!prepared.success) {
+    return prepared.failure;
   }
 
+  const { prep } = prepared;
+
   const reply = await generateAssistantReply({
-    businessId: input.businessId,
-    conversationId: input.conversationId ?? undefined,
-    provider,
-    model,
-    systemPrompt:
-      systemPrompt +
-      buildCrmActionsReplyContext(executorResult.clientSummary) +
-      buildHumanRequestReplyContext(humanRequestReason),
-    language,
-    userMessage: input.clientMessage,
-    knowledgeContext: mapKnowledgeForLlm(knowledgeEntries),
-    conversationHistory,
+    businessId: prep.businessId,
+    conversationId: prep.conversationId ?? undefined,
+    provider: prep.provider,
+    model: prep.model,
+    systemPrompt: prep.systemPrompt,
+    language: prep.language,
+    userMessage: prep.clientMessage,
+    knowledgeContext: mapKnowledgeForLlm(prep.knowledgeEntries),
+    conversationHistory: prep.conversationHistory,
   });
 
   if (!reply.success) {
@@ -318,11 +279,130 @@ export async function generateChannelAutoReply(input: {
   return {
     success: true,
     text: reply.data.text,
-    matchedAgentId: routing.agent?.id ?? null,
-    matchedAgentName: routing.agent?.name ?? null,
-    provider,
-    model,
+    matchedAgentId: null,
+    matchedAgentName: null,
+    provider: prep.provider,
+    model: prep.model,
   };
+}
+
+/** Background: orchestrator + CRM + owner alert (+ optional follow-up to customer). */
+export async function runAutoReplyBackgroundOrchestration(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+  language: string;
+  sendFollowUp?: (text: string) => Promise<{ success: boolean }>;
+}): Promise<void> {
+  const conversationHistory = await fetchConversationHistory(
+    input.admin,
+    input.conversationId,
+  );
+
+  const agents = await fetchRoutableAgents(input.admin, input.businessId);
+
+  const contactId = await resolveConversationContactId(
+    input.admin,
+    input.conversationId,
+  );
+
+  const contact =
+    contactId != null
+      ? await loadContactSnapshot(input.admin, input.businessId, contactId)
+      : null;
+
+  const orchestration = await runAutoReplyOrchestrator({
+    businessId: input.businessId,
+    message: input.clientMessage,
+    conversationHistory,
+    contact,
+  });
+
+  if (!orchestration) {
+    resolveAgentRoutingFromClassification({
+      agents,
+      channel: input.channel,
+      message: input.clientMessage,
+      classification: null,
+    });
+    return;
+  }
+
+  const routing = resolveAgentRoutingFromClassification({
+    agents,
+    channel: input.channel,
+    message: input.clientMessage,
+    classification: {
+      intent: orchestration.intent,
+      confidence: orchestration.confidence,
+    },
+  });
+
+  const agentGoal =
+    resolveAgentGoal(routing.agent) ??
+    mapIntentToAgentGoal(orchestration.intent);
+
+  if (contactId != null) {
+    await applyPreparedExecutorPlan({
+      admin: input.admin,
+      businessId: input.businessId,
+      contactId,
+      conversationId: input.conversationId,
+      channel: input.channel,
+      clientMessage: input.clientMessage,
+      agent: routing.agent,
+      goal: agentGoal,
+      routingMethod: routing.method,
+      plan: orchestratorResponseToExecutorPlan(orchestration),
+    });
+  }
+
+  if (!orchestration.needsHuman) {
+    return;
+  }
+
+  const humanReason =
+    orchestration.humanReason?.trim() || "Customer needs a real person";
+
+  await createAiHumanRequest({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    contactId,
+    contactName: contact?.name,
+    reason: humanReason,
+    messagePreview: input.clientMessage,
+  });
+
+  if (!input.sendFollowUp) {
+    return;
+  }
+
+  const followUpText = buildHumanHandoffFollowUpMessage(input.language);
+  const followUpResult = await input.sendFollowUp(followUpText);
+
+  if (!followUpResult.success) {
+    console.warn(
+      "[auto-reply-pipeline]",
+      JSON.stringify({ error: "human_follow_up_send_failed" }),
+    );
+  }
+}
+
+/** @deprecated Prefer generateFastAssistantReply for inbound auto-reply. */
+export async function generateChannelAutoReply(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  clientMessage: string;
+  conversationId?: string | null;
+  conversationHistory?: ConversationTurn[];
+  requireAiEnabled?: boolean;
+}): Promise<AutoReplyGenerationResult> {
+  return generateFastAssistantReply(input);
 }
 
 export async function isChannelAutoReplyEnabled(input: {

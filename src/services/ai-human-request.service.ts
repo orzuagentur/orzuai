@@ -316,3 +316,17 @@ export function buildHumanRequestReplyContext(reason: string): string {
     "Tell the customer that a real person will join the conversation shortly. Stay helpful but do not pretend you already solved what needs a human.",
   ].join("\n");
 }
+
+export function buildHumanHandoffFollowUpMessage(language: string): string {
+  const normalized = language.trim().toLowerCase();
+
+  if (normalized.includes("russian") || normalized === "ru") {
+    return "Я передал запрос менеджеру — он подключится к диалогу, как только освободится.";
+  }
+
+  if (normalized.includes("uzbek") || normalized === "uz") {
+    return "So'rovingizni menejerga yetkazdim — u bo'shagan zahoti suhbatga qo'shiladi.";
+  }
+
+  return "I've notified our team — a manager will join this chat as soon as they're available.";
+}

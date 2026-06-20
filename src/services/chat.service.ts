@@ -10,7 +10,7 @@ import {
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
+import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
 import {
   createOutboundMessageDelivery,
   insertChannelMessage,
@@ -1161,7 +1161,7 @@ export async function suggestConversationReply(
   }
 
   const admin = createAdminClient();
-  const reply = await generateChannelAutoReply({
+  const reply = await generateFastAssistantReply({
     admin,
     businessId,
     channel: conversation.channel,

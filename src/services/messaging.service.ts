@@ -1,9 +1,14 @@
 import "server-only";
 
+import { after } from "next/server";
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { generateChannelAutoReply, isChannelAutoReplyEnabled } from "@/services/auto-reply-pipeline.service";
+import {
+  generateFastAssistantReply,
+  isChannelAutoReplyEnabled,
+  runAutoReplyBackgroundOrchestration,
+} from "@/services/auto-reply-pipeline.service";
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/auto-reply-queue.service";
 import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
@@ -435,7 +440,7 @@ export async function processChannelAutoReply(input: {
     return;
   }
 
-  const reply = await generateChannelAutoReply({
+  const reply = await generateFastAssistantReply({
     admin,
     businessId,
     channel,
@@ -475,6 +480,56 @@ export async function processChannelAutoReply(input: {
     totalMessages: 1,
     aiReplies: 1,
   });
+
+  const preparedLanguage = await resolveAutoReplyLanguage(admin, businessId);
+
+  after(async () => {
+    try {
+      await runAutoReplyBackgroundOrchestration({
+        admin,
+        businessId,
+        channel,
+        conversationId,
+        clientMessage,
+        language: preparedLanguage,
+        sendFollowUp: async (text) => {
+          const result = await sendReply(text);
+
+          if (result.success) {
+            await insertChannelMessage(admin, {
+              conversationId,
+              channel,
+              senderType: "ai",
+              content: text,
+              aiGenerated: true,
+            });
+
+            await incrementMessagingAnalytics(admin, businessId, channel, {
+              totalMessages: 1,
+              aiReplies: 1,
+            });
+          }
+
+          return result;
+        },
+      });
+    } catch (error) {
+      console.error("[messaging] background auto-reply orchestration failed", error);
+    }
+  });
+}
+
+async function resolveAutoReplyLanguage(
+  admin: MessagingDbClient,
+  businessId: string,
+): Promise<string> {
+  const { data } = await admin
+    .from("ai_assistant_profile")
+    .select("language")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data?.language?.trim() || "English";
 }
 
 export function scheduleChannelAutoReply(

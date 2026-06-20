@@ -9,7 +9,7 @@ import { notifyAutoReplyTyping } from "@/services/auto-reply-inbox-status.servic
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-const AUTO_REPLY_DEBOUNCE_MS = 3_000;
+const AUTO_REPLY_DEBOUNCE_MS = 1_500;
 
 type ChannelAutoReplyJob = {
   admin: MessagingDbClient;
@@ -122,6 +122,7 @@ function ensureBackgroundFlush(key: string): void {
       const stillPending = pendingByConversation.get(key);
 
       if (stillPending) {
+        stillPending.backgroundTaskStarted = false;
         await notifyAutoReplyTyping(stillPending.conversationId, false);
       }
     }
@@ -145,6 +146,7 @@ export function scheduleDebouncedChannelAutoReply(
     existing.sendReply = input.sendReply;
     existing.admin = input.admin;
     existing.debounceUntil = Date.now() + AUTO_REPLY_DEBOUNCE_MS;
+    existing.backgroundTaskStarted = false;
     void notifyAutoReplyTyping(input.conversationId, true);
     ensureBackgroundFlush(key);
     return;

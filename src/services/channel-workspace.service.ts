@@ -25,7 +25,7 @@ import {
   getProviderAvailability,
   isProviderConfigured,
 } from "@/services/llm.service";
-import { generateChannelAutoReply } from "@/services/auto-reply-pipeline.service";
+import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
@@ -457,7 +457,7 @@ export async function testChannelAiReply(
 
   const admin = createAdminClient();
 
-  const reply = await generateChannelAutoReply({
+  const reply = await generateFastAssistantReply({
     admin,
     businessId,
     channel: parsed.data.channel,
