@@ -20,7 +20,6 @@ import {
   isDialog360SandboxMode,
 } from "@/lib/whatsapp/constants";
 import {
-  sendWhatsAppTextMessage,
   set360DialogWebhook,
   verifyWhatsAppCredentials,
 } from "@/lib/whatsapp/client";
@@ -842,7 +841,6 @@ async function completeInboundWhatsAppMessage(input: {
     conversationId,
     createdContact,
     content,
-    normalizedPhone,
   } = input;
 
   await incrementMessagingAnalytics(admin, businessId, "whatsapp", {
@@ -861,20 +859,6 @@ async function completeInboundWhatsAppMessage(input: {
     channel: "whatsapp",
     conversationId,
     clientMessage: getMessagePlainText(content),
-    sendReply: async (text) => {
-      if (!connection.meta_phone_number_id || !connection.meta_access_token) {
-        return { success: false };
-      }
-
-      const sendResult = await sendWhatsAppTextMessage(
-        connection.meta_phone_number_id,
-        connection.meta_access_token,
-        normalizedPhone.replace(/^\+/, ""),
-        text,
-      );
-
-      return { success: sendResult.success };
-    },
   });
 }
 

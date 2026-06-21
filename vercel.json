@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/messaging-health",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-health",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/knowledge-embeddings",
+      "schedule": "0 3 * * *"
     }
   ]
 }

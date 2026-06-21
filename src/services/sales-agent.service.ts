@@ -131,6 +131,7 @@ export async function processSalesAgentRules(input: {
 
   const aiResult = await generateText({
     businessId: input.businessId,
+    callType: "bant",
     prompt: `${BANT_PROMPT}\n${input.message}`,
     systemInstruction:
       "You are a B2B sales analyst. Score BANT dimensions from 0 to 100.",

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { generateText } from "@/services/llm.service";
+import { generateTextWithFallback } from "@/services/llm.service";
 import type { ContactSnapshot } from "@/services/agent-task-executor.service";
 import {
   orchestratorResponseSchema,
@@ -11,6 +11,21 @@ type ConversationTurn = {
   role: "user" | "assistant";
   content: string;
 };
+
+export type OrchestratorFailureCode =
+  | "llm_failed"
+  | "invalid_json"
+  | "validation_failed";
+
+export type OrchestratorRunResult =
+  | { success: true; data: OrchestratorResponse; usedProvider?: string }
+  | {
+      success: false;
+      errorCode: OrchestratorFailureCode;
+      errorMessage: string;
+      rawText?: string;
+      attemptedProviders?: string[];
+    };
 
 function parseJsonObject(text: string): unknown | null {
   const trimmed = text.trim();
@@ -110,50 +125,64 @@ function buildOrchestratorPrompt(input: {
   ].join("\n");
 }
 
-export async function runAutoReplyOrchestrator(input: {
+async function requestOrchestratorJson(input: {
   businessId: string;
   message: string;
-  conversationHistory?: ConversationTurn[];
+  conversationHistory: ConversationTurn[];
   contact: ContactSnapshot | null;
-}): Promise<OrchestratorResponse | null> {
-  const conversationHistory = input.conversationHistory ?? [];
+}): Promise<
+  | { success: true; text: string; usedProvider?: string }
+  | { success: false; errorMessage: string; attemptedProviders: string[] }
+> {
+  const prompt = buildOrchestratorPrompt(input);
 
-  const result = await generateText({
+  const result = await generateTextWithFallback({
     businessId: input.businessId,
-    provider: "gemini",
-    skipUsageLog: true,
-    skipUsageLimit: true,
+    callType: "orchestrator",
+    preferredProvider: "gemini",
     systemInstruction:
       "You route customer messages and plan CRM updates for a business inbox. Reply with valid JSON only. confidence is 0 to 1. Never invent contact details. Set needsHuman when a real business owner must join the chat.",
-    prompt: buildOrchestratorPrompt({
-      message: input.message,
-      conversationHistory,
-      contact: input.contact,
-    }),
+    prompt,
   });
 
   if (!result.success) {
-    console.warn(
-      "[ai-orchestrator]",
-      JSON.stringify({ error: result.error.message }),
-    );
-    return null;
+    return {
+      success: false,
+      errorMessage: result.error.message,
+      attemptedProviders: result.attemptedProviders,
+    };
   }
 
-  const parsed = parseJsonObject(result.data.text);
+  return {
+    success: true,
+    text: result.data.text,
+    usedProvider: result.usedProvider,
+  };
+}
+
+function validateOrchestratorResponse(
+  rawText: string,
+): OrchestratorRunResult | null {
+  const parsed = parseJsonObject(rawText);
 
   if (!parsed) {
-    return null;
+    return {
+      success: false,
+      errorCode: "invalid_json",
+      errorMessage: "Orchestrator returned invalid JSON.",
+      rawText: rawText.slice(0, 500),
+    };
   }
 
   const validated = orchestratorResponseSchema.safeParse(parsed);
 
   if (!validated.success) {
-    console.warn(
-      "[ai-orchestrator]",
-      JSON.stringify({ error: "invalid_orchestrator_json" }),
-    );
-    return null;
+    return {
+      success: false,
+      errorCode: "validation_failed",
+      errorMessage: "Orchestrator JSON failed schema validation.",
+      rawText: rawText.slice(0, 500),
+    };
   }
 
   console.info(
@@ -170,5 +199,86 @@ export async function runAutoReplyOrchestrator(input: {
     }),
   );
 
-  return validated.data;
+  return { success: true, data: validated.data };
 }
+
+export async function runAutoReplyOrchestrator(input: {
+  businessId: string;
+  message: string;
+  conversationHistory?: ConversationTurn[];
+  contact: ContactSnapshot | null;
+}): Promise<OrchestratorRunResult> {
+  const conversationHistory = input.conversationHistory ?? [];
+
+  const firstAttempt = await requestOrchestratorJson({
+    businessId: input.businessId,
+    message: input.message,
+    conversationHistory,
+    contact: input.contact,
+  });
+
+  if (!firstAttempt.success) {
+    console.warn(
+      "[ai-orchestrator]",
+      JSON.stringify({
+        error: firstAttempt.errorMessage,
+        providers: firstAttempt.attemptedProviders,
+      }),
+    );
+
+    return {
+      success: false,
+      errorCode: "llm_failed",
+      errorMessage: firstAttempt.errorMessage,
+      attemptedProviders: firstAttempt.attemptedProviders,
+    };
+  }
+
+  const validated = validateOrchestratorResponse(firstAttempt.text);
+
+  if (validated?.success) {
+    return {
+      ...validated,
+      usedProvider: firstAttempt.usedProvider,
+    };
+  }
+
+  const retryAttempt = await requestOrchestratorJson({
+    businessId: input.businessId,
+    message: input.message,
+    conversationHistory,
+    contact: input.contact,
+  });
+
+  if (!retryAttempt.success) {
+    return validated ?? {
+      success: false,
+      errorCode: "llm_failed",
+      errorMessage: retryAttempt.errorMessage,
+      attemptedProviders: retryAttempt.attemptedProviders,
+    };
+  }
+
+  const retryValidated = validateOrchestratorResponse(retryAttempt.text);
+
+  if (retryValidated) {
+    if (retryValidated.success) {
+      return {
+        ...retryValidated,
+        usedProvider: retryAttempt.usedProvider,
+      };
+    }
+
+    return retryValidated;
+  }
+
+  return validated ?? {
+    success: false,
+    errorCode: "invalid_json",
+    errorMessage: "Orchestrator returned invalid JSON after retry.",
+    rawText: retryAttempt.text.slice(0, 500),
+  };
+}
+
+/** Legacy export — response shape lives in `@/types/ai-orchestrator.types`. */
+export type { OrchestratorResponse };

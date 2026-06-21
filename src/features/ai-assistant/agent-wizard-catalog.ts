@@ -30,16 +30,16 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
   {
     id: "sales",
     label: "Sales & leads",
-    description: "Qualify interest, answer product questions, and move deals forward.",
-    benefit: "Turn every message into a qualified lead",
+    description: "Background BANT-style qualification, deals, and lead tasks in CRM.",
+    benefit: "Auto-update CRM when customers ask about pricing or buying",
     icon: TargetIcon,
     iconId: "target",
     recommendedProvider: "openai",
     recommendedModel: "gpt-4o-mini",
     draft: {
-      name: "Sales agent",
+      name: "Sales CRM agent",
       systemPrompt:
-        "You are a sales assistant. Qualify leads from each message, answer product questions using the knowledge base, and suggest booking a call when intent is high. Be helpful, not pushy.",
+        "Background sales CRM agent. When customer messages imply purchase intent, plan CRM updates: lead score context, create deals, tasks, and notes. Do not write customer-facing chat text.",
       triggerKeywords: ["price", "buy", "demo", "cost", "budget", "interested"],
       enabled: false,
     },
@@ -47,15 +47,15 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
   {
     id: "support",
     label: "Customer support",
-    description: "Resolve FAQs from your knowledge base and escalate when needed.",
-    benefit: "Answer common questions instantly, 24/7",
+    description: "Background support tasks, notes, and escalation flags in CRM.",
+    benefit: "Log support issues and tasks without changing chat voice",
     icon: HeadphonesIcon,
     iconId: "headphones",
     recommendedProvider: "gemini",
     draft: {
-      name: "Support agent",
+      name: "Support CRM agent",
       systemPrompt:
-        "You are a customer support agent. Answer common questions from the knowledge base. If the issue needs a human, acknowledge it and ask for details.",
+        "Background support CRM agent. Plan CRM tasks and notes for customer issues. Escalate to human when needed. Do not write customer-facing chat text.",
       triggerKeywords: ["help", "issue", "problem", "support", "how"],
       enabled: false,
     },
@@ -63,16 +63,16 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
   {
     id: "booking",
     label: "Booking & scheduling",
-    description: "Collect date, time, and contact details for appointments.",
-    benefit: "Capture bookings without back-and-forth",
+    description: "Background booking tasks and contact detail capture in CRM.",
+    benefit: "Create booking tasks from appointment requests",
     icon: CalendarIcon,
     iconId: "calendar",
     recommendedProvider: "openai",
     recommendedModel: "gpt-4o-mini",
     draft: {
-      name: "Booking agent",
+      name: "Booking CRM agent",
       systemPrompt:
-        "You help customers schedule appointments. Collect preferred date, time, and contact details. Confirm availability politely and recap the booking clearly.",
+        "Background booking CRM agent. Plan tasks and contact updates when customers request appointments. Do not write customer-facing chat text.",
       triggerKeywords: ["book", "appointment", "schedule", "reserve", "slot"],
       enabled: false,
     },
@@ -86,9 +86,9 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
     iconId: "wrench",
     recommendedProvider: "gemini",
     draft: {
-      name: "Custom agent",
+      name: "Custom CRM agent",
       systemPrompt:
-        "You are a helpful business assistant. Answer customer questions clearly and professionally using the knowledge base. Escalate to a human when the request is complex or sensitive.",
+        "Background CRM agent with custom routing rules. Plan CRM updates from customer messages. Do not write customer-facing chat text.",
       triggerKeywords: [],
       enabled: false,
     },
@@ -96,9 +96,9 @@ export const AGENT_WIZARD_GOALS: AgentWizardGoal[] = [
 ];
 
 export const AGENT_WIZARD_STEPS = [
-  { id: 1, label: "Goal" },
+  { id: 1, label: "CRM goal" },
   { id: 2, label: "Channels" },
-  { id: 3, label: "AI model" },
+  { id: 3, label: "Background AI" },
   { id: 4, label: "Review" },
 ] as const;
 

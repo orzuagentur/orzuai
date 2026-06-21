@@ -1,6 +1,7 @@
 import "server-only";
 
 import { estimateAiCostUsd } from "@/lib/ai/cost";
+import type { AiCallType } from "@/lib/ai/call-types";
 import type { AiProvider } from "@/lib/ai/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -61,6 +62,7 @@ export async function logAiUsage(input: {
   inputTokens: number;
   outputTokens: number;
   billingSource?: "platform" | "customer";
+  callType?: AiCallType;
 }): Promise<void> {
   if (!hasSupabaseEnv()) {
     return;
@@ -82,6 +84,7 @@ export async function logAiUsage(input: {
     output_tokens: input.outputTokens,
     estimated_cost_usd: estimatedCostUsd,
     billing_source: input.billingSource ?? "platform",
+    call_type: input.callType ?? "other",
   });
 }
 

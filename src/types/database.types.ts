@@ -226,6 +226,8 @@ export type Database = {
           category: KnowledgeCategory;
           source: string;
           source_url: string | null;
+          embedding: string | null;
+          embedding_model: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -237,6 +239,8 @@ export type Database = {
           category: KnowledgeCategory;
           source?: string;
           source_url?: string | null;
+          embedding?: string | null;
+          embedding_model?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -248,6 +252,8 @@ export type Database = {
           category?: KnowledgeCategory;
           source?: string;
           source_url?: string | null;
+          embedding?: string | null;
+          embedding_model?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -721,6 +727,9 @@ export type Database = {
           last_sync_message_at: string | null;
           last_sync_message_id: string | null;
           total_message_count: number;
+          ai_summary: string | null;
+          ai_summary_updated_at: string | null;
+          ai_summary_message_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -742,6 +751,9 @@ export type Database = {
           last_sync_message_at?: string | null;
           last_sync_message_id?: string | null;
           total_message_count?: number;
+          ai_summary?: string | null;
+          ai_summary_updated_at?: string | null;
+          ai_summary_message_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -763,6 +775,9 @@ export type Database = {
           last_sync_message_at?: string | null;
           last_sync_message_id?: string | null;
           total_message_count?: number;
+          ai_summary?: string | null;
+          ai_summary_updated_at?: string | null;
+          ai_summary_message_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -1211,6 +1226,108 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_reply_jobs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          pending_messages: string[];
+          status: WebhookQueueStatus;
+          attempt_count: number;
+          max_attempts: number;
+          next_attempt_at: string;
+          needs_reprocess: boolean;
+          last_error: string | null;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          pending_messages?: string[];
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          needs_reprocess?: boolean;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          channel?: MessagingChannel;
+          pending_messages?: string[];
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          needs_reprocess?: boolean;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_orchestration_jobs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          client_message: string;
+          idempotency_key: string;
+          status: WebhookQueueStatus;
+          attempt_count: number;
+          max_attempts: number;
+          next_attempt_at: string;
+          last_error: string | null;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          client_message: string;
+          idempotency_key: string;
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          channel?: MessagingChannel;
+          client_message?: string;
+          idempotency_key?: string;
+          status?: WebhookQueueStatus;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       media_signed_url_cache: {
         Row: {
           storage_path: string;
@@ -1348,6 +1465,38 @@ export type Database = {
           },
         ];
       };
+      agent_crm_idempotency: {
+        Row: {
+          id: string;
+          business_id: string;
+          idempotency_key: string;
+          action_type: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          idempotency_key: string;
+          action_type: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          idempotency_key?: string;
+          action_type?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_crm_idempotency_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agent_runs: {
         Row: {
           id: string;
@@ -1466,6 +1615,7 @@ export type Database = {
           system_prompt: string;
           communication_style: string;
           language: string;
+          fallback_reply_message: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1475,6 +1625,7 @@ export type Database = {
           system_prompt: string;
           communication_style?: string;
           language?: string;
+          fallback_reply_message?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1484,6 +1635,7 @@ export type Database = {
           system_prompt?: string;
           communication_style?: string;
           language?: string;
+          fallback_reply_message?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1590,6 +1742,7 @@ export type Database = {
           output_tokens: number;
           estimated_cost_usd: number;
           billing_source: string;
+          call_type: string;
           created_at: string;
         };
         Insert: {
@@ -1602,6 +1755,7 @@ export type Database = {
           output_tokens?: number;
           estimated_cost_usd?: number;
           billing_source?: string;
+          call_type?: string;
           created_at?: string;
         };
         Update: {
@@ -1614,6 +1768,7 @@ export type Database = {
           output_tokens?: number;
           estimated_cost_usd?: number;
           billing_source?: string;
+          call_type?: string;
           created_at?: string;
         };
         Relationships: [
@@ -2114,6 +2269,41 @@ export type Database = {
           p_limit?: number;
         };
         Returns: Database["public"]["Tables"]["inbound_webhook_queue"]["Row"][];
+      };
+      claim_ai_reply_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["ai_reply_jobs"]["Row"][];
+      };
+      claim_ai_orchestration_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["ai_orchestration_jobs"]["Row"][];
+      };
+      match_knowledge_by_embedding: {
+        Args: {
+          p_business_id: string;
+          p_query_embedding: string;
+          p_match_count?: number;
+        };
+        Returns: {
+          id: string;
+          title: string;
+          content: string;
+          category: string;
+          similarity: number;
+        }[];
+      };
+      upsert_ai_reply_job: {
+        Args: {
+          p_business_id: string;
+          p_conversation_id: string;
+          p_channel: Database["public"]["Enums"]["messaging_channel"];
+          p_message: string;
+        };
+        Returns: string;
       };
       claim_message_delivery_jobs: {
         Args: {

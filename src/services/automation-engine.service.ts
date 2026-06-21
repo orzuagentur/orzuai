@@ -245,6 +245,7 @@ async function executeWorkflowAction(
     if (hasGeminiEnv() || agent) {
       const result = await generateText({
         businessId: context.businessId,
+        callType: "automation",
         provider: agent?.provider as "gemini" | "openai" | "claude" | undefined,
         model: agent?.model ?? undefined,
         prompt: [

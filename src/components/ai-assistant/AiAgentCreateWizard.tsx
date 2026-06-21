@@ -587,6 +587,10 @@ export function AiAgentCreateWizard({
                 </p>
               </div>
 
+              <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+                {AI_ASSISTANT_MESSAGES.crmAgentsVoiceNotice}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 {AGENT_WIZARD_GOALS.map((entry) => (
                   <button

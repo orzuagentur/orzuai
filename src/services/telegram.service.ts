@@ -10,7 +10,6 @@ import { hasSupabaseEnv } from "@/lib/env";
 import {
   deleteTelegramWebhook,
   getTelegramBotInfo,
-  sendTelegramTextMessage,
   setTelegramWebhook,
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -413,7 +412,6 @@ async function completeInboundTelegramMessage(input: {
     conversationId,
     createdContact,
     content,
-    message,
   } = input;
 
   await incrementMessagingAnalytics(admin, businessId, "telegram", {
@@ -432,19 +430,6 @@ async function completeInboundTelegramMessage(input: {
     channel: "telegram",
     conversationId,
     clientMessage: getMessagePlainText(content),
-    sendReply: async (text) => {
-      if (!connection.bot_token) {
-        return { success: false };
-      }
-
-      const sendResult = await sendTelegramTextMessage(
-        connection.bot_token,
-        message.chatId,
-        text,
-      );
-
-      return { success: sendResult.success };
-    },
   });
 }
 

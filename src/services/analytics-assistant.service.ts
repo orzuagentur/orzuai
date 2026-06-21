@@ -96,7 +96,7 @@ export async function askAnalyticsAssistant(input: {
 
   const aiResult = await generateText({
     businessId: business.id,
-    skipUsageLog: false,
+    callType: "analytics",
     prompt: [
       "You are an analytics assistant for a small business CRM.",
       "Use ONLY the JSON metrics below. Be concise and actionable.",

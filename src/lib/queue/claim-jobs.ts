@@ -81,3 +81,33 @@ export async function claimInboundMediaHydrationJob(
 
   return data?.[0] ?? null;
 }
+
+export async function claimAiReplyJobs(
+  limit: number,
+): Promise<Database["public"]["Tables"]["ai_reply_jobs"]["Row"][]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("claim_ai_reply_jobs", {
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+export async function claimAiOrchestrationJobs(
+  limit: number,
+): Promise<Database["public"]["Tables"]["ai_orchestration_jobs"]["Row"][]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("claim_ai_orchestration_jobs", {
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}

@@ -1,5 +1,7 @@
 # TASKS.md
 
+> **Roadmap files:** `TASKS.md` (product) · [`TasksCat.md`](TasksCat.md) (Inbox/Messaging perf) · [`TasksAI.md`](TasksAI.md) (AI platform production — CTO audit, 100k scale)
+
 ## Project Progress (MVP v1 + Version 2)
 
 ### Phase 1 - Foundation

@@ -9,23 +9,27 @@ export const AI_ASSISTANT_MESSAGES = {
   hubAssistantInfoTitle: "What the AI Assistant does",
   hubAssistantInfoBody:
     "The AI Assistant replies to customers around the clock on WhatsApp, Instagram, and Telegram. It answers questions, shares information from your knowledge base, and keeps conversations moving when your team is offline. Turn it on per channel — no agents required.",
-  hubAgentsTitle: "AI Agents",
+  hubAgentsTitle: "CRM Agents",
   hubAgentsDescription:
-    "Specialized assistants that take action in your CRM.",
-  hubAgentsInfoTitle: "What AI Agents do",
+    "Background executors that update CRM from customer conversations.",
+  hubAgentsInfoTitle: "What CRM Agents do",
   hubAgentsInfoBody:
-    "AI Agents understand customer intent and work in the background on CRM tasks: creating follow-up tasks, deals, and notes, and updating contact details from conversations. Create agents with clear goals and enable them when you are ready.",
+    "CRM Agents run in the background after the AI Assistant replies. They route intent, create tasks and deals, save notes, and update contacts. Customers always talk to your AI Assistant — not separate chat bots.",
   sectionAssistantTitle: "AI Assistant",
   sectionAssistantSubtitle:
     "Enable 24/7 auto-reply on each connected channel.",
-  sectionAgentsTitle: "AI Agents",
+  sectionAgentsTitle: "CRM Agents",
   sectionAgentsSubtitle:
-    "Create and manage agents that handle specialized CRM work.",
+    "Configure background executors for CRM automation — not separate customer chat bots.",
   backToAiHub: "Back to AI",
   tabAssistant: "AI Assistant",
-  tabAgents: "AI Agents",
+  tabAgents: "CRM Agents",
   assistantTabDescription:
-    "Turn the assistant on for each channel. It works independently of agents.",
+    "Turn the assistant on for each channel. One AI Assistant replies to all customers.",
+  assistantReplyEngineNote:
+    "Customer replies use your AI Assistant profile with platform AI (Gemini first, then OpenAI or Claude if needed). Per-channel model settings do not apply to inbound auto-reply.",
+  assistantContextLimitsNote:
+    "Context: rolling conversation summary + last 20 messages (40 on Pro). Knowledge Base uses semantic search when available.",
   assistantEdit: "Edit",
   assistantEditTitle: "AI Assistant settings",
   assistantEditFormDescription:
@@ -51,7 +55,7 @@ export const AI_ASSISTANT_MESSAGES = {
   channelAgentInactive: "No enabled AI agent on this channel",
   searchPlaceholder: "Search agents…",
   channelsTabDescription:
-    "Turn AI auto-reply on or off for each channel and configure model settings.",
+    "Turn AI auto-reply on or off for each channel. Replies use your AI Assistant profile.",
   channelsSummaryTitle: "Overview",
   channelsSummaryEnabled: (count: number, total: number) =>
     `${count} of ${total} channels active`,
@@ -61,20 +65,22 @@ export const AI_ASSISTANT_MESSAGES = {
   channelsKnowledgeHint:
     "Add FAQs and policies in Knowledge Base so AI answers accurately.",
   channelsAgentsHint:
-    "Need keyword routing or multiple agents? Open AI Agents for advanced setup.",
-  newAgent: "New agent",
-  wizardTitle: "Create AI agent",
+    "Need CRM routing by intent? Open CRM Agents to configure background executors.",
+  newAgent: "New CRM agent",
+  wizardTitle: "Create CRM agent",
   wizardSubtitle:
-    "Set a goal, channels, AI model, then review before going live.",
-  wizardStep1Title: "What should this agent do?",
+    "Pick a CRM goal, channels, and background AI model. Customers still hear only your AI Assistant.",
+  wizardStep1Title: "What should this agent do in CRM?",
   wizardStep1Description:
-    "Pick the main job for this agent. You can fine-tune instructions on the last step.",
+    "CRM agents do not change customer-facing replies. They run after the AI Assistant and update your CRM.",
+  crmAgentsVoiceNotice:
+    "All customer messages are answered by AI Assistant. This agent only handles background CRM work.",
   wizardStep2Title: "Where should it work?",
   wizardStep2Description:
     "Select connected channels. Connect new ones in Integrations if needed.",
-  wizardStep3Title: "Choose AI model",
+  wizardStep3Title: "Background AI model",
   wizardStep3Description:
-    "Use OrzuAI platform AI (included) or connect your own API key for custom models and cost tracking.",
+    "Model used for CRM planning and routing — not for customer chat replies.",
   wizardStep4Title: "Review and create",
   wizardStep4Description:
     "Confirm the name, instructions, and routing. Enable when you are ready to go live.",
@@ -137,9 +143,10 @@ export const AI_ASSISTANT_MESSAGES = {
   configureAgentTitle: "Agent settings",
   enableAgent: "Enable",
   disableAgent: "Disable",
-  agentViewSubtitle: "Saved configuration for this agent.",
+  agentViewSubtitle: "Background CRM executor configuration.",
   agentSavedSettingsTitle: "Saved settings",
-  agentSavedSettingsHint: "These are the current values stored for this agent.",
+  agentSavedSettingsHint:
+    "CRM routing and background AI settings. Customer replies always use AI Assistant.",
   agentStatus: "Status",
   agentDefaultRouting: "Default routing (no keywords)",
   aiProviderLabel: "AI provider",
@@ -179,18 +186,18 @@ export const AI_ASSISTANT_MESSAGES = {
   aiModelLabel: "AI model",
   aiLanguageLabel: "Reply language",
   sectionAiModel: "AI model & language",
-  sectionAiModelHint: "Choose which AI powers this agent's replies.",
+  sectionAiModelHint: "Model for background CRM planning — not customer chat replies.",
   editAgent: "Edit",
   agentAnalytics: "Analytics",
   agentAnalyticsTitle: "AI agent analytics",
   agentAnalyticsClose: "Back to agent",
-  agentAnalyticsEmpty: "No analytics yet. Stats appear after this agent sends replies.",
+  agentAnalyticsEmpty: "No CRM activity yet. Stats appear after this agent runs in the background.",
   agentAnalyticsContacts: "Contacts served",
-  agentAnalyticsContactsHint: "Unique customers who received replies from this agent.",
+  agentAnalyticsContactsHint: "Contacts where this agent applied CRM actions.",
   agentAnalyticsConversations: "Conversations",
-  agentAnalyticsConversationsHint: "Chats where this agent sent at least one reply.",
-  agentAnalyticsTotalReplies: "AI replies",
-  agentAnalyticsTotalRepliesHint: "Total messages sent by this agent.",
+  agentAnalyticsConversationsHint: "Conversations where this agent ran CRM automation.",
+  agentAnalyticsTotalReplies: "CRM runs",
+  agentAnalyticsTotalRepliesHint: "Background CRM runs logged for this agent.",
   agentAnalyticsLast7Days: "Last 7 days",
   agentAnalyticsLast30DaysCount: (count: number) => `${count} in the last 30 days`,
   agentAnalyticsAvgPerContact: "Avg replies per contact",
@@ -215,7 +222,7 @@ export const AI_ASSISTANT_MESSAGES = {
   wizardAddChannel: "Add new channel",
   communicationStyleLabel: "Communication style",
   communicationStyleHint:
-    "How the agent should sound when replying to customers.",
+    "Reference tone for CRM planning prompts. Does not change AI Assistant chat voice.",
   agentIconLabel: "Agent icon",
   agentIconHint: "Pick an icon to recognize this agent in the list.",
   sectionInstructions: "Instructions",
@@ -236,9 +243,9 @@ export const AI_ASSISTANT_MESSAGES = {
   goToIntegrations: "Connect channel",
   agentBuilderTitle: "Agent editor",
   agentBuilderDescription:
-    "Auto-replies run only through enabled agents. Leave keywords empty for the channel default agent; add keywords for specialists.",
+    "CRM agents route intent and update CRM in the background. AI Assistant handles every customer reply.",
   agentName: "Agent name",
-  agentPrompt: "System prompt",
+  agentPrompt: "CRM instructions",
   agentChannels: "Active channels",
   agentTriggers: "Trigger keywords (comma-separated)",
   agentTriggersHint:
@@ -248,7 +255,7 @@ export const AI_ASSISTANT_MESSAGES = {
   agentDefaultSummary: "Default · handles unmatched messages",
   agentRoutingConflictTitle: "Routing conflict",
   agentRoutingRuleHint:
-    "Each channel has one default agent (no keywords). Add more agents with trigger keywords for specialized replies.",
+    "Each channel has one default CRM agent (no keywords). Add keywords for specialized CRM routing.",
   agentKeywordsRequiredHint:
     "A default agent already exists on this channel. Add keywords to create a specialist agent.",
   agentCreate: "Create agent",
@@ -287,6 +294,6 @@ export const AI_ASSISTANT_MESSAGES = {
   followUpAgentStats: (count: number) =>
     count === 1 ? "1 follow-up sent so far." : `${count} follow-ups sent so far.`,
   channelsIntro:
-    "Channel defaults apply when no agent matches. Model and language are shared per channel.",
+    "Channel toggles control AI Assistant auto-reply only. Customer voice and language come from AI Assistant settings.",
   save: "Save",
 } as const;

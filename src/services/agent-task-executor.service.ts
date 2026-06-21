@@ -3,6 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
+import {
+  buildCrmActionIdempotencyKey,
+  buildExecutorPlanIdempotencyKey,
+  hasCrmIdempotencyKey,
+  recordCrmIdempotencyKey,
+} from "@/lib/crm/executor-idempotency";
 import { generateText } from "@/services/llm.service";
 import type {
   AgentExecutorResult,
@@ -473,10 +479,29 @@ async function applyCreateTask(
   businessId: string,
   contactId: string,
   action: Extract<ExecutorAction, { type: "create_task" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
 ): Promise<string | null> {
   const title = action.title.trim();
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "create_task",
+    actionFingerprint: title,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
 
   if (await hasRecentTask(admin, businessId, contactId, title)) {
+    await recordCrmIdempotencyKey(admin, {
+      businessId,
+      idempotencyKey,
+      actionType: "create_task",
+    });
     return null;
   }
 
@@ -492,6 +517,12 @@ async function applyCreateTask(
   if (error) {
     throw new Error(error.message);
   }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "create_task",
+  });
 
   return `Task created: ${title}`;
 }
@@ -520,10 +551,29 @@ async function applyCreateDeal(
   businessId: string,
   contactId: string,
   action: Extract<ExecutorAction, { type: "create_deal" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
 ): Promise<string | null> {
   const title = action.title.trim();
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "create_deal",
+    actionFingerprint: title,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
 
   if (await hasRecentDeal(admin, businessId, contactId, title)) {
+    await recordCrmIdempotencyKey(admin, {
+      businessId,
+      idempotencyKey,
+      actionType: "create_deal",
+    });
     return null;
   }
 
@@ -543,6 +593,12 @@ async function applyCreateDeal(
     throw new Error(error.message);
   }
 
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "create_deal",
+  });
+
   return `Deal created: ${title}`;
 }
 
@@ -551,8 +607,23 @@ async function applyAddNote(
   businessId: string,
   contact: ContactSnapshot,
   action: Extract<ExecutorAction, { type: "add_note" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
 ): Promise<string | null> {
   const noteLine = action.content.trim();
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "add_note",
+    actionFingerprint: noteLine,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
   const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
   const existingNotes = contact.customFields.notes?.trim() ?? "";
   const nextNotes = existingNotes
@@ -576,6 +647,12 @@ async function applyAddNote(
     throw new Error(error.message);
   }
 
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "add_note",
+  });
+
   return "Note saved on contact";
 }
 
@@ -585,6 +662,10 @@ async function applyExecutorPlan(
   contact: ContactSnapshot,
   plan: ExecutorPlan,
   goal: AgentWizardGoalId | null,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
 ): Promise<string[]> {
   const applied: string[] = [];
   const allowed = getAllowedActionTypes(goal);
@@ -608,9 +689,21 @@ async function applyExecutorPlan(
     let result: string | null = null;
 
     if (action.type === "create_task") {
-      result = await applyCreateTask(admin, businessId, contact.id, action);
+      result = await applyCreateTask(
+        admin,
+        businessId,
+        contact.id,
+        action,
+        idempotencyContext,
+      );
     } else if (action.type === "create_deal") {
-      result = await applyCreateDeal(admin, businessId, contact.id, action);
+      result = await applyCreateDeal(
+        admin,
+        businessId,
+        contact.id,
+        action,
+        idempotencyContext,
+      );
     } else if (action.type === "add_note") {
       const refreshed = await loadContactSnapshot(admin, businessId, contact.id);
       result = await applyAddNote(
@@ -618,6 +711,7 @@ async function applyExecutorPlan(
         businessId,
         refreshed ?? contact,
         action,
+        idempotencyContext,
       );
     }
 
@@ -669,8 +763,7 @@ export async function planAgentCrmActions(input: {
   const result = await generateText({
     businessId: input.businessId,
     provider: "gemini",
-    skipUsageLog: true,
-    skipUsageLimit: true,
+    callType: "crm_plan",
     systemInstruction:
       "You extract structured CRM data from customer messages. Reply with valid JSON only. Never invent contact details.",
     prompt: buildExecutorPrompt(input),
@@ -704,6 +797,22 @@ async function executePlanOnContact(input: {
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
 }): Promise<AgentExecutorResult> {
+  const planIdempotencyKey = buildExecutorPlanIdempotencyKey({
+    conversationId: input.conversationId,
+    clientMessage: input.clientMessage,
+  });
+
+  if (
+    await hasCrmIdempotencyKey(input.admin, input.businessId, planIdempotencyKey)
+  ) {
+    return {
+      success: true,
+      actionsApplied: [],
+      clientSummary: "",
+      rawPlan: input.plan,
+    };
+  }
+
   try {
     const actionsApplied = await applyExecutorPlan(
       input.admin,
@@ -711,6 +820,10 @@ async function executePlanOnContact(input: {
       input.contact,
       input.plan,
       input.goal,
+      {
+        conversationId: input.conversationId,
+        clientMessage: input.clientMessage,
+      },
     );
 
     const clientSummary =
@@ -729,6 +842,12 @@ async function executePlanOnContact(input: {
       routingMethod: input.routingMethod ?? null,
       actionsApplied,
       success: true,
+    });
+
+    await recordCrmIdempotencyKey(input.admin, {
+      businessId: input.businessId,
+      idempotencyKey: planIdempotencyKey,
+      actionType: "executor_plan",
     });
 
     console.info(
@@ -815,91 +934,4 @@ export async function applyPreparedExecutorPlan(input: {
     routingMethod: input.routingMethod,
     plan: input.plan,
   });
-}
-
-export async function executeAgentCrmActions(input: {
-  admin: MessagingDbClient;
-  businessId: string;
-  contactId: string;
-  conversationId?: string | null;
-  channel: string;
-  clientMessage: string;
-  conversationHistory?: ConversationTurn[];
-  agent: RoutableAiAgent | null;
-  goal: AgentWizardGoalId | null;
-  routingMethod?: AgentRoutingMethod | null;
-}): Promise<AgentExecutorResult> {
-  const conversationHistory = input.conversationHistory ?? [];
-  const contact = await loadContactSnapshot(
-    input.admin,
-    input.businessId,
-    input.contactId,
-  );
-
-  if (!contact) {
-    return {
-      success: false,
-      actionsApplied: [],
-      clientSummary: "",
-      rawPlan: null,
-      errorMessage: "Contact not found",
-    };
-  }
-
-  const plan = await planAgentCrmActions({
-    businessId: input.businessId,
-    contact,
-    message: input.clientMessage,
-    conversationHistory,
-    agent: input.agent,
-    goal: input.goal,
-  });
-
-  if (!plan) {
-    await logAgentRun(input.admin, {
-      businessId: input.businessId,
-      conversationId: input.conversationId ?? null,
-      contactId: input.contactId,
-      agentId: input.agent?.id ?? null,
-      channel: input.channel,
-      clientMessage: input.clientMessage,
-      routingMethod: input.routingMethod ?? null,
-      actionsApplied: [],
-      success: true,
-    });
-
-    return {
-      success: true,
-      actionsApplied: [],
-      clientSummary: "",
-      rawPlan: null,
-    };
-  }
-
-  return executePlanOnContact({
-    admin: input.admin,
-    businessId: input.businessId,
-    contact,
-    contactId: input.contactId,
-    conversationId: input.conversationId,
-    channel: input.channel,
-    clientMessage: input.clientMessage,
-    agent: input.agent,
-    goal: input.goal,
-    routingMethod: input.routingMethod,
-    plan,
-  });
-}
-
-export function buildCrmActionsReplyContext(clientSummary: string): string {
-  if (!clientSummary.trim()) {
-    return "";
-  }
-
-  return [
-    "",
-    "CRM actions completed for this customer message:",
-    clientSummary.trim(),
-    "Confirm what was saved in CRM naturally in your reply when relevant. Do not mention internal systems.",
-  ].join("\n");
 }

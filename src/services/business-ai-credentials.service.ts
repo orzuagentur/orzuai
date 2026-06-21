@@ -261,9 +261,12 @@ export async function resolveBusinessLlmCredentials(
   provider: AiProvider,
 ): Promise<ResolvedLlmCredentials> {
   if (businessId) {
-    const businessKey = await getBusinessProviderApiKey(businessId, provider);
+    const [preferCustomer, businessKey] = await Promise.all([
+      getBusinessPreferCustomerAiKeys(businessId),
+      getBusinessProviderApiKey(businessId, provider),
+    ]);
 
-    if (businessKey) {
+    if (preferCustomer && businessKey) {
       return {
         apiKey: businessKey,
         billingSource: "customer",

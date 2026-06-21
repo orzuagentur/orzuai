@@ -94,7 +94,7 @@ export async function analyzeAndStoreSentiment(input: {
 
   const aiResult = await generateText({
     businessId: input.businessId,
-    skipUsageLog: true,
+    callType: "sentiment",
     prompt: `Classify customer message sentiment.\nMessage: ${input.message}`,
     systemInstruction:
       "Reply with exactly one word: positive, neutral, or negative.",

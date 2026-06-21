@@ -1,4 +1,3 @@
-import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -16,11 +15,6 @@ export type RoutableAiAgent = {
   language?: string;
   communicationStyle?: string;
   updatedAt?: string;
-};
-
-export type AgentMatchResult = {
-  agent: RoutableAiAgent | null;
-  systemPrompt: string;
 };
 
 function countKeywordMatches(messageLower: string, keywords: string[]): number {
@@ -98,27 +92,4 @@ export function resolveAgentMatch(input: {
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
 
   return defaultAgents[0] ?? null;
-}
-
-export function resolveAgentSystemPrompt(input: {
-  agents: RoutableAiAgent[];
-  channel: MessagingChannel;
-  message: string;
-  fallbackPrompt: string;
-}): AgentMatchResult {
-  const agent = resolveAgentMatch({
-    agents: input.agents,
-    channel: input.channel,
-    message: input.message,
-  });
-
-  return {
-    agent,
-    systemPrompt: agent
-      ? buildEffectiveAgentPrompt({
-          systemPrompt: agent.systemPrompt,
-          communicationStyle: agent.communicationStyle,
-        })
-      : input.fallbackPrompt,
-  };
 }

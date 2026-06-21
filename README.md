@@ -119,4 +119,12 @@ See `.env.example` → Load tests section for credentials.
 - **Delivery status**: postgres realtime on `message_deliveries` only (no broadcast duplicate)
 - **Unread writes**: max 2 per inbound message (`20250713120000_unread_trigger_batch.sql`)
 
-Product roadmap: `TASKS.md` · Performance/reliability: `TasksCat.md`
+### How AI works
+
+1. **AI Assistant** — one customer-facing voice per business. Inbound messages are debounced (`ai_reply_jobs`), then answered using the AI Assistant profile (Gemini → OpenAI → Claude fallback).
+2. **CRM Agents** — background executors only. After a reply is sent, `ai_orchestration_jobs` runs intent routing, CRM updates (tasks, deals, notes), and agent run logging. Customers never chat with agents directly.
+3. **Channel toggle** — enable or disable auto-reply per channel in **AI → AI Assistant**. Per-channel provider/model fields in `ai_settings` do not override the assistant reply engine.
+4. **Workers** — `/api/workers/ai-reply-queue`, `/api/workers/ai-orchestration-queue`; health via `/api/cron/ai-health`.
+5. **Memory** — rolling conversation summary (every 10 messages, background); semantic Knowledge Base search (pgvector + Gemini embeddings); CRM snapshot in fast replies (deal stage, tasks, lead score).
+
+Product roadmap: `TASKS.md` · AI orchestration: `TasksAI.md` · Performance/reliability: `TasksCat.md`

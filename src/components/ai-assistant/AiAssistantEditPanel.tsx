@@ -84,6 +84,9 @@ export function AiAssistantEditPanel({
             <CardDescription>
               {AI_ASSISTANT_MESSAGES.assistantEditFormDescription}
             </CardDescription>
+            <p className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.assistantReplyEngineNote}
+            </p>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">

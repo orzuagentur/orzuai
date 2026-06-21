@@ -126,6 +126,7 @@ async function generateFollowUpMessage(input: {
 
   const result = await generateText({
     businessId: input.businessId,
+    callType: "follow_up",
     provider: agent?.provider as "gemini" | "openai" | "claude" | undefined,
     model: agent?.model,
     prompt: [

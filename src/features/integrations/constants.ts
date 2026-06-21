@@ -153,7 +153,7 @@ export const INTEGRATIONS_MESSAGES = {
   contactsHint: "Contacts received on this channel.",
   aiPreviewTitle: "AI auto-reply",
   aiPreviewDescription:
-    "Turn on the AI Assistant for this channel. Customize behavior in AI settings.",
+    "Turn on the AI Assistant for this channel. Replies use your AI Assistant profile (Gemini first, with OpenAI or Claude fallback).",
   aiPreviewEnabled: "AI Assistant is on for this channel.",
   aiPreviewDisabled: "AI Assistant is off for this channel.",
   openAiSettings: "Open AI Assistant",

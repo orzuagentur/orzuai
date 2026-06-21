@@ -155,6 +155,12 @@ export function AiAssistantHubPanel({
           <p className="text-sm text-muted-foreground">
             {AI_ASSISTANT_MESSAGES.assistantTabDescription}
           </p>
+          <p className="text-sm text-muted-foreground">
+            {AI_ASSISTANT_MESSAGES.assistantReplyEngineNote}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {AI_ASSISTANT_MESSAGES.assistantContextLimitsNote}
+          </p>
           {enabledChannelCount > 0 ? (
             <p className="text-sm font-medium text-foreground">
               Active on {enabledChannelCount} channel

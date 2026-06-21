@@ -128,8 +128,7 @@ export async function classifyCustomerIntent(input: {
   const result = await generateText({
     businessId: input.businessId,
     provider: "gemini",
-    skipUsageLog: true,
-    skipUsageLimit: true,
+    callType: "intent",
     systemInstruction:
       "You classify customer messages for business automation. Reply with valid JSON only. confidence is 0 to 1.",
     prompt: buildClassificationPrompt({

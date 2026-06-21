@@ -6,6 +6,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { KnowledgeCategory } from "@/types/database.types";
@@ -26,6 +27,7 @@ import {
   buildKnowledgeSearchPattern,
   mapKnowledgeEntry,
 } from "@/utils/knowledge";
+import { storeKnowledgeEntryEmbedding } from "@/services/knowledge-embedding.service";
 
 function missingConfigError(): {
   success: false;
@@ -162,6 +164,15 @@ export async function createKnowledgeEntry(
     };
   }
 
+  const admin = createAdminClient();
+  void storeKnowledgeEntryEmbedding(admin, {
+    entryId: data.id,
+    businessId,
+    title: data.title,
+    content: data.content,
+    category: data.category,
+  });
+
   revalidateKnowledgePath();
 
   return {
@@ -227,6 +238,15 @@ export async function updateKnowledgeEntry(
       },
     };
   }
+
+  const admin = createAdminClient();
+  void storeKnowledgeEntryEmbedding(admin, {
+    entryId: data.id,
+    businessId: ownership.businessId,
+    title: data.title,
+    content: data.content,
+    category: data.category,
+  });
 
   revalidateKnowledgePath();
 

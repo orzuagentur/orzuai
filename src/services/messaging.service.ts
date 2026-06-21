@@ -1,16 +1,16 @@
 import "server-only";
 
-import { after } from "next/server";
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   generateFastAssistantReply,
   isChannelAutoReplyEnabled,
-  runAutoReplyBackgroundOrchestration,
 } from "@/services/auto-reply-pipeline.service";
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
-import { scheduleDebouncedChannelAutoReply } from "@/services/auto-reply-queue.service";
+import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
+import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
+import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
@@ -425,10 +425,8 @@ export async function processChannelAutoReply(input: {
   channel: MessagingChannel;
   conversationId: string;
   clientMessage: string;
-  sendReply: (text: string) => Promise<{ success: boolean }>;
 }): Promise<void> {
-  const { admin, businessId, channel, conversationId, clientMessage, sendReply } =
-    input;
+  const { admin, businessId, channel, conversationId, clientMessage } = input;
 
   const aiEnabled = await isChannelAutoReplyEnabled({
     admin,
@@ -457,7 +455,13 @@ export async function processChannelAutoReply(input: {
     return;
   }
 
-  const sendResult = await sendReply(reply.text);
+  const sendResult = await sendChannelAutoReplyText({
+    admin,
+    businessId,
+    channel,
+    conversationId,
+    text: reply.text,
+  });
 
   if (!sendResult.success) {
     await notifyAutoReplyError(conversationId, {
@@ -481,66 +485,34 @@ export async function processChannelAutoReply(input: {
     aiReplies: 1,
   });
 
-  const preparedLanguage = await resolveAutoReplyLanguage(admin, businessId);
-
-  after(async () => {
-    try {
-      await runAutoReplyBackgroundOrchestration({
-        admin,
-        businessId,
-        channel,
-        conversationId,
-        clientMessage,
-        language: preparedLanguage,
-        sendFollowUp: async (text) => {
-          const result = await sendReply(text);
-
-          if (result.success) {
-            await insertChannelMessage(admin, {
-              conversationId,
-              channel,
-              senderType: "ai",
-              content: text,
-              aiGenerated: true,
-            });
-
-            await incrementMessagingAnalytics(admin, businessId, channel, {
-              totalMessages: 1,
-              aiReplies: 1,
-            });
-          }
-
-          return result;
-        },
-      });
-    } catch (error) {
-      console.error("[messaging] background auto-reply orchestration failed", error);
-    }
-  });
+  try {
+    await enqueueAiOrchestrationJob({
+      businessId,
+      channel,
+      conversationId,
+      clientMessage,
+    });
+  } catch (error) {
+    console.error("[messaging] failed to enqueue AI orchestration job", error);
+  }
 }
 
-async function resolveAutoReplyLanguage(
-  admin: MessagingDbClient,
-  businessId: string,
-): Promise<string> {
-  const { data } = await admin
-    .from("ai_assistant_profile")
-    .select("language")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  return data?.language?.trim() || "English";
+export function scheduleChannelAutoReply(input: {
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+}): void {
+  void scheduleDebouncedChannelAutoReply(input);
 }
 
-export function scheduleChannelAutoReply(
-  input: Parameters<typeof processChannelAutoReply>[0],
-): void {
-  scheduleDebouncedChannelAutoReply(input);
-}
-
-export function scheduleInboundMessageProcessing(
-  input: Parameters<typeof processChannelAutoReply>[0],
-): void {
+export function scheduleInboundMessageProcessing(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+}): void {
   scheduleInboundMessageEffects({
     admin: input.admin,
     businessId: input.businessId,
@@ -548,5 +520,10 @@ export function scheduleInboundMessageProcessing(
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
   });
-  scheduleChannelAutoReply(input);
+  scheduleChannelAutoReply({
+    businessId: input.businessId,
+    channel: input.channel,
+    conversationId: input.conversationId,
+    clientMessage: input.clientMessage,
+  });
 }

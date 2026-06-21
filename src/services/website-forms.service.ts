@@ -369,12 +369,10 @@ async function processWebsiteFormFollowUp(input: {
 
   if (!connection.auto_follow_up_enabled || connection.follow_up_channel === "none") {
     scheduleChannelAutoReply({
-      admin,
       businessId,
       channel: "website_forms",
       conversationId,
       clientMessage,
-      sendReply: async () => ({ success: true }),
     });
     return;
   }
