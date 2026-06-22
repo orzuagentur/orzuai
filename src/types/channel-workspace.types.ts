@@ -131,7 +131,7 @@ export type AiAssistantPageData = {
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
-  createWizardStep: 1 | 2 | 3 | 4;
+  createWizardStep: 1 | 2 | 3 | 4 | 5;
   createWizardGoal: string | null;
   searchQuery: string;
   showSetupBanner: boolean;

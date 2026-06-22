@@ -1,7 +1,8 @@
 export const PLATFORM_COPILOT_MESSAGES = {
-  name: "OrzuAI",
+  name: "orzuAI",
+  sidebarLabel: "orzuAI",
   tagline: "Platform assistant",
-  openAria: "Open OrzuAI assistant",
+  openAria: "Open orzuAI assistant",
   closeAria: "Close assistant",
   emptyHint:
     "Ask how to use OrzuX — I can guide you and open the right page.",

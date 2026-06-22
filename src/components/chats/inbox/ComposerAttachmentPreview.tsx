@@ -23,6 +23,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  chatAccentProgressClassName,
+  chatComposerFieldClassName,
+  chatMicIconShellClassName,
+  chatSendButtonClassName,
+} from "@/features/chats/chat-theme";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import {
@@ -143,8 +149,8 @@ function VoicePreviewPlayer({
   return (
     <div className="flex w-full items-center gap-2 px-3">
       <audio ref={audioRef} src={previewUrl} preload="metadata" className="hidden" />
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600/15">
-        <MicIcon className="size-4 text-emerald-700" />
+      <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full", chatMicIconShellClassName)}>
+        <MicIcon className="size-4" />
       </div>
       <Button
         type="button"
@@ -163,7 +169,7 @@ function VoicePreviewPlayer({
       <div className="min-w-0 flex-1">
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-emerald-600 transition-all"
+            className={cn("h-full rounded-full transition-all", chatAccentProgressClassName)}
             style={{
               width:
                 totalDuration > 0
@@ -202,7 +208,7 @@ export function ComposerAttachmentPreview({
     kind === "image" || kind === "video" || kind === "document" || isVoice;
 
   return (
-    <div className="rounded-xl border bg-background p-3 shadow-sm">
+    <div className={cn("rounded-xl border p-3 shadow-sm", chatComposerFieldClassName)}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">
           {isVoice
@@ -347,7 +353,10 @@ export function ComposerAttachmentPreview({
               {uploadPhase === "uploading" ? (
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-150 ease-out"
+                    className={cn(
+                      "h-full rounded-full transition-[width] duration-150 ease-out",
+                      chatAccentProgressClassName,
+                    )}
                     style={{ width: `${Math.min(100, uploadProgress ?? 0)}%` }}
                   />
                 </div>
@@ -358,7 +367,7 @@ export function ComposerAttachmentPreview({
           <Button
             type="button"
             size="sm"
-            className="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-700 sm:w-auto sm:self-end"
+            className={cn("w-full gap-1.5 sm:w-auto sm:self-end", chatSendButtonClassName)}
             disabled={isSending}
             onClick={onSend}
           >

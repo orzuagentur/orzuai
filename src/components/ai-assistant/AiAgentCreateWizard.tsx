@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { AgentConnectedChannelSelect } from "@/components/ai-assistant/AgentConnectedChannelSelect";
 import { AgentRoutingConflictBanner } from "@/components/ai-assistant/AgentRoutingConflictBanner";
 import { AiAgentChannelIconRow } from "@/components/ai-assistant/AiAgentChannelIconRow";
+import { AiAgentWizardTestChat } from "@/components/ai-assistant/AiAgentWizardTestChat";
 import { AiAgentIconPicker } from "@/components/ai-assistant/AiAgentIconPicker";
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import {
@@ -34,6 +35,7 @@ import {
   getAgentWizardGoal,
   resolveGoalAiConfig,
   type AgentWizardGoalId,
+  type AgentWizardStepId,
 } from "@/features/ai-assistant/agent-wizard-catalog";
 import { getConnectedMessagingChannels } from "@/features/ai-assistant/connected-channels";
 import {
@@ -67,7 +69,7 @@ import { resolveAgentMatch } from "@/utils/ai-agent-routing";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 type AiAgentCreateWizardProps = {
-  step: 1 | 2 | 3 | 4;
+  step: AgentWizardStepId;
   goal: AgentWizardGoalId | null;
   activeChannel: MessagingIntegrationChannelId;
   activeChannelFilter: MessagingIntegrationChannelId | null;
@@ -80,7 +82,7 @@ type AiAgentCreateWizardProps = {
   businessProviderCredentials: BusinessProviderCredential[];
   preferCustomerAiKeys: boolean;
   allAgents: AiAgentItem[];
-  onStepChange: (step: 1 | 2 | 3 | 4, goal?: AgentWizardGoalId | null) => void;
+  onStepChange: (step: AgentWizardStepId, goal?: AgentWizardGoalId | null) => void;
   onCancel: () => void;
 };
 
@@ -170,7 +172,7 @@ export function AiAgentCreateWizard({
   const [savedCredentials, setSavedCredentials] = useState(
     businessProviderCredentials,
   );
-  const [testMessage, setTestMessage] = useState("");
+  const [routingPreviewMessage, setRoutingPreviewMessage] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
 
@@ -219,7 +221,7 @@ export function AiAgentCreateWizard({
     setDraftApiKey("");
     setUseForAllAgents(true);
     setIsReplacingKey(false);
-    setTestMessage("");
+    setRoutingPreviewMessage("");
   }, [
     businessProviderCredentials,
     channelStatuses,
@@ -235,7 +237,7 @@ export function AiAgentCreateWizard({
     draft.channels[0] ?? activeChannelFilter ?? activeChannel;
 
   const routingPreview = useMemo(() => {
-    if (!testMessage.trim() || !goalConfig) {
+    if (!routingPreviewMessage.trim() || !goalConfig) {
       return null;
     }
 
@@ -265,14 +267,14 @@ export function AiAgentCreateWizard({
     return resolveAgentMatch({
       agents: [candidate],
       channel: previewChannel,
-      message: testMessage,
+      message: routingPreviewMessage,
     });
   }, [
     channelDefaults.language,
     draft,
     goalConfig,
     previewChannel,
-    testMessage,
+    routingPreviewMessage,
   ]);
 
   const routingConflicts = useMemo(
@@ -500,6 +502,8 @@ export function AiAgentCreateWizard({
       : AI_ASSISTANT_MESSAGES.wizardBillingOwnTitle;
   }
 
+  const isTestStep = step === 4;
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {isCreating ? (
@@ -511,29 +515,57 @@ export function AiAgentCreateWizard({
         </div>
       ) : null}
 
-      <header className="shrink-0 border-b px-4 py-4 md:px-8">
-        <div className="mx-auto flex max-w-4xl items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">
-              {AI_ASSISTANT_MESSAGES.wizardTitle}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {AI_ASSISTANT_MESSAGES.wizardSubtitle}
+      <header
+        className={cn(
+          "shrink-0 border-b bg-background",
+          isTestStep ? "px-3 py-2 md:px-4" : "px-4 py-4 md:px-8",
+        )}
+      >
+        {isTestStep ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="truncate text-sm font-medium">
+              {AI_ASSISTANT_MESSAGES.wizardStepTestTitle}
             </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={onCancel}
+              disabled={isBusy}
+              aria-label={AI_ASSISTANT_MESSAGES.createAgentCancel}
+            >
+              <XIcon className="size-4" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={onCancel}
-            disabled={isBusy}
-            aria-label={AI_ASSISTANT_MESSAGES.createAgentCancel}
-          >
-            <XIcon className="size-4" />
-          </Button>
-        </div>
+        ) : (
+          <div className="mx-auto flex max-w-4xl items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-xl font-semibold tracking-tight">
+                {AI_ASSISTANT_MESSAGES.wizardTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {AI_ASSISTANT_MESSAGES.wizardSubtitle}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={onCancel}
+              disabled={isBusy}
+              aria-label={AI_ASSISTANT_MESSAGES.createAgentCancel}
+            >
+              <XIcon className="size-4" />
+            </Button>
+          </div>
+        )}
 
-        <div className="mx-auto mt-6 flex max-w-4xl items-center gap-2">
+        <div
+          className={cn(
+            "mx-auto flex items-center gap-2",
+            isTestStep ? "mt-2 w-full max-w-none" : "mt-6 max-w-4xl",
+          )}
+        >
           {AGENT_WIZARD_STEPS.map((wizardStep, index) => {
             const isActive = step === wizardStep.id;
             const isComplete = step > wizardStep.id;
@@ -574,8 +606,21 @@ export function AiAgentCreateWizard({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-4xl">
+      <div
+        className={cn(
+          "min-h-0 flex-1",
+          isTestStep
+            ? "flex flex-col overflow-hidden"
+            : "overflow-y-auto px-4 py-6 md:px-8",
+        )}
+      >
+        <div
+          className={cn(
+            isTestStep
+              ? "flex min-h-0 w-full flex-1 flex-col"
+              : "mx-auto max-w-4xl",
+          )}
+        >
           {step === 1 ? (
             <section className="space-y-6">
               <div>
@@ -673,7 +718,27 @@ export function AiAgentCreateWizard({
             />
           ) : null}
 
-          {step === 4 && goalConfig ? (
+          {step === 4 && goalConfig && goal ? (
+            <section className="flex h-full min-h-0 flex-1 flex-col">
+              <AiAgentWizardTestChat
+                key={`${goal}-${draft.provider}-${draft.model}-${draft.systemPrompt}`}
+                className="h-full min-h-0 flex-1"
+                agentName={draft.name.trim() || goalConfig.draft.name}
+                channel={previewChannel}
+                goal={goal}
+                systemPrompt={
+                  draft.systemPrompt.trim() || goalConfig.draft.systemPrompt
+                }
+                provider={draft.provider}
+                model={draft.model}
+                language={channelDefaults.language}
+                communicationStyle={draft.communicationStyle}
+                disabled={isBusy}
+              />
+            </section>
+          ) : null}
+
+          {step === 5 && goalConfig ? (
             <section className="space-y-6">
               <div>
                 <h2 className="text-lg font-medium">
@@ -791,13 +856,15 @@ export function AiAgentCreateWizard({
                     </p>
                     <div className="mt-3 space-y-2">
                       <Input
-                        value={testMessage}
-                        onChange={(event) => setTestMessage(event.target.value)}
+                        value={routingPreviewMessage}
+                        onChange={(event) =>
+                          setRoutingPreviewMessage(event.target.value)
+                        }
                         placeholder={AI_ASSISTANT_MESSAGES.testMessage}
                         disabled={isBusy}
                       />
                       <p className="text-caption text-muted-foreground">
-                        {testMessage.trim()
+                        {routingPreviewMessage.trim()
                           ? routingPreview
                             ? AI_ASSISTANT_MESSAGES.testMatchAgent(routingPreview.name)
                             : AI_ASSISTANT_MESSAGES.testMatchFallback
@@ -819,8 +886,18 @@ export function AiAgentCreateWizard({
       </div>
 
       {step > 1 ? (
-        <footer className="shrink-0 border-t bg-background px-4 py-4 md:px-8">
-          <div className="mx-auto flex max-w-4xl flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <footer
+          className={cn(
+            "shrink-0 border-t bg-background",
+            isTestStep ? "px-3 py-2 md:px-4" : "px-4 py-4 md:px-8",
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between",
+              isTestStep ? "w-full max-w-none" : "max-w-4xl",
+            )}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -836,7 +913,12 @@ export function AiAgentCreateWizard({
                   return;
                 }
 
-                onStepChange(3, goal);
+                if (step === 4) {
+                  onStepChange(3, goal);
+                  return;
+                }
+
+                onStepChange(4, goal);
               }}
               className="gap-2"
             >
@@ -845,7 +927,9 @@ export function AiAgentCreateWizard({
                 ? AI_ASSISTANT_MESSAGES.wizardBackToGoals
                 : step === 3
                   ? AI_ASSISTANT_MESSAGES.wizardBackToChannels
-                  : AI_ASSISTANT_MESSAGES.wizardBackToModel}
+                  : step === 4
+                    ? AI_ASSISTANT_MESSAGES.wizardBackToModel
+                    : AI_ASSISTANT_MESSAGES.wizardBackToTest}
             </Button>
 
             {step === 2 ? (
@@ -882,6 +966,18 @@ export function AiAgentCreateWizard({
             ) : null}
 
             {step === 4 ? (
+              <Button
+                type="button"
+                disabled={isBusy}
+                onClick={() => onStepChange(5, goal)}
+                className="gap-2"
+              >
+                {AI_ASSISTANT_MESSAGES.wizardContinue}
+                <ArrowRightIcon className="size-4" />
+              </Button>
+            ) : null}
+
+            {step === 5 ? (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   type="button"

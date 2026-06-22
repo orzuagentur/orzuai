@@ -2,14 +2,12 @@ import { cn } from "@/lib/utils";
 
 type DashboardPageHeadingProps = {
   title: string;
-  description: string;
   compact?: boolean;
   className?: string;
 };
 
 export function DashboardPageHeading({
   title,
-  description,
   compact = false,
   className,
 }: DashboardPageHeadingProps) {
@@ -25,9 +23,6 @@ export function DashboardPageHeading({
     >
       <p className="truncate text-base font-semibold leading-tight sm:text-lg">
         {title}
-      </p>
-      <p className="truncate text-xs leading-tight text-muted-foreground">
-        {description}
       </p>
     </div>
   );

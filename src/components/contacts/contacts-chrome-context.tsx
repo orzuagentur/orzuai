@@ -12,6 +12,8 @@ import {
 } from "react";
 
 import type { ContactSegment, CrmEntityTab, LeadSegment } from "@/types/contact.types";
+import type { CrmDealsPageData } from "@/types/crm-deal.types";
+import type { LeadsPageData, UnifiedContactsPageData } from "@/types/contact.types";
 
 export type ContactsChromeConfig = {
   activeTab: CrmEntityTab;
@@ -27,6 +29,8 @@ export type ContactsChromeConfig = {
   dealsView?: "kanban" | "list";
   onDealsViewChange?: (view: "kanban" | "list") => void;
   onNewDeal?: () => void;
+  crmListData?: UnifiedContactsPageData | LeadsPageData | null;
+  crmDealsData?: CrmDealsPageData | null;
 };
 
 type ContactsChromeContextValue = {
@@ -124,6 +128,8 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
   const onLeadSegmentChange = config?.onLeadSegmentChange;
   const onDealsViewChange = config?.onDealsViewChange;
   const onNewDeal = config?.onNewDeal;
+  const crmListData = config?.crmListData;
+  const crmDealsData = config?.crmDealsData;
 
   useEffect(() => {
     const setChrome = setChromeRef.current;
@@ -151,6 +157,8 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
       dealsView,
       onDealsViewChange,
       onNewDeal,
+      crmListData: config?.crmListData,
+      crmDealsData: config?.crmDealsData,
     });
 
     return () => {
@@ -169,6 +177,8 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
     onSearchChange,
     onSegmentChange,
     onViewChange,
+    crmListData,
+    crmDealsData,
     searchPlaceholder,
     searchQuery,
   ]);

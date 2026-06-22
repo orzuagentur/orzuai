@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { getNavSegmentActiveClassName } from "@/features/navigation/channel-rail-ui";
 import { cn } from "@/lib/utils";
 import type { CrmEntityTab } from "@/types/contact.types";
 import type { CrmDealsPageData } from "@/types/crm-deal.types";
@@ -13,6 +14,7 @@ type CrmEntityTabsProps = {
   activeTab: CrmEntityTab;
   listData?: UnifiedContactsPageData | LeadsPageData | null;
   dealsData?: CrmDealsPageData | null;
+  variant?: "default" | "header";
   className?: string;
 };
 
@@ -76,12 +78,14 @@ export function CrmEntityTabs({
   activeTab,
   listData = null,
   dealsData = null,
+  variant = "default",
   className,
 }: CrmEntityTabsProps) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-1 border-b px-4 py-2",
+        "flex shrink-0 items-center gap-0.5",
+        variant === "header" ? "px-0" : "gap-1 border-b px-4 py-2",
         className,
       )}
     >
@@ -93,10 +97,11 @@ export function CrmEntityTabs({
             key={tab.id}
             href={buildTabHref(tab.id, listData, dealsData)}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              isActive
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              "rounded-lg transition-colors",
+              variant === "header"
+                ? "px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm"
+                : "px-3 py-1.5 text-sm font-medium",
+              getNavSegmentActiveClassName(isActive),
             )}
           >
             {tab.label}

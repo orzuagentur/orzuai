@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { AiSidebarNavGroup } from "@/components/dashboard/AiSidebarNavGroup";
+import { SidebarPanelToggle } from "@/components/dashboard/SidebarPanelToggle";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { BRAND_NAME } from "@/constants/brand";
@@ -21,13 +22,14 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { UserProfileSection } from "./UserProfileSection";
 import { ThemeToggle } from "./ThemeToggle";
 import { AiHumanRequestsButton } from "./AiHumanRequestsButton";
+import { PlatformCopilotSidebarButton } from "./PlatformCopilotSidebarButton";
 
 type AppSidebarProps = {
   userProfile: DashboardUserProfile;
@@ -48,12 +50,14 @@ function getNavBadgeCount(
   return 0;
 }
 
-export function AppSidebar({ userProfile }: AppSidebarProps) {
+function AppSidebarContent({ userProfile }: AppSidebarProps) {
   const pathname = usePathname();
   const { counts } = useDashboardNavBadges();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
+    <>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -76,6 +80,12 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        {!isCollapsed ? (
+          <div className="flex justify-end px-2 pb-0.5 group-data-[collapsible=icon]:hidden">
+            <SidebarPanelToggle />
+          </div>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
@@ -93,6 +103,7 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
                     ? pathname === item.href
                     : pathname === item.href ||
                       pathname.startsWith(`${item.href}/`);
+
                 const badgeCount = getNavBadgeCount(item.id, counts);
 
                 return (
@@ -122,11 +133,24 @@ export function AppSidebar({ userProfile }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        {isCollapsed ? (
+          <div className="flex justify-center py-1">
+            <SidebarPanelToggle />
+          </div>
+        ) : null}
+        <PlatformCopilotSidebarButton />
         <AiHumanRequestsButton />
         <ThemeToggle />
         <UserProfileSection userProfile={userProfile} />
       </SidebarFooter>
-      <SidebarRail />
+    </>
+  );
+}
+
+export function AppSidebar({ userProfile }: AppSidebarProps) {
+  return (
+    <Sidebar collapsible="icon" variant="sidebar">
+      <AppSidebarContent userProfile={userProfile} />
     </Sidebar>
   );
 }

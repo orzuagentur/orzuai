@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { deleteChatMessageAction } from "@/features/chats/actions/delete-chat-message";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { getChatMessageActionHoverClassName } from "@/features/chats/chat-theme";
 import { cn } from "@/lib/utils";
 import type { ChatMessageData } from "@/types/chat.types";
 import { parseMediaMessage } from "@/utils/chat-media";
@@ -85,7 +86,7 @@ export function ChatMessageActionsMenu({
           size="icon-sm"
           className={cn(
             "size-7 shrink-0 opacity-70 transition-opacity sm:opacity-0 sm:group-hover/message:opacity-100 data-[state=open]:opacity-100",
-            isOutgoing ? "text-emerald-100 hover:bg-emerald-700/40" : "",
+            isOutgoing ? getChatMessageActionHoverClassName(true) : "",
           )}
           aria-label={CHAT_MESSAGES.messageActionsLabel}
           disabled={isDeleting}
@@ -97,7 +98,7 @@ export function ChatMessageActionsMenu({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={isOutgoing ? "end" : "start"} className="w-44">
+      <DropdownMenuContent align="start" className="w-44">
         {canCopy ? (
           <DropdownMenuItem onClick={() => void handleCopy()}>
             <CopyIcon className="size-4" />

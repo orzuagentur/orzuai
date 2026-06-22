@@ -3,12 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
+import { useAnalyticsChromeRegistration } from "@/components/analytics/analytics-chrome-context";
 import { AnalyticsAskPanel } from "@/components/analytics/AnalyticsAskPanel";
 import { AnalyticsChannelsPanel } from "@/components/analytics/AnalyticsChannelsPanel";
 import { AnalyticsAiOpsPanel } from "@/components/analytics/AnalyticsAiOpsPanel";
 import { AnalyticsPulsePanel } from "@/components/analytics/AnalyticsPulsePanel";
 import { AnalyticsSalesPanel } from "@/components/analytics/AnalyticsSalesPanel";
-import { AnalyticsTabBar } from "@/components/analytics/AnalyticsTabBar";
 import type { AnalyticsPageData } from "@/types/channel-workspace.types";
 import {
   buildAnalyticsHref,
@@ -60,10 +60,13 @@ export function AnalyticsCommandCenter({ data }: AnalyticsCommandCenterProps) {
     );
   }, [data.activePeriod, router]);
 
+  useAnalyticsChromeRegistration({
+    activeTab: data.activeTab,
+    onTabChange: handleTabChange,
+  });
+
   return (
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-      <AnalyticsTabBar activeTab={data.activeTab} onTabChange={handleTabChange} />
-
       {data.activeTab === "pulse" ? (
         <AnalyticsPulsePanel
           pulse={data.pulse}

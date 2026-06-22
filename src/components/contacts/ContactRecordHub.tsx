@@ -8,12 +8,12 @@ import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard
 import { ContactProfileDrawer } from "@/components/contacts/ContactProfileDrawer";
 import { ContactRecordWorkspace } from "@/components/contacts/ContactRecordWorkspace";
 import { ContactsChannelTabs } from "@/components/contacts/ContactsChannelTabs";
-import { CrmEntityTabs } from "@/components/contacts/CrmEntityTabs";
 import { DealsWorkspace } from "@/components/contacts/DealsWorkspace";
 import { useContactsChromeRegistration } from "@/components/contacts/contacts-chrome-context";
 import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
 import { Button } from "@/components/ui/button";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { ChannelRailAside } from "@/components/navigation/ChannelRailAside";
 import { cn } from "@/lib/utils";
 import type {
   ContactPipelinePageData,
@@ -216,6 +216,8 @@ export function ContactRecordHub({
                 : undefined,
             onLeadSegmentChange:
               activeTab === "leads" ? handleLeadSegmentChange : undefined,
+            crmListData: activeTab === "leads" ? leadsData : listData,
+            crmDealsData: dealsData,
           }
         : null,
   );
@@ -272,11 +274,6 @@ export function ContactRecordHub({
   if (activeTab === "deals" && dealsData) {
     return (
       <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-        <CrmEntityTabs
-          activeTab={activeTab}
-          listData={leadsData ?? listData}
-          dealsData={dealsData}
-        />
         <DealsWorkspace dealsData={dealsData} />
       </div>
     );
@@ -288,30 +285,27 @@ export function ContactRecordHub({
 
   return (
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-      <CrmEntityTabs
-        activeTab={activeTab}
-        listData={activeTab === "leads" ? leadsData : listData}
-        dealsData={dealsData}
-      />
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <ChannelRailAside>
+          <ContactsChannelTabs
+            activeTab={activeTab}
+            activeChannel={currentListData.activeChannelFilter}
+            activeSegment={listData?.activeSegment ?? "all"}
+            activeLeadSegment={leadsData?.activeLeadSegment}
+            activeView={currentListData.activeView}
+            activeContactId={currentListData.activeContactId}
+            showProfilePanel={currentListData.showProfilePanel}
+            searchQuery={currentListData.searchQuery}
+            visibleChannelIds={visibleChannelIds}
+          />
+        </ChannelRailAside>
 
-      <ContactsChannelTabs
-        activeTab={activeTab}
-        activeChannel={currentListData.activeChannelFilter}
-        activeSegment={listData?.activeSegment ?? "all"}
-        activeLeadSegment={leadsData?.activeLeadSegment}
-        activeView={currentListData.activeView}
-        activeContactId={currentListData.activeContactId}
-        showProfilePanel={currentListData.showProfilePanel}
-        searchQuery={currentListData.searchQuery}
-        visibleChannelIds={visibleChannelIds}
-      />
-
-      <div
-        className={cn(
-          "grid min-h-0 min-w-0 flex-1 overflow-hidden",
-          "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
-        )}
-      >
+        <div
+          className={cn(
+            "grid min-h-0 min-w-0 flex-1 overflow-hidden",
+            "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
+          )}
+        >
         <aside
           className={cn(
             "flex min-h-0 min-w-0 flex-col overflow-hidden border-r",
@@ -423,6 +417,7 @@ export function ContactRecordHub({
             onBack={showRecordOnMobile ? clearContactSelection : undefined}
           />
         </main>
+      </div>
       </div>
 
       <ContactProfileDrawer

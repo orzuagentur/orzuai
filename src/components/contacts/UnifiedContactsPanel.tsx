@@ -115,7 +115,7 @@ export function UnifiedContactsPanel({
               href={buildContactHref(listData, contact.id, variant)}
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
-                isSelected && "bg-primary/5",
+                isSelected && "bg-muted/70",
               )}
             >
               <ContactAvatar

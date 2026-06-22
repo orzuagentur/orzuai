@@ -1,11 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { LayoutGridIcon } from "lucide-react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
+import { ChannelRailItem } from "@/components/navigation/ChannelRailItem";
 import { CONTACT_CHANNEL_FILTERS, CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
+import {
+  CHANNEL_RAIL_NAV_CLASS,
+  getChannelRailIconShellClassName,
+} from "@/features/navigation/channel-rail-ui";
 import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import { buildContactsHref } from "@/utils/contacts-url";
@@ -39,6 +43,7 @@ export function ContactsChannelTabs({
   const visibleChannels = CONTACT_CHANNEL_FILTERS.filter(
     (filter) => filter.id !== null && visibleChannelIds.includes(filter.id),
   );
+
   function hrefForChannel(channel: MessagingChannel | null) {
     if (activeTab === "leads") {
       return buildContactsHref({
@@ -68,54 +73,46 @@ export function ContactsChannelTabs({
   const isAllActive = !activeChannel;
 
   return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center gap-1 overflow-x-auto border-b px-4 py-2",
-        className,
-      )}
+    <nav
+      aria-label={CONTACTS_MESSAGES.filterAll}
+      className={cn(CHANNEL_RAIL_NAV_CLASS, className)}
     >
-      <Link
+      <ChannelRailItem
         href={hrefForChannel(null)}
-        title={CONTACTS_MESSAGES.filterAll}
-        aria-label={CONTACTS_MESSAGES.filterAll}
-        className={cn(
-          "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
-          isAllActive
-            ? "bg-primary/15 text-foreground ring-1 ring-primary/30"
-            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-        )}
-      >
-        <LayoutGridIcon className="size-5" />
-      </Link>
+        isActive={isAllActive}
+        label={CONTACTS_MESSAGES.filterAll}
+        ariaLabel={CONTACTS_MESSAGES.filterAll}
+        iconShell={
+          <div className={getChannelRailIconShellClassName(isAllActive)}>
+            <LayoutGridIcon className="size-5" />
+          </div>
+        }
+      />
 
       {visibleChannels.map((filter) => {
-          const channel = filter.id!;
-          const isActive = activeChannel === channel;
+        const channel = filter.id!;
+        const isActive = activeChannel === channel;
 
-          return (
-            <Link
-              key={channel}
-              href={hrefForChannel(channel)}
-              title={filter.label}
-              aria-label={filter.label}
-              className={cn(
-                "relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
-                isActive
-                  ? "bg-primary/15 ring-1 ring-primary/30"
-                  : "hover:bg-muted/60",
-              )}
-            >
+        return (
+          <ChannelRailItem
+            key={channel}
+            href={hrefForChannel(channel)}
+            isActive={isActive}
+            label={filter.label}
+            ariaLabel={filter.label}
+            iconShell={
               <div
-                className={cn(
-                  "flex size-8 items-center justify-center rounded-md",
+                className={getChannelRailIconShellClassName(
+                  isActive,
                   getChannelIconContainerClassName(channel),
                 )}
               >
-                <ChannelBrandIcon channel={channel} className="size-4" />
+                <ChannelBrandIcon channel={channel} className="size-5" />
               </div>
-            </Link>
-          );
-        })}
-    </div>
+            }
+          />
+        );
+      })}
+    </nav>
   );
 }

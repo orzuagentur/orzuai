@@ -10,6 +10,7 @@ import {
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAutoReplyTyping } from "@/services/auto-reply-inbox-status.service";
+import { isChannelAutoReplyEnabled } from "@/services/auto-reply-pipeline.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -52,6 +53,12 @@ type ChannelAutoReplyScheduleInput = {
 };
 
 let replyDrainPromise: Promise<AiReplyQueueDrainResult> | null = null;
+let debouncedDrainTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce window + small buffer so claim runs after upsert_ai_reply_job timer. */
+function getDebouncedDrainDelayMs(): number {
+  return AUTO_REPLY_DEBOUNCE_MS + 250;
+}
 
 function combineClientMessages(messages: string[]): string {
   return messages
@@ -150,7 +157,7 @@ async function upsertAiReplyJob(
   return data ?? null;
 }
 
-function scheduleAiReplyProcessingInProcess(): void {
+function startAiReplyQueueDrain(): void {
   if (replyDrainPromise) {
     return;
   }
@@ -174,13 +181,31 @@ function scheduleAiReplyProcessingInProcess(): void {
     });
 }
 
+function scheduleDebouncedAiReplyDrain(): void {
+  if (debouncedDrainTimer) {
+    clearTimeout(debouncedDrainTimer);
+  }
+
+  debouncedDrainTimer = setTimeout(() => {
+    debouncedDrainTimer = null;
+    startAiReplyQueueDrain();
+  }, getDebouncedDrainDelayMs());
+}
+
 export function dispatchAiReplyWorker(
   source: "enqueue" | "retry" = "enqueue",
 ): void {
-  scheduleAiReplyProcessingInProcess();
+  startAiReplyQueueDrain();
+  scheduleDebouncedAiReplyDrain();
   void dispatchAiReplyQueueWorker({
     source,
     delaySeconds: Math.ceil(AUTO_REPLY_DEBOUNCE_MS / 1000) + 1,
+  }).then((result) => {
+    if (!result.dispatched) {
+      console.warn(
+        "[ai-reply-queue] QStash not configured; relying on in-process drain and cron",
+      );
+    }
   });
 }
 
@@ -194,6 +219,17 @@ export async function scheduleDebouncedChannelAutoReply(
   }
 
   const admin = createAdminClient();
+
+  const aiEnabled = await isChannelAutoReplyEnabled({
+    admin,
+    businessId: input.businessId,
+    channel: input.channel,
+  });
+
+  if (!aiEnabled) {
+    return;
+  }
+
   await upsertAiReplyJob(admin, input);
   void notifyAutoReplyTyping(input.conversationId, true);
   dispatchAiReplyWorker("enqueue");
@@ -315,11 +351,6 @@ async function processClaimedAiReplyJob(
     return "completed";
   }
 
-  await admin
-    .from("ai_reply_jobs")
-    .update({ pending_messages: [] })
-    .eq("id", job.id);
-
   try {
     const { processChannelAutoReply } = await import("@/services/messaging.service");
 
@@ -330,6 +361,11 @@ async function processClaimedAiReplyJob(
       conversationId: job.conversation_id,
       clientMessage,
     });
+
+    await admin
+      .from("ai_reply_jobs")
+      .update({ pending_messages: [] })
+      .eq("id", job.id);
 
     return finalizeAiReplyJob(admin, job, "completed");
   } catch (error) {

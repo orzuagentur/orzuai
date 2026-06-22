@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import { useAutomationsChromeRegistration } from "@/components/automations/automations-chrome-context";
 import { AutomationCreateWizard } from "@/components/automations/AutomationCreateWizard";
 import { AutomationWorkflowDetailPanel } from "@/components/automations/AutomationWorkflowDetailPanel";
 import { AutomationsActivityPanel } from "@/components/automations/AutomationsActivityPanel";
-import { AutomationsTabBar } from "@/components/automations/AutomationsTabBar";
 import { AutomationsOverviewPanel } from "@/components/automations/AutomationsOverviewPanel";
 import { AutomationsRuleDetailPanel } from "@/components/automations/AutomationsRuleDetailPanel";
 import { AutomationsRulesListPanel } from "@/components/automations/AutomationsRulesListPanel";
@@ -84,6 +84,13 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
     void handleEnableRecommended();
   }, [handleEnableRecommended]);
 
+  useAutomationsChromeRegistration({
+    activeTab: data.activeTab,
+    onTabChange: handleTabChange,
+    onEnableRecommended: handleEnableRecommendedClick,
+    isEnablingRecommended,
+  });
+
   function clearRulesSelection() {
     router.push(buildAutomationsHref({ tab: "rules" }));
   }
@@ -105,12 +112,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
   if (data.isNewWorkflow) {
     return (
       <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-        <AutomationsTabBar
-          activeTab={data.activeTab}
-          onTabChange={handleTabChange}
-          onEnableRecommended={handleEnableRecommendedClick}
-          isEnablingRecommended={isEnablingRecommended}
-        />
         <AutomationCreateWizard
           step={data.createWizardStep}
           agents={data.agents}
@@ -125,13 +126,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
 
   return (
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-      <AutomationsTabBar
-        activeTab={data.activeTab}
-        onTabChange={handleTabChange}
-        onEnableRecommended={handleEnableRecommendedClick}
-        isEnablingRecommended={isEnablingRecommended}
-      />
-
       {data.activeTab === "overview" ? (
         <AutomationsOverviewPanel
           stats={data.stats}

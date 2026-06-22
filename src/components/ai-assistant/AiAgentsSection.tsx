@@ -12,7 +12,7 @@ import { AiAssistantChannelTabs } from "@/components/ai-assistant/AiAssistantCha
 import { useAiAssistantChromeRegistration } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { Button } from "@/components/ui/button";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
-import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
+import type { AgentWizardGoalId, AgentWizardStepId } from "@/features/ai-assistant/agent-wizard-catalog";
 import { cn } from "@/lib/utils";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
@@ -117,7 +117,7 @@ export function AiAgentsSection({ data }: AiAgentsSectionProps) {
   }, [data, router]);
 
   const handleWizardStepChange = useCallback(
-    (step: 1 | 2 | 3 | 4, goal?: AgentWizardGoalId | null) => {
+    (step: AgentWizardStepId, goal?: AgentWizardGoalId | null) => {
       router.push(
         buildAgentsHref(data, {
           agent: "new",

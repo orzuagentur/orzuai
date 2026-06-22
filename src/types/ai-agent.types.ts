@@ -31,6 +31,30 @@ const agentGoalSchema = z.enum([
   "custom",
 ] satisfies [AgentWizardGoalId, ...AgentWizardGoalId[]]);
 
+const wizardTestTurnSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(2000),
+});
+
+export const testAgentWizardReplySchema = z.object({
+  testMessage: z
+    .string()
+    .trim()
+    .min(1, "Enter a sample customer message.")
+    .max(2000, "Message is too long."),
+  conversationHistory: z.array(wizardTestTurnSchema).max(40).optional(),
+  channel: messagingChannelSchema,
+  name: z.string().trim().min(1, "Enter an agent name.").max(120),
+  systemPrompt: z.string().trim().min(1).max(4000),
+  goal: agentGoalSchema,
+  provider: z.enum(AI_PROVIDERS),
+  model: z.string().trim().min(1).max(100),
+  language: z.string().trim().min(1).max(32),
+  communicationStyle: communicationStyleSchema,
+});
+
+export type TestAgentWizardReplyInput = z.infer<typeof testAgentWizardReplySchema>;
+
 export const createAiAgentSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(120),
   systemPrompt: z

@@ -36,6 +36,11 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants";
 import { CHAT_ATTACHMENT_ACCEPT } from "@/features/chats/chat-attachments";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  chatComposerFieldClassName,
+  chatComposerShellClassName,
+  chatSendButtonClassName,
+} from "@/features/chats/chat-theme";
 import { cn } from "@/lib/utils";
 import type { MediaUploadProgress } from "@/hooks/use-send-chat-media";
 import type { CannedResponseItem } from "@/types/canned-response.types";
@@ -365,7 +370,7 @@ export function InboxChatComposer({
 
   return (
     <div
-      className="mt-auto shrink-0 border-t bg-muted/20"
+      className={cn("mt-auto shrink-0", chatComposerShellClassName)}
       data-inbox-chat-composer
     >
       <div className="flex gap-1 border-b px-3 pt-2">
@@ -571,7 +576,12 @@ export function InboxChatComposer({
               </Button>
             </div>
 
-            <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-border/60 bg-background px-3 py-2">
+            <div
+              className={cn(
+                "flex min-w-0 flex-1 items-end gap-2 px-3 py-2",
+                chatComposerFieldClassName,
+              )}
+            >
               <Textarea
                 ref={textareaRef}
                 value={draft}
@@ -590,7 +600,7 @@ export function InboxChatComposer({
               <Button
                 type="button"
                 size="icon"
-                className="size-10 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700"
+                className={cn("size-10 shrink-0 rounded-full", chatSendButtonClassName)}
                 disabled={
                   isBusy || !canSend || !draft.trim() || isRecording || hasPendingAttachment
                 }

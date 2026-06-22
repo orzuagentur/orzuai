@@ -169,6 +169,8 @@ export const CHAT_MESSAGES = {
   needsAttentionDescription: "Customers waiting for your reply",
   awaitingReply: "Awaiting reply",
   viewAll: "All",
+  channelRailLabel: "Channels",
+  channelRailFavorites: "Favorites",
   viewNeedsReply: "Needs reply",
   viewHighIntent: "High intent",
   highIntentBadge: "Hot lead",

@@ -15,12 +15,10 @@ import { WhatsAppStatusCard } from "@/components/dashboard/WhatsAppStatusCard";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import { getDashboardOverview } from "@/services/analytics.service";
-import { getUserDisplayName } from "@/utils/dashboard";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getOnboardingProgress } from "@/services/onboarding.service";
-import { getUserProfile } from "@/services/user.service";
 
 export default function DashboardPage() {
   return (
@@ -48,17 +46,8 @@ async function DashboardPageContent() {
     (channel) => channelStatuses[channel]?.status === "connected",
   );
 
-  const userProfile = authUser ? await getUserProfile(authUser) : null;
-  const displayName = userProfile
-    ? getUserDisplayName(userProfile.fullName, userProfile.email)
-    : "there";
-
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <p className="text-sm text-muted-foreground">
-        Welcome back, {displayName}.
-      </p>
-
       <PwaInstallBanner />
       <PushNotificationsBanner />
 

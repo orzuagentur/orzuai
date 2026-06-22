@@ -99,8 +99,40 @@ export const AGENT_WIZARD_STEPS = [
   { id: 1, label: "Goal" },
   { id: 2, label: "Channels" },
   { id: 3, label: "AI model" },
-  { id: 4, label: "Review" },
+  { id: 4, label: "Test" },
+  { id: 5, label: "Review" },
 ] as const;
+
+export type AgentWizardStepId = (typeof AGENT_WIZARD_STEPS)[number]["id"];
+
+const WIZARD_TEST_STARTERS: Record<AgentWizardGoalId, string[]> = {
+  booking: [
+    "Hi, I want to book an appointment",
+    "What times are available tomorrow?",
+    "Can I visit this weekend?",
+  ],
+  sales: [
+    "How much does your service cost?",
+    "I'm interested — can you tell me more?",
+    "Do you offer a free consultation?",
+  ],
+  support: [
+    "Hi, I need help with my order",
+    "What are your opening hours?",
+    "I have a question about delivery",
+  ],
+  custom: [
+    "Hello!",
+    "Can you help me?",
+    "I have a question about your business",
+  ],
+};
+
+export function getAgentWizardTestStarters(
+  goalId: AgentWizardGoalId,
+): string[] {
+  return WIZARD_TEST_STARTERS[goalId];
+}
 
 export function isAgentWizardGoalId(value: string): value is AgentWizardGoalId {
   return (AGENT_WIZARD_GOALS as readonly { id: string }[]).some(

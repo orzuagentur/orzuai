@@ -96,6 +96,8 @@ export function DealsWorkspace({ dealsData }: DealsWorkspaceProps) {
     onDealsViewChange: handleViewChange,
     onNewDeal: handleNewDeal,
     searchPlaceholder: CONTACTS_MESSAGES.dealsSearchPlaceholder,
+    crmListData: null,
+    crmDealsData: dealsData,
   });
 
   async function handleDealCreated(dealId: string) {

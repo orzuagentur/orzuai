@@ -81,6 +81,17 @@ export const AI_ASSISTANT_MESSAGES = {
   wizardStep3Title: "AI model",
   wizardStep3Description:
     "Model used for customer replies and autonomous CRM actions.",
+  wizardStepTestTitle: "Test your agent",
+  wizardStepTestDescription:
+    "Chat with your agent like a real customer before you go live.",
+  wizardStepTestComposerPlaceholder: "Type a message…",
+  wizardStepTestSend: "Send",
+  wizardStepTestRunning: "Agent is typing…",
+  wizardStepTestEmpty: "Pick a starter message or type your own below.",
+  wizardStepTestStartersTitle: "Try asking",
+  wizardStepTestClear: "Clear chat",
+  wizardStepTestYou: "You",
+  wizardStepTestAgent: "Agent",
   wizardStep4Title: "Review and create",
   wizardStep4Description:
     "Confirm the name, instructions, and routing. Enable when you are ready to go live.",
@@ -115,6 +126,7 @@ export const AI_ASSISTANT_MESSAGES = {
   wizardBackToGoals: "Back to goals",
   wizardBackToChannels: "Back to channels",
   wizardBackToModel: "Back to AI model",
+  wizardBackToTest: "Back to test",
   wizardContinue: "Continue",
   wizardCreateDraft: "Create as draft",
   wizardCreateAndEnable: "Create & enable",

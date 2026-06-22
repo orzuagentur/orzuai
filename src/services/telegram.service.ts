@@ -381,7 +381,7 @@ async function ingestTelegramMessage(
     });
   }
 
-  void completeInboundTelegramMessage({
+  await completeInboundTelegramMessage({
     admin,
     businessId,
     connection,
@@ -390,8 +390,6 @@ async function ingestTelegramMessage(
     createdContact,
     content,
     message,
-  }).catch((error) => {
-    console.error("[telegram] post-insert failed", error);
   });
 }
 
@@ -424,7 +422,7 @@ async function completeInboundTelegramMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  scheduleInboundMessageProcessing({
+  await scheduleInboundMessageProcessing({
     admin,
     businessId,
     channel: "telegram",

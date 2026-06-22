@@ -14,16 +14,14 @@ import {
 } from "react";
 import {
   AlertCircleIcon,
-  BookOpenIcon,
   CheckCheckIcon,
   CheckIcon,
   ChevronDownIcon,
   Clock3Icon,
   Loader2Icon,
-  SparklesIcon,
-  UserRoundIcon,
 } from "lucide-react";
 
+import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { MessageDateTime } from "@/components/ui/message-date-time";
 
@@ -33,6 +31,13 @@ import { MediaUploadProgressOverlay } from "@/components/chats/inbox/MediaUpload
 import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMenu";
 import { TypingIndicator } from "@/components/chats/TypingIndicator";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  chatPaneClassName,
+  chatUnreadDividerClassName,
+  getChatBubbleClassName,
+  getChatBubbleMetaClassName,
+  getChatBubbleMutedActionClassName,
+} from "@/features/chats/chat-theme";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMessageUploadProgress } from "@/hooks/use-message-upload-progress";
 import { usePrefetchVisibleConversationMedia } from "@/hooks/use-prefetch-conversation-media";
@@ -68,6 +73,8 @@ type MessageHistoryProps = {
   autoReplyError?: { code: string; message: string } | null;
   onDismissAutoReplyError?: () => void;
   typingContactName?: string;
+  contactName?: string;
+  contactAvatarUrl?: string | null;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
   hasOlderMessages?: boolean;
@@ -104,7 +111,7 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
   if (message.deliveryStatus === "failed") {
     return (
       <AlertCircleIcon
-        className="size-3 shrink-0 text-red-300"
+        className="size-3 shrink-0 text-red-500 dark:text-red-400"
         aria-label={CHAT_MESSAGES.messageDeliveryFailed}
       />
     );
@@ -124,8 +131,8 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
 
   if (message.deliveryStatus === "read") {
     return (
-      <BookOpenIcon
-        className="size-2.5 shrink-0 opacity-90"
+      <CheckCheckIcon
+        className="size-3 shrink-0 text-[#53bdeb]"
         aria-label={CHAT_MESSAGES.messageRead}
       />
     );
@@ -134,7 +141,7 @@ function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
   if (message.deliveryStatus === "delivered") {
     return (
       <CheckCheckIcon
-        className="size-3 shrink-0 opacity-90"
+        className="size-3 shrink-0 text-[#667781] dark:text-[#99beb7]"
         aria-hidden
       />
     );
@@ -202,11 +209,9 @@ function MessageUploadOverlay({ messageId }: { messageId: string }) {
 function MessageUploadStatus({
   message,
   isOutgoing,
-  isInbox,
 }: {
   message: ChatMessageData;
   isOutgoing: boolean;
-  isInbox: boolean;
 }) {
   const uploadProgress = useMessageUploadProgress(
     message.id,
@@ -218,16 +223,7 @@ function MessageUploadStatus({
     !uploadProgress;
 
   return (
-    <p
-      className={cn(
-        "mt-1 flex items-center justify-end gap-1 text-[10px]",
-        isOutgoing
-          ? isInbox
-            ? "text-emerald-100"
-            : "text-primary-foreground/70"
-          : "text-muted-foreground",
-      )}
-    >
+    <p className={getChatBubbleMetaClassName(isOutgoing)}>
       {message.isPending && !showInstantSent ? (
         <Clock3Icon className="size-3 shrink-0" aria-hidden />
       ) : null}
@@ -254,6 +250,24 @@ function MessageUploadStatus({
   );
 }
 
+function MessageSenderAvatar({
+  contactName,
+  contactAvatarUrl,
+}: {
+  contactName: string;
+  contactAvatarUrl?: string | null;
+}) {
+  return (
+    <ContactAvatar
+      name={contactName}
+      avatarUrl={contactAvatarUrl}
+      size="sm"
+      className="mb-0.5 size-7 shrink-0 self-end"
+      aria-hidden
+    />
+  );
+}
+
 type MessageHistoryItemProps = {
   message: ChatMessageData;
   index: number;
@@ -262,6 +276,8 @@ type MessageHistoryItemProps = {
   isInbox: boolean;
   lastReadAt: string | null;
   showMessageActions: boolean;
+  contactName: string;
+  contactAvatarUrl?: string | null;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
   onReadProgress?: (readAt: string) => void;
@@ -276,6 +292,8 @@ function MessageHistoryItem({
   isInbox,
   lastReadAt,
   showMessageActions,
+  contactName,
+  contactAvatarUrl,
   onMessageRemoved,
   onMessageUpdated,
   onReadProgress,
@@ -341,11 +359,16 @@ function MessageHistoryItem({
           role="separator"
           aria-label={CHAT_MESSAGES.unreadDivider}
         >
-          <div className="h-px flex-1 bg-primary/30" />
-          <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+          <div className={cn("h-px flex-1", chatUnreadDividerClassName.line)} />
+          <span
+            className={cn(
+              "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+              chatUnreadDividerClassName.pill,
+            )}
+          >
             {CHAT_MESSAGES.unreadDivider}
           </span>
-          <div className="h-px flex-1 bg-primary/30" />
+          <div className={cn("h-px flex-1", chatUnreadDividerClassName.line)} />
         </div>
       ) : null}
       <div
@@ -354,7 +377,13 @@ function MessageHistoryItem({
           isOutgoing ? "justify-end" : "justify-start",
         )}
       >
-        {canShowMessageActions && !isOutgoing ? (
+        {!isOutgoing && isInbox ? (
+          <MessageSenderAvatar
+            contactName={contactName}
+            contactAvatarUrl={contactAvatarUrl}
+          />
+        ) : null}
+        {canShowMessageActions && isOutgoing ? (
           <ChatMessageActionsMenu
             message={message}
             isOutgoing={isOutgoing}
@@ -363,46 +392,20 @@ function MessageHistoryItem({
         ) : null}
         <div
           className={cn(
-            "max-w-[min(85%,28rem)] min-w-0 shrink rounded-lg text-sm shadow-sm",
-            media
-              ? isAudioMessage
-                ? "px-2 py-1"
-                : "px-1.5 py-1.5"
-              : "px-3 py-2",
+            getChatBubbleClassName({
+              isOutgoing,
+              isDeleted,
+              isUnread: isInbox && isUnreadMessage,
+              hasMedia: Boolean(media),
+              isAudioMessage: isAudioMessage,
+            }),
             message.isPending && media && "opacity-80",
-            isDeleted
-              ? "border border-dashed bg-muted/40 text-muted-foreground"
-              : isOutgoing
-                ? isInbox
-                  ? "rounded-br-sm bg-emerald-600 text-white"
-                  : "rounded-br-md bg-primary text-primary-foreground"
-                : isInbox
-                  ? "rounded-bl-sm border bg-card text-foreground"
-                  : "rounded-bl-md bg-muted",
-            isInbox &&
-              isUnreadMessage &&
-              !isDeleted &&
-              "ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/20",
           )}
         >
           {!isInbox ? (
             <p className="text-[11px] font-medium opacity-80">
               {getSenderLabel(message)}
             </p>
-          ) : null}
-          {isInbox && isOutgoing && !isDeleted ? (
-            <div className="mb-1 flex items-center gap-1 opacity-90">
-              {message.senderType === "ai" ? (
-                <SparklesIcon className="size-3 shrink-0" aria-hidden />
-              ) : (
-                <UserRoundIcon className="size-3 shrink-0" aria-hidden />
-              )}
-              <span className="text-[10px] font-medium">
-                {message.senderType === "ai"
-                  ? CHAT_MESSAGES.replyFromAi
-                  : CHAT_MESSAGES.replyFromYou}
-              </span>
-            </div>
           ) : null}
           {isDeleted ? (
             <p className="text-sm italic">{CHAT_MESSAGES.messageDeletedForAll}</p>
@@ -441,22 +444,15 @@ function MessageHistoryItem({
           ) : (
             <ExpandableMessageText
               text={text}
-              mutedActionClassName={
-                isOutgoing
-                  ? isInbox
-                    ? "text-emerald-100"
-                    : "text-primary-foreground/80"
-                  : "text-muted-foreground"
-              }
+              mutedActionClassName={getChatBubbleMutedActionClassName(isOutgoing)}
             />
           )}
           <MessageUploadStatus
             message={message}
             isOutgoing={isOutgoing}
-            isInbox={isInbox}
           />
         </div>
-        {canShowMessageActions && isOutgoing ? (
+        {canShowMessageActions && !isOutgoing ? (
           <ChatMessageActionsMenu
             message={message}
             isOutgoing={isOutgoing}
@@ -476,6 +472,8 @@ const MemoMessageHistoryItem = memo(
     previous.isInbox === next.isInbox &&
     previous.lastReadAt === next.lastReadAt &&
     previous.showMessageActions === next.showMessageActions &&
+    previous.contactName === next.contactName &&
+    previous.contactAvatarUrl === next.contactAvatarUrl &&
     previous.onMessageRemoved === next.onMessageRemoved &&
     previous.onMessageUpdated === next.onMessageUpdated &&
     previous.onReadProgress === next.onReadProgress &&
@@ -498,6 +496,8 @@ export const MessageHistory = forwardRef<
     isClientTyping = false,
     isReplyTyping = false,
     typingContactName = "Customer",
+    contactName = typingContactName,
+    contactAvatarUrl = null,
     onMessageRemoved,
     onMessageUpdated,
     hasOlderMessages = false,
@@ -633,8 +633,8 @@ export const MessageHistory = forwardRef<
   }
 
   const scrollAreaClassName = cn(
-    "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4",
-    isInbox && "bg-muted/20",
+    "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-4 sm:py-4",
+    chatPaneClassName,
     !isScrollAnchored && "invisible",
   );
 
@@ -717,6 +717,8 @@ export const MessageHistory = forwardRef<
                   isInbox={isInbox}
                   lastReadAt={lastReadAt}
                   showMessageActions={showMessageActions}
+                  contactName={contactName}
+                  contactAvatarUrl={contactAvatarUrl}
                   onMessageRemoved={onMessageRemoved}
                   onMessageUpdated={onMessageUpdated}
                   onReadProgress={onReadProgress}
@@ -738,6 +740,8 @@ export const MessageHistory = forwardRef<
               isInbox={isInbox}
               lastReadAt={lastReadAt}
               showMessageActions={showMessageActions}
+              contactName={contactName}
+              contactAvatarUrl={contactAvatarUrl}
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
               onReadProgress={onReadProgress}
@@ -748,15 +752,26 @@ export const MessageHistory = forwardRef<
       )}
 
       {isClientTyping && isInbox ? (
-        <TypingIndicator
-          label={CHAT_MESSAGES.customerTyping(typingContactName)}
-        />
+        <div className="flex min-w-0 w-full items-end justify-start gap-1">
+          <ContactAvatar
+            name={contactName}
+            avatarUrl={contactAvatarUrl}
+            size="sm"
+            className="mb-0.5 size-7 shrink-0"
+            aria-hidden
+          />
+          <TypingIndicator
+            label={CHAT_MESSAGES.customerTyping(typingContactName)}
+          />
+        </div>
       ) : null}
       {isReplyTyping && isInbox ? (
-        <TypingIndicator
-          label={CHAT_MESSAGES.replyTypingLabel}
-          variant="outgoing"
-        />
+        <div className="flex min-w-0 w-full items-end justify-end gap-1">
+          <TypingIndicator
+            label={CHAT_MESSAGES.replyTypingLabel}
+            variant="outgoing"
+          />
+        </div>
       ) : null}
       {bottomRef ? <div ref={bottomRef} className="shrink-0" /> : null}
       </div>

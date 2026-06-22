@@ -403,7 +403,7 @@ async function runInlineOrchestration(input: {
     resolveAgentGoal(routing.agent) ?? mapIntentToAgentGoal(orchestration.intent);
 
   if (input.prep.contactId != null) {
-    await applyPreparedExecutorPlan({
+    void applyPreparedExecutorPlan({
       admin: input.prep.admin,
       businessId: input.prep.businessId,
       contactId: input.prep.contactId,
@@ -414,6 +414,8 @@ async function runInlineOrchestration(input: {
       goal: agentGoal,
       routingMethod: routing.method,
       plan: orchestratorResponseToExecutorPlan(orchestration),
+    }).catch((error) => {
+      console.error("[auto-reply] inline CRM executor failed", error);
     });
   }
 
@@ -421,7 +423,7 @@ async function runInlineOrchestration(input: {
     const humanReason =
       orchestration.humanReason?.trim() || "Customer needs a real person";
 
-    await createAiHumanRequest({
+    void createAiHumanRequest({
       admin: input.prep.admin,
       businessId: input.prep.businessId,
       conversationId: input.prep.conversationId,
@@ -430,6 +432,8 @@ async function runInlineOrchestration(input: {
       contactName: contact?.name,
       reason: humanReason,
       messagePreview: input.prep.clientMessage,
+    }).catch((error) => {
+      console.error("[auto-reply] human handoff request failed", error);
     });
   }
 
@@ -556,7 +560,7 @@ async function prepareAutoReplyContext(input: {
   };
 }
 
-/** Agent-first auto-reply: orchestration + CRM before customer-facing text. */
+/** Agent-first auto-reply: orchestrator before reply; CRM runs in background. */
 export async function generateFastAssistantReply(input: {
   admin: MessagingDbClient;
   businessId: string;

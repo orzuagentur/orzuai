@@ -29,6 +29,7 @@ import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleto
 import { Button } from "@/components/ui/button";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { chatHeaderClassName } from "@/features/chats/chat-theme";
 import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
@@ -386,8 +387,13 @@ export function ChatWindow({
   if (!conversation) {
     if (isLoadingConversation && loadingPreview) {
       return (
-        <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
-          <div className="shrink-0 border-b bg-card px-4 py-3">
+        <div
+          className={cn(
+            "flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-background",
+            className,
+          )}
+        >
+          <div className="shrink-0 border-b bg-background px-4 py-3">
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -471,7 +477,7 @@ export function ChatWindow({
 
   return (
       <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
-        <div className="shrink-0 border-b bg-card px-4 py-3">
+        <div className={cn("shrink-0 px-4 py-3", chatHeaderClassName)}>
           <div className="flex min-w-0 items-center justify-between gap-2">
             <ContactAvatar
               name={conversation.contactName}
@@ -595,6 +601,8 @@ export function ChatWindow({
               isClientTyping={isClientTyping}
               isReplyTyping={isReplyTyping}
               typingContactName={conversation.contactName}
+              contactName={conversation.contactName}
+              contactAvatarUrl={conversation.contactAvatarUrl}
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
               hasOlderMessages={hasOlderMessages}

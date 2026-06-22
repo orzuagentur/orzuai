@@ -808,7 +808,7 @@ async function ingestIncomingMessage(
     });
   }
 
-  void completeInboundWhatsAppMessage({
+  await completeInboundWhatsAppMessage({
     admin,
     businessId,
     connection,
@@ -818,8 +818,6 @@ async function ingestIncomingMessage(
     content,
     message,
     normalizedPhone,
-  }).catch((error) => {
-    console.error("[whatsapp] post-insert failed", error);
   });
 }
 
@@ -853,7 +851,7 @@ async function completeInboundWhatsAppMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  scheduleInboundMessageProcessing({
+  await scheduleInboundMessageProcessing({
     admin,
     businessId,
     channel: "whatsapp",

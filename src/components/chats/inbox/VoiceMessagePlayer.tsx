@@ -5,6 +5,7 @@ import { Loader2Icon, PauseIcon, PlayIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { getChatVoicePlayerClasses } from "@/features/chats/chat-theme";
 import { cn } from "@/lib/utils";
 
 type VoiceMessagePlayerProps = {
@@ -119,14 +120,11 @@ export function VoiceMessagePlayer({
     void audio.play();
   }
 
-  const barColor = isOutgoing ? "bg-white/85" : "bg-foreground/70";
-  const barMutedColor = isOutgoing ? "bg-white/30" : "bg-foreground/20";
-  const buttonClass = isOutgoing
-    ? "bg-white/20 text-white hover:bg-white/30"
-    : "bg-foreground/10 text-foreground hover:bg-foreground/15";
-  const durationClass = isOutgoing
-    ? "text-emerald-100/90"
-    : "text-muted-foreground";
+  const voiceTheme = getChatVoicePlayerClasses(Boolean(isOutgoing));
+  const barColor = voiceTheme.bar;
+  const barMutedColor = voiceTheme.barMuted;
+  const buttonClass = voiceTheme.button;
+  const durationClass = voiceTheme.duration;
 
   return (
     <div

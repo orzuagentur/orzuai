@@ -21,6 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import {
+  getChatMediaCardClassName,
+  getChatMediaDownloadButtonClassName,
+  getChatMediaPanelClassName,
+  getChatMediaShellClassName,
+} from "@/features/chats/chat-theme";
 import { retryInboundMediaAttachmentAction } from "@/features/chats/actions/retry-inbound-media-attachment";
 import { hasPersistedMediaBlob } from "@/lib/client-cache/chat-media-blob-cache";
 import { useChatImageMediaUrls, useChatMediaUrl } from "@/hooks/use-chat-media-url";
@@ -114,14 +120,14 @@ function MediaLoadPrompt({
     <div
       className={cn(
         "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg px-4 py-5 text-center",
-        isOutgoing ? "bg-emerald-800/25 text-emerald-50" : "bg-black/5 text-muted-foreground",
+        isOutgoing ? getChatMediaShellClassName(true) : getChatMediaShellClassName(false),
         className,
       )}
     >
       <div
         className={cn(
           "flex size-11 items-center justify-center rounded-full",
-          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+          isOutgoing ? getChatMediaPanelClassName(true) : getChatMediaPanelClassName(false),
         )}
       >
         <Icon className="size-5 opacity-80" aria-hidden />
@@ -191,7 +197,7 @@ function MediaHydratingPlaceholder({
     <div
       className={cn(
         "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg px-4 py-5 text-center",
-        isOutgoing ? "bg-emerald-800/25 text-emerald-50" : "bg-black/5 text-muted-foreground",
+        isOutgoing ? getChatMediaShellClassName(true) : getChatMediaShellClassName(false),
         className,
       )}
       role="status"
@@ -201,7 +207,7 @@ function MediaHydratingPlaceholder({
       <div
         className={cn(
           "flex size-11 items-center justify-center rounded-full",
-          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+          isOutgoing ? getChatMediaPanelClassName(true) : getChatMediaPanelClassName(false),
         )}
       >
         <Icon className="size-5 opacity-80" aria-hidden />
@@ -236,8 +242,8 @@ function MediaFailedPlaceholder({
       className={cn(
         "flex min-h-[120px] min-w-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center",
         isOutgoing
-          ? "border-emerald-400/30 bg-emerald-800/20 text-emerald-50"
-          : "border-border bg-muted/20 text-muted-foreground",
+          ? cn(getChatMediaCardClassName(true), "text-[#243028] dark:text-[#e8f0ee]")
+          : cn(getChatMediaCardClassName(false), "text-[#5f6f78] dark:text-[#8b9aa6]"),
         className,
       )}
       role="alert"
@@ -245,7 +251,7 @@ function MediaFailedPlaceholder({
       <div
         className={cn(
           "flex size-11 items-center justify-center rounded-full",
-          isOutgoing ? "bg-emerald-800/40" : "bg-background",
+          isOutgoing ? getChatMediaPanelClassName(true) : getChatMediaPanelClassName(false),
         )}
       >
         <Icon className="size-5 opacity-80" aria-hidden />
@@ -354,8 +360,8 @@ function MediaDownloadButton({
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
         isOutgoing
-          ? "bg-emerald-800/50 text-white hover:bg-emerald-800/70"
-          : "bg-background hover:bg-muted",
+          ? getChatMediaDownloadButtonClassName(true)
+          : getChatMediaDownloadButtonClassName(false),
         className,
       )}
       aria-label={CHAT_MESSAGES.downloadAttachment}
@@ -739,13 +745,13 @@ function ChatMediaDocument({
       <div
         className={cn(
           "flex min-w-[220px] max-w-[min(300px,100%)] items-center gap-3 rounded-lg border px-3 py-2.5",
-          isOutgoing ? "border-emerald-400/30 bg-emerald-800/20" : "border-border bg-muted/30",
+          isOutgoing ? getChatMediaCardClassName(true) : getChatMediaCardClassName(false),
         )}
       >
         <div
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-lg",
-            isOutgoing ? "bg-emerald-800/40" : "bg-background",
+            isOutgoing ? getChatMediaPanelClassName(true) : getChatMediaPanelClassName(false),
           )}
         >
           <DocIcon className="size-5" />

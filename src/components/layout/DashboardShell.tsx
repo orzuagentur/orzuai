@@ -2,6 +2,8 @@
 
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
+import { AnalyticsChromeProvider } from "@/components/analytics/analytics-chrome-context";
+import { AutomationsChromeProvider } from "@/components/automations/automations-chrome-context";
 import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-context";
 import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
@@ -12,6 +14,8 @@ import { AiHumanRequestOverlay } from "@/components/dashboard/AiHumanRequestOver
 import { DashboardAiHumanAlerts } from "@/components/dashboard/DashboardAiHumanAlerts";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { AiHumanRequestsProvider } from "@/contexts/ai-human-requests-context";
+import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
+import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
 import { PlatformCopilotWidget } from "@/components/platform-copilot/PlatformCopilotWidget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
@@ -34,6 +38,10 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
         <InboxChromeProvider>
           <ContactsChromeProvider>
             <AiAssistantChromeProvider>
+            <AnalyticsChromeProvider>
+            <AutomationsChromeProvider>
+            <DashboardProfileProvider userProfile={userProfile}>
+            <PlatformCopilotProvider>
             <SidebarProvider>
               <AppSidebar userProfile={userProfile} />
               <SidebarInset>
@@ -45,6 +53,10 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
             </SidebarProvider>
             <PlatformCopilotWidget />
             <AiHumanRequestOverlay />
+            </PlatformCopilotProvider>
+            </DashboardProfileProvider>
+            </AutomationsChromeProvider>
+            </AnalyticsChromeProvider>
             </AiAssistantChromeProvider>
           </ContactsChromeProvider>
         </InboxChromeProvider>

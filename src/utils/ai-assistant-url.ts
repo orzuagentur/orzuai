@@ -17,7 +17,7 @@ export type AiAssistantUrlState = {
   channel?: MessagingChannel | null;
   tab?: AiAssistantTab;
   agent?: string | null;
-  step?: 1 | 2 | 3 | 4 | null;
+  step?: 1 | 2 | 3 | 4 | 5 | null;
   goal?: string | null;
   q?: string | null;
   setup?: boolean;
@@ -132,14 +132,14 @@ export function buildAiAssistantHref(state: AiAssistantUrlState = {}): string {
 function parseCreateWizardStep(
   value: string | undefined,
   isNewAgent: boolean,
-): 1 | 2 | 3 | 4 {
+): 1 | 2 | 3 | 4 | 5 {
   if (!isNewAgent) {
     return 1;
   }
 
   const parsed = Number(value);
 
-  if (parsed === 2 || parsed === 3 || parsed === 4) {
+  if (parsed === 2 || parsed === 3 || parsed === 4 || parsed === 5) {
     return parsed;
   }
 
@@ -165,7 +165,7 @@ export function parseAiAssistantSearchParams(
   activeTab: AiAssistantTab;
   activeAgentId: string | null;
   isNewAgent: boolean;
-  createWizardStep: 1 | 2 | 3 | 4;
+  createWizardStep: 1 | 2 | 3 | 4 | 5;
   createWizardGoal: string | null;
   isEditingAgent: boolean;
   isViewingAnalytics: boolean;
@@ -226,7 +226,7 @@ export function buildLegacyAiAssistantRedirectHref(
       section: tab,
       channel: parseMessagingChannel(params.channel),
       agent: params.agent ?? null,
-      step: params.step ? (Number(params.step) as 1 | 2 | 3 | 4) : null,
+      step: params.step ? (Number(params.step) as 1 | 2 | 3 | 4 | 5) : null,
       goal: params.goal ?? null,
       q: params.q ?? null,
       setup: params.setup === "1",
@@ -257,7 +257,7 @@ export function buildLegacyAiAssistantRedirectHref(
       section: "agents",
       channel: parseMessagingChannel(params.channel),
       agent: params.agent ?? null,
-      step: params.step ? (Number(params.step) as 1 | 2 | 3 | 4) : null,
+      step: params.step ? (Number(params.step) as 1 | 2 | 3 | 4 | 5) : null,
       goal: params.goal ?? null,
       q: params.q ?? null,
       setup: params.setup === "1",

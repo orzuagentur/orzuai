@@ -99,7 +99,7 @@ function ConversationListRow({
     isInboxVariant &&
       isUnread &&
       !isActive &&
-      "border-l-[3px] border-l-primary bg-primary/5",
+      "border-l-[3px] border-l-muted-foreground/35 bg-muted/40",
     !isInboxVariant &&
       needsAttention &&
       "border-l-2 border-l-amber-500 bg-amber-500/5",

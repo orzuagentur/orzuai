@@ -452,7 +452,7 @@ export async function processChannelAutoReply(input: {
       errorCode: error.code,
       errorMessage: error.message,
     });
-    return;
+    throw new Error(`[${error.code}] ${error.message}`);
   }
 
   const sendResult = await sendChannelAutoReplyText({
@@ -468,7 +468,7 @@ export async function processChannelAutoReply(input: {
       errorCode: "send_failed",
       errorMessage: CHAT_MESSAGES.autoReplyErrorSendFailed,
     });
-    return;
+    throw new Error("[send_failed] Unable to deliver auto-reply.");
   }
 
   await insertChannelMessage(admin, {
@@ -499,22 +499,22 @@ export async function processChannelAutoReply(input: {
   }
 }
 
-export function scheduleChannelAutoReply(input: {
+export async function scheduleChannelAutoReply(input: {
   businessId: string;
   channel: MessagingChannel;
   conversationId: string;
   clientMessage: string;
-}): void {
-  void scheduleDebouncedChannelAutoReply(input);
+}): Promise<void> {
+  await scheduleDebouncedChannelAutoReply(input);
 }
 
-export function scheduleInboundMessageProcessing(input: {
+export async function scheduleInboundMessageProcessing(input: {
   admin: MessagingDbClient;
   businessId: string;
   channel: MessagingChannel;
   conversationId: string;
   clientMessage: string;
-}): void {
+}): Promise<void> {
   scheduleInboundMessageEffects({
     admin: input.admin,
     businessId: input.businessId,
@@ -522,7 +522,7 @@ export function scheduleInboundMessageProcessing(input: {
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
   });
-  scheduleChannelAutoReply({
+  await scheduleChannelAutoReply({
     businessId: input.businessId,
     channel: input.channel,
     conversationId: input.conversationId,

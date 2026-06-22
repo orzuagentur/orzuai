@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { useInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
+import { ChannelRailAside } from "@/components/navigation/ChannelRailAside";
 import { cn } from "@/lib/utils";
 
 type InboxShellProps = {
@@ -34,18 +35,22 @@ function InboxShellContent({
         className,
       )}
     >
-      {!chatFullscreen ? channelTabs : null}
-
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {!chatFullscreen ? (
-          <aside
+          <div
             className={cn(
-              "flex w-full min-h-0 min-w-0 shrink-0 flex-col overflow-hidden border-r lg:w-[22rem]",
+              "flex min-h-0 min-w-0 shrink-0 overflow-hidden border-r",
               showChatOnMobile && "hidden lg:flex",
             )}
           >
-            {listColumn}
-          </aside>
+            {channelTabs ? (
+              <ChannelRailAside>{channelTabs}</ChannelRailAside>
+            ) : null}
+
+            <aside className="flex w-full min-h-0 min-w-0 flex-col overflow-hidden lg:w-[22rem]">
+              {listColumn}
+            </aside>
+          </div>
         ) : null}
 
         <main

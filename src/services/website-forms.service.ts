@@ -368,7 +368,7 @@ async function processWebsiteFormFollowUp(input: {
     input;
 
   if (!connection.auto_follow_up_enabled || connection.follow_up_channel === "none") {
-    scheduleChannelAutoReply({
+    await scheduleChannelAutoReply({
       businessId,
       channel: "website_forms",
       conversationId,

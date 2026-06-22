@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Loader2Icon, PlusIcon, SparklesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getNavSegmentActiveClassName } from "@/features/navigation/channel-rail-ui";
 import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -15,8 +16,7 @@ import {
 type AutomationsTabBarProps = {
   activeTab: AutomationsTab;
   onTabChange: (tab: AutomationsTab) => void;
-  onEnableRecommended?: () => void;
-  isEnablingRecommended?: boolean;
+  variant?: "default" | "header";
   className?: string;
 };
 
@@ -29,10 +29,38 @@ const TAB_LABELS: Record<AutomationsTab, string> = {
 export function AutomationsTabBar({
   activeTab,
   onTabChange,
-  onEnableRecommended,
-  isEnablingRecommended = false,
+  variant = "default",
   className,
 }: AutomationsTabBarProps) {
+  if (variant === "header") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-0.5 overflow-x-auto",
+          className,
+        )}
+      >
+        {AUTOMATIONS_TABS.map((tab) => {
+          const isActive = activeTab === tab;
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onTabChange(tab)}
+              className={cn(
+                "shrink-0 rounded-lg px-2.5 py-1 text-xs transition-colors sm:px-3 sm:py-1.5 sm:text-sm",
+                getNavSegmentActiveClassName(isActive),
+              )}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -41,22 +69,43 @@ export function AutomationsTabBar({
       )}
     >
       <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
-        {AUTOMATIONS_TABS.map((tab) => (
-          <Button
-            key={tab}
-            type="button"
-            size="sm"
-            variant={activeTab === tab ? "secondary" : "ghost"}
-            className="h-8 shrink-0 px-2.5 text-xs sm:text-sm"
-            onClick={() => onTabChange(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </Button>
-        ))}
+        {AUTOMATIONS_TABS.map((tab) => {
+          const isActive = activeTab === tab;
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onTabChange(tab)}
+              className={cn(
+                "h-8 shrink-0 rounded-lg px-2.5 text-xs sm:text-sm",
+                getNavSegmentActiveClassName(isActive),
+              )}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
+}
 
-      <div className="min-w-0 flex-1" />
+type AutomationsHeaderActionsProps = {
+  activeTab: AutomationsTab;
+  onEnableRecommended?: () => void;
+  isEnablingRecommended?: boolean;
+  className?: string;
+};
 
+export function AutomationsHeaderActions({
+  activeTab,
+  onEnableRecommended,
+  isEnablingRecommended = false,
+  className,
+}: AutomationsHeaderActionsProps) {
+  return (
+    <div className={cn("flex shrink-0 items-center gap-2", className)}>
       {activeTab === "rules" ? (
         <Button
           type="button"
