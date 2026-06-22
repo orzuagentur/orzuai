@@ -20,6 +20,7 @@ import {
   refreshGoogleCalendarAccessToken,
 } from "@/lib/google-calendar/oauth";
 import { hasGoogleOAuthEnv, hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -132,8 +133,8 @@ async function getValidAccessToken(
     connection.refresh_token,
   );
 
-  const supabase = await createClient();
-  await supabase
+  const admin = createAdminClient();
+  await admin
     .from("google_calendar_connections")
     .update({
       access_token: refreshed.accessToken,
@@ -258,12 +259,14 @@ export async function getGoogleCalendarEventsForBusiness(
   }
 
   const timeMin = new Date();
+  timeMin.setDate(timeMin.getDate() - 7);
   timeMin.setHours(0, 0, 0, 0);
 
-  const timeMax = new Date(timeMin);
-  timeMax.setDate(timeMax.getDate() + 30);
+  const timeMax = new Date();
+  timeMax.setDate(timeMax.getDate() + 60);
+  timeMax.setHours(23, 59, 59, 999);
 
-  const events = await listGoogleCalendarEvents(
+  const result = await listGoogleCalendarEvents(
     accessToken,
     row.calendar_id,
     timeMin.toISOString(),
@@ -279,8 +282,54 @@ export async function getGoogleCalendarEventsForBusiness(
     .eq("id", row.id);
 
   return {
-    events,
+    events: result.events,
     timeMin: timeMin.toISOString(),
     timeMax: timeMax.toISOString(),
+    syncError: result.error,
   };
+}
+
+export async function createGoogleCalendarEventForBusiness(input: {
+  summary: string;
+  startDateTime: string;
+  endDateTime: string;
+  timeZone: string;
+  description?: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return { success: false, message: GOOGLE_CALENDAR_MESSAGES.eventCreateFailed };
+  }
+
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("google_calendar_connections")
+    .select("*")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!row || row.google_calendar_status !== "connected" || !row.calendar_id) {
+    return { success: false, message: GOOGLE_CALENDAR_MESSAGES.eventCreateFailed };
+  }
+
+  const accessToken = await getValidAccessToken(row);
+
+  if (!accessToken) {
+    return { success: false, message: GOOGLE_CALENDAR_MESSAGES.syncError };
+  }
+
+  const { createGoogleCalendarEvent } = await import("@/lib/google-calendar/client");
+  const created = await createGoogleCalendarEvent(
+    accessToken,
+    row.calendar_id,
+    input,
+  );
+
+  if (!created.success) {
+    return { success: false, message: created.error };
+  }
+
+  revalidateGoogleCalendarPaths();
+  return { success: true };
 }

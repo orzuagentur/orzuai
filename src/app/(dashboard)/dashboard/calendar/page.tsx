@@ -67,6 +67,7 @@ async function CalendarPageContent() {
       events={eventsResult?.events ?? []}
       calendarSummary={connection.calendarSummary}
       googleAccountEmail={connection.googleAccountEmail}
+      syncError={eventsResult?.syncError}
     />
   );
 }

@@ -19,7 +19,14 @@ export const EMAIL_MESSAGES = {
   disconnectSuccess: "Gmail disconnected.",
   oauthError: "Could not connect Gmail. Please try again.",
   oauthSuccess: "Gmail connected successfully.",
-  syncHint: "New emails sync automatically every few minutes.",
+  syncHint: "Incoming mail syncs every ~3 min on production. Use Sync now after sending a test email to your Gmail address.",
+  syncNow: "Sync now",
+  syncSuccess: (count: number) =>
+    count > 0 ? `Imported ${count} new email(s).` : "Inbox is up to date.",
+  syncFailed: "Could not sync Gmail.",
+  inboxHint:
+    "Only emails received in your Gmail inbox appear here (not outgoing-only). Send a test to your connected address.",
+  lastSynced: "Last synced",
   openInbox: "Open Inbox",
 } as const;
 

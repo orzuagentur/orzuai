@@ -33,4 +33,5 @@ export type GoogleCalendarEventsResult = {
   events: GoogleCalendarEvent[];
   timeMin: string;
   timeMax: string;
+  syncError?: string;
 };

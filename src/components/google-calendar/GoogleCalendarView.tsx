@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarIcon, ExternalLinkIcon, MapPinIcon } from "lucide-react";
 
+import { GoogleCalendarToolbar } from "@/components/google-calendar/GoogleCalendarToolbar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,6 +17,7 @@ type GoogleCalendarViewProps = {
   events: GoogleCalendarEvent[];
   calendarSummary: string | null;
   googleAccountEmail: string | null;
+  syncError?: string | null;
 };
 
 function formatEventTime(event: GoogleCalendarEvent): string {
@@ -66,13 +68,15 @@ export function GoogleCalendarView({
   events,
   calendarSummary,
   googleAccountEmail,
+  syncError,
 }: GoogleCalendarViewProps) {
   const grouped = groupEventsByDay(events);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-full flex-1 flex-col gap-6 bg-background p-4 text-foreground md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Google Calendar</p>
           {calendarSummary ? (
             <p className="text-sm text-muted-foreground">
               {calendarSummary}
@@ -80,20 +84,36 @@ export function GoogleCalendarView({
             </p>
           ) : null}
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF}>Settings</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <GoogleCalendarToolbar />
+          <Button variant="outline" size="sm" asChild>
+            <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF}>Settings</Link>
+          </Button>
+        </div>
       </div>
 
+      {syncError ? (
+        <Card className="border-destructive/30 bg-destructive/5 shadow-none">
+          <CardContent className="p-4 text-sm text-destructive">
+            {syncError}. Reconnect in{" "}
+            <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF} className="underline">
+              Calendar settings
+            </Link>
+            .
+          </CardContent>
+        </Card>
+      ) : null}
+
       {events.length === 0 ? (
-        <Card className="max-w-2xl shadow-none">
+        <Card className="max-w-2xl border bg-card shadow-none">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <CalendarIcon className="size-4" />
               No events
             </CardTitle>
             <CardDescription>
-              No upcoming events in the next 30 days.
+              No events in the next 60 days (or past week). Use Create event above,
+              or add events in Google Calendar and click Refresh.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -119,10 +139,10 @@ export function GoogleCalendarView({
                 </h2>
                 <div className="space-y-2">
                   {dayEvents.map((event) => (
-                    <Card key={event.id} className="shadow-none">
+                    <Card key={event.id} className="border bg-card shadow-none">
                       <CardContent className="flex items-start justify-between gap-4 p-4">
                         <div className="min-w-0 space-y-1">
-                          <p className="font-medium">{event.summary}</p>
+                          <p className="font-medium text-foreground">{event.summary}</p>
                           <p className="text-sm text-muted-foreground">
                             {formatEventTime(event)}
                           </p>

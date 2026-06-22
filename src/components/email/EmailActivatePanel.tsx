@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ExternalLinkIcon, Loader2Icon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { GmailIcon } from "@/components/icons/channel-brand-icons";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { disconnectGmailAction } from "@/features/email/actions/disconnect";
+import { syncGmailNowAction } from "@/features/email/actions/sync-now";
 import { EMAIL_INTEGRATION_HREF, EMAIL_MESSAGES } from "@/features/email/constants";
 import type {
   GmailConnectConfig,
@@ -40,6 +41,7 @@ export function EmailActivatePanel({
 }: EmailActivatePanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("connected") === "1") {
@@ -122,7 +124,14 @@ export function EmailActivatePanel({
                   </span>
                   {connection.gmailAddress}
                 </p>
+                <p className="mt-2 text-muted-foreground">{EMAIL_MESSAGES.inboxHint}</p>
                 <p className="mt-2 text-muted-foreground">{EMAIL_MESSAGES.syncHint}</p>
+                {connection.lastSyncedAt ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {EMAIL_MESSAGES.lastSynced}:{" "}
+                    {new Date(connection.lastSyncedAt).toLocaleString()}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -132,6 +141,33 @@ export function EmailActivatePanel({
                   <GmailIcon className="size-5" />
                   {EMAIL_MESSAGES.openInbox}
                 </Link>
+              </Button>
+              <Button
+                variant="outline"
+                disabled={isSyncing}
+                onClick={() => {
+                  void (async () => {
+                    setIsSyncing(true);
+                    try {
+                      const result = await syncGmailNowAction();
+                      if (result.success) {
+                        toast.success(result.message);
+                        router.refresh();
+                      } else {
+                        toast.error(result.message ?? EMAIL_MESSAGES.syncFailed);
+                      }
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  })();
+                }}
+              >
+                {isSyncing ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCwIcon className="size-4" />
+                )}
+                {EMAIL_MESSAGES.syncNow}
               </Button>
               <Button variant="outline" asChild>
                 <a href={config.connectUrl}>

@@ -90,7 +90,7 @@ export async function listGoogleCalendarEvents(
   calendarId: string,
   timeMin: string,
   timeMax: string,
-): Promise<GoogleCalendarEvent[]> {
+): Promise<{ events: GoogleCalendarEvent[]; error?: string }> {
   const params = new URLSearchParams({
     timeMin,
     timeMax,
@@ -107,12 +107,68 @@ export async function listGoogleCalendarEvents(
   );
 
   if (!response.ok) {
-    return [];
+    const body = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    return {
+      events: [],
+      error: body?.error?.message ?? `Calendar API error (${response.status})`,
+    };
   }
 
   const data = (await response.json()) as GoogleEventsListResponse;
 
-  return (data.items ?? [])
-    .map(mapGoogleEvent)
-    .filter((event): event is GoogleCalendarEvent => event !== null);
+  return {
+    events: (data.items ?? [])
+      .map(mapGoogleEvent)
+      .filter((event): event is GoogleCalendarEvent => event !== null),
+  };
+}
+
+export async function createGoogleCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  input: {
+    summary: string;
+    description?: string;
+    startDateTime: string;
+    endDateTime: string;
+    timeZone: string;
+  },
+): Promise<{ success: boolean; event?: GoogleCalendarEvent; error?: string }> {
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: input.summary,
+        description: input.description,
+        start: { dateTime: input.startDateTime, timeZone: input.timeZone },
+        end: { dateTime: input.endDateTime, timeZone: input.timeZone },
+      }),
+    },
+  );
+
+  const data = (await response.json()) as GoogleEventItem & {
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: data.error?.message ?? "Failed to create event.",
+    };
+  }
+
+  const event = mapGoogleEvent(data);
+
+  if (!event) {
+    return { success: false, error: "Invalid event response." };
+  }
+
+  return { success: true, event };
 }
