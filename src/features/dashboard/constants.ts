@@ -3,6 +3,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  Calendar,
   CreditCard,
   LayoutDashboard,
   MessageSquare,
@@ -102,6 +103,46 @@ export const DASHBOARD_NAV_ITEMS = [
   icon: LucideIcon;
 }>;
 
+export type DashboardNavItem = {
+  id: string;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+export type DashboardNavItemId =
+  | (typeof DASHBOARD_NAV_ITEMS)[number]["id"]
+  | "calendar";
+
+export type DashboardNavOptions = {
+  googleCalendarConnected?: boolean;
+};
+
+/** Base nav plus integration-driven items (e.g. Calendar when Google is connected). */
+export function buildDashboardNavItems(
+  options: DashboardNavOptions = {},
+): DashboardNavItem[] {
+  const items: DashboardNavItem[] = [...DASHBOARD_NAV_ITEMS];
+
+  if (options.googleCalendarConnected) {
+    const crmIndex = items.findIndex((item) => item.id === "contacts");
+    const calendarItem: DashboardNavItem = {
+      id: "calendar",
+      label: "Calendar",
+      href: DASHBOARD_ROUTES.calendar,
+      icon: Calendar,
+    };
+
+    if (crmIndex >= 0) {
+      items.splice(crmIndex + 1, 0, calendarItem);
+    } else {
+      items.push(calendarItem);
+    }
+  }
+
+  return items;
+}
+
 export const SETTINGS_MESSAGES = {
   pageTitle: "Settings",
   pageDescription:
@@ -154,5 +195,3 @@ export const ANALYTICS_CARD_LABELS = {
 
 export const DASHBOARD_COMING_SOON_MESSAGE =
   "This section is coming in a future release.";
-
-export type DashboardNavItemId = (typeof DASHBOARD_NAV_ITEMS)[number]["id"];

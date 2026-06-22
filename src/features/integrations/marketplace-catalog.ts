@@ -35,11 +35,4 @@ export const THIRD_PARTY_MARKETPLACE_APPS: MarketplaceApp[] = [
     description: "Connect 5,000+ apps.",
     status: "coming_soon",
   },
-  {
-    id: "google-calendar",
-    name: "Google Calendar",
-    category: "Booking",
-    description: "AI booking from chat.",
-    status: "beta",
-  },
 ];

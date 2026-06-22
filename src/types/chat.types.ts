@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { CannedResponseItem } from "./canned-response.types";
 import type {
   ConversationStatus,
@@ -18,10 +19,8 @@ export const sendChatMessageSchema = z.object({
 });
 
 const messagingChannelSchema = z.enum([
-  "whatsapp",
-  "instagram",
-  "telegram",
-  "website_forms",
+  MESSAGING_INTEGRATION_CHANNELS[0],
+  ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
 ]);
 
 export const toggleChatAiSchema = z.object({

@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/knowledge-embeddings",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-sync",
+      "schedule": "*/3 * * * *"
     }
   ]
 }

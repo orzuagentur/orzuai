@@ -24,6 +24,14 @@ import {
   listRecentVoiceCalls,
 } from "@/services/voice-agent.service";
 import {
+  getGmailConnection,
+  getGmailConnectConfig,
+} from "@/services/gmail-integration.service";
+import {
+  getGoogleCalendarConnection,
+  getGoogleCalendarConnectConfig,
+} from "@/services/google-calendar.service";
+import {
   getWhatsAppConnection,
   getWhatsAppConnectConfig,
 } from "@/services/whatsapp.service";
@@ -55,6 +63,10 @@ export default async function IntegrationsChannelPage({
 
   if (channelParam === "website_knowledge") {
     redirect(`${DASHBOARD_ROUTES.knowledgeBase}#website-sync`);
+  }
+
+  if (channelParam === "google-calendar") {
+    redirect(`${DASHBOARD_ROUTES.integrations}/google_calendar?section=activate`);
   }
 
   if (channelParam === "instagram") {
@@ -90,6 +102,10 @@ export default async function IntegrationsChannelPage({
     voiceSettings,
     voiceRecentCalls,
     voiceConnectConfig,
+    googleCalendarConnection,
+    googleCalendarConnectConfig,
+    gmailConnection,
+    gmailConnectConfig,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWhatsAppConnectConfig()),
@@ -104,6 +120,10 @@ export default async function IntegrationsChannelPage({
       : Promise.resolve(null),
     business ? listRecentVoiceCalls(business.id) : Promise.resolve([]),
     Promise.resolve(getVoiceConnectConfig()),
+    business ? getGoogleCalendarConnection(business.id) : Promise.resolve(null),
+    Promise.resolve(getGoogleCalendarConnectConfig()),
+    business ? getGmailConnection(business.id) : Promise.resolve(null),
+    Promise.resolve(getGmailConnectConfig()),
   ]);
 
   const channelStatuses = buildIntegrationChannelStatuses({
@@ -112,6 +132,8 @@ export default async function IntegrationsChannelPage({
     websiteFormConnection,
     websiteKnowledgeSync,
     voiceConnection,
+    googleCalendarConnection,
+    gmailConnection,
   });
 
   const isActivated = isChannelActivated(channel, channelStatuses);
@@ -166,6 +188,14 @@ export default async function IntegrationsChannelPage({
                 }
               : undefined
           }
+          googleCalendar={{
+            connection: googleCalendarConnection,
+            connectConfig: googleCalendarConnectConfig,
+          }}
+          gmail={{
+            connection: gmailConnection,
+            connectConfig: gmailConnectConfig,
+          }}
           channelContacts={channelContacts}
           channelAiSettings={channelAiSettings}
         />

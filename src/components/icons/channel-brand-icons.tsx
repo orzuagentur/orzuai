@@ -112,12 +112,71 @@ export function WebsiteFormsIcon({ className, ...props }: IconProps) {
   );
 }
 
+/** Official Gmail mark (envelope M). */
+export function GmailIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path
+        fill="#EA4335"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#4A90E2"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
+
+/** Official Google Calendar mark. */
+export function GoogleCalendarIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path
+        fill="#FFFFFF"
+        d="M18.316 5.684H5.684A2.684 2.684 0 0 0 3 8.368v10.316A2.684 2.684 0 0 0 5.684 21.368h12.632A2.684 2.684 0 0 0 21 18.684V8.368a2.684 2.684 0 0 0-2.684-2.684z"
+      />
+      <path fill="#1A73E8" d="M21 8.368V8H3v.368A2.684 2.684 0 0 0 5.684 11h12.632A2.684 2.684 0 0 0 21 8.368z" />
+      <path fill="#EA4335" d="M7.5 3h1.5v3H7.5V3zM15 3h1.5v3H15V3z" />
+      <path
+        fill="#34A853"
+        d="M7.5 3V5.25H6A1.5 1.5 0 0 0 4.5 6.75V8h15V6.75A1.5 1.5 0 0 0 18 5.25h-1.5V3H15v2.25H9V3H7.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M8 12h2.25v2.25H8V12zm3.375 0H13.5v2.25h-2.125V12zm3.375 0H16.875v2.25H14.75V12zM8 15.375h2.25V17.5H8v-2.125zm3.375 0H13.5V17.5h-2.125v-2.125zm3.375 0H16.875V17.5H14.75v-2.125z"
+      />
+      <path fill="#FBBC04" d="M3 8h18v1H3V8z" />
+    </svg>
+  );
+}
+
 const CHANNEL_ICON_MAP = {
   whatsapp: WhatsAppIcon,
   instagram: InstagramIcon,
   telegram: TelegramIcon,
   website_forms: WebsiteFormsIcon,
   voice: VoiceIcon,
+  email: GmailIcon,
+  google_calendar: GoogleCalendarIcon,
 } as const;
 
 export type ChannelBrandId = keyof typeof CHANNEL_ICON_MAP;

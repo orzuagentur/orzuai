@@ -43,5 +43,9 @@ export function resolveDashboardPageTitle(pathname: string): string {
     return item.label;
   }
 
+  if (pathname === DASHBOARD_ROUTES.calendar) {
+    return "Calendar";
+  }
+
   return "OrzuX";
 }

@@ -10,6 +10,7 @@ import {
 } from "@/features/dashboard/constants";
 import { INTEGRATIONS_MESSAGES } from "@/features/integrations";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
+import { GOOGLE_CALENDAR_MESSAGES } from "@/features/google-calendar/constants";
 import { ONBOARDING_MESSAGES } from "@/features/onboarding/constants";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
 
@@ -101,6 +102,23 @@ export function getDashboardPageHeaderMeta(
     return {
       title: KNOWLEDGE_MESSAGES.pageTitle,
       description: KNOWLEDGE_MESSAGES.pageDescription,
+    };
+  }
+
+  if (
+    pathname === DASHBOARD_ROUTES.calendar ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.calendar}/`)
+  ) {
+    return {
+      title: GOOGLE_CALENDAR_MESSAGES.pageTitle,
+      description: GOOGLE_CALENDAR_MESSAGES.pageDescription,
+    };
+  }
+
+  if (pathname === DASHBOARD_ROUTES.googleCalendarIntegration) {
+    return {
+      title: GOOGLE_CALENDAR_MESSAGES.connectTitle,
+      description: GOOGLE_CALENDAR_MESSAGES.connectDescription,
     };
   }
 

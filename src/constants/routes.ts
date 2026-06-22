@@ -43,6 +43,8 @@ export const DASHBOARD_ROUTES = {
   subscription: "/dashboard/subscription",
   automations: "/dashboard/automations",
   marketplace: "/dashboard/integrations/marketplace",
+  calendar: "/dashboard/calendar",
+  googleCalendarIntegration: "/dashboard/integrations/google_calendar",
 } as const;
 
 export const PROTECTED_ROUTE_PREFIXES = ["/dashboard"] as const;

@@ -78,6 +78,7 @@ export async function deliverChannelTextMessage(input: {
   if (input.channel === "email") {
     return deliverEmailTextMessage({
       admin: input.admin,
+      businessId: input.businessId,
       recipientEmail: input.recipientId,
       subject: "Message from your business",
       content: input.content,

@@ -20,6 +20,10 @@ export type InstagramStatus = "connected" | "disconnected" | "pending";
 
 export type TelegramStatus = "connected" | "disconnected" | "pending";
 
+export type EmailConnectionStatus = "connected" | "disconnected" | "pending";
+
+export type GoogleCalendarStatus = "connected" | "disconnected" | "pending";
+
 export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
 
 export type WebsiteFormFollowUp =
@@ -419,6 +423,115 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "telegram_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          email_status: EmailConnectionStatus;
+          gmail_address: string | null;
+          access_token: string | null;
+          refresh_token: string | null;
+          token_expires_at: string | null;
+          history_id: string | null;
+          last_synced_at: string | null;
+          connected_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          email_status?: EmailConnectionStatus;
+          gmail_address?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          history_id?: string | null;
+          last_synced_at?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          email_status?: EmailConnectionStatus;
+          gmail_address?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          history_id?: string | null;
+          last_synced_at?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "email_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      google_calendar_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          google_calendar_status: GoogleCalendarStatus;
+          google_account_email: string | null;
+          calendar_id: string | null;
+          calendar_summary: string | null;
+          access_token: string | null;
+          refresh_token: string | null;
+          token_expires_at: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          google_calendar_status?: GoogleCalendarStatus;
+          google_account_email?: string | null;
+          calendar_id?: string | null;
+          calendar_summary?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          google_calendar_status?: GoogleCalendarStatus;
+          google_account_email?: string | null;
+          calendar_id?: string | null;
+          calendar_summary?: string | null;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
             referencedRelation: "businesses";
@@ -2412,6 +2525,8 @@ export type Database = {
       whatsapp_status: WhatsappStatus;
       instagram_status: InstagramStatus;
       telegram_status: TelegramStatus;
+      email_connection_status: EmailConnectionStatus;
+      google_calendar_status: GoogleCalendarStatus;
       website_form_status: WebsiteFormStatus;
       website_form_follow_up: WebsiteFormFollowUp;
       website_knowledge_sync_status: WebsiteKnowledgeSyncStatus;
@@ -2436,6 +2551,10 @@ export type InstagramConnection =
   Database["public"]["Tables"]["instagram_connections"]["Row"];
 export type TelegramConnection =
   Database["public"]["Tables"]["telegram_connections"]["Row"];
+export type EmailConnection =
+  Database["public"]["Tables"]["email_connections"]["Row"];
+export type GoogleCalendarConnection =
+  Database["public"]["Tables"]["google_calendar_connections"]["Row"];
 export type WebsiteFormConnection =
   Database["public"]["Tables"]["website_form_connections"]["Row"];
 export type WebsiteKnowledgeSync =

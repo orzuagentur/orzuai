@@ -23,10 +23,15 @@ import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-boot
 
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
+  googleCalendarConnected?: boolean;
   children: React.ReactNode;
 };
 
-export function DashboardShell({ userProfile, children }: DashboardShellProps) {
+export function DashboardShell({
+  userProfile,
+  googleCalendarConnected = false,
+  children,
+}: DashboardShellProps) {
   useSupabaseRealtimeBootstrap();
 
   return (
@@ -43,7 +48,10 @@ export function DashboardShell({ userProfile, children }: DashboardShellProps) {
             <DashboardProfileProvider userProfile={userProfile}>
             <PlatformCopilotProvider>
             <SidebarProvider>
-              <AppSidebar userProfile={userProfile} />
+              <AppSidebar
+                userProfile={userProfile}
+                googleCalendarConnected={googleCalendarConnected}
+              />
               <SidebarInset>
                 <DashboardHeader />
                 <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

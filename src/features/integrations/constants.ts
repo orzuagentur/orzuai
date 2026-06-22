@@ -1,6 +1,8 @@
 import type { ComponentType, SVGProps } from "react";
 
 import {
+  GmailIcon,
+  GoogleCalendarIcon,
   TelegramIcon,
   VoiceIcon,
   WebsiteFormsIcon,
@@ -16,11 +18,14 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
   "telegram",
   "website_forms",
+  "email",
 ] as const;
 
 export const INTEGRATION_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
   "voice",
+  "email",
+  "google_calendar",
   "website_knowledge",
 ] as const;
 
@@ -101,6 +106,20 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     label: "AI Voice",
     description: "AI calls leads after website forms",
     icon: VoiceIcon,
+    available: true,
+  },
+  {
+    id: "email",
+    label: "Gmail",
+    description: "Email inbox and AI replies",
+    icon: GmailIcon,
+    available: true,
+  },
+  {
+    id: "google_calendar",
+    label: "Google Calendar",
+    description: "AI booking and calendar sync",
+    icon: GoogleCalendarIcon,
     available: true,
   },
 ];

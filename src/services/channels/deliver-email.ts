@@ -1,7 +1,9 @@
 import "server-only";
 
+import { sendGmailMessage } from "@/lib/gmail/client";
 import { getResendClient } from "@/lib/resend/client";
 import { hasResendEnv, getResendFromEmail } from "@/lib/env";
+import { getGmailAccessTokenForBusiness } from "@/services/gmail-integration.service";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -10,18 +12,40 @@ type MessagingDbClient = SupabaseClient<Database>;
 
 export async function deliverEmailTextMessage(input: {
   admin: MessagingDbClient;
+  businessId: string;
   recipientEmail: string;
   subject: string;
   content: string;
 }): Promise<ChannelTextDeliveryResult> {
-  if (!hasResendEnv()) {
-    return { success: false, error: "Email delivery is not configured." };
-  }
-
-  const recipient = input.recipientEmail.trim();
+  const recipient = input.recipientEmail.trim().toLowerCase();
 
   if (!recipient.includes("@")) {
     return { success: false, error: "Recipient email is invalid." };
+  }
+
+  const gmail = await getGmailAccessTokenForBusiness(input.businessId);
+
+  if (gmail) {
+    const sendResult = await sendGmailMessage({
+      accessToken: gmail.accessToken,
+      fromEmail: gmail.fromEmail,
+      toEmail: recipient,
+      subject: input.subject,
+      body: input.content,
+    });
+
+    if (!sendResult.success) {
+      return { success: false, error: sendResult.error ?? "Gmail send failed." };
+    }
+
+    return { success: true, providerMessageId: sendResult.messageId };
+  }
+
+  if (!hasResendEnv()) {
+    return {
+      success: false,
+      error: "Gmail is not connected and email delivery is not configured.",
+    };
   }
 
   try {

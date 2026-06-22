@@ -20,6 +20,14 @@ export function getChannelIconContainerClassName(
     return "bg-indigo-50 dark:bg-indigo-950/50";
   }
 
+  if (channel === "email") {
+    return "bg-red-50 dark:bg-red-950/40";
+  }
+
+  if (channel === "google_calendar") {
+    return "bg-blue-50 dark:bg-blue-950/50";
+  }
+
   return "bg-amber-50 dark:bg-amber-950/50";
 }
 

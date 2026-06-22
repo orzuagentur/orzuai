@@ -26,6 +26,8 @@ import {
   isProviderConfigured,
 } from "@/services/llm.service";
 import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
+import { getGmailConnection } from "@/services/gmail-integration.service";
+import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
@@ -67,6 +69,37 @@ export async function enableAiForChannels(
     .update({ ai_enabled: true })
     .eq("business_id", businessId)
     .in("channel", channels);
+}
+
+export async function syncChannelAiEnabledAfterAgentChange(
+  businessId: string,
+  channels: MessagingIntegrationChannelId[],
+): Promise<void> {
+  if (!hasSupabaseEnv() || channels.length === 0) {
+    return;
+  }
+
+  const supabase = await createClient();
+
+  const { data: enabledAgents } = await supabase
+    .from("ai_agents")
+    .select("channels")
+    .eq("business_id", businessId)
+    .eq("enabled", true);
+
+  for (const channel of channels) {
+    await ensureChannelAiSettings(supabase, businessId, channel);
+
+    const hasEnabledAgent = (enabledAgents ?? []).some((agent) =>
+      (agent.channels ?? []).includes(channel),
+    );
+
+    await supabase
+      .from("ai_settings")
+      .update({ ai_enabled: hasEnabledAgent })
+      .eq("business_id", businessId)
+      .eq("channel", channel);
+  }
 }
 
 function revalidateChannelWorkspacePaths(channel: MessagingIntegrationChannelId): void {
@@ -268,13 +301,15 @@ export async function syncChannelAnalytics(
 }
 
 export async function getChannelConnectionStatuses(businessId: string) {
-  const [whatsapp, telegram, websiteForms, websiteKnowledge, voice] =
+  const [whatsapp, telegram, websiteForms, websiteKnowledge, voice, googleCalendar, gmail] =
     await Promise.all([
       getWhatsAppConnection(businessId),
       getTelegramConnection(businessId),
       getWebsiteFormConnection(businessId),
       getWebsiteKnowledgeSync(businessId),
       getVoiceConnection(businessId),
+      getGoogleCalendarConnection(businessId),
+      getGmailConnection(businessId),
     ]);
 
   return buildIntegrationChannelStatuses({
@@ -283,6 +318,8 @@ export async function getChannelConnectionStatuses(businessId: string) {
     websiteFormConnection: websiteForms,
     websiteKnowledgeSync: websiteKnowledge,
     voiceConnection: voice,
+    googleCalendarConnection: googleCalendar,
+    gmailConnection: gmail,
   });
 }
 

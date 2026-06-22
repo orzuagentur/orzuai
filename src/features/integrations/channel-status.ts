@@ -1,4 +1,6 @@
 import type { VoiceConnectionData } from "@/types/voice-agent.types";
+import type { GmailConnectionData } from "@/types/gmail-integration.types";
+import type { GoogleCalendarConnectionData } from "@/types/google-calendar.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
@@ -31,6 +33,8 @@ type BuildChannelStatusesInput = {
   websiteFormConnection: WebsiteFormConnectionData | null;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
   voiceConnection?: VoiceConnectionData | null;
+  googleCalendarConnection?: GoogleCalendarConnectionData | null;
+  gmailConnection?: GmailConnectionData | null;
 };
 
 export function buildIntegrationChannelStatuses({
@@ -39,6 +43,8 @@ export function buildIntegrationChannelStatuses({
   websiteFormConnection,
   websiteKnowledgeSync,
   voiceConnection,
+  googleCalendarConnection,
+  gmailConnection,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
   let whatsappStatus: IntegrationChannelStatus = "disconnected";
   let whatsappDetail: string | undefined;
@@ -100,6 +106,29 @@ export function buildIntegrationChannelStatuses({
     voiceDetail = voiceConnection.phoneNumber ?? undefined;
   }
 
+  let googleCalendarStatus: IntegrationChannelStatus = "disconnected";
+  let googleCalendarDetail: string | undefined;
+
+  if (googleCalendarConnection?.status === "connected") {
+    googleCalendarStatus = "connected";
+    googleCalendarDetail =
+      googleCalendarConnection.googleAccountEmail ??
+      googleCalendarConnection.calendarSummary ??
+      undefined;
+  } else if (googleCalendarConnection?.status === "pending") {
+    googleCalendarStatus = "pending";
+  }
+
+  let emailStatus: IntegrationChannelStatus = "disconnected";
+  let emailDetail: string | undefined;
+
+  if (gmailConnection?.status === "connected") {
+    emailStatus = "connected";
+    emailDetail = gmailConnection.gmailAddress ?? undefined;
+  } else if (gmailConnection?.status === "pending") {
+    emailStatus = "pending";
+  }
+
   return {
     whatsapp: {
       status: whatsappStatus,
@@ -120,6 +149,14 @@ export function buildIntegrationChannelStatuses({
     voice: {
       status: voiceStatus,
       detail: voiceDetail,
+    },
+    google_calendar: {
+      status: googleCalendarStatus,
+      detail: googleCalendarDetail,
+    },
+    email: {
+      status: emailStatus,
+      detail: emailDetail,
     },
   };
 }

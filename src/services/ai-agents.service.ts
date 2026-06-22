@@ -12,7 +12,7 @@ import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { enableAiForChannels } from "@/services/channel-workspace.service";
+import { enableAiForChannels, syncChannelAiEnabledAfterAgentChange } from "@/services/channel-workspace.service";
 import { resolveAgentIconId } from "@/features/ai-assistant/agent-icons";
 import { inferAgentGoalFromIcon, isAgentGoalId } from "@/lib/ai-assistant/infer-agent-goal";
 import type {
@@ -208,20 +208,17 @@ export async function toggleAiAgentEnabled(input: {
 
   const supabase = await createClient();
 
-  if (input.enabled) {
-    const { data: agent } = await supabase
-      .from("ai_agents")
-      .select("channels")
-      .eq("id", input.id)
-      .eq("business_id", businessId)
-      .maybeSingle();
+  const { data: agent } = await supabase
+    .from("ai_agents")
+    .select("channels")
+    .eq("id", input.id)
+    .eq("business_id", businessId)
+    .maybeSingle();
 
-    if (agent?.channels?.length) {
-      await enableAiForChannels(
-        businessId,
-        agent.channels.filter(isInboxMessagingChannel),
-      );
-    }
+  const agentChannels = (agent?.channels ?? []).filter(isInboxMessagingChannel);
+
+  if (input.enabled && agentChannels.length > 0) {
+    await enableAiForChannels(businessId, agentChannels);
   }
 
   const { error } = await supabase
@@ -235,6 +232,10 @@ export async function toggleAiAgentEnabled(input: {
       success: false,
       error: { code: "UPDATE_FAILED", message: AI_ASSISTANT_MESSAGES.saveFailed },
     };
+  }
+
+  if (!input.enabled && agentChannels.length > 0) {
+    await syncChannelAiEnabledAfterAgentChange(businessId, agentChannels);
   }
 
   revalidateAgentPaths();

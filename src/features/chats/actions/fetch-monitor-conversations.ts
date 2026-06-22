@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import {
   listConversationsMonitorPage,
   listConversationsPage,
@@ -16,7 +17,10 @@ const fetchMonitorConversationsSchema = z.object({
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(50),
   channel: z
-    .enum(["whatsapp", "telegram", "instagram", "website_forms"])
+    .enum([
+      MESSAGING_INTEGRATION_CHANNELS[0],
+      ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
+    ])
     .optional(),
   search: z.string().max(200).optional(),
   view: z

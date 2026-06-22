@@ -6,11 +6,15 @@ import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { listCannedResponses } from "@/services/canned-responses.service";
+import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
 const fetchCannedResponsesSchema = z.object({
   channel: z
-    .enum(["whatsapp", "telegram", "instagram", "website_forms"])
+    .enum([
+      MESSAGING_INTEGRATION_CHANNELS[0],
+      ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
+    ])
     .optional(),
 });
 

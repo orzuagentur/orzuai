@@ -1,12 +1,13 @@
 import { z } from "zod";
 
-import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import {
+  MESSAGING_INTEGRATION_CHANNELS,
+  type MessagingIntegrationChannelId,
+} from "@/features/integrations/constants";
 
 const messagingChannelSchema = z.enum([
-  "whatsapp",
-  "instagram",
-  "telegram",
-  "website_forms",
+  MESSAGING_INTEGRATION_CHANNELS[0],
+  ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
 ]);
 
 export const createCannedResponseSchema = z.object({

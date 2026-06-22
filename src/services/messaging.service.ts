@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   generateFastAssistantReply,
   isChannelAutoReplyEnabled,
+  runAutoReplyBackgroundOrchestration,
 } from "@/services/auto-reply-pipeline.service";
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
-import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
@@ -485,18 +485,16 @@ export async function processChannelAutoReply(input: {
     aiReplies: 1,
   });
 
-  try {
-    if (!reply.orchestrationHandled) {
-      await enqueueAiOrchestrationJob({
-        businessId,
-        channel,
-        conversationId,
-        clientMessage,
-      });
-    }
-  } catch (error) {
-    console.error("[messaging] failed to enqueue AI orchestration job", error);
-  }
+  void runAutoReplyBackgroundOrchestration({
+    admin,
+    businessId,
+    channel,
+    conversationId,
+    clientMessage,
+    language: reply.language,
+  }).catch((error) => {
+    console.error("[messaging] background CRM orchestration failed", error);
+  });
 }
 
 export async function scheduleChannelAutoReply(input: {

@@ -56,6 +56,10 @@ export function IntegrationChannelShell({
       : { status: "coming_soon" });
 
   const Icon = channelConfig?.icon;
+  const sectionNavItems =
+    activeChannel === "google_calendar"
+      ? INTEGRATION_SECTION_LIST.filter((section) => section.id === "activate")
+      : INTEGRATION_SECTION_LIST;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -97,7 +101,7 @@ export function IntegrationChannelShell({
           {isMessagingChannel ? (
             isActivated ? (
               <nav className="mt-4 flex flex-wrap gap-1">
-                {INTEGRATION_SECTION_LIST.map((section) => {
+                {sectionNavItems.map((section) => {
                   const href = section.href(activeChannel);
                   const label =
                     section.id === "activate"
@@ -130,7 +134,7 @@ export function IntegrationChannelShell({
             )
           ) : (
             <nav className="mt-4 flex flex-wrap gap-1">
-              {INTEGRATION_SECTION_LIST.map((section) => {
+              {sectionNavItems.map((section) => {
                 const href = section.href(activeChannel);
                 const label =
                   section.id === "activate" && isActivated

@@ -1,4 +1,6 @@
 import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
+import { EmailActivatePanelClient } from "@/components/email/EmailActivatePanelClient";
+import { GoogleCalendarConnectPanelClient } from "@/components/google-calendar/GoogleCalendarConnectPanelClient";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
 import { IntegrationChannelAiPreview } from "@/components/integrations/IntegrationChannelAiPreview";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
@@ -44,6 +46,14 @@ import type {
   WhatsAppConnectionData,
   WhatsAppConnectConfig,
 } from "@/types/whatsapp.types";
+import type {
+  GmailConnectConfig,
+  GmailConnectionData,
+} from "@/types/gmail-integration.types";
+import type {
+  GoogleCalendarConnectConfig,
+  GoogleCalendarConnectionData,
+} from "@/types/google-calendar.types";
 
 type IntegrationSectionPanelsProps = {
   channel: IntegrationChannelId;
@@ -68,6 +78,14 @@ type IntegrationSectionPanelsProps = {
     recentCalls: VoiceCallLogItem[];
     connectConfig: VoiceConnectConfig;
   };
+  googleCalendar?: {
+    connection: GoogleCalendarConnectionData | null;
+    connectConfig: GoogleCalendarConnectConfig;
+  };
+  gmail?: {
+    connection: GmailConnectionData | null;
+    connectConfig: GmailConnectConfig;
+  };
   channelContacts?: ChannelContactsData | null;
   channelAiSettings?: ChannelAiSettingsData | null;
 };
@@ -81,6 +99,8 @@ export function IntegrationSectionPanels({
   telegram,
   websiteForms,
   voice,
+  googleCalendar,
+  gmail,
   channelContacts,
   channelAiSettings,
 }: IntegrationSectionPanelsProps) {
@@ -97,6 +117,8 @@ export function IntegrationSectionPanels({
           telegram={telegram}
           websiteForms={websiteForms}
           voice={voice}
+          googleCalendar={googleCalendar}
+          gmail={gmail}
         />
         {isMessagingChannel && isConnected && channelAiSettings ? (
           <IntegrationChannelAiPreview settings={channelAiSettings} />
@@ -137,6 +159,8 @@ function ActivateSection({
   telegram,
   websiteForms,
   voice,
+  googleCalendar,
+  gmail,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
@@ -144,6 +168,8 @@ function ActivateSection({
   telegram?: IntegrationSectionPanelsProps["telegram"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
   voice?: IntegrationSectionPanelsProps["voice"];
+  googleCalendar?: IntegrationSectionPanelsProps["googleCalendar"];
+  gmail?: IntegrationSectionPanelsProps["gmail"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -186,6 +212,28 @@ function ActivateSection({
         recentCalls={voice.recentCalls}
         config={voice.connectConfig}
         hasBusiness={hasBusiness}
+        embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "email" && gmail) {
+    return (
+      <EmailActivatePanelClient
+        connection={gmail.connection}
+        hasBusiness={hasBusiness}
+        config={gmail.connectConfig}
+        embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "google_calendar" && googleCalendar) {
+    return (
+      <GoogleCalendarConnectPanelClient
+        connection={googleCalendar.connection}
+        hasBusiness={hasBusiness}
+        config={googleCalendar.connectConfig}
         embeddedInHub
       />
     );

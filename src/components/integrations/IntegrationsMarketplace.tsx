@@ -84,7 +84,9 @@ export function IntegrationsMarketplace({
                 <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary">
                   {activated
                     ? INTEGRATIONS_MESSAGES.configureChannel
-                    : INTEGRATIONS_MESSAGES.connectChannel}
+                    : entry.status === "coming_soon"
+                      ? INTEGRATIONS_MESSAGES.statusComingSoon
+                      : INTEGRATIONS_MESSAGES.connectChannel}
                   <ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
                 </div>
               </Link>

@@ -8,7 +8,7 @@ import { SidebarPanelToggle } from "@/components/dashboard/SidebarPanelToggle";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { BRAND_NAME } from "@/constants/brand";
-import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
+import { buildDashboardNavItems, DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
 import { useDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import {
   Sidebar,
@@ -33,6 +33,7 @@ import { PlatformCopilotSidebarButton } from "./PlatformCopilotSidebarButton";
 
 type AppSidebarProps = {
   userProfile: DashboardUserProfile;
+  googleCalendarConnected?: boolean;
 };
 
 function getNavBadgeCount(
@@ -50,11 +51,15 @@ function getNavBadgeCount(
   return 0;
 }
 
-function AppSidebarContent({ userProfile }: AppSidebarProps) {
+function AppSidebarContent({
+  userProfile,
+  googleCalendarConnected = false,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const { counts } = useDashboardNavBadges();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const navItems = buildDashboardNavItems({ googleCalendarConnected });
 
   return (
     <>
@@ -93,7 +98,7 @@ function AppSidebarContent({ userProfile }: AppSidebarProps) {
           <SidebarGroupLabel className="text-sm">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {DASHBOARD_NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 if (item.id === "ai-assistant") {
                   return <AiSidebarNavGroup key={item.id} pathname={pathname} />;
                 }
@@ -147,10 +152,16 @@ function AppSidebarContent({ userProfile }: AppSidebarProps) {
   );
 }
 
-export function AppSidebar({ userProfile }: AppSidebarProps) {
+export function AppSidebar({
+  userProfile,
+  googleCalendarConnected = false,
+}: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" variant="sidebar">
-      <AppSidebarContent userProfile={userProfile} />
+      <AppSidebarContent
+        userProfile={userProfile}
+        googleCalendarConnected={googleCalendarConnected}
+      />
     </Sidebar>
   );
 }
