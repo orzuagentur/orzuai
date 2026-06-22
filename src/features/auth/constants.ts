@@ -19,6 +19,11 @@ export const LOGIN_MESSAGES = {
   genericError: "Unable to sign in. Please try again.",
 } as const;
 
+export const GOOGLE_SIGN_IN_MESSAGES = {
+  genericError: "Unable to start Google sign-in. Please try again.",
+  missingRedirectUrl: "Google sign-in did not return a redirect URL.",
+} as const;
+
 export const MAGIC_LINK_MESSAGES = {
   requestTitle: "Sign in with email link",
   requestDescription:

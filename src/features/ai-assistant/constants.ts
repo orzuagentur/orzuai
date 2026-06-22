@@ -2,38 +2,38 @@ export const AI_ASSISTANT_MESSAGES = {
   pageTitle: "AI",
   pageSubtitle: "Choose how AI supports your customers and your team.",
   pageDescription:
-    "Create your business profile to enable the AI Assistant and agents.",
-  hubAssistantTitle: "AI Assistant",
+    "Create an AI agent that talks to customers and works autonomously on your channels.",
+  hubAssistantTitle: "AI channels",
   hubAssistantDescription:
-    "24/7 customer support on your messaging channels.",
-  hubAssistantInfoTitle: "What the AI Assistant does",
+    "Turn your AI agents on for each messaging channel.",
+  hubAssistantInfoTitle: "Channels",
   hubAssistantInfoBody:
-    "The AI Assistant replies to customers around the clock on WhatsApp, Instagram, and Telegram. It answers questions, shares information from your knowledge base, and keeps conversations moving when your team is offline. Turn it on per channel — no agents required.",
-  hubAgentsTitle: "CRM Agents",
+    "Enable auto-reply per channel. Your enabled AI agent handles customer conversations 24/7 on WhatsApp, Telegram, and other channels.",
+  hubAgentsTitle: "AI Agents",
   hubAgentsDescription:
-    "Background executors that update CRM from customer conversations.",
-  hubAgentsInfoTitle: "What CRM Agents do",
+    "Autonomous agents that chat with customers and update your CRM.",
+  hubAgentsInfoTitle: "What AI Agents do",
   hubAgentsInfoBody:
-    "CRM Agents run in the background after the AI Assistant replies. They route intent, create tasks and deals, save notes, and update contacts. Customers always talk to your AI Assistant — not separate chat bots.",
-  sectionAssistantTitle: "AI Assistant",
+    "Each agent understands customer intent without keywords — booking, sales, support — replies in chat, and saves tasks, deals, and notes in CRM. Create a booking agent for salons, a sales agent for leads, or a custom agent.",
+  sectionAssistantTitle: "Channels",
   sectionAssistantSubtitle:
     "Enable 24/7 auto-reply on each connected channel.",
-  sectionAgentsTitle: "CRM Agents",
+  sectionAgentsTitle: "AI Agents",
   sectionAgentsSubtitle:
-    "Configure background executors for CRM automation — not separate customer chat bots.",
+    "Create agents that talk to customers and act autonomously on the platform.",
   backToAiHub: "Back to AI",
-  tabAssistant: "AI Assistant",
-  tabAgents: "CRM Agents",
+  tabAssistant: "Channels",
+  tabAgents: "AI Agents",
   assistantTabDescription:
-    "Turn the assistant on for each channel. One AI Assistant replies to all customers.",
+    "Turn AI on for each channel. Your enabled agent replies to all customers.",
   assistantReplyEngineNote:
-    "Customer replies use your AI Assistant profile with platform AI (Gemini first, then OpenAI or Claude if needed). Per-channel model settings do not apply to inbound auto-reply.",
+    "Replies use your enabled AI agent (Gemini first, then OpenAI or Claude if needed). Intent is detected automatically — no keywords required.",
   assistantContextLimitsNote:
     "Context: rolling conversation summary + last 20 messages (40 on Pro). Knowledge Base uses semantic search when available.",
   assistantEdit: "Edit",
-  assistantEditTitle: "AI Assistant settings",
+  assistantEditTitle: "Legacy assistant profile",
   assistantEditFormDescription:
-    "Set how your assistant introduces itself and replies to customers.",
+    "Used only when no AI agent is enabled on this channel. Prefer creating an agent instead.",
   assistantEditDescription:
     "Name, behavior, and communication style — available in the next update.",
   assistantEditBack: "Back to channels",
@@ -55,7 +55,7 @@ export const AI_ASSISTANT_MESSAGES = {
   channelAgentInactive: "No enabled AI agent on this channel",
   searchPlaceholder: "Search agents…",
   channelsTabDescription:
-    "Turn AI auto-reply on or off for each channel. Replies use your AI Assistant profile.",
+    "Turn AI auto-reply on or off for each channel. Uses your enabled AI agent.",
   channelsSummaryTitle: "Overview",
   channelsSummaryEnabled: (count: number, total: number) =>
     `${count} of ${total} channels active`,
@@ -65,22 +65,22 @@ export const AI_ASSISTANT_MESSAGES = {
   channelsKnowledgeHint:
     "Add FAQs and policies in Knowledge Base so AI answers accurately.",
   channelsAgentsHint:
-    "Need CRM routing by intent? Open CRM Agents to configure background executors.",
-  newAgent: "New CRM agent",
-  wizardTitle: "Create CRM agent",
+    "Create an AI agent with a booking, sales, or support goal — it talks to customers and updates CRM automatically.",
+  newAgent: "New AI agent",
+  wizardTitle: "Create AI agent",
   wizardSubtitle:
-    "Pick a CRM goal, channels, and background AI model. Customers still hear only your AI Assistant.",
-  wizardStep1Title: "What should this agent do in CRM?",
+    "Your agent talks to customers 24/7, understands intent without keywords, and updates CRM.",
+  wizardStep1Title: "What should this agent do?",
   wizardStep1Description:
-    "CRM agents do not change customer-facing replies. They run after the AI Assistant and update your CRM.",
+    "Pick a goal. The agent chats with customers and acts autonomously — booking, sales, or support.",
   crmAgentsVoiceNotice:
-    "All customer messages are answered by AI Assistant. This agent only handles background CRM work.",
+    "This agent is the voice customers hear. It understands natural language and updates CRM automatically.",
   wizardStep2Title: "Where should it work?",
   wizardStep2Description:
     "Select connected channels. Connect new ones in Integrations if needed.",
-  wizardStep3Title: "Background AI model",
+  wizardStep3Title: "AI model",
   wizardStep3Description:
-    "Model used for CRM planning and routing — not for customer chat replies.",
+    "Model used for customer replies and autonomous CRM actions.",
   wizardStep4Title: "Review and create",
   wizardStep4Description:
     "Confirm the name, instructions, and routing. Enable when you are ready to go live.",

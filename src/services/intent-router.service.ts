@@ -11,9 +11,9 @@ import {
   type IntentClassification,
 } from "@/types/intent-router.types";
 import {
-  resolveAgentMatch,
   type RoutableAiAgent,
 } from "@/utils/ai-agent-routing";
+import { selectDefaultChannelAgent } from "@/services/customer-agent-resolver.service";
 
 export const INTENT_ROUTER_CONFIDENCE_THRESHOLD = 0.65;
 
@@ -208,16 +208,15 @@ export function resolveAgentRoutingFromClassification(input: {
     }
   }
 
-  const keywordAgent = resolveAgentMatch({
+  const defaultAgent = selectDefaultChannelAgent({
     agents,
     channel: input.channel,
-    message: input.message,
   });
 
-  const result: AgentRoutingResult = keywordAgent
+  const result: AgentRoutingResult = defaultAgent
     ? {
-        agent: keywordAgent,
-        method: "keyword",
+        agent: defaultAgent,
+        method: classification ? "intent" : "default",
         classification,
       }
     : {

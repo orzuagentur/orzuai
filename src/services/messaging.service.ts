@@ -486,12 +486,14 @@ export async function processChannelAutoReply(input: {
   });
 
   try {
-    await enqueueAiOrchestrationJob({
-      businessId,
-      channel,
-      conversationId,
-      clientMessage,
-    });
+    if (!reply.orchestrationHandled) {
+      await enqueueAiOrchestrationJob({
+        businessId,
+        channel,
+        conversationId,
+        clientMessage,
+      });
+    }
   } catch (error) {
     console.error("[messaging] failed to enqueue AI orchestration job", error);
   }

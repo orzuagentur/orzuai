@@ -121,10 +121,10 @@ See `.env.example` → Load tests section for credentials.
 
 ### How AI works
 
-1. **AI Assistant** — one customer-facing voice per business. Inbound messages are debounced (`ai_reply_jobs`), then answered using the AI Assistant profile (Gemini → OpenAI → Claude fallback).
-2. **CRM Agents** — background executors only. After a reply is sent, `ai_orchestration_jobs` runs intent routing, CRM updates (tasks, deals, notes), and agent run logging. Customers never chat with agents directly.
-3. **Channel toggle** — enable or disable auto-reply per channel in **AI → AI Assistant**. Per-channel provider/model fields in `ai_settings` do not override the assistant reply engine.
+1. **AI Agents** — customer-facing autonomous agents per business. Each enabled agent talks on selected channels, detects intent without keywords, replies in chat, and updates CRM (tasks, deals, notes).
+2. **Unified loop** — inbound message → orchestrator (intent + CRM plan) → CRM actions → customer reply with context. No separate background-only agent layer.
+3. **Channel toggle** — enable or disable auto-reply per channel in **AI → Channels**. Legacy assistant profile is used only when no agent is enabled on the channel.
 4. **Workers** — `/api/workers/ai-reply-queue`, `/api/workers/ai-orchestration-queue`; health via `/api/cron/ai-health`.
-5. **Memory** — rolling conversation summary (every 10 messages, background); semantic Knowledge Base search (pgvector + Gemini embeddings); CRM snapshot in fast replies (deal stage, tasks, lead score).
+5. **Memory** — rolling conversation summary; semantic Knowledge Base search; CRM snapshot in replies.
 
 Product roadmap: `TASKS.md` · AI orchestration: `TasksAI.md` · Performance/reliability: `TasksCat.md`

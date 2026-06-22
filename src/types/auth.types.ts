@@ -136,6 +136,10 @@ export type AuthActionResult =
   | { success: true }
   | { success: false; error: string };
 
+export type GoogleSignInResult =
+  | { success: true; redirectUrl: string }
+  | { success: false; error: string };
+
 export type RegistrationErrorCode =
   | "VALIDATION_ERROR"
   | "REGISTRATION_FAILED"

@@ -121,7 +121,7 @@ function buildOrchestratorPrompt(input: {
     "- sales intent: prefer create_deal, create_task, add_note",
     "- general/none: add_note and contactUpdates only when customer shares new details",
     "- Do not invent contact data. Omit uncertain fields.",
-    "- clientSummary: one short sentence describing CRM updates for the assistant reply.",
+    "- clientSummary: one short sentence for the agent's customer-facing reply (what was saved or proposed).",
   ].join("\n");
 }
 

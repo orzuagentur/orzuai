@@ -3,8 +3,8 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-import { signInWithGoogle } from "@/features/auth/google-sign-in";
-import type { AuthActionResult } from "@/types/auth.types";
+import { signInWithGoogleAction } from "@/features/auth/actions/sign-in-with-google";
+import type { GoogleSignInResult } from "@/types/auth.types";
 
 type UseGoogleSignInOptions = {
   nextPath?: string;
@@ -15,18 +15,19 @@ export function useGoogleSignIn(options: UseGoogleSignInOptions = {}) {
   const { nextPath, onError } = options;
   const [isLoading, setIsLoading] = useState(false);
 
-  const signIn = useCallback(async (): Promise<AuthActionResult> => {
+  const signIn = useCallback(async (): Promise<GoogleSignInResult> => {
     setIsLoading(true);
 
     try {
-      const result = await signInWithGoogle(nextPath);
+      const result = await signInWithGoogleAction(nextPath);
 
       if (!result.success) {
-        const message = result.error;
-        onError?.(message);
-        toast.error(message);
+        onError?.(result.error);
+        toast.error(result.error);
+        return result;
       }
 
+      window.location.assign(result.redirectUrl);
       return result;
     } finally {
       setIsLoading(false);

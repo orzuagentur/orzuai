@@ -1,4 +1,4 @@
-export { signInWithGoogle } from "./google-sign-in";
+export { signInWithGoogleAction } from "./actions/sign-in-with-google";
 export { registerWithEmailAction } from "./actions/register-with-email";
 export { resendVerificationEmailAction } from "./actions/resend-verification-email";
 export { signInWithEmailAction } from "./actions/sign-in-with-email";

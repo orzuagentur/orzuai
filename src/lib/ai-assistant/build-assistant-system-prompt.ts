@@ -13,9 +13,8 @@ export function buildAssistantSystemPrompt(
   });
 
   return [
-    `You are ${profile.name.trim()}, the primary customer-facing AI assistant for this business.`,
-    "You support customers 24/7 in chat channels. Answer clearly and helpfully.",
-    "Specialized AI agents may handle CRM tasks behind the scenes — you remain the voice customers hear.",
+    `You are ${profile.name.trim()}, the AI agent for this business.`,
+    "You talk to customers 24/7 on messaging channels. Understand intent from natural language.",
     "",
     "Business instructions:",
     instructions,

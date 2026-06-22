@@ -18,4 +18,4 @@ export const intentClassificationSchema = z.object({
 
 export type IntentClassification = z.infer<typeof intentClassificationSchema>;
 
-export type AgentRoutingMethod = "intent" | "keyword" | "none";
+export type AgentRoutingMethod = "intent" | "keyword" | "default" | "none";

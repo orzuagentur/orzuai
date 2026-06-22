@@ -5,6 +5,7 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
 import {
   ACCOUNT_DELETION_MESSAGES,
+  GOOGLE_SIGN_IN_MESSAGES,
   LOGIN_MESSAGES,
   MAGIC_LINK_MESSAGES,
   PASSWORD_RESET_MESSAGES,
@@ -32,6 +33,7 @@ import type {
   ResendVerificationEmailInput,
   ResetPasswordPayload,
   MagicLinkResult,
+  GoogleSignInResult,
   SignInWithEmailInput,
   SignInWithMagicLinkInput,
   VerificationResult,
@@ -454,6 +456,52 @@ export async function signInWithMagicLink(
     data: {
       email: parsed.data.email,
     },
+  };
+}
+
+export async function signInWithGoogle(
+  nextPath?: string,
+): Promise<GoogleSignInResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error:
+        "Authentication services are not configured. Missing required environment variables.",
+    };
+  }
+
+  const supabase = await createClient();
+  const redirectTo = buildAuthCallbackUrl(nextPath ?? APP_ROUTES.dashboard);
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+      queryParams: {
+        access_type: "offline",
+        prompt: "select_account",
+      },
+    },
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: error.message || GOOGLE_SIGN_IN_MESSAGES.genericError,
+    };
+  }
+
+  if (!data.url) {
+    return {
+      success: false,
+      error: GOOGLE_SIGN_IN_MESSAGES.missingRedirectUrl,
+    };
+  }
+
+  return {
+    success: true,
+    redirectUrl: data.url,
   };
 }
 
