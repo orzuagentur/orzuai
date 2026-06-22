@@ -35,10 +35,18 @@ export async function syncGmailNowAction(): Promise<{
     revalidatePath(`${DASHBOARD_ROUTES.chats}/email`);
     revalidatePath(DASHBOARD_ROUTES.integrations);
 
+    if (result.error) {
+      return {
+        success: false,
+        imported: result.imported,
+        message: result.error,
+      };
+    }
+
     return {
       success: true,
       imported: result.imported,
-      message: EMAIL_MESSAGES.syncSuccess(result.imported),
+      message: EMAIL_MESSAGES.syncSuccess(result.imported, result.scanned),
     };
   } catch {
     return {

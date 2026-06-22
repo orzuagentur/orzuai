@@ -104,6 +104,18 @@ export function hasGoogleOAuthEnv(): boolean {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
+export function getGmailPubsubTopic(): string | undefined {
+  return process.env[ENV_KEYS.GMAIL_PUBSUB_TOPIC]?.trim() || undefined;
+}
+
+export function getGmailPubsubPushSecret(): string | undefined {
+  return process.env[ENV_KEYS.GMAIL_PUBSUB_PUSH_SECRET]?.trim() || undefined;
+}
+
+export function hasGmailPushEnv(): boolean {
+  return Boolean(getGmailPubsubTopic() && getGmailPubsubPushSecret());
+}
+
 export function getTelegramWebhookSecret(): string | undefined {
   return process.env[ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]?.trim() || undefined;
 }

@@ -31,11 +31,20 @@ type GmailMessageResponse = {
   };
 };
 
+export type GmailApiError = {
+  status: number;
+  message: string;
+};
+
+type GmailFetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: GmailApiError };
+
 async function gmailFetch<T>(
   accessToken: string,
   path: string,
   init?: RequestInit,
-): Promise<T | null> {
+): Promise<GmailFetchResult<T>> {
   const response = await fetch(`https://gmail.googleapis.com/gmail/v1${path}`, {
     ...init,
     headers: {
@@ -46,21 +55,52 @@ async function gmailFetch<T>(
   });
 
   if (!response.ok) {
-    return null;
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+
+    return {
+      ok: false,
+      error: {
+        status: response.status,
+        message: body?.error?.message ?? `Gmail API request failed (${response.status}).`,
+      },
+    };
   }
 
-  return (await response.json()) as T;
+  return { ok: true, data: (await response.json()) as T };
+}
+
+export function formatGmailApiError(error: GmailApiError): string {
+  if (
+    error.status === 403 &&
+    error.message.toLowerCase().includes("gmail api has not been used")
+  ) {
+    return "Gmail API is disabled in Google Cloud. Enable Gmail API for your OAuth project, then try Sync now again.";
+  }
+
+  return error.message;
 }
 
 export async function fetchGmailProfile(
   accessToken: string,
-): Promise<{ emailAddress: string; historyId: string } | null> {
-  const data = await gmailFetch<GmailProfileResponse>(
+): Promise<
+  | { emailAddress: string; historyId: string }
+  | { error: GmailApiError }
+  | null
+> {
+  const result = await gmailFetch<GmailProfileResponse>(
     accessToken,
     "/users/me/profile",
   );
 
-  if (!data?.emailAddress || !data.historyId) {
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  const data = result.data;
+
+  if (!data.emailAddress || !data.historyId) {
     return null;
   }
 
@@ -72,42 +112,61 @@ export async function fetchGmailProfile(
 
 export async function listRecentInboxMessageIds(
   accessToken: string,
-  maxResults = 25,
-): Promise<string[]> {
+  maxResults = 50,
+): Promise<{ messageIds: string[]; error?: GmailApiError }> {
   const params = new URLSearchParams({
     labelIds: "INBOX",
     maxResults: String(maxResults),
-    q: "newer_than:7d",
+    q: "newer_than:30d",
   });
 
-  const data = await gmailFetch<GmailListResponse>(
+  const result = await gmailFetch<GmailListResponse>(
     accessToken,
     `/users/me/messages?${params.toString()}`,
   );
 
-  return (data?.messages ?? [])
-    .map((message) => message.id)
-    .filter((id): id is string => Boolean(id));
+  if (!result.ok) {
+    return { messageIds: [], error: result.error };
+  }
+
+  return {
+    messageIds: (result.data.messages ?? [])
+      .map((message) => message.id)
+      .filter((id): id is string => Boolean(id)),
+  };
 }
 
 export async function listHistoryMessageIds(
   accessToken: string,
   startHistoryId: string,
-): Promise<{ messageIds: string[]; historyId: string | null }> {
+): Promise<{
+  messageIds: string[];
+  historyId: string | null;
+  error?: GmailApiError;
+}> {
   const params = new URLSearchParams({
     startHistoryId,
     historyTypes: "messageAdded",
     labelId: "INBOX",
   });
 
-  const data = await gmailFetch<GmailHistoryResponse>(
+  const result = await gmailFetch<GmailHistoryResponse>(
     accessToken,
     `/users/me/history?${params.toString()}`,
   );
 
+  if (!result.ok) {
+    return {
+      messageIds: [],
+      historyId: null,
+      error: result.error,
+    };
+  }
+
+  const data = result.data;
   const messageIds = new Set<string>();
 
-  for (const entry of data?.history ?? []) {
+  for (const entry of data.history ?? []) {
     for (const added of entry.messagesAdded ?? []) {
       if (added.message?.id) {
         messageIds.add(added.message.id);
@@ -117,7 +176,7 @@ export async function listHistoryMessageIds(
 
   return {
     messageIds: [...messageIds],
-    historyId: data?.historyId ?? null,
+    historyId: data.historyId ?? null,
   };
 }
 
@@ -125,16 +184,18 @@ export async function getGmailMessage(
   accessToken: string,
   messageId: string,
 ): Promise<ParsedGmailMessage | null> {
-  const data = await gmailFetch<GmailMessageResponse>(
+  const result = await gmailFetch<GmailMessageResponse>(
     accessToken,
     `/users/me/messages/${encodeURIComponent(messageId)}?format=full`,
   );
 
-  if (!data) {
+  if (!result.ok) {
     return null;
   }
 
-  return parseGmailApiMessage(data as Parameters<typeof parseGmailApiMessage>[0]);
+  return parseGmailApiMessage(
+    result.data as Parameters<typeof parseGmailApiMessage>[0],
+  );
 }
 
 export async function sendGmailMessage(input: {
@@ -182,4 +243,64 @@ export async function sendGmailMessage(input: {
   }
 
   return { success: true, messageId: data.id };
+}
+
+type GmailWatchResponse = {
+  historyId?: string;
+  expiration?: string;
+};
+
+export async function watchGmailInbox(
+  accessToken: string,
+  topicName: string,
+): Promise<
+  | { historyId: string; expiration: string }
+  | { error: GmailApiError }
+> {
+  const result = await gmailFetch<GmailWatchResponse>(
+    accessToken,
+    "/users/me/watch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        topicName,
+        labelIds: ["INBOX"],
+        labelFilterBehavior: "INCLUDE",
+      }),
+    },
+  );
+
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  const historyId = result.data.historyId;
+  const expiration = result.data.expiration;
+
+  if (!historyId || !expiration) {
+    return {
+      error: {
+        status: 500,
+        message: "Gmail watch response was incomplete.",
+      },
+    };
+  }
+
+  return { historyId, expiration };
+}
+
+export async function stopGmailWatch(
+  accessToken: string,
+): Promise<{ success: true } | { error: GmailApiError }> {
+  const result = await gmailFetch<Record<string, never>>(
+    accessToken,
+    "/users/me/stop",
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  return { success: true };
 }

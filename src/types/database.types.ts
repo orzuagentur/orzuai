@@ -441,6 +441,7 @@ export type Database = {
           token_expires_at: string | null;
           history_id: string | null;
           last_synced_at: string | null;
+          watch_expiration: string | null;
           connected_at: string | null;
           created_at: string;
           updated_at: string;
@@ -455,6 +456,7 @@ export type Database = {
           token_expires_at?: string | null;
           history_id?: string | null;
           last_synced_at?: string | null;
+          watch_expiration?: string | null;
           connected_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -469,6 +471,7 @@ export type Database = {
           token_expires_at?: string | null;
           history_id?: string | null;
           last_synced_at?: string | null;
+          watch_expiration?: string | null;
           connected_at?: string | null;
           created_at?: string;
           updated_at?: string;

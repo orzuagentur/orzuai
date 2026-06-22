@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { disconnectGmailAction } from "@/features/email/actions/disconnect";
+import { enableGmailPushWatchAction } from "@/features/email/actions/enable-push-watch";
 import { syncGmailNowAction } from "@/features/email/actions/sync-now";
 import { EMAIL_INTEGRATION_HREF, EMAIL_MESSAGES } from "@/features/email/constants";
 import type {
@@ -42,6 +43,7 @@ export function EmailActivatePanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("connected") === "1") {
@@ -125,7 +127,25 @@ export function EmailActivatePanel({
                   {connection.gmailAddress}
                 </p>
                 <p className="mt-2 text-muted-foreground">{EMAIL_MESSAGES.inboxHint}</p>
-                <p className="mt-2 text-muted-foreground">{EMAIL_MESSAGES.syncHint}</p>
+                <p className="mt-2 text-muted-foreground">
+                  {config.pushEnabled
+                    ? connection.watchExpiration
+                      ? EMAIL_MESSAGES.pushEnabledHint
+                      : EMAIL_MESSAGES.pushDisabledHint
+                    : EMAIL_MESSAGES.syncHint}
+                </p>
+                {config.pushEnabled && connection.watchExpiration ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {EMAIL_MESSAGES.pushWatchUntil}:{" "}
+                    {new Date(connection.watchExpiration).toLocaleString()}
+                  </p>
+                ) : null}
+                {config.pushEnabled && config.pushWebhookUrl ? (
+                  <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-xs">
+                    <p className="font-medium">{EMAIL_MESSAGES.pushWebhookLabel}</p>
+                    <code className="mt-1 block break-all">{config.pushWebhookUrl}</code>
+                  </div>
+                ) : null}
                 {connection.lastSyncedAt ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {EMAIL_MESSAGES.lastSynced}:{" "}
@@ -169,6 +189,35 @@ export function EmailActivatePanel({
                 )}
                 {EMAIL_MESSAGES.syncNow}
               </Button>
+              {config.pushEnabled ? (
+                <Button
+                  variant="outline"
+                  disabled={isEnablingPush}
+                  onClick={() => {
+                    void (async () => {
+                      setIsEnablingPush(true);
+                      try {
+                        const result = await enableGmailPushWatchAction();
+                        if (result.success) {
+                          toast.success(EMAIL_MESSAGES.pushEnabledHint);
+                          router.refresh();
+                        } else {
+                          toast.error(result.message ?? EMAIL_MESSAGES.pushFailed);
+                        }
+                      } finally {
+                        setIsEnablingPush(false);
+                      }
+                    })();
+                  }}
+                >
+                  {isEnablingPush ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCwIcon className="size-4" />
+                  )}
+                  {EMAIL_MESSAGES.enablePushWatch}
+                </Button>
+              ) : null}
               <Button variant="outline" asChild>
                 <a href={config.connectUrl}>
                   <ExternalLinkIcon className="size-4" />

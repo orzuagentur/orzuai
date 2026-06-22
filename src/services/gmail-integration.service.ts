@@ -9,10 +9,19 @@ import {
 } from "@/features/email/constants";
 import {
   fetchGmailProfile,
+  formatGmailApiError,
   getGmailMessage,
   listHistoryMessageIds,
   listRecentInboxMessageIds,
+  stopGmailWatch,
+  watchGmailInbox,
 } from "@/lib/gmail/client";
+import {
+  getGmailPubsubTopic,
+  getGmailPushWebhookUrl,
+  hasGmailPushEnv,
+  type GmailPushNotification,
+} from "@/lib/gmail/push";
 import {
   buildGmailAuthUrl,
   createGmailOAuthState,
@@ -64,6 +73,7 @@ function mapGmailConnection(row: EmailConnection): GmailConnectionData {
     gmailAddress: row.gmail_address,
     connectedAt: row.connected_at,
     lastSyncedAt: row.last_synced_at,
+    watchExpiration: row.watch_expiration,
     createdAt: row.created_at,
   };
 }
@@ -90,6 +100,8 @@ export function getGmailConnectConfig(): GmailConnectConfig {
     isConfigured: hasGoogleOAuthEnv(),
     redirectUri: getGmailRedirectUri(),
     connectUrl: "/api/integrations/gmail/connect",
+    pushEnabled: hasGmailPushEnv(),
+    pushWebhookUrl: hasGmailPushEnv() ? getGmailPushWebhookUrl() : null,
   };
 }
 
@@ -142,6 +154,57 @@ async function getValidAccessToken(
   return refreshed.accessToken;
 }
 
+async function startGmailWatchForConnection(
+  admin: ReturnType<typeof createAdminClient>,
+  connection: EmailConnection,
+): Promise<{ success: boolean; error?: string }> {
+  const topicName = getGmailPubsubTopic();
+
+  if (!topicName) {
+    return { success: false, error: "Gmail Pub/Sub topic is not configured." };
+  }
+
+  const accessToken = await getValidAccessToken(connection);
+
+  if (!accessToken) {
+    return { success: false, error: "Gmail access token is missing or expired." };
+  }
+
+  const watch = await watchGmailInbox(accessToken, topicName);
+
+  if ("error" in watch) {
+    return { success: false, error: formatGmailApiError(watch.error) };
+  }
+
+  const expirationMs = Number(watch.expiration);
+  const watchExpiration = Number.isFinite(expirationMs)
+    ? new Date(expirationMs).toISOString()
+    : null;
+
+  await admin
+    .from("email_connections")
+    .update({
+      history_id: watch.historyId,
+      watch_expiration: watchExpiration,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", connection.id);
+
+  return { success: true };
+}
+
+async function stopGmailWatchForConnection(
+  connection: EmailConnection,
+): Promise<void> {
+  const accessToken = await getValidAccessToken(connection);
+
+  if (!accessToken) {
+    return;
+  }
+
+  await stopGmailWatch(accessToken);
+}
+
 export async function completeGmailOAuth(
   businessId: string,
   code: string,
@@ -157,7 +220,9 @@ export async function completeGmailOAuth(
       fetchGmailAccountEmail(tokens.accessToken),
     ]);
 
-    const gmailAddress = profile?.emailAddress ?? email;
+    const profileData =
+      profile && "emailAddress" in profile ? profile : null;
+    const gmailAddress = profileData?.emailAddress ?? email;
     const now = new Date().toISOString();
     const supabase = await createClient();
 
@@ -169,7 +234,7 @@ export async function completeGmailOAuth(
         access_token: tokens.accessToken,
         refresh_token: tokens.refreshToken,
         token_expires_at: tokens.expiresAt,
-        history_id: profile?.historyId ?? null,
+        history_id: profileData?.historyId ?? null,
         connected_at: now,
         last_synced_at: null,
         updated_at: now,
@@ -185,6 +250,18 @@ export async function completeGmailOAuth(
 
     const admin = createAdminClient();
     await syncGmailInboxForBusiness(admin, businessId, { initial: true });
+
+    if (hasGmailPushEnv()) {
+      const { data: connection } = await admin
+        .from("email_connections")
+        .select("*")
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      if (connection) {
+        await startGmailWatchForConnection(admin, connection);
+      }
+    }
 
     revalidateGmailPaths();
     return { success: true };
@@ -210,6 +287,16 @@ export async function disconnectGmail(): Promise<{
   }
 
   const supabase = await createClient();
+  const { data: connection } = await supabase
+    .from("email_connections")
+    .select("*")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (connection?.email_status === "connected") {
+    await stopGmailWatchForConnection(connection);
+  }
+
   const { error } = await supabase
     .from("email_connections")
     .update({
@@ -219,6 +306,7 @@ export async function disconnectGmail(): Promise<{
       refresh_token: null,
       token_expires_at: null,
       history_id: null,
+      watch_expiration: null,
       connected_at: null,
       last_synced_at: null,
       updated_at: new Date().toISOString(),
@@ -319,7 +407,7 @@ export async function syncGmailInboxForBusiness(
   admin: ReturnType<typeof createAdminClient>,
   businessId: string,
   options: { initial?: boolean } = {},
-): Promise<{ imported: number }> {
+): Promise<{ imported: number; scanned: number; error?: string }> {
   const { data: connection } = await admin
     .from("email_connections")
     .select("*")
@@ -328,31 +416,54 @@ export async function syncGmailInboxForBusiness(
     .maybeSingle();
 
   if (!connection) {
-    return { imported: 0 };
+    return { imported: 0, scanned: 0, error: "Gmail is not connected." };
   }
 
   const accessToken = await getValidAccessToken(connection);
 
   if (!accessToken) {
-    return { imported: 0 };
+    return {
+      imported: 0,
+      scanned: 0,
+      error: "Gmail access expired. Reconnect Gmail in Integrations.",
+    };
   }
 
-  let messageIds: string[] = [];
+  const inbox = await listRecentInboxMessageIds(accessToken);
+  const messageIdSet = new Set(inbox.messageIds);
   let nextHistoryId = connection.history_id;
+  let syncError = inbox.error ? formatGmailApiError(inbox.error) : undefined;
 
   if (connection.history_id && !options.initial) {
     const history = await listHistoryMessageIds(
       accessToken,
       connection.history_id,
     );
-    messageIds = history.messageIds;
-    nextHistoryId = history.historyId ?? connection.history_id;
-  } else {
-    messageIds = await listRecentInboxMessageIds(accessToken);
-    const profile = await fetchGmailProfile(accessToken);
-    nextHistoryId = profile?.historyId ?? connection.history_id;
+
+    for (const messageId of history.messageIds) {
+      messageIdSet.add(messageId);
+    }
+
+    if (history.historyId) {
+      nextHistoryId = history.historyId;
+    }
+
+    if (!syncError && history.error && inbox.messageIds.length === 0) {
+      syncError = formatGmailApiError(history.error);
+    }
   }
 
+  if (!nextHistoryId) {
+    const profile = await fetchGmailProfile(accessToken);
+
+    if (profile && "historyId" in profile) {
+      nextHistoryId = profile.historyId;
+    } else if (profile && "error" in profile && !syncError) {
+      syncError = formatGmailApiError(profile.error);
+    }
+  }
+
+  const messageIds = [...messageIdSet];
   let imported = 0;
 
   for (const messageId of messageIds) {
@@ -377,7 +488,11 @@ export async function syncGmailInboxForBusiness(
     })
     .eq("id", connection.id);
 
-  return { imported };
+  return {
+    imported,
+    scanned: messageIds.length,
+    error: syncError,
+  };
 }
 
 export async function syncAllGmailInboxes(): Promise<{
@@ -433,4 +548,109 @@ export async function getGmailAccessTokenForBusiness(
     accessToken,
     fromEmail: connection.gmail_address,
   };
+}
+
+export async function handleGmailPushNotification(
+  notification: GmailPushNotification,
+): Promise<{ synced: boolean; imported: number }> {
+  if (!hasSupabaseEnv()) {
+    return { synced: false, imported: 0 };
+  }
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("email_connections")
+    .select("*")
+    .eq("email_status", "connected")
+    .ilike("gmail_address", notification.emailAddress)
+    .maybeSingle();
+
+  if (!connection) {
+    return { synced: false, imported: 0 };
+  }
+
+  const result = await syncGmailInboxForBusiness(
+    admin,
+    connection.business_id,
+  );
+
+  revalidateGmailPaths();
+  return { synced: true, imported: result.imported };
+}
+
+export async function renewAllGmailWatches(): Promise<{
+  processed: number;
+  renewed: number;
+  failed: number;
+}> {
+  if (!hasSupabaseEnv() || !hasGmailPushEnv()) {
+    return { processed: 0, renewed: 0, failed: 0 };
+  }
+
+  const admin = createAdminClient();
+  const renewBeforeMs = Date.now() + 48 * 60 * 60 * 1000;
+
+  const { data: connections } = await admin
+    .from("email_connections")
+    .select("*")
+    .eq("email_status", "connected");
+
+  const dueConnections = (connections ?? []).filter((connection) => {
+    if (!connection.watch_expiration) {
+      return true;
+    }
+
+    return new Date(connection.watch_expiration).getTime() <= renewBeforeMs;
+  });
+
+  let renewed = 0;
+  let failed = 0;
+
+  for (const connection of dueConnections) {
+    const result = await startGmailWatchForConnection(admin, connection);
+
+    if (result.success) {
+      renewed += 1;
+    } else {
+      failed += 1;
+    }
+  }
+
+  return {
+    processed: dueConnections.length,
+    renewed,
+    failed,
+  };
+}
+
+export async function renewGmailWatchForBusiness(
+  businessId: string,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv() || !hasGmailPushEnv()) {
+    return {
+      success: false,
+      message: EMAIL_MESSAGES.pushNotConfigured,
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("email_connections")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("email_status", "connected")
+    .maybeSingle();
+
+  if (!connection) {
+    return { success: false, message: "Gmail is not connected." };
+  }
+
+  const result = await startGmailWatchForConnection(admin, connection);
+
+  if (!result.success) {
+    return { success: false, message: result.error ?? EMAIL_MESSAGES.pushFailed };
+  }
+
+  revalidateGmailPaths();
+  return { success: true };
 }
