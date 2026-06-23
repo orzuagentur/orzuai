@@ -68,6 +68,8 @@ type InboxChatComposerProps = {
   onDraftChange: (value: string) => void;
   cannedResponses: CannedResponseItem[];
   canSend: boolean;
+  /** When set, controls only the send button (defaults to canSend + non-empty draft). */
+  canSubmit?: boolean;
   channelNotConnectedMessage: string;
   websiteFormsHint?: boolean;
   isSending: boolean;
@@ -124,6 +126,7 @@ export function InboxChatComposer({
   onDraftChange,
   cannedResponses,
   canSend,
+  canSubmit,
   channelNotConnectedMessage,
   websiteFormsHint = false,
   isSending,
@@ -152,6 +155,8 @@ export function InboxChatComposer({
   const mediaSupported = supportsMediaChannel(channel) && !hideMediaActions;
   const isBusy = isSending;
   const hasPendingAttachment = pendingAttachment !== null;
+  const readyToSubmit =
+    canSubmit ?? (canSend && draft.trim().length > 0);
 
   const clearPendingAttachment = useCallback(() => {
     setMediaCaption("");
@@ -366,7 +371,7 @@ export function InboxChatComposer({
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
 
-      if (canSend && draft.trim() && !isBusy && !hasPendingAttachment) {
+      if (readyToSubmit && !isBusy && !hasPendingAttachment) {
         onSubmit();
       }
     }
@@ -606,7 +611,7 @@ export function InboxChatComposer({
                 size="icon"
                 className={cn("size-10 shrink-0 rounded-full", chatSendButtonClassName)}
                 disabled={
-                  isBusy || !canSend || !draft.trim() || isRecording || hasPendingAttachment
+                  isBusy || !readyToSubmit || isRecording || hasPendingAttachment
                 }
                 aria-label={CHAT_MESSAGES.sendLabel}
                 onClick={onSubmit}

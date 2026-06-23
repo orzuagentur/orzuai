@@ -29,7 +29,7 @@ export function EmailChatComposer({
   ...composerProps
 }: EmailChatComposerProps) {
   const showSubjectField = composerProps.composerTab === "reply";
-  const canSendEmail =
+  const canSubmitEmail =
     composerProps.canSend &&
     subject.trim().length > 0 &&
     composerProps.draft.trim().length > 0;
@@ -56,7 +56,7 @@ export function EmailChatComposer({
       <InboxChatComposer
         {...composerProps}
         channel="email"
-        canSend={canSendEmail}
+        canSubmit={canSubmitEmail}
         websiteFormsHint={false}
         isSendingMedia={false}
         composerPlaceholder={CHAT_MESSAGES.emailBodyPlaceholder}

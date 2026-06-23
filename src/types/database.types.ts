@@ -2511,6 +2511,7 @@ export type Database = {
           p_content: string;
           p_external_message_id?: string | null;
           p_message_preview?: string | null;
+          p_email_subject?: string | null;
         };
         Returns: {
           id: string;

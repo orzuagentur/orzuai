@@ -1,7 +1,5 @@
--- Email inbox: store subject separately from message body
-
-ALTER TABLE public.messages
-  ADD COLUMN IF NOT EXISTS email_subject TEXT;
+-- PostgREST PGRST203: two insert_inbound_channel_message overloads (with/without p_email_subject).
+-- CREATE OR REPLACE does not remove the old 6-arg signature when adding a 7th parameter.
 
 DROP FUNCTION IF EXISTS public.insert_inbound_channel_message(
   UUID,
