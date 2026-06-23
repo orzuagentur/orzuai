@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
+import { EmailChatComposer } from "@/components/chats/inbox/EmailChatComposer";
 import { ChatAiToggle } from "@/components/chats/inbox/ChatAiToggle";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
@@ -43,6 +44,7 @@ import type { MessagingChannel } from "@/types/database.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { cacheChatMessageMediaUrl } from "@/utils/cache-chat-media-url";
 import { isChatScrollPinnedToBottom } from "@/utils/chat-scroll";
+import { deriveDefaultEmailReplySubject } from "@/utils/email-message";
 import { throttle } from "@/utils/throttle";
 import {
   createOptimisticChatMessage,
@@ -102,6 +104,10 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
     return CHAT_MESSAGES.websiteFormsNotConnected;
   }
 
+  if (channel === "email") {
+    return CHAT_MESSAGES.emailNotConnected;
+  }
+
   return CHAT_MESSAGES.whatsappNotConnected;
 }
 
@@ -141,6 +147,7 @@ export function ChatWindow({
   const channelNotConnectedMessage = getChannelNotConnectedMessage(channel);
   const router = useRouter();
   const [internalDraft, setInternalDraft] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
   const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
   const [internalSuggestOpen, setInternalSuggestOpen] = useState(false);
   const suggestOpen = controlledSuggestOpen ?? internalSuggestOpen;
@@ -165,6 +172,15 @@ export function ChatWindow({
   useEffect(() => {
     setIsFavorite(conversation?.contactIsFavorite ?? false);
   }, [conversation?.contactId, conversation?.contactIsFavorite]);
+
+  useEffect(() => {
+    if (conversation?.channel === "email") {
+      setEmailSubject(deriveDefaultEmailReplySubject(conversation.messages));
+      return;
+    }
+
+    setEmailSubject("");
+  }, [conversation?.id, conversation?.channel, conversation?.messages]);
 
   useEffect(() => {
     if (!conversation && inboxLayout?.chatFullscreen) {
@@ -441,7 +457,13 @@ export function ChatWindow({
     }
 
     const content = draft.trim();
+    const subject = conversation.channel === "email" ? emailSubject.trim() : "";
     const pendingId = createOptimisticMessageId();
+
+    if (conversation.channel === "email" && !subject) {
+      toast.error(`${CHAT_MESSAGES.emailSubjectLabel} is required.`);
+      return;
+    }
 
     onOptimisticMessage?.(
       createOptimisticChatMessage({
@@ -449,6 +471,7 @@ export function ChatWindow({
         conversationId: conversation.id,
         channel: conversation.channel,
         content,
+        emailSubject: conversation.channel === "email" ? subject : null,
       }),
     );
     setDraft("");
@@ -459,6 +482,7 @@ export function ChatWindow({
       const result = await sendMessage({
         conversationId: conversation.id,
         content,
+        ...(conversation.channel === "email" ? { emailSubject: subject } : {}),
       });
 
       if (result.success && result.data?.message) {
@@ -468,6 +492,9 @@ export function ChatWindow({
 
       onSendFailed?.(pendingId);
       setDraft(content);
+      if (conversation.channel === "email") {
+        setEmailSubject(subject);
+      }
     })();
   }
 
@@ -640,79 +667,104 @@ export function ChatWindow({
               </div>
             ) : null}
 
-            <InboxChatComposer
-              conversationId={conversation.id}
-              channel={conversation.channel}
-              internalNote={conversation.internalNote}
-              draft={draft}
-              onDraftChange={setDraft}
-              cannedResponses={cannedResponses}
-              canSend={canSend}
-              channelNotConnectedMessage={channelNotConnectedMessage}
-              websiteFormsHint={conversation.channel === "website_forms"}
-              isSending={isLoading}
-              isSendingMedia={isSendingMedia}
-              mediaUploadProgress={uploadProgress}
-              composerTab={composerTab}
-              onComposerTabChange={setComposerTab}
-              onSubmit={() => {
-                void handleInboxSend();
-              }}
-              onOpenAiSuggest={() => {
-                inboxLayout?.setDetailsOpen(false);
-                setSuggestOpen(true);
-              }}
-              onQuickRepliesOpen={onQuickRepliesOpen}
-              onSendMedia={(file, caption) => {
-                const pendingId = createOptimisticMessageId();
-                const optimisticMessage = createOptimisticMediaChatMessage({
-                  id: pendingId,
-                  conversationId: conversation.id,
-                  channel: conversation.channel,
-                  file,
-                  caption,
-                });
-
-                onOptimisticMessage?.(optimisticMessage);
-                scrollToLatestMessage();
-                requestAnimationFrame(scrollToLatestMessage);
-
-                void (async () => {
-                  const result = await sendMedia(
-                    conversation.id,
+            {conversation.channel === "email" ? (
+              <EmailChatComposer
+                conversationId={conversation.id}
+                internalNote={conversation.internalNote}
+                subject={emailSubject}
+                onSubjectChange={setEmailSubject}
+                draft={draft}
+                onDraftChange={setDraft}
+                cannedResponses={cannedResponses}
+                canSend={canSend}
+                channelNotConnectedMessage={channelNotConnectedMessage}
+                isSending={isLoading}
+                composerTab={composerTab}
+                onComposerTabChange={setComposerTab}
+                onSubmit={() => {
+                  void handleInboxSend();
+                }}
+                onOpenAiSuggest={() => {
+                  inboxLayout?.setDetailsOpen(false);
+                  setSuggestOpen(true);
+                }}
+                onQuickRepliesOpen={onQuickRepliesOpen}
+              />
+            ) : (
+              <InboxChatComposer
+                conversationId={conversation.id}
+                channel={conversation.channel}
+                internalNote={conversation.internalNote}
+                draft={draft}
+                onDraftChange={setDraft}
+                cannedResponses={cannedResponses}
+                canSend={canSend}
+                channelNotConnectedMessage={channelNotConnectedMessage}
+                websiteFormsHint={conversation.channel === "website_forms"}
+                isSending={isLoading}
+                isSendingMedia={isSendingMedia}
+                mediaUploadProgress={uploadProgress}
+                composerTab={composerTab}
+                onComposerTabChange={setComposerTab}
+                onSubmit={() => {
+                  void handleInboxSend();
+                }}
+                onOpenAiSuggest={() => {
+                  inboxLayout?.setDetailsOpen(false);
+                  setSuggestOpen(true);
+                }}
+                onQuickRepliesOpen={onQuickRepliesOpen}
+                onSendMedia={(file, caption) => {
+                  const pendingId = createOptimisticMessageId();
+                  const optimisticMessage = createOptimisticMediaChatMessage({
+                    id: pendingId,
+                    conversationId: conversation.id,
+                    channel: conversation.channel,
                     file,
                     caption,
-                    {
-                      onProgress: (progress) => {
-                        reportMediaUploadProgressRef.current(
-                          pendingId,
-                          progress,
-                        );
+                  });
+
+                  onOptimisticMessage?.(optimisticMessage);
+                  scrollToLatestMessage();
+                  requestAnimationFrame(scrollToLatestMessage);
+
+                  void (async () => {
+                    const result = await sendMedia(
+                      conversation.id,
+                      file,
+                      caption,
+                      {
+                        onProgress: (progress) => {
+                          reportMediaUploadProgressRef.current(
+                            pendingId,
+                            progress,
+                          );
+                        },
                       },
-                    },
-                  );
+                    );
 
-                  if (result.success && result.data?.message) {
-                    clearMessageUploadProgress(pendingId);
+                    if (result.success && result.data?.message) {
+                      clearMessageUploadProgress(pendingId);
 
-                    if (result.data.mediaSignedUrl) {
-                      cacheChatMessageMediaUrl(
-                        result.data.message,
-                        result.data.mediaSignedUrl,
-                      );
+                      if (result.data.mediaSignedUrl) {
+                        cacheChatMessageMediaUrl(
+                          result.data.message,
+                          result.data.mediaSignedUrl,
+                        );
+                      }
+
+                      onMessageSent?.(result.data.message, pendingId);
+                      return;
                     }
 
-                    onMessageSent?.(result.data.message, pendingId);
-                    return;
-                  }
+                    onSendFailed?.(pendingId);
+                    clearMessageUploadProgress(pendingId);
+                  })();
 
-                  onSendFailed?.(pendingId);
-                  clearMessageUploadProgress(pendingId);
-                })();
-
-                return true;
-              }}
-            />
+                  return true;
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

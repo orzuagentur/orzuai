@@ -375,6 +375,31 @@ export async function sendTelegramTextMessage(
   return { success: true, messageId: String(result.result.message_id) };
 }
 
+export type TelegramChatInfo = {
+  id: number;
+  type: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
+export async function getTelegramChat(
+  botToken: string,
+  chatId: string,
+): Promise<
+  { success: true; chat: TelegramChatInfo } | { success: false; message: string }
+> {
+  const result = await callTelegramApi<TelegramChatInfo>(botToken, "getChat", {
+    chat_id: chatId,
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return { success: true, chat: result.result };
+}
+
 export function verifyTelegramWebhookSecret(
   headerValue: string | null,
   expectedSecret: string,

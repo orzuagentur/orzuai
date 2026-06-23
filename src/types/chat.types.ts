@@ -16,6 +16,12 @@ export const sendChatMessageSchema = z.object({
     .trim()
     .min(1, "Message cannot be empty.")
     .max(4096, "Message is too long."),
+  emailSubject: z
+    .string()
+    .trim()
+    .min(1, "Email subject cannot be empty.")
+    .max(998, "Email subject is too long.")
+    .optional(),
 });
 
 const messagingChannelSchema = z.enum([
@@ -82,6 +88,7 @@ export type ChatMessageData = {
   channel: MessagingChannel;
   senderType: MessageSenderType;
   content: string;
+  emailSubject?: string | null;
   aiGenerated: boolean;
   createdAt: string;
   deletedForAllAt: string | null;

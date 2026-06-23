@@ -5,7 +5,7 @@ import {
   CHAT_ATTACHMENTS_BUCKET,
   MAX_CHAT_ATTACHMENT_BYTES,
 } from "@/features/chats/chat-attachments";
-import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
+import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleBusiness } from "@/services/business-access.service";
@@ -126,7 +126,13 @@ async function isChannelConnected(
   }
 
   if (channel === "email") {
-    return hasResendEnv();
+    const { data } = await supabase
+      .from("email_connections")
+      .select("email_status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.email_status === "connected";
   }
 
   return false;
@@ -146,7 +152,7 @@ function channelNotConnectedMessage(channel: MessagingChannel): string {
   }
 
   if (channel === "email") {
-    return CHAT_MESSAGES.contactEmailUnavailable;
+    return CHAT_MESSAGES.emailNotConnected;
   }
 
   if (channel === "facebook_messenger") {

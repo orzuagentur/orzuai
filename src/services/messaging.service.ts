@@ -28,6 +28,7 @@ export type ChannelMessageInsert = {
   channel: MessagingChannel;
   senderType: MessageSenderType;
   content: string;
+  emailSubject?: string | null;
   aiGenerated?: boolean;
   aiAgentId?: string | null;
   externalMessageId?: string | null;
@@ -39,6 +40,7 @@ export type InsertedChannelMessageRow = {
   channel: MessagingChannel;
   sender_type: MessageSenderType;
   content: string;
+  email_subject?: string | null;
   ai_generated: boolean;
   created_at: string;
   external_message_id?: string | null;
@@ -84,12 +86,13 @@ export async function insertChannelMessage(
       channel: input.channel,
       sender_type: input.senderType,
       content: input.content,
+      email_subject: input.emailSubject?.trim() || null,
       ai_generated: input.aiGenerated ?? false,
       ai_agent_id: input.aiAgentId ?? null,
       external_message_id: input.externalMessageId ?? null,
     })
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, external_message_id",
+      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at, external_message_id",
     )
     .single();
 
@@ -112,6 +115,8 @@ export async function insertChannelMessage(
   await updateConversationLastMessageFromInsert(admin, {
     conversationId: input.conversationId,
     content: input.content,
+    emailSubject: input.emailSubject,
+    channel: input.channel,
     senderType: input.senderType,
     aiGenerated: input.aiGenerated,
     createdAt: inserted.created_at,
@@ -476,6 +481,7 @@ export async function processChannelAutoReply(input: {
     channel,
     senderType: "ai",
     content: reply.text,
+    emailSubject: sendResult.emailSubject,
     aiGenerated: true,
     aiAgentId: reply.matchedAgentId,
   });

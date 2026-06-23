@@ -17,6 +17,7 @@ import { createBillingPortalAction } from "@/features/subscription/actions/creat
 import { createCheckoutSessionAction } from "@/features/subscription/actions/create-checkout-session";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
 import type { SubscriptionPlanId } from "@/features/subscription/plans";
+import { isUnlimitedAiReplies } from "@/features/subscription/plans";
 import type { SubscriptionPageData } from "@/types/subscription.types";
 
 type SubscriptionHubProps = {
@@ -104,14 +105,18 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
               {SUBSCRIPTION_MESSAGES.usage}
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
-              {data.usedReplies} / {data.monthlyLimit} AI replies ({data.usagePercent}%)
+              {isUnlimitedAiReplies(data.monthlyLimit)
+                ? `${data.usedReplies} AI replies (unlimited)`
+                : `${data.usedReplies} / ${data.monthlyLimit} AI replies (${data.usagePercent}%)`}
             </p>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${data.usagePercent}%` }}
-              />
-            </div>
+            {!isUnlimitedAiReplies(data.monthlyLimit) ? (
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${data.usagePercent}%` }}
+                />
+              </div>
+            ) : null}
           </div>
 
           {data.hasStripeCustomer ? (

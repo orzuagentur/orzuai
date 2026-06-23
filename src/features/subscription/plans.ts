@@ -1,3 +1,6 @@
+/** Sentinel: no monthly AI reply cap (testing / unlimited tier). */
+export const UNLIMITED_AI_REPLIES = -1;
+
 export const SUBSCRIPTION_PLAN_IDS = ["free", "starter", "pro", "agency"] as const;
 
 export type SubscriptionPlanId = (typeof SUBSCRIPTION_PLAN_IDS)[number];
@@ -14,9 +17,9 @@ export const SUBSCRIPTION_PLANS: Record<
 > = {
   free: {
     label: "Free Plan",
-    monthlyAiReplies: 100,
+    monthlyAiReplies: UNLIMITED_AI_REPLIES,
     priceMonthly: 0,
-    features: ["100 AI replies / month", "1 channel", "Basic CRM"],
+    features: ["Unlimited AI replies (testing)", "1 channel", "Basic CRM"],
   },
   starter: {
     label: "Starter",
@@ -42,6 +45,10 @@ export const SUBSCRIPTION_PLANS: Record<
     features: ["50,000 AI replies / month", "Multi-brand", "Priority support"],
   },
 };
+
+export function isUnlimitedAiReplies(monthlyLimit: number): boolean {
+  return monthlyLimit < 0;
+}
 
 export function resolveSubscriptionPlan(
   plan: string | null | undefined,

@@ -50,6 +50,7 @@ import {
   formatUploadSpeed,
 } from "@/utils/format-upload-rate";
 import { isChatMessageDeletedForAll } from "@/utils/chat";
+import { resolveEmailMessageParts } from "@/utils/email-message";
 import { mergeRefs } from "@/utils/merge-refs";
 import {
   findFirstUnreadClientMessageIndex,
@@ -176,6 +177,7 @@ function messageContentEqual(
   return (
     left.id === right.id &&
     left.content === right.content &&
+    left.emailSubject === right.emailSubject &&
     left.senderType === right.senderType &&
     left.aiGenerated === right.aiGenerated &&
     left.createdAt === right.createdAt &&
@@ -302,7 +304,12 @@ function MessageHistoryItem({
   const isOutgoing =
     message.senderType === "user" || message.senderType === "ai";
   const isDeleted = isChatMessageDeletedForAll(message);
-  const { media, text } = parseMediaMessage(message.content);
+  const emailParts =
+    message.channel === "email"
+      ? resolveEmailMessageParts(message)
+      : { subject: null, body: message.content };
+  const { media, text: mediaCaptionText } = parseMediaMessage(emailParts.body);
+  const text = media ? mediaCaptionText : emailParts.body;
   const isAudioMessage = media?.kind === "audio";
   const showUnreadDivider = isInbox && index === firstUnreadIndex;
   const isUnreadMessage =
@@ -442,10 +449,17 @@ function MessageHistoryItem({
               ) : null}
             </div>
           ) : (
-            <ExpandableMessageText
-              text={text}
-              mutedActionClassName={getChatBubbleMutedActionClassName(isOutgoing)}
-            />
+            <>
+              {message.channel === "email" && emailParts.subject ? (
+                <p className="mb-1 text-xs font-semibold opacity-90">
+                  {emailParts.subject}
+                </p>
+              ) : null}
+              <ExpandableMessageText
+                text={text}
+                mutedActionClassName={getChatBubbleMutedActionClassName(isOutgoing)}
+              />
+            </>
           )}
           <MessageUploadStatus
             message={message}

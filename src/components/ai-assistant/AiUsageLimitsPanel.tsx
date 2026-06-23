@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
+import { isUnlimitedAiReplies } from "@/features/subscription/plans";
 import type { AiUsageSummary } from "@/types/ai-usage.types";
 
 type AiUsageLimitsPanelProps = {
@@ -18,6 +19,8 @@ export function AiUsageLimitsPanel({ usage }: AiUsageLimitsPanelProps) {
   if (!usage) {
     return null;
   }
+
+  const unlimited = isUnlimitedAiReplies(usage.monthlyLimit);
 
   return (
     <Card className="shadow-none">
@@ -31,18 +34,23 @@ export function AiUsageLimitsPanel({ usage }: AiUsageLimitsPanelProps) {
             Plan: <strong>{usage.planLabel}</strong>
           </span>
           <span className="tabular-nums text-muted-foreground">
-            {usage.usedReplies} / {usage.monthlyLimit} AI replies this month
+            {unlimited
+              ? `${usage.usedReplies} AI replies this month (unlimited)`
+              : `${usage.usedReplies} / ${usage.monthlyLimit} AI replies this month`}
           </span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${usage.usagePercent}%` }}
-          />
-        </div>
+        {!unlimited ? (
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${usage.usagePercent}%` }}
+            />
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">
-          {usage.remainingReplies} replies remaining. Usage resets at the start of
-          each calendar month.
+          {unlimited
+            ? "No monthly reply limit on your current plan."
+            : `${usage.remainingReplies} replies remaining. Usage resets at the start of each calendar month.`}
         </p>
       </CardContent>
     </Card>

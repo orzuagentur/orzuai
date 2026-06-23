@@ -1080,6 +1080,7 @@ export type Database = {
           channel: MessagingChannel;
           sender_type: MessageSenderType;
           content: string;
+          email_subject: string | null;
           ai_generated: boolean;
           ai_agent_id: string | null;
           deleted_for_all_at: string | null;
@@ -1096,6 +1097,7 @@ export type Database = {
           channel?: MessagingChannel;
           sender_type: MessageSenderType;
           content: string;
+          email_subject?: string | null;
           ai_generated?: boolean;
           ai_agent_id?: string | null;
           deleted_for_all_at?: string | null;
@@ -1112,6 +1114,7 @@ export type Database = {
           channel?: MessagingChannel;
           sender_type?: MessageSenderType;
           content?: string;
+          email_subject?: string | null;
           ai_generated?: boolean;
           ai_agent_id?: string | null;
           deleted_for_all_at?: string | null;
@@ -2515,6 +2518,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["messaging_channel"];
           sender_type: Database["public"]["Enums"]["message_sender_type"];
           content: string;
+          email_subject: string | null;
           ai_generated: boolean;
           created_at: string;
           external_message_id: string | null;

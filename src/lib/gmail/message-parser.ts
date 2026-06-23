@@ -80,8 +80,6 @@ export function parseGmailApiMessage(message: {
     message.snippet?.trim() ||
     subject;
 
-  const content = `Subject: ${subject}\n\n${body}`.trim();
-
   return {
     id: message.id,
     threadId: message.threadId ?? null,
@@ -89,7 +87,7 @@ export function parseGmailApiMessage(message: {
     fromEmail: email,
     fromName: name,
     subject,
-    body: content,
-    snippet: message.snippet ?? content.slice(0, 200),
+    body,
+    snippet: message.snippet ?? body.slice(0, 200),
   };
 }

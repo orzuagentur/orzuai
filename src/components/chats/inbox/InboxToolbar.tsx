@@ -2,6 +2,7 @@
 
 import { FilterIcon, SearchIcon } from "lucide-react";
 
+import { AddContactButton } from "@/components/chats/inbox/AddContactButton";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,6 +50,8 @@ export function InboxToolbar({
           aria-label={CHAT_MESSAGES.searchMessagesPlaceholder}
         />
       </div>
+
+      <AddContactButton />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

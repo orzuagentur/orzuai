@@ -375,6 +375,7 @@ async function ingestGmailMessage(
     conversationId: context.conversationId,
     channel: "email",
     content: parsed.body,
+    emailSubject: parsed.subject,
     externalMessageId: parsed.id,
   });
 

@@ -21,6 +21,7 @@ export function createOptimisticChatMessage(input: {
   conversationId: string;
   channel: MessagingChannel;
   content: string;
+  emailSubject?: string | null;
 }): ChatMessageData {
   return {
     id: input.id,
@@ -28,6 +29,7 @@ export function createOptimisticChatMessage(input: {
     channel: input.channel,
     senderType: "user",
     content: input.content,
+    emailSubject: input.emailSubject ?? null,
     aiGenerated: false,
     createdAt: new Date().toISOString(),
     deletedForAllAt: null,

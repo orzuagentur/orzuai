@@ -407,3 +407,61 @@ export function verifyWhatsAppWebhookSignature(
 
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
 }
+
+type WhatsAppContactCheckResult =
+  | { success: true; waId: string }
+  | { success: false; message: string };
+
+export async function checkWhatsAppContactRegistered(
+  _phoneNumberId: string,
+  apiKey: string,
+  phoneDigits: string,
+): Promise<WhatsAppContactCheckResult> {
+  const normalized = phoneDigits.replace(/\D/g, "");
+
+  if (!normalized) {
+    return { success: false, message: "Enter a valid phone number." };
+  }
+
+  const response = await fetch(buildDialog360Url("/contacts"), {
+    method: "POST",
+    headers: dialog360Headers(apiKey),
+    body: JSON.stringify({
+      blocking: "wait",
+      contacts: [normalized],
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        contacts?: Array<{
+          input?: string;
+          status?: string;
+          wa_id?: string;
+        }>;
+        error?: { message?: string };
+      }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message:
+        payload?.error?.message ||
+        "Unable to verify this WhatsApp number. Check the number and try again.",
+    };
+  }
+
+  const contact = payload?.contacts?.[0];
+  const waId = contact?.wa_id?.replace(/\D/g, "");
+
+  if (contact?.status === "valid" && waId) {
+    return { success: true, waId };
+  }
+
+  return {
+    success: false,
+    message: "This number is not registered on WhatsApp.",
+  };
+}

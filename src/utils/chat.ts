@@ -10,6 +10,7 @@ type RawMessageRow = {
   channel: MessagingChannel;
   sender_type: MessageSenderType;
   content: string;
+  email_subject?: string | null;
   ai_generated: boolean;
   deleted_for_all_at?: string | null;
   hidden_for_business?: boolean;
@@ -56,6 +57,7 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
     channel: row.channel,
     senderType: row.sender_type,
     content: row.content,
+    emailSubject: row.email_subject ?? null,
     aiGenerated: row.ai_generated,
     createdAt: row.created_at,
     deletedForAllAt: row.deleted_for_all_at ?? null,

@@ -4,6 +4,7 @@ import { toChannelExternalId } from "@/services/channels/contact-identity";
 import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { getMessagePreviewText } from "@/utils/chat-media";
+import { formatEmailListPreview } from "@/utils/email-message";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -29,6 +30,7 @@ type InsertInboundChannelMessageInput = {
   conversationId: string;
   channel: MessagingChannel;
   content: string;
+  emailSubject?: string | null;
   externalMessageId?: string | null;
 };
 
@@ -77,13 +79,22 @@ export async function insertInboundChannelMessage(
   admin: MessagingDbClient,
   input: InsertInboundChannelMessageInput,
 ): Promise<InsertInboundChannelMessageResult | null> {
+  const preview =
+    input.channel === "email"
+      ? formatEmailListPreview(
+          input.emailSubject ?? null,
+          input.content,
+        )
+      : getMessagePreviewText(input.content);
+
   const { data, error } = await admin.rpc("insert_inbound_channel_message", {
     p_conversation_id: input.conversationId,
     p_channel: input.channel,
     p_sender_type: "client",
     p_content: input.content,
     p_external_message_id: input.externalMessageId ?? undefined,
-    p_message_preview: getMessagePreviewText(input.content),
+    p_message_preview: preview,
+    p_email_subject: input.emailSubject ?? undefined,
   });
 
   if (error) {

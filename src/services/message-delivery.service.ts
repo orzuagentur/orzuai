@@ -75,7 +75,9 @@ async function processDeliveryRow(
 ): Promise<DeliveryProcessResult> {
   const { data: message } = await admin
     .from("messages")
-    .select("id, conversation_id, channel, content, sender_type, hidden_for_business")
+    .select(
+      "id, conversation_id, channel, content, email_subject, sender_type, hidden_for_business",
+    )
     .eq("id", delivery.message_id)
     .maybeSingle();
 
@@ -164,6 +166,7 @@ async function processDeliveryRow(
       channel: delivery.channel,
       recipientId,
       content: message.content,
+      emailSubject: message.email_subject ?? undefined,
     });
   }
 

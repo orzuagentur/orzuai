@@ -64,6 +64,8 @@ export async function updateConversationLastMessageFromInsert(
   input: {
     conversationId: string;
     content: string;
+    channel?: Database["public"]["Tables"]["messages"]["Row"]["channel"];
+    emailSubject?: string | null;
     senderType: Database["public"]["Tables"]["messages"]["Row"]["sender_type"];
     aiGenerated?: boolean;
     createdAt: string;
@@ -80,6 +82,8 @@ export async function updateConversationLastMessageFromInsert(
     .update(
       buildConversationLastMessageUpdate({
         content: input.content,
+        channel: input.channel,
+        emailSubject: input.emailSubject,
         senderType: input.senderType,
         aiGenerated: input.aiGenerated,
         createdAt: input.createdAt,

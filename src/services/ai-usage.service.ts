@@ -6,8 +6,10 @@ import type { AiProvider } from "@/lib/ai/constants";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  isUnlimitedAiReplies,
   resolveSubscriptionPlan,
   SUBSCRIPTION_PLANS,
+  UNLIMITED_AI_REPLIES,
   type SubscriptionPlanId,
 } from "@/features/subscription/plans";
 import { businessHasCustomAiCredentials } from "@/services/business-ai-credentials.service";
@@ -42,6 +44,11 @@ export async function assertAiUsageAllowed(
 
   const plan = await getBusinessPlan(businessId);
   const limit = SUBSCRIPTION_PLANS[plan].monthlyAiReplies;
+
+  if (isUnlimitedAiReplies(limit)) {
+    return { allowed: true };
+  }
+
   const summary = await getAiUsageSummaryForBusiness(businessId, plan);
 
   if (summary.usedReplies >= limit) {
@@ -116,11 +123,17 @@ export async function getAiUsageSummaryForBusiness(
     .gte("created_at", monthStart);
 
   const usedReplies = count ?? 0;
-  const remainingReplies = Math.max(0, planConfig.monthlyAiReplies - usedReplies);
+  const unlimited = isUnlimitedAiReplies(planConfig.monthlyAiReplies);
+  const remainingReplies = unlimited
+    ? UNLIMITED_AI_REPLIES
+    : Math.max(0, planConfig.monthlyAiReplies - usedReplies);
   const usagePercent =
-    planConfig.monthlyAiReplies > 0
-      ? Math.min(100, Math.round((usedReplies / planConfig.monthlyAiReplies) * 100))
-      : 0;
+    unlimited || planConfig.monthlyAiReplies <= 0
+      ? 0
+      : Math.min(
+          100,
+          Math.round((usedReplies / planConfig.monthlyAiReplies) * 100),
+        );
 
   return {
     planId: resolvedPlan,

@@ -15,6 +15,7 @@ type OutboundMessageRow = {
   channel: Database["public"]["Tables"]["messages"]["Row"]["channel"];
   sender_type: Database["public"]["Tables"]["messages"]["Row"]["sender_type"];
   content: string;
+  email_subject?: string | null;
   ai_generated: boolean;
   created_at: string;
   deleted_for_all_at?: string | null;

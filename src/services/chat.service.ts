@@ -59,7 +59,11 @@ import {
   resolveContactFromRow,
 } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
+import { getGmailConnection } from "@/services/gmail-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
+
+const CHAT_MESSAGE_SELECT =
+  "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at";
 
 export type InboxBusinessContext = {
   userId: string;
@@ -150,7 +154,7 @@ export async function getConversationDetail(
   const { data: messages } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+      CHAT_MESSAGE_SELECT,
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
@@ -219,7 +223,7 @@ export async function getOlderConversationMessages(
   const { data: messages } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+      CHAT_MESSAGE_SELECT,
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
@@ -262,7 +266,7 @@ export async function getConversationMessagesTail(
   const { data: messages } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+      CHAT_MESSAGE_SELECT,
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
@@ -299,7 +303,7 @@ export async function getNewConversationMessages(
   let query = supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at",
+      CHAT_MESSAGE_SELECT,
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false);
@@ -372,6 +376,11 @@ export async function isChatChannelConnected(
 
   if (channel === "telegram") {
     return isTelegramConnected(businessId);
+  }
+
+  if (channel === "email") {
+    const connection = await getGmailConnection(businessId);
+    return connection?.status === "connected";
   }
 
   return isWebsiteFormsConnected(businessId);
@@ -905,6 +914,83 @@ export async function sendChatMessage(
         },
       };
     }
+  } else if (conversation.channel === "email") {
+    const gmailConnection = await getGmailConnection(businessId);
+
+    if (gmailConnection?.status !== "connected") {
+      return {
+        success: false,
+        error: {
+          code: "WHATSAPP_NOT_CONNECTED",
+          message: CHAT_MESSAGES.emailNotConnected,
+        },
+      };
+    }
+
+    const emailSubject = parsed.data.emailSubject?.trim();
+
+    if (!emailSubject) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `${CHAT_MESSAGES.emailSubjectLabel} is required.`,
+        },
+      };
+    }
+
+    const contact = resolveContactFromRow(conversation.contact);
+
+    if (!contact) {
+      return {
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: CHAT_MESSAGES.genericError,
+        },
+      };
+    }
+
+    const insertedMessage = await insertChannelMessage(supabase, {
+      conversationId: parsed.data.conversationId,
+      channel: conversation.channel,
+      senderType: "user",
+      content: parsed.data.content,
+      emailSubject,
+    });
+
+    await createOutboundMessageDelivery(supabase, {
+      messageId: insertedMessage.id,
+      businessId,
+      channel: conversation.channel,
+    });
+
+    const now = new Date().toISOString();
+    const contactUpdates = contact.id
+      ? [
+          supabase
+            .from("contacts")
+            .update({ last_message_at: now })
+            .eq("id", contact.id),
+        ]
+      : [];
+
+    await Promise.all([
+      supabase
+        .from("conversations")
+        .update({ updated_at: now })
+        .eq("id", parsed.data.conversationId),
+      ...contactUpdates,
+    ]);
+
+    scheduleOutboundMessageDelivery(insertedMessage.id);
+
+    return {
+      success: true,
+      data: {
+        message: buildPendingOutboundChatMessage(insertedMessage),
+      },
+    };
   } else {
     const connected = await isWhatsAppConnected(businessId);
 
@@ -985,7 +1071,7 @@ export async function sendChatMessage(
   const { data: insertedMessage } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at",
+      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at",
     )
     .eq("conversation_id", parsed.data.conversationId)
     .order("created_at", { ascending: false })

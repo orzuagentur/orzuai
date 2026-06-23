@@ -15,6 +15,7 @@ export async function deliverChannelTextMessage(input: {
   channel: MessagingChannel;
   recipientId: string;
   content: string;
+  emailSubject?: string;
 }): Promise<ChannelTextDeliveryResult> {
   if (input.channel === "website_forms") {
     return { success: true };
@@ -80,7 +81,7 @@ export async function deliverChannelTextMessage(input: {
       admin: input.admin,
       businessId: input.businessId,
       recipientEmail: input.recipientId,
-      subject: "Message from your business",
+      subject: input.emailSubject?.trim() || "Message from your business",
       content: input.content,
     });
   }

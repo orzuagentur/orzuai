@@ -79,6 +79,8 @@ type InboxChatComposerProps = {
   onOpenAiSuggest: () => void;
   onQuickRepliesOpen?: () => void;
   onSendMedia?: (file: File, caption?: string) => Promise<boolean> | boolean;
+  composerPlaceholder?: string;
+  hideMediaActions?: boolean;
 };
 
 function supportsMediaChannel(channel: MessagingChannel): boolean {
@@ -133,6 +135,8 @@ export function InboxChatComposer({
   onOpenAiSuggest,
   onQuickRepliesOpen,
   onSendMedia,
+  composerPlaceholder,
+  hideMediaActions = false,
 }: InboxChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -145,7 +149,7 @@ export function InboxChatComposer({
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingAttachment | null>(null);
   const [mediaCaption, setMediaCaption] = useState("");
-  const mediaSupported = supportsMediaChannel(channel);
+  const mediaSupported = supportsMediaChannel(channel) && !hideMediaActions;
   const isBusy = isSending;
   const hasPendingAttachment = pendingAttachment !== null;
 
@@ -587,7 +591,7 @@ export function InboxChatComposer({
                 value={draft}
                 onChange={(event) => onDraftChange(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={CHAT_MESSAGES.composerPlaceholder}
+                placeholder={composerPlaceholder ?? CHAT_MESSAGES.composerPlaceholder}
                 rows={1}
                 disabled={isBusy || !canSend || isRecording}
                 className={cn(
