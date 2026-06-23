@@ -37,6 +37,12 @@ export function IntegrationDangerZone({
       toast.success(successMessage);
       setStep("idle");
       router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : INTEGRATIONS_MESSAGES.disconnectError,
+      );
     } finally {
       setIsDisconnecting(false);
     }

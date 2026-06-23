@@ -196,13 +196,21 @@ async function startGmailWatchForConnection(
 async function stopGmailWatchForConnection(
   connection: EmailConnection,
 ): Promise<void> {
-  const accessToken = await getValidAccessToken(connection);
+  const accessToken = connection.access_token;
 
   if (!accessToken) {
     return;
   }
 
-  await stopGmailWatch(accessToken);
+  try {
+    const result = await stopGmailWatch(accessToken);
+
+    if ("error" in result) {
+      console.error("[gmail] stop watch on disconnect", result.error);
+    }
+  } catch (error) {
+    console.error("[gmail] stop watch on disconnect failed", error);
+  }
 }
 
 export async function completeGmailOAuth(
@@ -280,45 +288,62 @@ export async function disconnectGmail(): Promise<{
     return { success: false, message: EMAIL_MESSAGES.oauthError };
   }
 
-  const businessId = await getOwnedBusinessId();
+  try {
+    const businessId = await getOwnedBusinessId();
 
-  if (!businessId) {
-    return { success: false, message: EMAIL_MESSAGES.noBusinessDescription };
+    if (!businessId) {
+      return { success: false, message: EMAIL_MESSAGES.noBusinessDescription };
+    }
+
+    const supabase = await createClient();
+    const admin = createAdminClient();
+    const { data: connection } = await supabase
+      .from("email_connections")
+      .select("*")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (connection?.email_status === "connected") {
+      await stopGmailWatchForConnection(connection);
+    }
+
+    const now = new Date().toISOString();
+    const { data: updated, error } = await admin
+      .from("email_connections")
+      .update({
+        email_status: "disconnected",
+        gmail_address: null,
+        access_token: null,
+        refresh_token: null,
+        token_expires_at: null,
+        history_id: null,
+        watch_expiration: null,
+        connected_at: null,
+        last_synced_at: null,
+        updated_at: now,
+      })
+      .eq("business_id", businessId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    if (connection && !updated?.id) {
+      return {
+        success: false,
+        message: "Could not disconnect Gmail. Please try again.",
+      };
+    }
+
+    revalidateGmailPaths();
+    return { success: true };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : EMAIL_MESSAGES.oauthError;
+    return { success: false, message };
   }
-
-  const supabase = await createClient();
-  const { data: connection } = await supabase
-    .from("email_connections")
-    .select("*")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (connection?.email_status === "connected") {
-    await stopGmailWatchForConnection(connection);
-  }
-
-  const { error } = await supabase
-    .from("email_connections")
-    .update({
-      email_status: "disconnected",
-      gmail_address: null,
-      access_token: null,
-      refresh_token: null,
-      token_expires_at: null,
-      history_id: null,
-      watch_expiration: null,
-      connected_at: null,
-      last_synced_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("business_id", businessId);
-
-  if (error) {
-    return { success: false, message: error.message };
-  }
-
-  revalidateGmailPaths();
-  return { success: true };
 }
 
 async function ingestGmailMessage(
