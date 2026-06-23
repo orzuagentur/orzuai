@@ -182,13 +182,13 @@ export async function getAiPerformanceMetrics(
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("sender_type, ai_generated, ai_agent_id")
+    .select("sender_type, ai_generated")
     .in("conversation_id", conversationIds);
 
   let aiReplies = 0;
   let humanReplies = 0;
   let assistantOnlyReplies = 0;
-  let delegatedAgentReplies = 0;
+  const delegatedAgentReplies = 0;
 
   for (const message of messages ?? []) {
     if (message.sender_type === "client") {
@@ -198,11 +198,7 @@ export async function getAiPerformanceMetrics(
     if (message.ai_generated || message.sender_type === "ai") {
       aiReplies += 1;
 
-      if (message.ai_agent_id) {
-        delegatedAgentReplies += 1;
-      } else {
-        assistantOnlyReplies += 1;
-      }
+      assistantOnlyReplies += 1;
     } else if (message.sender_type === "user") {
       humanReplies += 1;
     }

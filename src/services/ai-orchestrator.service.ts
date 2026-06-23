@@ -117,10 +117,12 @@ function buildOrchestratorPrompt(input: {
     "- When needsHuman is true, still return intent and CRM actions when relevant.",
     "",
     "CRM rules (only when contact is present):",
-    "- booking/support intent: prefer create_task and add_note",
+    "- booking intent: when the customer gives a clear date/time and the business calendar is connected, prefer create_calendar_event plus add_note",
+    "- booking/support intent: prefer create_task and add_note when a real calendar event is not certain",
     "- sales intent: prefer create_deal, create_task, add_note",
     "- general/none: add_note and contactUpdates only when customer shares new details",
     "- Do not invent contact data. Omit uncertain fields.",
+    "- create_calendar_event requires summary, startDateTime, endDateTime, timeZone, optional description. Use ISO date-times.",
     "- clientSummary: one short sentence for the agent's customer-facing reply (what was saved or proposed).",
   ].join("\n");
 }

@@ -7,9 +7,6 @@ import {
 } from "@/features/business/constants";
 import { buildAssistantSystemPrompt } from "@/lib/ai-assistant/build-assistant-system-prompt";
 import {
-  buildCustomerAgentSystemPrompt,
-} from "@/lib/ai-assistant/build-agent-system-prompt";
-import {
   AI_CONTEXT_LIMITS,
   resolveHistoryMessageLimit,
   trimConversationHistory,
@@ -34,21 +31,9 @@ import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
 import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
 import { getDefaultAiAssistantProfile } from "@/services/ai-assistant-profile.service";
-import {
-  mapAgentRowToRoutable,
-  mapIntentToAgentGoal,
-  resolveAgentRoutingFromClassification,
-} from "@/services/intent-router.service";
 import { getDefaultGeminiModel } from "@/lib/env";
-import {
-  resolveAgentLanguage,
-  resolveAgentLlmConfig,
-  selectDefaultChannelAgent,
-} from "@/services/customer-agent-resolver.service";
-import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
-import { isAgentGoalId } from "@/lib/ai-assistant/infer-agent-goal";
-import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
 import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
+import type { ExecutorPlan } from "@/types/agent-executor.types";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
 import {
   formatConversationSummaryForSystemPrompt,
@@ -94,8 +79,6 @@ type AutoReplyPrep = {
   conversationHistory: ConversationTurn[];
   conversationSummary: string | null;
   crmContext: string;
-  agents: RoutableAiAgent[];
-  activeAgent: RoutableAiAgent | null;
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
   systemPrompt: string;
   provider: AiProvider;
@@ -146,7 +129,7 @@ async function resolveAssistantProfile(
   const { data } = await admin
     .from("ai_assistant_profile")
     .select(
-      "business_id, name, system_prompt, communication_style, language, fallback_reply_message",
+      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner",
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -159,6 +142,13 @@ async function resolveAssistantProfile(
       communicationStyle: data.communication_style,
       language: data.language,
       fallbackReplyMessage: data.fallback_reply_message,
+      canReply: data.can_reply ?? true,
+      canCreateTask: data.can_create_task ?? true,
+      canCreateDeal: data.can_create_deal ?? true,
+      canUpdateContact: data.can_update_contact ?? true,
+      canCreateCalendarEvent: data.can_create_calendar_event ?? false,
+      canRequestHuman: data.can_request_human ?? true,
+      canNotifyOwner: data.can_notify_owner ?? true,
     };
   }
 
@@ -169,23 +159,16 @@ async function resolveAssistantProfile(
     system_prompt: defaults.systemPrompt,
     communication_style: defaults.communicationStyle,
     language: defaults.language,
+    can_reply: defaults.canReply,
+    can_create_task: defaults.canCreateTask,
+    can_create_deal: defaults.canCreateDeal,
+    can_update_contact: defaults.canUpdateContact,
+    can_create_calendar_event: defaults.canCreateCalendarEvent,
+    can_request_human: defaults.canRequestHuman,
+    can_notify_owner: defaults.canNotifyOwner,
   });
 
   return { ...defaults, fallbackReplyMessage: null };
-}
-
-async function fetchRoutableAgents(
-  admin: MessagingDbClient,
-  businessId: string,
-) {
-  const { data } = await admin
-    .from("ai_agents")
-    .select(
-      "id, name, system_prompt, channels, trigger_keywords, enabled, goal, provider, model, use_custom_model, language, communication_style, updated_at",
-    )
-    .eq("business_id", businessId);
-
-  return (data ?? []).map(mapAgentRowToRoutable);
 }
 
 async function resolveConversationContactId(
@@ -255,14 +238,29 @@ async function fetchCrmReplySnapshot(
   };
 }
 
-function resolveAgentGoal(
-  agent: Awaited<ReturnType<typeof fetchRoutableAgents>>[number] | null,
-): AgentWizardGoalId | null {
-  if (!agent?.goal || !isAgentGoalId(agent.goal)) {
-    return null;
-  }
+function applyAgentPermissionsToPlan(
+  plan: ExecutorPlan,
+  profile: Awaited<ReturnType<typeof resolveAssistantProfile>>,
+): ExecutorPlan {
+  return {
+    clientSummary: plan.clientSummary,
+    contactUpdates: profile.canUpdateContact ? plan.contactUpdates : undefined,
+    actions: plan.actions.filter((action) => {
+      if (action.type === "create_task") {
+        return profile.canCreateTask;
+      }
 
-  return agent.goal;
+      if (action.type === "create_deal") {
+        return profile.canCreateDeal;
+      }
+
+      if (action.type === "create_calendar_event") {
+        return profile.canCreateCalendarEvent;
+      }
+
+      return true;
+    }),
+  };
 }
 
 function assembleAutoReplySystemPrompt(input: {
@@ -287,19 +285,7 @@ function assembleAutoReplySystemPrompt(input: {
   return sections.join("\n\n");
 }
 
-function buildVoiceSystemPrompt(input: {
-  agent: RoutableAiAgent | null;
-  profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
-}): string {
-  if (input.agent) {
-    return buildCustomerAgentSystemPrompt(input.agent);
-  }
-
-  return buildAssistantSystemPrompt(input.profile);
-}
-
-function buildPrepFromAgent(input: {
-  agent: RoutableAiAgent | null;
+function buildPrepFromProfile(input: {
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
   conversationSummary: string | null;
   crmContext: string;
@@ -309,24 +295,15 @@ function buildPrepFromAgent(input: {
   model: string;
   language: string;
 } {
-  const llm = resolveAgentLlmConfig(input.agent);
-  const language = resolveAgentLanguage(
-    input.agent,
-    input.profile.language,
-  );
-
   return {
     systemPrompt: assembleAutoReplySystemPrompt({
-      baseSystemPrompt: buildVoiceSystemPrompt({
-        agent: input.agent,
-        profile: input.profile,
-      }),
+      baseSystemPrompt: buildAssistantSystemPrompt(input.profile),
       conversationSummary: input.conversationSummary,
       crmContext: input.crmContext,
     }),
-    provider: llm.provider,
-    model: llm.model,
-    language,
+    provider: "gemini",
+    model: getDefaultGeminiModel(),
+    language: input.profile.language,
   };
 }
 
@@ -386,16 +363,10 @@ async function prepareAutoReplyContext(input: {
     };
   }
 
-  const [profile, subscriptionPlan, agents] = await Promise.all([
+  const [profile, subscriptionPlan] = await Promise.all([
     resolveAssistantProfile(input.admin, input.businessId),
     fetchBusinessSubscriptionPlan(input.admin, input.businessId),
-    fetchRoutableAgents(input.admin, input.businessId),
   ]);
-
-  const activeAgent = selectDefaultChannelAgent({
-    agents,
-    channel: input.channel,
-  });
 
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
   const contactId =
@@ -435,8 +406,7 @@ async function prepareAutoReplyContext(input: {
   );
 
   const crmContext = buildCrmReplyContext(crmSnapshot);
-  const voice = buildPrepFromAgent({
-    agent: activeAgent,
+  const voice = buildPrepFromProfile({
     profile,
     conversationSummary: conversationMemory?.aiSummary ?? null,
     crmContext,
@@ -453,8 +423,6 @@ async function prepareAutoReplyContext(input: {
       conversationHistory: trimmedHistory,
       conversationSummary: conversationMemory?.aiSummary ?? null,
       crmContext,
-      agents,
-      activeAgent,
       profile,
       systemPrompt: voice.systemPrompt,
       provider: voice.provider,
@@ -467,7 +435,7 @@ async function prepareAutoReplyContext(input: {
   };
 }
 
-/** Reply first with the Assistant profile; a channel agent can override the voice. */
+/** Reply first with the single AI Agent profile. */
 export async function generateFastAssistantReply(input: {
   admin: MessagingDbClient;
   businessId: string;
@@ -484,10 +452,12 @@ export async function generateFastAssistantReply(input: {
   }
 
   const { prep } = prepared;
-  const agent = prep.activeAgent;
 
-  const voice = buildPrepFromAgent({
-    agent,
+  if (!prep.profile.canReply) {
+    return { success: false, reason: "ai_disabled" };
+  }
+
+  const voice = buildPrepFromProfile({
     profile: prep.profile,
     conversationSummary: prep.conversationSummary,
     crmContext: prep.crmContext,
@@ -515,8 +485,8 @@ export async function generateFastAssistantReply(input: {
     return {
       success: true,
       text: fallbackText,
-      matchedAgentId: agent?.id ?? null,
-      matchedAgentName: agent?.name ?? null,
+      matchedAgentId: null,
+      matchedAgentName: prep.profile.name,
       provider: voice.provider,
       model: voice.model,
       language: voice.language,
@@ -535,8 +505,8 @@ export async function generateFastAssistantReply(input: {
   return {
     success: true,
     text: reply.data.text,
-    matchedAgentId: agent?.id ?? null,
-    matchedAgentName: agent?.name ?? null,
+    matchedAgentId: null,
+    matchedAgentName: prep.profile.name,
     provider: reply.usedProvider ?? voice.provider,
     model: reply.data.model,
     language: voice.language,
@@ -558,14 +528,13 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     input.businessId,
   );
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
+  const profile = await resolveAssistantProfile(input.admin, input.businessId);
 
   const conversationHistory = await fetchConversationHistory(
     input.admin,
     input.conversationId,
     historyLimit,
   );
-
-  const agents = await fetchRoutableAgents(input.admin, input.businessId);
 
   const contactId = await resolveConversationContactId(
     input.admin,
@@ -595,13 +564,6 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       errorMessage: `[${orchestrationResult.errorCode}] ${orchestrationResult.errorMessage}`,
     });
 
-    resolveAgentRoutingFromClassification({
-      agents,
-      channel: input.channel,
-      message: input.clientMessage,
-      classification: null,
-    });
-
     void refreshConversationSummaryIfNeeded({
       admin: input.admin,
       businessId: input.businessId,
@@ -612,20 +574,6 @@ export async function runAutoReplyBackgroundOrchestration(input: {
 
   const orchestration = orchestrationResult.data;
 
-  const routing = resolveAgentRoutingFromClassification({
-    agents,
-    channel: input.channel,
-    message: input.clientMessage,
-    classification: {
-      intent: orchestration.intent,
-      confidence: orchestration.confidence,
-    },
-  });
-
-  const agentGoal =
-    resolveAgentGoal(routing.agent) ??
-    mapIntentToAgentGoal(orchestration.intent);
-
   if (contactId != null) {
     await applyPreparedExecutorPlan({
       admin: input.admin,
@@ -634,14 +582,21 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       conversationId: input.conversationId,
       channel: input.channel,
       clientMessage: input.clientMessage,
-      agent: routing.agent,
-      goal: agentGoal,
-      routingMethod: routing.method,
-      plan: orchestratorResponseToExecutorPlan(orchestration),
+      agent: null,
+      goal: null,
+      routingMethod: "none",
+      plan: applyAgentPermissionsToPlan(
+        orchestratorResponseToExecutorPlan(orchestration),
+        profile,
+      ),
     });
   }
 
-  if (!orchestration.needsHuman) {
+  if (
+    !orchestration.needsHuman ||
+    !profile.canRequestHuman ||
+    !profile.canNotifyOwner
+  ) {
     void refreshConversationSummaryIfNeeded({
       admin: input.admin,
       businessId: input.businessId,

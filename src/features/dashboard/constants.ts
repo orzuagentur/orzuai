@@ -18,18 +18,11 @@ import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 
 export const DASHBOARD_AI_NAV_ITEMS = [
   {
-    id: "ai-assistant-section",
-    label: AI_ASSISTANT_MESSAGES.tabAssistant,
-    href: DASHBOARD_ROUTES.aiAssistantSection,
-    infoTitle: AI_ASSISTANT_MESSAGES.hubAssistantInfoTitle,
-    infoBody: AI_ASSISTANT_MESSAGES.hubAssistantInfoBody,
-  },
-  {
-    id: "ai-agents-section",
-    label: AI_ASSISTANT_MESSAGES.tabAgents,
-    href: DASHBOARD_ROUTES.aiAgentsSection,
-    infoTitle: AI_ASSISTANT_MESSAGES.hubAgentsInfoTitle,
-    infoBody: AI_ASSISTANT_MESSAGES.hubAgentsInfoBody,
+    id: "ai-agent",
+    label: AI_ASSISTANT_MESSAGES.singleAgentTitle,
+    href: DASHBOARD_ROUTES.aiAssistant,
+    infoTitle: AI_ASSISTANT_MESSAGES.singleAgentInfoTitle,
+    infoBody: AI_ASSISTANT_MESSAGES.singleAgentInfoBody,
   },
 ] as const;
 
@@ -56,8 +49,8 @@ export const DASHBOARD_NAV_ITEMS = [
   },
   {
     id: "ai-assistant",
-    label: "AI",
-    href: DASHBOARD_ROUTES.aiAssistantSection,
+    label: "AI Agent",
+    href: DASHBOARD_ROUTES.aiAssistant,
     icon: Bot,
   },
   {

@@ -3,9 +3,6 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { processInboundMessageAutomations } from "@/services/automation-engine.service";
-import { processHighIntentTaskRule } from "@/services/high-intent-task.service";
-import { processSalesAgentRules } from "@/services/sales-agent.service";
-import { analyzeAndStoreSentiment } from "@/services/sentiment.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -67,26 +64,8 @@ export async function processInboundMessageEffects(
     message,
   });
 
-  await analyzeAndStoreSentiment({
-    admin: input.admin,
-    businessId: input.businessId,
-    contactId,
-    message,
-  });
-
-  await processSalesAgentRules({
-    admin: input.admin,
-    businessId: input.businessId,
-    contactId,
-    message,
-  });
-
-  await processHighIntentTaskRule({
-    admin: input.admin,
-    businessId: input.businessId,
-    contactId,
-    message,
-  });
+  // CRM, sentiment, and handoff decisions now live in the single AI Agent
+  // orchestrator so one inbound message cannot create duplicate tasks/deals.
 }
 
 export function scheduleInboundMessageEffects(

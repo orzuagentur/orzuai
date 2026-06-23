@@ -13,7 +13,6 @@ export async function logOrchestratorAgentRun(
     contactId: string | null;
     channel: string;
     clientMessage: string;
-    agentId?: string | null;
     routingMethod?: string | null;
     actions?: string[];
     success: boolean;
@@ -24,7 +23,6 @@ export async function logOrchestratorAgentRun(
     business_id: input.businessId,
     conversation_id: input.conversationId,
     contact_id: input.contactId,
-    agent_id: input.agentId ?? null,
     channel: input.channel,
     client_message: input.clientMessage.slice(0, 2000),
     routing_method: input.routingMethod ?? null,

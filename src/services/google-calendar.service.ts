@@ -333,3 +333,44 @@ export async function createGoogleCalendarEventForBusiness(input: {
   revalidateGoogleCalendarPaths();
   return { success: true };
 }
+
+export async function createGoogleCalendarEventForBusinessWithAdmin(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  businessId: string;
+  summary: string;
+  startDateTime: string;
+  endDateTime: string;
+  timeZone: string;
+  description?: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const { data: row } = await input.admin
+    .from("google_calendar_connections")
+    .select("*")
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (!row || row.google_calendar_status !== "connected" || !row.calendar_id) {
+    return { success: false, message: GOOGLE_CALENDAR_MESSAGES.eventCreateFailed };
+  }
+
+  const accessToken = await getValidAccessToken(row);
+
+  if (!accessToken) {
+    return { success: false, message: GOOGLE_CALENDAR_MESSAGES.syncError };
+  }
+
+  const { createGoogleCalendarEvent } = await import("@/lib/google-calendar/client");
+  const created = await createGoogleCalendarEvent(accessToken, row.calendar_id, {
+    summary: input.summary,
+    startDateTime: input.startDateTime,
+    endDateTime: input.endDateTime,
+    timeZone: input.timeZone,
+    description: input.description,
+  });
+
+  if (!created.success) {
+    return { success: false, message: created.error };
+  }
+
+  return { success: true };
+}

@@ -35,10 +35,20 @@ export const executorAddNoteActionSchema = z.object({
   content: z.string().trim().min(1).max(2000),
 });
 
+export const executorCreateCalendarEventActionSchema = z.object({
+  type: z.literal("create_calendar_event"),
+  summary: z.string().trim().min(1).max(200),
+  startDateTime: z.string().trim().min(1).max(80),
+  endDateTime: z.string().trim().min(1).max(80),
+  timeZone: z.string().trim().min(1).max(80).default("UTC"),
+  description: z.string().trim().max(2000).optional(),
+});
+
 export const executorActionSchema = z.discriminatedUnion("type", [
   executorCreateTaskActionSchema,
   executorCreateDealActionSchema,
   executorAddNoteActionSchema,
+  executorCreateCalendarEventActionSchema,
 ]);
 
 export const executorPlanSchema = z.object({

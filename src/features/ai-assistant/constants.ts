@@ -1,45 +1,49 @@
 export const AI_ASSISTANT_MESSAGES = {
   pageTitle: "AI",
-  pageSubtitle: "Choose how AI supports your customers and your team.",
+  pageSubtitle: "Configure one autonomous AI Agent for all channels.",
   pageDescription:
     "Create an AI agent that talks to customers and works autonomously on your channels.",
-  hubAssistantTitle: "AI channels",
+  singleAgentTitle: "AI Agent",
+  singleAgentInfoTitle: "One AI Agent",
+  singleAgentInfoBody:
+    "Configure one autonomous agent, choose channels, and control exactly which actions it can perform.",
+  hubAssistantTitle: "AI Agent",
   hubAssistantDescription:
-    "Turn AI Assistant auto-replies on for each messaging channel.",
-  hubAssistantInfoTitle: "Channels",
+    "Turn your AI Agent on for each messaging channel.",
+  hubAssistantInfoTitle: "AI Agent channels",
   hubAssistantInfoBody:
-    "Enable auto-reply per channel. AI Assistant can answer 24/7 on WhatsApp, Telegram, and other channels even before you create CRM agents.",
-  hubAgentsTitle: "AI Agents",
+    "Enable the same AI Agent per channel. It answers customers, updates CRM, creates tasks/deals, books calendar events, and calls the owner when allowed.",
+  hubAgentsTitle: "AI Agent",
   hubAgentsDescription:
     "Autonomous agents that chat with customers and update your CRM.",
   hubAgentsInfoTitle: "What AI Agents do",
   hubAgentsInfoBody:
     "Each agent understands customer intent without keywords — booking, sales, support — replies in chat, and saves tasks, deals, and notes in CRM. Create a booking agent for salons, a sales agent for leads, or a custom agent.",
-  sectionAssistantTitle: "Channels",
+  sectionAssistantTitle: "AI Agent",
   sectionAssistantSubtitle:
-    "Enable 24/7 auto-reply on each connected channel.",
-  sectionAgentsTitle: "AI Agents",
+    "Configure one agent, its channels, and its permissions.",
+  sectionAgentsTitle: "AI Agent",
   sectionAgentsSubtitle:
     "Create agents that talk to customers and act autonomously on the platform.",
   backToAiHub: "Back to AI",
-  tabAssistant: "Channels",
-  tabAgents: "AI Agents",
+  tabAssistant: "AI Agent",
+  tabAgents: "AI Agent",
   assistantTabDescription:
-    "Turn AI on for each channel. AI Assistant replies to customers as soon as the channel is enabled.",
+    "Turn the same AI Agent on for each channel.",
   assistantReplyEngineNote:
-    "Replies use the AI Assistant profile with Gemini by default. Enabled CRM agents can still detect intent and save tasks, deals, and notes.",
+    "This single agent replies to customers and runs allowed CRM, calendar, notification, and handoff actions.",
   assistantContextLimitsNote:
     "Context: rolling conversation summary + last 20 messages (40 on Pro). Knowledge Base uses semantic search when available.",
   assistantEdit: "Edit",
-  assistantEditTitle: "AI Assistant profile",
+  assistantEditTitle: "AI Agent settings",
   assistantEditFormDescription:
-    "Used for auto-replies on enabled channels. CRM agents can add automation on top.",
+    "Configure the one agent customers talk to and the actions it may perform.",
   assistantEditDescription:
     "Name, behavior, and communication style — available in the next update.",
-  assistantEditBack: "Back to channels",
-  assistantEditSave: "Save assistant",
-  assistantEditSaved: "AI Assistant settings saved.",
-  assistantNameLabel: "Assistant name",
+  assistantEditBack: "Back to AI Agent",
+  assistantEditSave: "Save agent",
+  assistantEditSaved: "AI Agent settings saved.",
+  assistantNameLabel: "Agent name",
   assistantNamePlaceholder: "e.g. Anna from Orzu Clinic",
   assistantBehaviorLabel: "Behavior & instructions",
   assistantBehaviorPlaceholder:
@@ -47,6 +51,9 @@ export const AI_ASSISTANT_MESSAGES = {
   assistantBehaviorHint:
     "This guides every auto-reply. Add FAQs and policies in Knowledge Base for accuracy.",
   assistantLanguageLabel: "Reply language",
+  agentPermissionsTitle: "Permissions",
+  agentPermissionsHint:
+    "Only enabled permissions can be executed by the AI Agent after a customer message.",
   assistantChannelConnected: "Connected",
   assistantChannelNotConnected: "Not connected",
   assistantConnectChannel: "Connect",

@@ -48,22 +48,8 @@ export function getDashboardPageHeaderMeta(
 
   if (pathname === DASHBOARD_ROUTES.aiAssistant) {
     return {
-      title: AI_ASSISTANT_MESSAGES.pageTitle,
+      title: AI_ASSISTANT_MESSAGES.singleAgentTitle,
       description: AI_ASSISTANT_MESSAGES.pageSubtitle,
-    };
-  }
-
-  if (pathname === DASHBOARD_ROUTES.aiAssistantSection) {
-    return {
-      title: AI_ASSISTANT_MESSAGES.sectionAssistantTitle,
-      description: AI_ASSISTANT_MESSAGES.sectionAssistantSubtitle,
-    };
-  }
-
-  if (pathname === DASHBOARD_ROUTES.aiAgentsSection) {
-    return {
-      title: AI_ASSISTANT_MESSAGES.sectionAgentsTitle,
-      description: AI_ASSISTANT_MESSAGES.sectionAgentsSubtitle,
     };
   }
 

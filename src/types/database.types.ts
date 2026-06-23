@@ -1082,7 +1082,7 @@ export type Database = {
           content: string;
           email_subject: string | null;
           ai_generated: boolean;
-          ai_agent_id: string | null;
+          ai_agent_snapshot: unknown | null;
           deleted_for_all_at: string | null;
           hidden_for_business: boolean;
           edited_at: string | null;
@@ -1100,7 +1100,7 @@ export type Database = {
           content: string;
           email_subject?: string | null;
           ai_generated?: boolean;
-          ai_agent_id?: string | null;
+          ai_agent_snapshot?: unknown | null;
           deleted_for_all_at?: string | null;
           hidden_for_business?: boolean;
           edited_at?: string | null;
@@ -1118,7 +1118,7 @@ export type Database = {
           content?: string;
           email_subject?: string | null;
           ai_generated?: boolean;
-          ai_agent_id?: string | null;
+          ai_agent_snapshot?: unknown | null;
           deleted_for_all_at?: string | null;
           hidden_for_business?: boolean;
           edited_at?: string | null;
@@ -1522,71 +1522,6 @@ export type Database = {
           },
         ];
       };
-      ai_agents: {
-        Row: {
-          id: string;
-          business_id: string;
-          name: string;
-          system_prompt: string;
-          channels: MessagingChannel[];
-          trigger_keywords: string[];
-          enabled: boolean;
-          provider: string;
-          model: string;
-          language: string;
-          communication_style: string;
-          icon: string;
-          use_custom_model: boolean;
-          goal: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          business_id: string;
-          name: string;
-          system_prompt: string;
-          channels?: MessagingChannel[];
-          trigger_keywords?: string[];
-          enabled?: boolean;
-          provider?: string;
-          model?: string;
-          language?: string;
-          communication_style?: string;
-          icon?: string;
-          use_custom_model?: boolean;
-          goal?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          business_id?: string;
-          name?: string;
-          system_prompt?: string;
-          channels?: MessagingChannel[];
-          trigger_keywords?: string[];
-          enabled?: boolean;
-          provider?: string;
-          model?: string;
-          language?: string;
-          communication_style?: string;
-          icon?: string;
-          use_custom_model?: boolean;
-          goal?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "ai_agents_business_id_fkey";
-            columns: ["business_id"];
-            isOneToOne: false;
-            referencedRelation: "businesses";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       agent_crm_idempotency: {
         Row: {
           id: string;
@@ -1625,7 +1560,7 @@ export type Database = {
           business_id: string;
           conversation_id: string | null;
           contact_id: string | null;
-          agent_id: string | null;
+          ai_agent_snapshot: unknown | null;
           channel: string;
           client_message: string;
           routing_method: string | null;
@@ -1639,7 +1574,7 @@ export type Database = {
           business_id: string;
           conversation_id?: string | null;
           contact_id?: string | null;
-          agent_id?: string | null;
+          ai_agent_snapshot?: unknown | null;
           channel: string;
           client_message: string;
           routing_method?: string | null;
@@ -1653,7 +1588,7 @@ export type Database = {
           business_id?: string;
           conversation_id?: string | null;
           contact_id?: string | null;
-          agent_id?: string | null;
+          ai_agent_snapshot?: unknown | null;
           channel?: string;
           client_message?: string;
           routing_method?: string | null;
@@ -1738,6 +1673,13 @@ export type Database = {
           communication_style: string;
           language: string;
           fallback_reply_message: string | null;
+          can_reply: boolean;
+          can_create_task: boolean;
+          can_create_deal: boolean;
+          can_update_contact: boolean;
+          can_create_calendar_event: boolean;
+          can_request_human: boolean;
+          can_notify_owner: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -1748,6 +1690,13 @@ export type Database = {
           communication_style?: string;
           language?: string;
           fallback_reply_message?: string | null;
+          can_reply?: boolean;
+          can_create_task?: boolean;
+          can_create_deal?: boolean;
+          can_update_contact?: boolean;
+          can_create_calendar_event?: boolean;
+          can_request_human?: boolean;
+          can_notify_owner?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1758,6 +1707,13 @@ export type Database = {
           communication_style?: string;
           language?: string;
           fallback_reply_message?: string | null;
+          can_reply?: boolean;
+          can_create_task?: boolean;
+          can_create_deal?: boolean;
+          can_update_contact?: boolean;
+          can_create_calendar_event?: boolean;
+          can_request_human?: boolean;
+          can_notify_owner?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1920,7 +1876,6 @@ export type Database = {
           auto_task_threshold: number;
           sentiment_analysis_enabled: boolean;
           follow_up_agent_enabled: boolean;
-          follow_up_agent_id: string | null;
           updated_at: string;
         };
         Insert: {
@@ -1932,7 +1887,6 @@ export type Database = {
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
-          follow_up_agent_id?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -1944,7 +1898,6 @@ export type Database = {
           auto_task_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
-          follow_up_agent_id?: string | null;
           updated_at?: string;
         };
         Relationships: [

@@ -2,15 +2,9 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
+import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateText } from "@/services/llm.service";
-import {
-  incrementMessagingAnalytics,
-  insertChannelMessage,
-} from "@/services/messaging.service";
 import { notifyInboundMessagePush } from "@/services/push-notifications.service";
-import { sendTelegramChatMessage } from "@/services/telegram.service";
 import type {
   AutomationActionType,
   AutomationConfig,
@@ -18,7 +12,6 @@ import type {
 } from "@/features/automations/workflow-types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { Database, MessagingChannel } from "@/types/database.types";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 
 type AutomationDbClient = SupabaseClient<Database>;
 
@@ -114,120 +107,6 @@ async function logAutomationRun(
   });
 }
 
-async function loadAgent(
-  admin: AutomationDbClient,
-  businessId: string,
-  aiAgentId: string | null,
-) {
-  if (!aiAgentId) {
-    return null;
-  }
-
-  const { data } = await admin
-    .from("ai_agents")
-    .select("id, system_prompt, provider, model, language, enabled")
-    .eq("id", aiAgentId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (!data?.enabled) {
-    return null;
-  }
-
-  return data;
-}
-
-async function sendAutomationMessage(
-  admin: AutomationDbClient,
-  input: {
-    businessId: string;
-    channel: MessagingChannel;
-    conversationId: string;
-    content: string;
-    aiAgentId: string | null;
-  },
-): Promise<boolean> {
-  if (input.channel === "website_forms") {
-    await insertChannelMessage(admin, {
-      conversationId: input.conversationId,
-      channel: input.channel,
-      senderType: "ai",
-      content: input.content,
-      aiGenerated: true,
-      aiAgentId: input.aiAgentId,
-    });
-    return true;
-  }
-
-  if (input.channel === "whatsapp") {
-    const { data: conversation } = await admin
-      .from("conversations")
-      .select("contact:contacts(phone_number)")
-      .eq("id", input.conversationId)
-      .maybeSingle();
-
-    const contact = Array.isArray(conversation?.contact)
-      ? conversation.contact[0]
-      : conversation?.contact;
-
-    const { data: whatsappConnection } = await admin
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", input.businessId)
-      .eq("whatsapp_status", "connected")
-      .maybeSingle();
-
-    if (
-      !contact?.phone_number ||
-      !whatsappConnection?.meta_phone_number_id ||
-      !whatsappConnection.meta_access_token
-    ) {
-      return false;
-    }
-
-    const sendResult = await sendWhatsAppTextMessage(
-      whatsappConnection.meta_phone_number_id,
-      whatsappConnection.meta_access_token,
-      contact.phone_number.replace(/[^\d+]/g, ""),
-      input.content,
-    );
-
-    if (!sendResult.success) {
-      return false;
-    }
-
-    await insertChannelMessage(admin, {
-      conversationId: input.conversationId,
-      channel: input.channel,
-      senderType: "ai",
-      content: input.content,
-      aiGenerated: true,
-      aiAgentId: input.aiAgentId,
-    });
-  } else if (input.channel === "instagram") {
-    return false;
-  } else if (input.channel === "telegram") {
-    const sendResult = await sendTelegramChatMessage(
-      input.businessId,
-      input.conversationId,
-      input.content,
-    );
-
-    if (!sendResult.success) {
-      return false;
-    }
-  } else {
-    return false;
-  }
-
-  await incrementMessagingAnalytics(admin, input.businessId, input.channel, {
-    totalMessages: 1,
-    aiReplies: 1,
-  });
-
-  return true;
-}
-
 async function executeWorkflowAction(
   admin: AutomationDbClient,
   workflow: AutomationWorkflowRow,
@@ -237,45 +116,11 @@ async function executeWorkflowAction(
   const action = workflow.action_type as AutomationActionType;
 
   if (action === "send_message") {
-    const agent = await loadAgent(admin, context.businessId, config.aiAgentId ?? null);
-    const fallback = `Hi ${context.contactName}, thanks for reaching out — how can we help you today?`;
-
-    let content = fallback;
-
-    if (hasGeminiEnv() || agent) {
-      const result = await generateText({
-        businessId: context.businessId,
-        callType: "automation",
-        provider: agent?.provider as "gemini" | "openai" | "claude" | undefined,
-        model: agent?.model ?? undefined,
-        prompt: [
-          `Customer name: ${context.contactName}`,
-          context.message ? `Latest message: ${context.message}` : null,
-          "Write a short helpful reply (max 280 chars). No markdown.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        systemInstruction: agent
-          ? `${agent.system_prompt}\n\nWrite one concise reply message.`
-          : "You write short helpful business replies.",
-      });
-
-      if (result.success) {
-        content = result.data.text.trim().slice(0, 500);
-      }
-    }
-
-    const sent = await sendAutomationMessage(admin, {
-      businessId: context.businessId,
-      channel: context.channel,
-      conversationId: context.conversationId,
-      content,
-      aiAgentId: agent?.id ?? null,
-    });
-
-    return sent
-      ? { success: true, detail: "Message sent" }
-      : { success: false, detail: "Unable to send message" };
+    void config;
+    return {
+      success: true,
+      detail: "Skipped: customer replies are handled by the single AI Agent",
+    };
   }
 
   if (action === "create_task") {

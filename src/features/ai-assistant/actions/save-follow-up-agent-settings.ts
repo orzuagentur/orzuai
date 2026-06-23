@@ -8,7 +8,6 @@ import { saveFollowUpAgentSettings } from "@/services/follow-up-settings.service
 
 const saveFollowUpAgentSettingsSchema = z.object({
   enabled: z.boolean(),
-  aiAgentId: z.string().uuid().nullable().optional(),
 });
 
 export async function saveFollowUpAgentSettingsAction(

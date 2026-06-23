@@ -30,7 +30,6 @@ export type ChannelMessageInsert = {
   content: string;
   emailSubject?: string | null;
   aiGenerated?: boolean;
-  aiAgentId?: string | null;
   externalMessageId?: string | null;
 };
 
@@ -89,7 +88,6 @@ export async function insertChannelMessage(
       content: input.content,
       email_subject: input.emailSubject?.trim() || null,
       ai_generated: input.aiGenerated ?? false,
-      ai_agent_id: input.aiAgentId ?? null,
       external_message_id: input.externalMessageId ?? null,
     })
     .select(
@@ -484,7 +482,6 @@ export async function processChannelAutoReply(input: {
     content: reply.text,
     emailSubject: sendResult.emailSubject,
     aiGenerated: true,
-    aiAgentId: reply.matchedAgentId,
   });
 
   await incrementMessagingAnalytics(admin, businessId, channel, {

@@ -19,6 +19,13 @@ export const saveAiAssistantProfileSchema = z.object({
     message: "Select a communication style.",
   }),
   language: z.enum(languageValues),
+  canReply: z.boolean().default(true),
+  canCreateTask: z.boolean().default(true),
+  canCreateDeal: z.boolean().default(true),
+  canUpdateContact: z.boolean().default(true),
+  canCreateCalendarEvent: z.boolean().default(false),
+  canRequestHuman: z.boolean().default(true),
+  canNotifyOwner: z.boolean().default(true),
 });
 
 export type SaveAiAssistantProfileInput = z.infer<
@@ -31,4 +38,11 @@ export type AiAssistantProfileData = {
   systemPrompt: string;
   communicationStyle: string;
   language: string;
+  canReply: boolean;
+  canCreateTask: boolean;
+  canCreateDeal: boolean;
+  canUpdateContact: boolean;
+  canCreateCalendarEvent: boolean;
+  canRequestHuman: boolean;
+  canNotifyOwner: boolean;
 };

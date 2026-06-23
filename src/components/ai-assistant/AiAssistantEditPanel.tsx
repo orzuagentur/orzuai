@@ -45,7 +45,28 @@ export function AiAssistantEditPanel({
       : DEFAULT_COMMUNICATION_STYLE,
   );
   const [language, setLanguage] = useState(profile.language);
+  const [permissions, setPermissions] = useState({
+    canReply: profile.canReply,
+    canCreateTask: profile.canCreateTask,
+    canCreateDeal: profile.canCreateDeal,
+    canUpdateContact: profile.canUpdateContact,
+    canCreateCalendarEvent: profile.canCreateCalendarEvent,
+    canRequestHuman: profile.canRequestHuman,
+    canNotifyOwner: profile.canNotifyOwner,
+  });
   const [isSaving, setIsSaving] = useState(false);
+  const permissionRows: Array<{
+    key: keyof typeof permissions;
+    label: string;
+  }> = [
+    { key: "canReply", label: "Reply to customers autonomously" },
+    { key: "canCreateTask", label: "Create CRM tasks" },
+    { key: "canCreateDeal", label: "Create CRM deals" },
+    { key: "canUpdateContact", label: "Update contact details and notes" },
+    { key: "canCreateCalendarEvent", label: "Create Google Calendar events" },
+    { key: "canRequestHuman", label: "Ask the owner to join when needed" },
+    { key: "canNotifyOwner", label: "Send platform notifications to owner" },
+  ];
 
   async function handleSave() {
     setIsSaving(true);
@@ -56,6 +77,7 @@ export function AiAssistantEditPanel({
         systemPrompt,
         communicationStyle,
         language,
+        ...permissions,
       });
 
       if (!result.success) {
@@ -141,6 +163,34 @@ export function AiAssistantEditPanel({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label>{AI_ASSISTANT_MESSAGES.agentPermissionsTitle}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {AI_ASSISTANT_MESSAGES.agentPermissionsHint}
+                </p>
+              </div>
+              {permissionRows.map(({ key, label }) => (
+                <label
+                  key={key}
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                >
+                  <span>{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={permissions[key]}
+                    disabled={isSaving}
+                    onChange={(event) =>
+                      setPermissions((current) => ({
+                        ...current,
+                        [key]: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
             </div>
 
             <div className="flex flex-wrap gap-2">

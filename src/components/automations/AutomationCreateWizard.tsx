@@ -6,7 +6,6 @@ import { ArrowLeftIcon, ArrowRightIcon, Loader2Icon, XIcon } from "lucide-react"
 import { toast } from "sonner";
 
 import { AgentConnectedChannelSelect } from "@/components/ai-assistant/AgentConnectedChannelSelect";
-import { FollowUpAgentSelect } from "@/components/automations/FollowUpAgentSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,13 +32,11 @@ const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   lost: CONTACTS_MESSAGES.pipelineLost,
 };
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
-import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationCreateWizardProps = {
   step: 1 | 2 | 3;
-  agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
   onStepChange: (step: 1 | 2 | 3) => void;
@@ -48,7 +45,6 @@ type AutomationCreateWizardProps = {
 
 export function AutomationCreateWizard({
   step,
-  agents,
   channelStatuses,
   visibleChannelIds,
   onStepChange,
@@ -60,7 +56,6 @@ export function AutomationCreateWizard({
   const [triggerType, setTriggerType] = useState<AutomationTriggerType>("new_message");
   const [actionType, setActionType] = useState<AutomationActionType>("create_task");
   const [channels, setChannels] = useState<MessagingIntegrationChannelId[]>([]);
-  const [aiAgentId, setAiAgentId] = useState<string | null>(null);
   const [pipelineStage, setPipelineStage] = useState<string>("qualified");
   const [taskTitle, setTaskTitle] = useState("");
   const [tagName, setTagName] = useState("");
@@ -77,7 +72,6 @@ export function AutomationCreateWizard({
   function buildConfig(): AutomationConfig {
     return {
       channels,
-      ...(actionType === "send_message" ? { aiAgentId } : {}),
       ...(actionType === "update_stage"
         ? { pipelineStage: pipelineStage as AutomationConfig["pipelineStage"] }
         : {}),
@@ -221,11 +215,10 @@ export function AutomationCreateWizard({
               </p>
             </div>
             {actionType === "send_message" ? (
-              <FollowUpAgentSelect
-                agents={agents}
-                value={aiAgentId}
-                onChange={setAiAgentId}
-              />
+              <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                Customer-facing AI messages are handled by the single AI Agent.
+                This automation action is kept only for legacy workflows.
+              </p>
             ) : null}
             {actionType === "update_stage" ? (
               <div className="space-y-2">

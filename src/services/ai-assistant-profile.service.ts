@@ -31,6 +31,13 @@ function mapProfileRow(row: {
   system_prompt: string;
   communication_style: string;
   language: string;
+  can_reply?: boolean | null;
+  can_create_task?: boolean | null;
+  can_create_deal?: boolean | null;
+  can_update_contact?: boolean | null;
+  can_create_calendar_event?: boolean | null;
+  can_request_human?: boolean | null;
+  can_notify_owner?: boolean | null;
 }): AiAssistantProfileData {
   return {
     businessId: row.business_id,
@@ -38,6 +45,13 @@ function mapProfileRow(row: {
     systemPrompt: row.system_prompt,
     communicationStyle: row.communication_style,
     language: row.language,
+    canReply: row.can_reply ?? true,
+    canCreateTask: row.can_create_task ?? true,
+    canCreateDeal: row.can_create_deal ?? true,
+    canUpdateContact: row.can_update_contact ?? true,
+    canCreateCalendarEvent: row.can_create_calendar_event ?? false,
+    canRequestHuman: row.can_request_human ?? true,
+    canNotifyOwner: row.can_notify_owner ?? true,
   };
 }
 
@@ -46,10 +60,17 @@ export function getDefaultAiAssistantProfile(
 ): AiAssistantProfileData {
   return {
     businessId,
-    name: "AI Assistant",
+    name: "AI Agent",
     systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
     communicationStyle: DEFAULT_COMMUNICATION_STYLE,
     language: DEFAULT_AI_LANGUAGE,
+    canReply: true,
+    canCreateTask: true,
+    canCreateDeal: true,
+    canUpdateContact: true,
+    canCreateCalendarEvent: false,
+    canRequestHuman: true,
+    canNotifyOwner: true,
   };
 }
 
@@ -63,7 +84,7 @@ export async function ensureAiAssistantProfile(
   const supabase = await createClient();
   const { data } = await supabase
     .from("ai_assistant_profile")
-    .select("business_id, name, system_prompt, communication_style, language")
+    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner")
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -80,8 +101,15 @@ export async function ensureAiAssistantProfile(
       system_prompt: defaults.systemPrompt,
       communication_style: defaults.communicationStyle,
       language: defaults.language,
+      can_reply: defaults.canReply,
+      can_create_task: defaults.canCreateTask,
+      can_create_deal: defaults.canCreateDeal,
+      can_update_contact: defaults.canUpdateContact,
+      can_create_calendar_event: defaults.canCreateCalendarEvent,
+      can_request_human: defaults.canRequestHuman,
+      can_notify_owner: defaults.canNotifyOwner,
     })
-    .select("business_id, name, system_prompt, communication_style, language")
+    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner")
     .single();
 
   return created ? mapProfileRow(created) : defaults;
@@ -124,6 +152,13 @@ export async function saveAiAssistantProfile(
       system_prompt: parsed.data.systemPrompt,
       communication_style: parsed.data.communicationStyle,
       language: parsed.data.language,
+      can_reply: parsed.data.canReply,
+      can_create_task: parsed.data.canCreateTask,
+      can_create_deal: parsed.data.canCreateDeal,
+      can_update_contact: parsed.data.canUpdateContact,
+      can_create_calendar_event: parsed.data.canCreateCalendarEvent,
+      can_request_human: parsed.data.canRequestHuman,
+      can_notify_owner: parsed.data.canNotifyOwner,
     },
     { onConflict: "business_id" },
   );

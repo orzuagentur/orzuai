@@ -3,6 +3,7 @@ import "server-only";
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/services/llm.service";
+import { getAiAssistantProfileForBusiness } from "@/services/ai-assistant-profile.service";
 import {
   incrementMessagingAnalytics,
   insertChannelMessage,
@@ -58,43 +59,6 @@ async function isChannelConnected(
   return channel === "website_forms";
 }
 
-type FollowUpAgentProfile = {
-  id: string;
-  systemPrompt: string;
-  provider?: string;
-  model?: string;
-  language?: string;
-};
-
-async function loadFollowUpAgentProfile(
-  admin: ReturnType<typeof createAdminClient>,
-  businessId: string,
-  aiAgentId: string | null,
-): Promise<FollowUpAgentProfile | null> {
-  if (!aiAgentId) {
-    return null;
-  }
-
-  const { data } = await admin
-    .from("ai_agents")
-    .select("id, system_prompt, provider, model, language, enabled")
-    .eq("id", aiAgentId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (!data?.enabled) {
-    return null;
-  }
-
-  return {
-    id: data.id,
-    systemPrompt: data.system_prompt,
-    provider: data.provider ?? undefined,
-    model: data.model ?? undefined,
-    language: data.language ?? undefined,
-  };
-}
-
 async function generateFollowUpMessage(input: {
   admin: ReturnType<typeof createAdminClient>;
   businessId: string;
@@ -102,36 +66,26 @@ async function generateFollowUpMessage(input: {
   channel: MessagingChannel;
   lastOutboundContent: string;
   followUpDay: 1 | 2;
-  aiAgentId: string | null;
-}): Promise<{ content: string; aiAgentId: string | null } | null> {
-  const agent = await loadFollowUpAgentProfile(
-    input.admin,
-    input.businessId,
-    input.aiAgentId,
-  );
+}): Promise<{ content: string } | null> {
+  const profile = await getAiAssistantProfileForBusiness(input.businessId);
 
-  if (!hasGeminiEnv() && !agent) {
+  if (!hasGeminiEnv()) {
     return {
       content: `Hi ${input.contactName}, just checking in — let us know if you still need help.`,
-      aiAgentId: null,
     };
   }
 
-  const systemInstruction = agent
-    ? [
-        agent.systemPrompt,
-        "Write a short follow-up message. Keep replies under 280 characters. No markdown.",
-      ].join("\n\n")
-    : "You write polite sales follow-up messages. Keep replies under 280 characters.";
+  const systemInstruction = [
+    profile.systemPrompt,
+    "Write a short follow-up message as the single AI Agent. Keep replies under 280 characters. No markdown.",
+  ].join("\n\n");
 
   const result = await generateText({
     businessId: input.businessId,
     callType: "follow_up",
-    provider: agent?.provider as "gemini" | "openai" | "claude" | undefined,
-    model: agent?.model,
     prompt: [
       `Write a short follow-up #${input.followUpDay} for ${input.channel}.`,
-      agent?.language ? `Reply language: ${agent.language}` : null,
+      `Reply language: ${profile.language}`,
       `Customer name: ${input.contactName}`,
       `Previous message we sent: ${input.lastOutboundContent}`,
       "Goal: gentle nudge, 1-2 sentences, no markdown.",
@@ -147,7 +101,6 @@ async function generateFollowUpMessage(input: {
 
   return {
     content: result.data.text.trim().slice(0, 500),
-    aiAgentId: agent?.id ?? null,
   };
 }
 
@@ -155,7 +108,6 @@ async function sendFollowUpOnChannel(input: {
   admin: ReturnType<typeof createAdminClient>;
   candidate: FollowUpCandidate;
   content: string;
-  aiAgentId?: string | null;
 }): Promise<boolean> {
   const { admin, candidate } = input;
 
@@ -166,7 +118,6 @@ async function sendFollowUpOnChannel(input: {
       senderType: "ai",
       content: input.content,
       aiGenerated: true,
-      aiAgentId: input.aiAgentId ?? null,
     });
 
     await incrementMessagingAnalytics(admin, candidate.businessId, candidate.channel, {
@@ -220,7 +171,6 @@ async function sendFollowUpOnChannel(input: {
       senderType: "ai",
       content: input.content,
       aiGenerated: true,
-      aiAgentId: input.aiAgentId ?? null,
     });
   } else if (candidate.channel === "instagram") {
     return false;
@@ -367,23 +317,9 @@ export async function runDueConversationFollowUps(): Promise<{
 
   const admin = createAdminClient();
   const candidates = await listFollowUpCandidates(admin);
-  const followUpAgentByBusiness = new Map<string, string | null>();
   let sent = 0;
 
   for (const candidate of candidates) {
-    if (!followUpAgentByBusiness.has(candidate.businessId)) {
-      const { data: config } = await admin
-        .from("business_ai_config")
-        .select("follow_up_agent_id")
-        .eq("business_id", candidate.businessId)
-        .maybeSingle();
-
-      followUpAgentByBusiness.set(
-        candidate.businessId,
-        config?.follow_up_agent_id ?? null,
-      );
-    }
-
     const generated = await generateFollowUpMessage({
       admin,
       businessId: candidate.businessId,
@@ -391,7 +327,6 @@ export async function runDueConversationFollowUps(): Promise<{
       channel: candidate.channel,
       lastOutboundContent: candidate.lastOutboundContent,
       followUpDay: candidate.followUpDay,
-      aiAgentId: followUpAgentByBusiness.get(candidate.businessId) ?? null,
     });
 
     if (!generated) {
@@ -402,7 +337,6 @@ export async function runDueConversationFollowUps(): Promise<{
       admin,
       candidate,
       content: generated.content,
-      aiAgentId: generated.aiAgentId,
     });
 
     if (!delivered) {

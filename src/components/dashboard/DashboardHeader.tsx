@@ -33,7 +33,7 @@ function isContactsPath(pathname: string): boolean {
 }
 
 function isAiAssistantPath(pathname: string): boolean {
-  return pathname === DASHBOARD_ROUTES.aiAgentsSection;
+  return pathname === DASHBOARD_ROUTES.aiAssistant;
 }
 
 function isAnalyticsPath(pathname: string): boolean {

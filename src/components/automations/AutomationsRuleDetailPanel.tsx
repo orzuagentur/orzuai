@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 import { AutomationsChannelBadgeRow } from "@/components/automations/AutomationsChannelBadgeRow";
 import { AutomationOnOffControl } from "@/components/automations/AutomationOnOffControl";
-import { FollowUpAgentSelect } from "@/components/automations/FollowUpAgentSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +20,6 @@ import {
 } from "@/features/automations/rule-catalog";
 import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
-import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
@@ -30,7 +28,6 @@ type AutomationsRuleDetailPanelProps = {
   ruleId: AutomationRuleId;
   salesAgent: SalesAgentSettings;
   followUpAgent: FollowUpAgentSettings;
-  agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
   onBack?: () => void;
@@ -40,7 +37,6 @@ export function AutomationsRuleDetailPanel({
   ruleId,
   salesAgent,
   followUpAgent,
-  agents,
   channelStatuses,
   visibleChannelIds,
   onBack,
@@ -51,16 +47,12 @@ export function AutomationsRuleDetailPanel({
 
   const [salesSettings, setSalesSettings] = useState(salesAgent);
   const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
-  const [followUpAgentId, setFollowUpAgentId] = useState(
-    followUpAgent.aiAgentId,
-  );
   const [isSaving, setIsSaving] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSalesSettings(salesAgent);
     setFollowUpEnabled(followUpAgent.enabled);
-    setFollowUpAgentId(followUpAgent.aiAgentId);
   }, [salesAgent, followUpAgent]);
 
   async function persistSalesSettings(next: SalesAgentSettings) {
@@ -84,24 +76,19 @@ export function AutomationsRuleDetailPanel({
 
   async function persistFollowUp(input: {
     enabled?: boolean;
-    aiAgentId?: string | null;
   }) {
     setIsSaving(true);
 
     const nextEnabled = input.enabled ?? followUpEnabled;
-    const nextAgentId =
-      input.aiAgentId !== undefined ? input.aiAgentId : followUpAgentId;
 
     try {
       const result = await saveFollowUpAgentSettingsAction({
         enabled: nextEnabled,
-        aiAgentId: nextAgentId,
       });
 
       if (!result.success) {
         toast.error(result.message ?? AUTOMATIONS_MESSAGES.ruleSaveFailed);
         setFollowUpEnabled(followUpAgent.enabled);
-        setFollowUpAgentId(followUpAgent.aiAgentId);
         return;
       }
 
@@ -218,15 +205,9 @@ export function AutomationsRuleDetailPanel({
               setFollowUpEnabled(value);
               void persistFollowUp({ enabled: value });
             }, "Enable follow-up agent", AUTOMATIONS_MESSAGES.followUpChannelsHint)}
-            <FollowUpAgentSelect
-              agents={agents}
-              value={followUpAgentId}
-              disabled={isSaving || !followUpEnabled}
-              onChange={(agentId) => {
-                setFollowUpAgentId(agentId);
-                void persistFollowUp({ aiAgentId: agentId });
-              }}
-            />
+            <p className="text-sm text-muted-foreground">
+              Follow-ups use the same AI Agent profile and permissions.
+            </p>
             <p className="text-sm text-muted-foreground">
               {AUTOMATIONS_MESSAGES.followUpSentStat(followUpAgent.sentCount)}
             </p>

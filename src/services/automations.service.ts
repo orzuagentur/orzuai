@@ -3,7 +3,6 @@ import "server-only";
 import { getActiveMessagingChannelIds } from "@/features/integrations";
 import { countActiveRules } from "@/features/automations/rule-catalog";
 import { listCustomAutomations } from "@/services/custom-automations.service";
-import { listAiAgents } from "@/services/ai-agents.service";
 import { getAiUsageSummary } from "@/services/ai-usage.service";
 import { requireUser } from "@/services/auth.service";
 import {
@@ -50,7 +49,7 @@ export async function getAutomationsPageData(input?: {
         autoTaskThreshold: 75,
         sentimentAnalysisEnabled: true,
       },
-      followUpAgent: { enabled: true, sentCount: 0, aiAgentId: null },
+      followUpAgent: { enabled: true, sentCount: 0 },
       stats: {
         followUpsSent: 0,
         qualifiedContacts: 0,
@@ -72,7 +71,6 @@ export async function getAutomationsPageData(input?: {
     stats,
     activity,
     workflows,
-    agents,
     channelStatuses,
   ] = await Promise.all([
     getAiUsageSummary(),
@@ -81,7 +79,6 @@ export async function getAutomationsPageData(input?: {
     getAutomationStats(business.id),
     getAutomationActivity(business.id),
     listCustomAutomations(business.id),
-    listAiAgents(),
     getChannelConnectionStatuses(business.id),
   ]);
 
@@ -102,7 +99,7 @@ export async function getAutomationsPageData(input?: {
     stats: { ...stats, activeRules: builtinActive + customActive },
     activity,
     workflows,
-    agents,
+    agents: [],
     channelStatuses,
     visibleChannelIds,
   };

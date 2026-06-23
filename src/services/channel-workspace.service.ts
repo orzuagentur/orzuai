@@ -75,31 +75,9 @@ export async function syncChannelAiEnabledAfterAgentChange(
   businessId: string,
   channels: MessagingIntegrationChannelId[],
 ): Promise<void> {
-  if (!hasSupabaseEnv() || channels.length === 0) {
-    return;
-  }
-
-  const supabase = await createClient();
-
-  const { data: enabledAgents } = await supabase
-    .from("ai_agents")
-    .select("channels")
-    .eq("business_id", businessId)
-    .eq("enabled", true);
-
-  for (const channel of channels) {
-    await ensureChannelAiSettings(supabase, businessId, channel);
-
-    const hasEnabledAgent = (enabledAgents ?? []).some((agent) =>
-      (agent.channels ?? []).includes(channel),
-    );
-
-    await supabase
-      .from("ai_settings")
-      .update({ ai_enabled: hasEnabledAgent })
-      .eq("business_id", businessId)
-      .eq("channel", channel);
-  }
+  void businessId;
+  void channels;
+  // Single-agent mode stores channel enablement directly in ai_settings.
 }
 
 function revalidateChannelWorkspacePaths(channel: MessagingIntegrationChannelId): void {

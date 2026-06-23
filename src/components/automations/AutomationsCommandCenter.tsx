@@ -114,7 +114,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
       <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
         <AutomationCreateWizard
           step={data.createWizardStep}
-          agents={data.agents}
           channelStatuses={data.channelStatuses}
           visibleChannelIds={data.visibleChannelIds}
           onStepChange={handleWizardStepChange}
@@ -179,7 +178,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
                   ruleId={data.activeRuleId}
                   salesAgent={data.salesAgent}
                   followUpAgent={data.followUpAgent}
-                  agents={data.agents}
                   channelStatuses={data.channelStatuses}
                   visibleChannelIds={data.visibleChannelIds}
                   onBack={

@@ -24,7 +24,6 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { listAiAgents } from "@/services/ai-agents.service";
 import { getAiAssistantProfileForBusiness } from "@/services/ai-assistant-profile.service";
 import {
   getChannelAiSettingsForBusiness,
@@ -113,13 +112,11 @@ export async function getAiAssistantPageData(
 
   const [
     channelStatuses,
-    agents,
     businessProviderCredentials,
     preferCustomerAiKeys,
     assistantProfile,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
-    listAiAgents(),
     listBusinessProviderCredentials(businessId),
     getBusinessPreferCustomerAiKeys(businessId),
     getAiAssistantProfileForBusiness(businessId),
@@ -175,7 +172,7 @@ export async function getAiAssistantPageData(
     visibleChannelIds,
     channelStatuses,
     channels,
-    agents,
+    agents: [],
     enabledChannelCount: channels.filter((entry) => entry.settings.aiEnabled).length,
     connectedChannelCount: channels.filter(
       (entry) => entry.settings.isChannelConnected,

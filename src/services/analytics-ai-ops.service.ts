@@ -38,102 +38,8 @@ function startOfDaysAgo(days: number): Date {
 export async function listAgentsAnalyticsRollup(
   businessId: string,
 ): Promise<AgentAnalyticsRollupItem[]> {
-  if (!hasSupabaseEnv()) {
-    return [];
-  }
-
-  const admin = createAdminClient();
-  const { data: agents } = await admin
-    .from("ai_agents")
-    .select("id, name, enabled")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false });
-
-  if (!agents?.length) {
-    return [];
-  }
-
-  const agentIds = agents.map((agent) => agent.id);
-  const sevenDaysAgo = startOfDaysAgo(7);
-
-  const { data: messages } = await admin
-    .from("messages")
-    .select("ai_agent_id, created_at, conversation_id")
-    .in("ai_agent_id", agentIds);
-
-  const conversationIds = [
-    ...new Set((messages ?? []).map((row) => row.conversation_id)),
-  ];
-
-  const contactByConversation = new Map<string, string>();
-
-  if (conversationIds.length > 0) {
-    const { data: conversations } = await admin
-      .from("conversations")
-      .select("id, contact_id")
-      .eq("business_id", businessId)
-      .in("id", conversationIds);
-
-    for (const conversation of conversations ?? []) {
-      if (conversation.contact_id) {
-        contactByConversation.set(conversation.id, conversation.contact_id);
-      }
-    }
-  }
-
-  const stats = new Map<
-    string,
-    {
-      totalAiReplies: number;
-      aiRepliesLast7Days: number;
-      contactIds: Set<string>;
-    }
-  >();
-
-  for (const agent of agents) {
-    stats.set(agent.id, {
-      totalAiReplies: 0,
-      aiRepliesLast7Days: 0,
-      contactIds: new Set(),
-    });
-  }
-
-  for (const message of messages ?? []) {
-    if (!message.ai_agent_id) {
-      continue;
-    }
-
-    const entry = stats.get(message.ai_agent_id);
-
-    if (!entry) {
-      continue;
-    }
-
-    entry.totalAiReplies += 1;
-
-    if (new Date(message.created_at) >= sevenDaysAgo) {
-      entry.aiRepliesLast7Days += 1;
-    }
-
-    const contactId = contactByConversation.get(message.conversation_id);
-
-    if (contactId) {
-      entry.contactIds.add(contactId);
-    }
-  }
-
-  return agents.map((agent) => {
-    const entry = stats.get(agent.id)!;
-
-    return {
-      agentId: agent.id,
-      agentName: agent.name,
-      enabled: agent.enabled,
-      contactsServed: entry.contactIds.size,
-      totalAiReplies: entry.totalAiReplies,
-      aiRepliesLast7Days: entry.aiRepliesLast7Days,
-    };
-  });
+  void businessId;
+  return [];
 }
 
 export async function getAutomationOpsMetrics(
@@ -287,7 +193,7 @@ export async function listRecentAgentRuns(
   const { data } = await admin
     .from("agent_runs")
     .select(
-      "id, channel, client_message, routing_method, actions, success, error_message, created_at, contact_id, agent_id",
+      "id, channel, client_message, routing_method, actions, success, error_message, created_at, contact_id",
     )
     .eq("business_id", businessId)
     .order("created_at", { ascending: false })
@@ -302,34 +208,23 @@ export async function listRecentAgentRuns(
   const contactIds = [
     ...new Set(rows.map((row) => row.contact_id).filter(Boolean)),
   ] as string[];
-  const agentIds = [
-    ...new Set(rows.map((row) => row.agent_id).filter(Boolean)),
-  ] as string[];
-
-  const [contactsResult, agentsResult] = await Promise.all([
+  const [contactsResult] = await Promise.all([
     contactIds.length > 0
       ? admin.from("contacts").select("id, name").in("id", contactIds)
-      : Promise.resolve({ data: [] }),
-    agentIds.length > 0
-      ? admin.from("ai_agents").select("id, name").in("id", agentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
   const contactNames = new Map(
     (contactsResult.data ?? []).map((row) => [row.id, row.name]),
   );
-  const agentNames = new Map(
-    (agentsResult.data ?? []).map((row) => [row.id, row.name]),
-  );
-
   return rows.map((row) => ({
     id: row.id,
     createdAt: row.created_at,
     channel: row.channel,
     contactId: row.contact_id,
     contactName: row.contact_id ? contactNames.get(row.contact_id) ?? null : null,
-    agentId: row.agent_id,
-    agentName: row.agent_id ? agentNames.get(row.agent_id) ?? null : null,
+    agentId: null,
+    agentName: "AI Agent",
     routingMethod: row.routing_method,
     actions: parseAgentRunActions(row.actions),
     success: row.success,

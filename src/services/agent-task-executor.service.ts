@@ -27,6 +27,7 @@ import {
   parseAdditionalContacts,
   type AdditionalContactEntry,
 } from "@/utils/contact-additional-contacts";
+import { createGoogleCalendarEventForBusinessWithAdmin } from "@/services/google-calendar.service";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -175,21 +176,13 @@ function mapDealStatus(stage: PipelineStage): string {
 function getAllowedActionTypes(
   goal: AgentWizardGoalId | null,
 ): Set<ExecutorAction["type"]> {
-  if (!goal) {
-    return new Set(["add_note"]);
-  }
-
-  switch (goal) {
-    case "sales":
-      return new Set(["create_deal", "create_task", "add_note"]);
-    case "booking":
-      return new Set(["create_task", "add_note"]);
-    case "support":
-      return new Set(["create_task", "add_note"]);
-    case "custom":
-    default:
-      return new Set(["create_deal", "create_task", "add_note"]);
-  }
+  void goal;
+  return new Set([
+    "create_deal",
+    "create_task",
+    "add_note",
+    "create_calendar_event",
+  ]);
 }
 
 function buildExecutorPrompt(input: {
@@ -656,6 +649,49 @@ async function applyAddNote(
   return "Note saved on contact";
 }
 
+async function applyCreateCalendarEvent(
+  admin: MessagingDbClient,
+  businessId: string,
+  action: Extract<ExecutorAction, { type: "create_calendar_event" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "create_calendar_event",
+    actionFingerprint: `${action.summary}:${action.startDateTime}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const result = await createGoogleCalendarEventForBusinessWithAdmin({
+    admin,
+    businessId,
+    summary: action.summary,
+    startDateTime: action.startDateTime,
+    endDateTime: action.endDateTime,
+    timeZone: action.timeZone,
+    description: action.description,
+  });
+
+  if (!result.success) {
+    return null;
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "create_calendar_event",
+  });
+
+  return `Calendar event created: ${action.summary}`;
+}
+
 async function applyExecutorPlan(
   admin: MessagingDbClient,
   businessId: string,
@@ -713,6 +749,13 @@ async function applyExecutorPlan(
         action,
         idempotencyContext,
       );
+    } else if (action.type === "create_calendar_event") {
+      result = await applyCreateCalendarEvent(
+        admin,
+        businessId,
+        action,
+        idempotencyContext,
+      );
     }
 
     if (result) {
@@ -729,7 +772,6 @@ async function logAgentRun(
     businessId: string;
     conversationId: string | null;
     contactId: string;
-    agentId: string | null;
     channel: string;
     clientMessage: string;
     routingMethod: AgentRoutingMethod | null;
@@ -742,7 +784,6 @@ async function logAgentRun(
     business_id: input.businessId,
     conversation_id: input.conversationId,
     contact_id: input.contactId,
-    agent_id: input.agentId,
     channel: input.channel,
     client_message: input.clientMessage.slice(0, 2000),
     routing_method: input.routingMethod,
@@ -836,7 +877,6 @@ async function executePlanOnContact(input: {
       businessId: input.businessId,
       conversationId: input.conversationId ?? null,
       contactId: input.contactId,
-      agentId: input.agent?.id ?? null,
       channel: input.channel,
       clientMessage: input.clientMessage,
       routingMethod: input.routingMethod ?? null,
@@ -854,7 +894,6 @@ async function executePlanOnContact(input: {
       "[agent-executor]",
       JSON.stringify({
         contactId: input.contactId,
-        agentId: input.agent?.id ?? null,
         goal: input.goal,
         actionsApplied,
       }),
@@ -874,7 +913,6 @@ async function executePlanOnContact(input: {
       businessId: input.businessId,
       conversationId: input.conversationId ?? null,
       contactId: input.contactId,
-      agentId: input.agent?.id ?? null,
       channel: input.channel,
       clientMessage: input.clientMessage,
       routingMethod: input.routingMethod ?? null,
