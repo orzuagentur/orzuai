@@ -55,11 +55,11 @@ export function AiAssistantEditPanel({
     canNotifyOwner: profile.canNotifyOwner,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [deactivateStep, setDeactivateStep] = useState(0);
   const permissionRows: Array<{
     key: keyof typeof permissions;
     label: string;
   }> = [
-    { key: "canReply", label: "Reply to customers autonomously" },
     { key: "canCreateTask", label: "Create CRM tasks" },
     { key: "canCreateDeal", label: "Create CRM deals" },
     { key: "canUpdateContact", label: "Update contact details and notes" },
@@ -90,6 +90,60 @@ export function AiAssistantEditPanel({
       onBack();
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function saveWithPermissions(nextPermissions: typeof permissions) {
+    setIsSaving(true);
+
+    try {
+      const result = await saveAiAssistantProfileAction({
+        name,
+        systemPrompt,
+        communicationStyle,
+        language,
+        ...nextPermissions,
+      });
+
+      if (!result.success) {
+        toast.error(result.message ?? "Unable to save agent settings.");
+        return false;
+      }
+
+      setPermissions(nextPermissions);
+      toast.success(AI_ASSISTANT_MESSAGES.assistantEditSaved);
+      router.refresh();
+      return true;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeactivateClick() {
+    if (permissions.canReply === false) {
+      const reactivated = await saveWithPermissions({
+        ...permissions,
+        canReply: true,
+      });
+
+      if (reactivated) {
+        setDeactivateStep(0);
+      }
+      return;
+    }
+
+    if (deactivateStep < 2) {
+      setDeactivateStep((current) => current + 1);
+      return;
+    }
+
+    const deactivated = await saveWithPermissions({
+      ...permissions,
+      canReply: false,
+    });
+
+    if (deactivated) {
+      setDeactivateStep(0);
     }
   }
 
@@ -192,6 +246,35 @@ export function AiAssistantEditPanel({
                 </label>
               ))}
             </div>
+
+            <Card className="border-destructive/30 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base">Agent activation</CardTitle>
+                <CardDescription>
+                  Deactivating stops autonomous customer replies. CRM/calendar
+                  actions will not run until you activate the agent again.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Status: {permissions.canReply ? "Active" : "Deactivated"}
+                </p>
+                <Button
+                  type="button"
+                  variant={permissions.canReply ? "destructive" : "default"}
+                  disabled={isSaving}
+                  onClick={() => void handleDeactivateClick()}
+                >
+                  {permissions.canReply
+                    ? deactivateStep === 0
+                      ? "Deactivate agent"
+                      : deactivateStep === 1
+                        ? "Confirm deactivation"
+                        : "Final confirm"
+                    : "Activate agent"}
+                </Button>
+              </CardContent>
+            </Card>
 
             <div className="flex flex-wrap gap-2">
               <Button type="button" disabled={isSaving} onClick={() => void handleSave()}>

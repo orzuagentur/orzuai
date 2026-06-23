@@ -327,7 +327,7 @@ async function isWhatsAppConnected(businessId: string): Promise<boolean> {
     .from("whatsapp_connections")
     .select("whatsapp_status")
     .eq("business_id", businessId)
-    .order("sent_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -344,7 +344,7 @@ async function isTelegramConnected(businessId: string): Promise<boolean> {
     .from("telegram_connections")
     .select("telegram_status")
     .eq("business_id", businessId)
-    .order("sent_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

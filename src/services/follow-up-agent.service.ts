@@ -37,6 +37,8 @@ async function isChannelConnected(
       .from("whatsapp_connections")
       .select("whatsapp_status")
       .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     return data?.whatsapp_status === "connected";
@@ -51,6 +53,8 @@ async function isChannelConnected(
       .from("telegram_connections")
       .select("telegram_status")
       .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     return data?.telegram_status === "connected";
@@ -144,6 +148,8 @@ async function sendFollowUpOnChannel(input: {
       .select("meta_phone_number_id, meta_access_token")
       .eq("business_id", candidate.businessId)
       .eq("whatsapp_status", "connected")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (

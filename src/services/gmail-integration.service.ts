@@ -90,6 +90,8 @@ export async function getGmailConnection(
     .from("email_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   return data ? mapGmailConnection(data) : null;
@@ -107,6 +109,8 @@ export async function isGmailConnected(businessId: string): Promise<boolean> {
     .select("email_status")
     .eq("business_id", businessId)
     .eq("email_status", "connected")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   return Boolean(data);

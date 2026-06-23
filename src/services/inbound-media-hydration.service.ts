@@ -472,6 +472,8 @@ async function resolveInboundMediaContent(
       .from("whatsapp_connections")
       .select("meta_access_token")
       .eq("business_id", attachment.business_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!connection?.meta_access_token || !attachment.provider_media_id) {
@@ -496,6 +498,8 @@ async function resolveInboundMediaContent(
       .from("telegram_connections")
       .select("bot_token")
       .eq("business_id", attachment.business_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!connection?.bot_token || !attachment.provider_media_id) {

@@ -73,6 +73,8 @@ export async function getGoogleCalendarConnection(
     .from("google_calendar_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   return data ? mapGoogleCalendarConnection(data) : null;
@@ -246,6 +248,8 @@ export async function getGoogleCalendarEventsForBusiness(
     .from("google_calendar_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!row || row.google_calendar_status !== "connected" || !row.calendar_id) {
@@ -307,6 +311,8 @@ export async function createGoogleCalendarEventForBusiness(input: {
     .from("google_calendar_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!row || row.google_calendar_status !== "connected" || !row.calendar_id) {
@@ -347,6 +353,8 @@ export async function createGoogleCalendarEventForBusinessWithAdmin(input: {
     .from("google_calendar_connections")
     .select("*")
     .eq("business_id", input.businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!row || row.google_calendar_status !== "connected" || !row.calendar_id) {

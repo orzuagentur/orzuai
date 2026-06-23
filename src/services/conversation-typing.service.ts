@@ -121,6 +121,8 @@ export async function sendAgentTypingToChannel(
       .select("bot_token")
       .eq("business_id", business.id)
       .eq("telegram_status", "connected")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (connection?.bot_token) {

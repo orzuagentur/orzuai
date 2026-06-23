@@ -44,6 +44,7 @@ function missingConfigError(): {
 
 function revalidateKnowledgePath(): void {
   revalidatePath(DASHBOARD_ROUTES.knowledgeBase);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
 }
 
 async function getOwnedBusinessId(): Promise<string | null> {

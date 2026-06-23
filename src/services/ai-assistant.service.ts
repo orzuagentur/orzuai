@@ -29,6 +29,9 @@ import {
   getChannelAiSettingsForBusiness,
   getChannelConnectionStatuses,
 } from "@/services/channel-workspace.service";
+import { listKnowledgeEntries, parseKnowledgeCategory } from "@/services/knowledge.service";
+import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
+import { listRecentAgentRuns } from "@/services/analytics-ai-ops.service";
 import type {
   AiAssistantPageData,
   ApplyGlobalAiDefaultsInput,
@@ -66,6 +69,7 @@ export async function getAiAssistantPageData(
     edit?: string;
     analytics?: string;
     assistantEdit?: string;
+    category?: string;
   },
   options?: { section?: AiAssistantTab },
 ): Promise<AiAssistantPageData> {
@@ -107,19 +111,36 @@ export async function getAiAssistantPageData(
       enabledChannelCount: 0,
       connectedChannelCount: 0,
       assistantProfile: null,
+      knowledgeEntries: [],
+      knowledgeHasActiveFilters: false,
+      websiteKnowledgeSync: null,
+      recentAgentRuns: [],
     };
   }
+
+  const knowledgeQuery = input?.q?.trim() ?? "";
+  const knowledgeCategory = parseKnowledgeCategory(input?.category);
+  const knowledgeHasActiveFilters = Boolean(knowledgeQuery || knowledgeCategory);
 
   const [
     channelStatuses,
     businessProviderCredentials,
     preferCustomerAiKeys,
     assistantProfile,
+    knowledgeEntries,
+    websiteKnowledgeSync,
+    recentAgentRuns,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     listBusinessProviderCredentials(businessId),
     getBusinessPreferCustomerAiKeys(businessId),
     getAiAssistantProfileForBusiness(businessId),
+    listKnowledgeEntries(businessId, {
+      query: knowledgeQuery,
+      category: knowledgeCategory,
+    }),
+    getWebsiteKnowledgeSync(businessId),
+    listRecentAgentRuns(businessId, 8),
   ]);
 
   const providerAvailability = mergeProviderAvailability(
@@ -178,6 +199,10 @@ export async function getAiAssistantPageData(
       (entry) => entry.settings.isChannelConnected,
     ).length,
     assistantProfile,
+    knowledgeEntries,
+    knowledgeHasActiveFilters,
+    websiteKnowledgeSync,
+    recentAgentRuns,
   };
 }
 

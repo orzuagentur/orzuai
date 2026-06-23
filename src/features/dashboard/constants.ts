@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  BookOpen,
   Bot,
   Calendar,
   CreditCard,
@@ -10,7 +9,6 @@ import {
   Plug,
   Settings,
   Users,
-  Workflow,
 } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -54,12 +52,6 @@ export const DASHBOARD_NAV_ITEMS = [
     icon: Bot,
   },
   {
-    id: "automations",
-    label: "Automations",
-    href: DASHBOARD_ROUTES.automations,
-    icon: Workflow,
-  },
-  {
     id: "analytics",
     label: "Analytics",
     href: DASHBOARD_ROUTES.analytics,
@@ -70,12 +62,6 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "Integrations",
     href: DASHBOARD_ROUTES.integrations,
     icon: Plug,
-  },
-  {
-    id: "knowledge-base",
-    label: "Knowledge",
-    href: DASHBOARD_ROUTES.knowledgeBase,
-    icon: BookOpen,
   },
   {
     id: "subscription",

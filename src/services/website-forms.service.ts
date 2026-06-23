@@ -90,6 +90,8 @@ export async function getWebsiteFormConnection(
     .from("website_form_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!data) {
@@ -130,6 +132,8 @@ export async function enableWebsiteForms(): Promise<EnableWebsiteFormsResult> {
     .from("website_form_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (existing?.connection_status === "connected") {

@@ -97,6 +97,8 @@ async function isChannelConnected(
       .from("whatsapp_connections")
       .select("whatsapp_status")
       .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     return data?.whatsapp_status === "connected";
@@ -107,6 +109,8 @@ async function isChannelConnected(
       .from("telegram_connections")
       .select("telegram_status")
       .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     return data?.telegram_status === "connected";
@@ -121,6 +125,8 @@ async function isChannelConnected(
       .from("website_form_connections")
       .select("connection_status")
       .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     return data?.connection_status === "connected";

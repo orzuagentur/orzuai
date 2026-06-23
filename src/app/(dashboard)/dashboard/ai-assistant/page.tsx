@@ -10,6 +10,8 @@ type AiAssistantPageProps = {
   searchParams: Promise<{
     channel?: string;
     assistantEdit?: string;
+    q?: string;
+    category?: string;
   }>;
 };
 

@@ -27,6 +27,8 @@ export async function deliverChannelTextMessage(input: {
       .select("meta_phone_number_id, meta_access_token")
       .eq("business_id", input.businessId)
       .eq("whatsapp_status", "connected")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
@@ -53,6 +55,8 @@ export async function deliverChannelTextMessage(input: {
       .select("bot_token")
       .eq("business_id", input.businessId)
       .eq("telegram_status", "connected")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!connection?.bot_token) {

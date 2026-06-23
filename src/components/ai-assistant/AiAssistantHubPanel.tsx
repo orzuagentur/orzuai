@@ -131,15 +131,22 @@ export function AiAssistantChannelRow({
 type AiAssistantHubPanelProps = {
   channels: Array<{ channel: MessagingIntegrationChannelId; settings: ChannelAiSettingsData }>;
   enabledChannelCount: number;
+  onEdit?: () => void;
 };
 
 export function AiAssistantHubPanel({
   channels,
   enabledChannelCount,
+  onEdit,
 }: AiAssistantHubPanelProps) {
   const router = useRouter();
 
   function openAssistantEdit() {
+    if (onEdit) {
+      onEdit();
+      return;
+    }
+
     router.push(
       buildAiAssistantHref({
         section: "assistant",

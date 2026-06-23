@@ -96,6 +96,8 @@ export async function disconnectTelegram(): Promise<{
     .from("telegram_connections")
     .select("id, bot_token")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (connection?.bot_token) {
@@ -135,6 +137,8 @@ export async function getTelegramConnection(
     .from("telegram_connections")
     .select("*")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   return data ? mapTelegramConnection(data) : null;
@@ -203,6 +207,8 @@ export async function connectTelegramBot(
     .from("telegram_connections")
     .select("id, telegram_status")
     .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (existingConnection?.telegram_status === "connected") {
@@ -505,6 +511,8 @@ export async function sendTelegramChatMessage(
     .select("*")
     .eq("business_id", businessId)
     .eq("telegram_status", "connected")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!connection?.bot_token) {

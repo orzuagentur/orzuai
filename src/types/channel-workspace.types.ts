@@ -21,6 +21,8 @@ import type {
 import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
 import type { AiAgentItem } from "./ai-agent.types";
 import type { AiAssistantProfileData } from "./ai-assistant-profile.types";
+import type { KnowledgeEntryData } from "./knowledge.types";
+import type { WebsiteKnowledgeSyncData } from "./website-knowledge.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
@@ -145,6 +147,10 @@ export type AiAssistantPageData = {
   enabledChannelCount: number;
   connectedChannelCount: number;
   assistantProfile: AiAssistantProfileData | null;
+  knowledgeEntries: KnowledgeEntryData[];
+  knowledgeHasActiveFilters: boolean;
+  websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
+  recentAgentRuns: AgentRunListItem[];
 };
 
 export type ChannelAnalyticsActivityPoint = {

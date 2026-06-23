@@ -66,6 +66,8 @@ export async function sendWebsiteFormTelegramFollowUp(input: {
     .select("bot_token, telegram_status")
     .eq("business_id", businessId)
     .eq("telegram_status", "connected")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!connection?.bot_token) {
