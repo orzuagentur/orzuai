@@ -33,6 +33,7 @@ import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { getVoiceConnection } from "@/services/voice-agent.service";
 import { getWhatsAppConnection } from "@/services/whatsapp.service";
+import type { Database } from "@/types/database.types";
 import type {
   ChannelAiSettingsData,
   ChannelAnalyticsData,
@@ -41,6 +42,7 @@ import type {
   SaveChannelAiSettingsInput,
   TestChannelAiReplyInput,
 } from "@/types/channel-workspace.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   saveChannelAiSettingsSchema,
   testChannelAiReplySchema,
@@ -50,15 +52,38 @@ import {
   calculateConversionRate,
 } from "@/utils/dashboard";
 
+export async function isAgentReplyEnabled(
+  businessId: string,
+  db?: SupabaseClient<Database>,
+): Promise<boolean> {
+  if (!hasSupabaseEnv()) {
+    return false;
+  }
+
+  const supabase = db ?? createAdminClient();
+  const { data } = await supabase
+    .from("ai_assistant_profile")
+    .select("can_reply")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!data) {
+    return true;
+  }
+
+  return data.can_reply;
+}
+
 export async function enableAiForChannels(
   businessId: string,
   channels: MessagingIntegrationChannelId[],
+  db?: SupabaseClient<Database>,
 ): Promise<void> {
   if (!hasSupabaseEnv() || channels.length === 0) {
     return;
   }
 
-  const supabase = await createClient();
+  const supabase = db ?? (await createClient());
 
   for (const channel of channels) {
     await ensureChannelAiSettings(supabase, businessId, channel);
@@ -69,6 +94,35 @@ export async function enableAiForChannels(
     .update({ ai_enabled: true })
     .eq("business_id", businessId)
     .in("channel", channels);
+}
+
+/** Turn on channel auto-reply when the single agent is active (canReply). */
+export async function enableChannelAiIfAgentActive(
+  businessId: string,
+  channel: MessagingIntegrationChannelId,
+  db?: SupabaseClient<Database>,
+): Promise<void> {
+  if (!(await isAgentReplyEnabled(businessId, db))) {
+    return;
+  }
+
+  await enableAiForChannels(businessId, [channel], db);
+}
+
+export async function disableAiForAllChannels(
+  businessId: string,
+): Promise<void> {
+  if (!hasSupabaseEnv()) {
+    return;
+  }
+
+  const supabase = await createClient();
+
+  await supabase
+    .from("ai_settings")
+    .update({ ai_enabled: false })
+    .eq("business_id", businessId)
+    .in("channel", [...MESSAGING_INTEGRATION_CHANNELS]);
 }
 
 export async function syncChannelAiEnabledAfterAgentChange(
@@ -98,7 +152,7 @@ async function getOwnedBusinessId(): Promise<string | null> {
 }
 
 async function ensureChannelAiSettings(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   businessId: string,
   channel: MessagingIntegrationChannelId,
 ) {

@@ -227,10 +227,32 @@ export async function scheduleDebouncedChannelAutoReply(
   });
 
   if (!aiEnabled) {
+    console.warn(
+      "[ai-reply-queue] skipped auto-reply: channel AI is off",
+      JSON.stringify({
+        businessId: input.businessId,
+        channel: input.channel,
+        conversationId: input.conversationId,
+      }),
+    );
     return;
   }
 
-  await upsertAiReplyJob(admin, input);
+  try {
+    await upsertAiReplyJob(admin, input);
+  } catch (error) {
+    console.error(
+      "[ai-reply-queue] failed to enqueue auto-reply job",
+      JSON.stringify({
+        businessId: input.businessId,
+        channel: input.channel,
+        conversationId: input.conversationId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return;
+  }
+
   void notifyAutoReplyTyping(input.conversationId, true);
   dispatchAiReplyWorker("enqueue");
 }

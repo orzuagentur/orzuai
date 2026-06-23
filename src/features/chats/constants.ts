@@ -171,6 +171,9 @@ export const CHAT_MESSAGES = {
   autoReplyErrorQuota:
     "Monthly AI reply limit reached. Open Billing to upgrade or wait until next month.",
   autoReplyErrorDismiss: "Dismiss",
+  autoReplyDisabledBanner:
+    "AI auto-reply is off for this channel. Enable it in",
+  autoReplyDisabledBannerLink: "AI Agent → Channels",
   chatMenuLabel: "Chat actions",
   exportChatScreenshot: "Export chat screenshot",
   exportChatTranscript: "Export chat transcript",

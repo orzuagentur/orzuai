@@ -1,6 +1,5 @@
 export { sendChatMessageAction } from "./actions/send-chat-message";
 export { suggestConversationReplyAction } from "./actions/suggest-conversation-reply";
-export { toggleChatAiAction } from "./actions/toggle-chat-ai";
 export { CHAT_MESSAGES } from "./constants";
 export {
   CHAT_CHANNEL_LIST,

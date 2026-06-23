@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { CannedResponseItem } from "./canned-response.types";
 import type {
   ConversationStatus,
@@ -22,16 +21,6 @@ export const sendChatMessageSchema = z.object({
     .min(1, "Email subject cannot be empty.")
     .max(998, "Email subject is too long.")
     .optional(),
-});
-
-const messagingChannelSchema = z.enum([
-  MESSAGING_INTEGRATION_CHANNELS[0],
-  ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
-]);
-
-export const toggleChatAiSchema = z.object({
-  enabled: z.boolean(),
-  channel: messagingChannelSchema,
 });
 
 const conversationStatusSchema = z.enum([
@@ -67,7 +56,6 @@ export const retryInboundMediaAttachmentSchema = z.object({
 });
 
 export type SendChatMessageInput = z.infer<typeof sendChatMessageSchema>;
-export type ToggleChatAiInput = z.infer<typeof toggleChatAiSchema>;
 export type UpdateConversationStatusInput = z.infer<
   typeof updateConversationStatusSchema
 >;
@@ -219,5 +207,4 @@ export type SendChatMessageResult = ChatActionResult<{
   mediaSignedUrl?: string;
 }>;
 export type DeleteChatMessageResult = ChatActionResult<{ messageId: string }>;
-export type ToggleChatAiResult = ChatActionResult<{ aiEnabled: boolean }>;
 export type SuggestConversationReplyResult = ChatActionResult<{ suggestion: string }>;

@@ -13,6 +13,12 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import {
+  disableAiForAllChannels,
+  enableAiForChannels,
+  getChannelConnectionStatuses,
+} from "@/services/channel-workspace.service";
+import { getActiveMessagingChannelIds } from "@/features/integrations";
 import type {
   AiAssistantProfileData,
   SaveAiAssistantProfileInput,
@@ -178,6 +184,14 @@ export async function saveAiAssistantProfile(
       system_prompt: parsed.data.systemPrompt,
     })
     .eq("business_id", business.id);
+
+  if (parsed.data.canReply) {
+    const channelStatuses = await getChannelConnectionStatuses(business.id);
+    const connectedChannels = getActiveMessagingChannelIds(channelStatuses);
+    await enableAiForChannels(business.id, connectedChannels);
+  } else {
+    await disableAiForAllChannels(business.id);
+  }
 
   revalidateAssistantProfilePaths();
   return { success: true };

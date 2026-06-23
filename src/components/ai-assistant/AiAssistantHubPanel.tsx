@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Loader2Icon, PencilIcon } from "lucide-react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
@@ -14,8 +15,7 @@ import {
   INTEGRATION_CHANNEL_LIST,
 } from "@/features/integrations";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
-import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
-import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
+import { useToggleChannelAi } from "@/hooks/use-toggle-channel-ai";
 import { cn } from "@/lib/utils";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
@@ -30,23 +30,25 @@ export function AiAssistantChannelRow({
   onEdit,
 }: AiAssistantChannelRowProps) {
   const router = useRouter();
-  const aiEnabled = useChannelAiEnabled(settings.channel, settings.aiEnabled);
-  const { toggleAi, isLoading } = useToggleChatAi();
-  const isOn = aiEnabled === true;
+  const [isOn, setIsOn] = useState(settings.aiEnabled);
+  const { toggleChannelAi, isLoading } = useToggleChannelAi({
+    onSuccess: (enabled) => setIsOn(enabled),
+  });
   const channelMeta = INTEGRATION_CHANNEL_LIST.find(
     (item) => item.id === settings.channel,
   );
   const label = channelMeta?.label ?? settings.channel;
 
+  useEffect(() => {
+    setIsOn(settings.aiEnabled);
+  }, [settings.aiEnabled]);
+
   async function handleToggle() {
-    if (aiEnabled === null || !settings.isChannelConnected) {
+    if (!settings.isChannelConnected) {
       return;
     }
 
-    const result = await toggleAi({
-      channel: settings.channel,
-      enabled: !isOn,
-    });
+    const result = await toggleChannelAi(settings.channel, !isOn);
 
     if (result.success) {
       router.refresh();
@@ -83,8 +85,8 @@ export function AiAssistantChannelRow({
                 type="button"
                 role="switch"
                 aria-checked={isOn}
-                aria-label={`${label} AI Assistant`}
-                disabled={isLoading || aiEnabled === null}
+                aria-label={`${label} AI Agent`}
+                disabled={isLoading}
                 onClick={() => {
                   void handleToggle();
                 }}

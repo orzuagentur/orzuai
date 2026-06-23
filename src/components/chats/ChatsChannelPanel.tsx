@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
-import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
 import {
   useInboxPanel,
   useDebouncedInboxSearch,
@@ -173,7 +172,6 @@ function ChatsChannelPanelContent({
     conversation: activeConversation,
     channelConnected: activeChannelConnected,
     aiEnabled,
-    setAiEnabled,
     cannedResponses,
     isLoadingConversation,
     isLoadingOlderMessages,
@@ -215,11 +213,7 @@ function ChatsChannelPanelContent({
     preserveListReadStateRef.current = preserveListReadState;
   }, [preserveListReadState]);
 
-  const syncedChannelAiEnabled = useChannelAiEnabled(channel, channelAiEnabled);
-  const syncedConversationAiEnabled = useChannelAiEnabled(
-    activeConversation?.channel ?? channel,
-    aiEnabled ?? channelAiEnabled,
-  );
+  const resolvedConversationAiEnabled = aiEnabled ?? channelAiEnabled;
 
   const { detailsOpen } = useInboxLayout();
 
@@ -315,7 +309,7 @@ function ChatsChannelPanelContent({
           activeFilter,
           onFilterChange: setActiveFilter,
           aiChannel: channel,
-          aiEnabled: syncedChannelAiEnabled,
+          aiEnabled: resolvedConversationAiEnabled,
         }
       : null,
   );
@@ -393,11 +387,7 @@ function ChatsChannelPanelContent({
             isReplyTyping={isReplyTyping}
             autoReplyError={autoReplyError}
             onDismissAutoReplyError={dismissAutoReplyError}
-            aiEnabled={syncedConversationAiEnabled}
-            onAiEnabledChange={(enabled) => {
-              setAiEnabled(enabled);
-              setChannelAiEnabled(enabled);
-            }}
+            aiEnabled={resolvedConversationAiEnabled}
             channelConnected={resolvedChannelConnected}
             channel={channel}
             cannedResponses={cannedResponses}

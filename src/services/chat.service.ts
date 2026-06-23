@@ -25,7 +25,7 @@ import {
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations";
 import { isInboxMessagingChannel } from "@/features/integrations/constants";
-import { getChannelConnectionStatuses, updateChannelAiEnabled } from "@/services/channel-workspace.service";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { listCannedResponses } from "@/services/canned-responses.service";
 import { requireUser } from "@/services/auth.service";
 import { getAccessibleBusiness } from "@/services/business-access.service";
@@ -40,12 +40,10 @@ import type {
   ConversationDetail,
   SendChatMessageResult,
   SuggestConversationReplyResult,
-  ToggleChatAiResult,
 } from "@/types/chat.types";
 import {
   sendChatMessageSchema,
   suggestConversationReplySchema,
-  toggleChatAiSchema,
   updateConversationInternalNoteSchema,
   updateConversationStatusSchema,
 } from "@/types/chat.types";
@@ -1117,70 +1115,6 @@ export async function sendChatMessage(
     success: true,
     data: {
       message: mapChatMessage(insertedMessage),
-    },
-  };
-}
-
-export async function toggleChatAi(input: unknown): Promise<ToggleChatAiResult> {
-  if (!hasSupabaseEnv()) {
-    return missingConfigError();
-  }
-
-  const parsed = toggleChatAiSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: parsed.error.issues[0]?.message ?? CHAT_MESSAGES.genericError,
-      },
-    };
-  }
-
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return {
-      success: false,
-      error: {
-        code: "NO_BUSINESS",
-        message: CHAT_MESSAGES.noBusinessDescription,
-      },
-    };
-  }
-
-  if (!isInboxMessagingChannel(parsed.data.channel)) {
-    return {
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: CHAT_MESSAGES.genericError,
-      },
-    };
-  }
-
-  const result = await updateChannelAiEnabled(
-    parsed.data.channel,
-    parsed.data.enabled,
-  );
-
-  if (!result.success) {
-    return {
-      success: false,
-      error: {
-        code: "UPDATE_FAILED",
-        message: result.message ?? CHAT_MESSAGES.aiToggleFailed,
-      },
-    };
-  }
-
-  revalidateChatPaths(parsed.data.channel);
-
-  return {
-    success: true,
-    data: {
-      aiEnabled: parsed.data.enabled,
     },
   };
 }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -279,6 +280,8 @@ export async function connectTelegramBot(
   }
 
   revalidateTelegramPaths();
+
+  await enableChannelAiIfAgentActive(businessId, "telegram");
 
   return {
     success: true,

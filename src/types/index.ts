@@ -148,10 +148,7 @@ export type {
   ConversationListItem,
   SendChatMessageInput,
   SendChatMessageResult,
-  ToggleChatAiInput,
-  ToggleChatAiResult,
 } from "./chat.types";
 export {
   sendChatMessageSchema,
-  toggleChatAiSchema,
 } from "./chat.types";

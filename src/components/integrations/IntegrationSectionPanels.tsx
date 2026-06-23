@@ -2,7 +2,6 @@ import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelCont
 import { EmailActivatePanelClient } from "@/components/email/EmailActivatePanelClient";
 import { GoogleCalendarConnectPanelClient } from "@/components/google-calendar/GoogleCalendarConnectPanelClient";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
-import { IntegrationChannelAiPreview } from "@/components/integrations/IntegrationChannelAiPreview";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
@@ -102,7 +101,6 @@ export function IntegrationSectionPanels({
   googleCalendar,
   gmail,
   channelContacts,
-  channelAiSettings,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
   const isMessagingChannel = isMessagingIntegrationChannel(channel);
@@ -120,9 +118,6 @@ export function IntegrationSectionPanels({
           googleCalendar={googleCalendar}
           gmail={gmail}
         />
-        {isMessagingChannel && isConnected && channelAiSettings ? (
-          <IntegrationChannelAiPreview settings={channelAiSettings} />
-        ) : null}
       </div>
     );
   }

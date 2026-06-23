@@ -10,7 +10,6 @@ import {
 } from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import type { MessagingChannel } from "@/types/database.types";
-import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 
 export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -211,9 +210,9 @@ export const INTEGRATIONS_MESSAGES = {
 } as const;
 
 export function buildIntegrationAiSettingsHref(
-  channel: MessagingIntegrationChannelId,
+  _channel: MessagingIntegrationChannelId,
 ): string {
-  return buildAiAssistantHref({ section: "assistant", channel });
+  return DASHBOARD_ROUTES.aiAssistant;
 }
 
 export function buildChannelWorkspaceHref(

@@ -21,6 +21,7 @@ import {
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
@@ -137,6 +138,8 @@ export async function enableWebsiteForms(): Promise<EnableWebsiteFormsResult> {
     .maybeSingle();
 
   if (existing?.connection_status === "connected") {
+    await enableChannelAiIfAgentActive(businessId, "website_forms");
+
     return {
       success: true,
       data: {
@@ -182,6 +185,8 @@ export async function enableWebsiteForms(): Promise<EnableWebsiteFormsResult> {
 
     revalidateWebsiteFormsPaths();
 
+    await enableChannelAiIfAgentActive(businessId, "website_forms");
+
     return {
       success: true,
       data: {
@@ -205,6 +210,8 @@ export async function enableWebsiteForms(): Promise<EnableWebsiteFormsResult> {
   }
 
   revalidateWebsiteFormsPaths();
+
+  await enableChannelAiIfAgentActive(businessId, "website_forms");
 
   return {
     success: true,

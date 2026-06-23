@@ -29,8 +29,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { testChannelAiReplyAction } from "@/features/channel-workspace";
-import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
-import { useToggleChatAi } from "@/hooks/use-toggle-chat-ai";
 import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
 import {
   ONBOARDING_MESSAGES,
@@ -69,15 +67,7 @@ export function OnboardingWizard({
   const [testMessage, setTestMessage] = useState("");
   const [testReply, setTestReply] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const aiEnabled = useChannelAiEnabled(
-    aiSettings?.channel ?? null,
-    aiSettings?.aiEnabled ?? null,
-  );
-  const { toggleAi, isLoading: isTogglingAi } = useToggleChatAi();
-  const isAiOn = aiEnabled === true;
-  const assistantHref = aiSettings?.channel
-    ? buildAiAssistantHref({ section: "assistant", channel: aiSettings.channel })
-    : buildAiAssistantHref({ section: "assistant" });
+  const isAiOn = aiSettings?.aiEnabled === true;
   const assistantEditHref = aiSettings?.channel
     ? buildAiAssistantHref({
         section: "assistant",
@@ -89,21 +79,6 @@ export function OnboardingWizard({
     5,
     Math.max(1, Number(searchParams.get("step")) || step),
   );
-
-  async function handleToggleAi() {
-    if (!aiSettings?.channel || aiEnabled === null) {
-      return;
-    }
-
-    const result = await toggleAi({
-      channel: aiSettings.channel,
-      enabled: !isAiOn,
-    });
-
-    if (result.success) {
-      router.refresh();
-    }
-  }
 
   async function handleTest() {
     if (!aiSettings?.channel || !testMessage.trim()) {
@@ -256,34 +231,15 @@ export function OnboardingWizard({
                     : ONBOARDING_MESSAGES.stepAiDescription}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant={isAiOn ? "outline" : "default"}
-                    disabled={isTogglingAi || aiEnabled === null}
-                    onClick={() => {
-                      void handleToggleAi();
-                    }}
-                  >
-                    {isTogglingAi ? (
-                      <>
-                        <Loader2Icon className="size-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : isAiOn ? (
-                      ONBOARDING_MESSAGES.stepAiTurnOff
-                    ) : (
-                      ONBOARDING_MESSAGES.stepAiTurnOn
-                    )}
+                  <Button type="button" asChild>
+                    <Link href={DASHBOARD_ROUTES.aiAssistant}>
+                      {ONBOARDING_MESSAGES.stepAiOpenSettings}
+                      <ArrowRightIcon className="size-4" />
+                    </Link>
                   </Button>
                   <Button type="button" variant="secondary" asChild>
                     <Link href={assistantEditHref}>
                       {ONBOARDING_MESSAGES.stepAiCustomize}
-                      <ArrowRightIcon className="size-4" />
-                    </Link>
-                  </Button>
-                  <Button type="button" variant="ghost" asChild>
-                    <Link href={assistantHref}>
-                      {ONBOARDING_MESSAGES.stepAiOpenSettings}
                     </Link>
                   </Button>
                 </div>

@@ -18,10 +18,6 @@ import {
   peekCachedConversationDetail,
   setCachedConversationDetail,
 } from "@/lib/client-cache/inbox-messenger-cache";
-import {
-  getSyncedChannelAiEnabled,
-  subscribeChannelAiSync,
-} from "@/lib/client/channel-ai-sync-store";
 import { revokeOptimisticMediaContent } from "@/utils/optimistic-chat-message";
 import {
   buildMediaUrlCacheKey,
@@ -137,22 +133,6 @@ export function useInboxActiveConversation({
   useEffect(() => {
     lastReadSyncAtRef.current = 0;
   }, [selectedConversationId]);
-
-  useEffect(() => {
-    return subscribeChannelAiSync(() => {
-      const channel = conversationChannelRef.current;
-
-      if (!channel) {
-        return;
-      }
-
-      const synced = getSyncedChannelAiEnabled(channel);
-
-      if (synced !== undefined) {
-        setAiEnabled(synced);
-      }
-    });
-  }, []);
 
   const clearConversation = useCallback(() => {
     setConversation(null);
@@ -799,7 +779,6 @@ export function useInboxActiveConversation({
     conversation,
     channelConnected,
     aiEnabled,
-    setAiEnabled,
     cannedResponses,
     isLoadingConversation,
     isLoadingOlderMessages,

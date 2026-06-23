@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, useCallback } from "react";
 import { toast } from "sonner";
@@ -14,7 +15,6 @@ import {
 
 import { InboxChatComposer } from "@/components/chats/inbox/InboxChatComposer";
 import { EmailChatComposer } from "@/components/chats/inbox/EmailChatComposer";
-import { ChatAiToggle } from "@/components/chats/inbox/ChatAiToggle";
 import { InboxChatMenu } from "@/components/chats/inbox/InboxChatMenu";
 import { useOptionalInboxLayout } from "@/components/chats/inbox/inbox-layout-context";
 import { useAgentTypingIndicator } from "@/hooks/use-agent-typing-indicator";
@@ -30,6 +30,7 @@ import { MessageHistorySkeleton } from "@/components/chats/MessageHistorySkeleto
 import { Button } from "@/components/ui/button";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { chatHeaderClassName } from "@/features/chats/chat-theme";
 import {
   getChannelBadgeClassName,
@@ -60,8 +61,7 @@ type ChatLoadingPreview = {
 
 type ChatWindowProps = {
   conversation: ConversationDetail | null;
-  aiEnabled: boolean | null;
-  onAiEnabledChange?: (enabled: boolean) => void;
+  aiEnabled?: boolean | null;
   channelConnected: boolean;
   channel: MessagingChannel;
   cannedResponses: CannedResponseItem[];
@@ -113,8 +113,7 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
 
 export function ChatWindow({
   conversation,
-  aiEnabled,
-  onAiEnabledChange,
+  aiEnabled = null,
   channelConnected,
   channel,
   cannedResponses,
@@ -533,13 +532,6 @@ export function ChatWindow({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              {inboxLayout ? (
-                <ChatAiToggle
-                  channel={conversation.channel}
-                  aiEnabled={aiEnabled}
-                  onEnabledChange={onAiEnabledChange}
-                />
-              ) : null}
               <Button
                 type="button"
                 variant="ghost"
@@ -640,6 +632,20 @@ export function ChatWindow({
               newMessagesBelow={newMessagesBelow}
               onScrollToBottom={handleScrolledToBottom}
             />
+
+            {inboxLayout && aiEnabled === false ? (
+              <div className="shrink-0 border-t bg-amber-500/5 px-4 py-2.5">
+                <p className="text-sm text-muted-foreground">
+                  {CHAT_MESSAGES.autoReplyDisabledBanner}{" "}
+                  <Link
+                    href={DASHBOARD_ROUTES.aiAssistant}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {CHAT_MESSAGES.autoReplyDisabledBannerLink}
+                  </Link>
+                </p>
+              </div>
+            ) : null}
 
             {autoReplyError && inboxLayout ? (
               <div className="shrink-0 border-t bg-destructive/5 px-4 py-2.5">

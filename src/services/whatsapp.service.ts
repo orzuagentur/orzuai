@@ -29,6 +29,7 @@ import {
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createClient } from "@/lib/supabase/server";
+import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { applyWhatsAppDeliveryStatusUpdates } from "@/services/message-delivery-status.service";
@@ -506,6 +507,8 @@ async function activate360DialogChannel(input: {
       message: WHATSAPP_MESSAGES.genericError,
     };
   }
+
+  await enableChannelAiIfAgentActive(businessId, "whatsapp", supabase);
 
   return {
     success: true,

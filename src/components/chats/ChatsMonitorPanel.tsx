@@ -32,7 +32,6 @@ import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-
 import type { ListConversationsMonitorResult } from "@/services/chat-inbox-query.service";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { useInboxPanel, useDebouncedInboxSearch, useSkipInitialListFetch } from "@/hooks/use-inbox-panel";
-import { useChannelAiEnabled } from "@/hooks/use-channel-ai-enabled";
 import { AiSuggestReplyPanel } from "@/components/chats/AiSuggestReplyPanel";
 import {
   getCachedConversationList,
@@ -192,7 +191,6 @@ function ChatsMonitorPanelContent({
     conversation: activeConversation,
     channelConnected: activeChannelConnected,
     aiEnabled: activeAiEnabled,
-    setAiEnabled: setActiveAiEnabled,
     cannedResponses: activeCannedResponses,
     isLoadingConversation,
     isLoadingOlderMessages,
@@ -298,8 +296,6 @@ function ChatsMonitorPanelContent({
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
   const { detailsOpen } = useInboxLayout();
-  const chatAiChannel =
-    activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp";
   const channelStatsConnected = useMemo(() => {
     const channel = activeConversation?.channel ?? selectedListItem?.channel;
 
@@ -311,10 +307,6 @@ function ChatsMonitorPanelContent({
   }, [activeConversation?.channel, channelStats, selectedListItem?.channel]);
   const resolvedChannelConnected =
     activeChannelConnected || channelStatsConnected;
-  const syncedActiveAiEnabled = useChannelAiEnabled(
-    chatAiChannel,
-    activeAiEnabled,
-  );
   const aiChannel = activeConversation?.channel ?? null;
 
   const handleContactFavoriteChange = useCallback(
@@ -403,7 +395,7 @@ function ChatsMonitorPanelContent({
           activeFilter,
           onFilterChange: setActiveFilter,
           aiChannel,
-          aiEnabled: syncedActiveAiEnabled,
+          aiEnabled: activeAiEnabled,
         }
       : null,
   );
@@ -514,8 +506,7 @@ function ChatsMonitorPanelContent({
             isReplyTyping={isReplyTyping}
             autoReplyError={autoReplyError}
             onDismissAutoReplyError={dismissAutoReplyError}
-            aiEnabled={syncedActiveAiEnabled}
-            onAiEnabledChange={setActiveAiEnabled}
+            aiEnabled={activeAiEnabled}
             channelConnected={resolvedChannelConnected}
             channel={activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp"}
             cannedResponses={activeCannedResponses}

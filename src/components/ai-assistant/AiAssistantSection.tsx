@@ -417,8 +417,11 @@ function TestAgentTab() {
 export function AiAssistantSection({ data }: AiAssistantSectionProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AiAgentTab>("dashboard");
-  const [activated, setActivated] = useState(data.enabledChannelCount > 0);
-  const shouldShowActivation = !activated && data.enabledChannelCount === 0;
+  const isAgentActive = data.assistantProfile?.canReply ?? false;
+  const [activated, setActivated] = useState(
+    isAgentActive || data.enabledChannelCount > 0,
+  );
+  const shouldShowActivation = !activated && !isAgentActive;
 
   const tabs = useMemo(() => TAB_ITEMS, []);
 
