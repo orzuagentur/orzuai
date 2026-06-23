@@ -1,4 +1,5 @@
 import type { ChatMessageData } from "@/types/chat.types";
+import { getMessageSortTime } from "@/utils/message-timestamp";
 
 export function isUnreadClientMessage(
   message: ChatMessageData,
@@ -13,7 +14,7 @@ export function isUnreadClientMessage(
   }
 
   return (
-    new Date(message.createdAt).getTime() > new Date(lastReadAt).getTime()
+    new Date(getMessageSortTime(message)).getTime() > new Date(lastReadAt).getTime()
   );
 }
 

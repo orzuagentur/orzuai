@@ -41,7 +41,6 @@ import {
 } from "@/services/intent-router.service";
 import { getDefaultGeminiModel } from "@/lib/env";
 import {
-  hasEnabledChannelAgent,
   resolveAgentLanguage,
   resolveAgentLlmConfig,
   selectDefaultChannelAgent,
@@ -393,32 +392,10 @@ async function prepareAutoReplyContext(input: {
     fetchRoutableAgents(input.admin, input.businessId),
   ]);
 
-  if (requireAiEnabled && !hasEnabledChannelAgent({ agents, channel: input.channel })) {
-    return {
-      success: false,
-      failure: {
-        success: false,
-        reason: "ai_disabled",
-        message: "No enabled AI agent is assigned to this channel.",
-      },
-    };
-  }
-
   const activeAgent = selectDefaultChannelAgent({
     agents,
     channel: input.channel,
   });
-
-  if (requireAiEnabled && !activeAgent) {
-    return {
-      success: false,
-      failure: {
-        success: false,
-        reason: "ai_disabled",
-        message: "No enabled AI agent is assigned to this channel.",
-      },
-    };
-  }
 
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
   const contactId =
@@ -490,7 +467,7 @@ async function prepareAutoReplyContext(input: {
   };
 }
 
-/** Reply first with the channel's enabled agent; CRM orchestration runs after send. */
+/** Reply first with the Assistant profile; a channel agent can override the voice. */
 export async function generateFastAssistantReply(input: {
   admin: MessagingDbClient;
   businessId: string;
@@ -508,14 +485,6 @@ export async function generateFastAssistantReply(input: {
 
   const { prep } = prepared;
   const agent = prep.activeAgent;
-
-  if (!agent) {
-    return {
-      success: false,
-      reason: "ai_disabled",
-      message: "No enabled AI agent is assigned to this channel.",
-    };
-  }
 
   const voice = buildPrepFromAgent({
     agent,
@@ -546,8 +515,8 @@ export async function generateFastAssistantReply(input: {
     return {
       success: true,
       text: fallbackText,
-      matchedAgentId: agent.id,
-      matchedAgentName: agent.name,
+      matchedAgentId: agent?.id ?? null,
+      matchedAgentName: agent?.name ?? null,
       provider: voice.provider,
       model: voice.model,
       language: voice.language,
@@ -566,8 +535,8 @@ export async function generateFastAssistantReply(input: {
   return {
     success: true,
     text: reply.data.text,
-    matchedAgentId: agent.id,
-    matchedAgentName: agent.name,
+    matchedAgentId: agent?.id ?? null,
+    matchedAgentName: agent?.name ?? null,
     provider: reply.usedProvider ?? voice.provider,
     model: reply.data.model,
     language: voice.language,
@@ -739,17 +708,9 @@ export async function isChannelAutoReplyEnabled(input: {
   businessId: string;
   channel: MessagingChannel;
 }): Promise<boolean> {
-  const aiEnabled = await ensureChannelAiSettingsRow(
+  return ensureChannelAiSettingsRow(
     input.admin,
     input.businessId,
     input.channel,
   );
-
-  if (!aiEnabled) {
-    return false;
-  }
-
-  const agents = await fetchRoutableAgents(input.admin, input.businessId);
-
-  return hasEnabledChannelAgent({ agents, channel: input.channel });
 }

@@ -63,7 +63,7 @@ import { isGmailConnected } from "@/services/gmail-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
 
 const CHAT_MESSAGE_SELECT =
-  "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at";
+  "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at, sent_at";
 
 export type InboxBusinessContext = {
   userId: string;
@@ -158,7 +158,7 @@ export async function getConversationDetail(
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
 
   const orderedMessages = (messages ?? []).slice().reverse();
@@ -199,7 +199,7 @@ export async function getConversationDetail(
 export async function getOlderConversationMessages(
   conversationId: string,
   businessId: string,
-  beforeCreatedAt: string,
+  beforeSentAt: string,
 ): Promise<{
   messages: ReturnType<typeof mapChatMessage>[];
   hasMore: boolean;
@@ -227,8 +227,8 @@ export async function getOlderConversationMessages(
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
-    .lt("created_at", beforeCreatedAt)
-    .order("created_at", { ascending: false })
+    .lt("sent_at", beforeSentAt)
+    .order("sent_at", { ascending: false })
     .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
 
   const orderedMessages = (messages ?? []).slice().reverse();
@@ -270,7 +270,7 @@ export async function getConversationMessagesTail(
     )
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(limit);
 
   const orderedMessages = (messages ?? []).slice().reverse();
@@ -281,7 +281,7 @@ export async function getConversationMessagesTail(
 export async function getNewConversationMessages(
   conversationId: string,
   businessId: string,
-  afterCreatedAt: string,
+  afterSentAt: string,
   afterMessageId?: string,
 ): Promise<ReturnType<typeof mapChatMessage>[] | null> {
   if (!hasSupabaseEnv()) {
@@ -310,13 +310,13 @@ export async function getNewConversationMessages(
 
   if (afterMessageId) {
     query = query.or(
-      `created_at.gt.${afterCreatedAt},and(created_at.eq.${afterCreatedAt},id.gt.${afterMessageId})`,
+      `sent_at.gt.${afterSentAt},and(sent_at.eq.${afterSentAt},id.gt.${afterMessageId})`,
     );
   } else {
-    query = query.gt("created_at", afterCreatedAt);
+    query = query.gt("sent_at", afterSentAt);
   }
 
-  const { data: messages } = await query.order("created_at", { ascending: true });
+  const { data: messages } = await query.order("sent_at", { ascending: true });
 
   return enrichChatMessages(supabase, (messages ?? []).map(mapChatMessage));
 }
@@ -327,7 +327,7 @@ async function isWhatsAppConnected(businessId: string): Promise<boolean> {
     .from("whatsapp_connections")
     .select("whatsapp_status")
     .eq("business_id", businessId)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -344,7 +344,7 @@ async function isTelegramConnected(businessId: string): Promise<boolean> {
     .from("telegram_connections")
     .select("telegram_status")
     .eq("business_id", businessId)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -1073,7 +1073,7 @@ export async function sendChatMessage(
       "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at",
     )
     .eq("conversation_id", parsed.data.conversationId)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

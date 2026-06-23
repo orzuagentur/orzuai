@@ -23,6 +23,7 @@ type GmailMessageResponse = {
   id?: string;
   threadId?: string;
   snippet?: string;
+  internalDate?: string;
   payload?: {
     headers?: Array<{ name?: string; value?: string }>;
     mimeType?: string;

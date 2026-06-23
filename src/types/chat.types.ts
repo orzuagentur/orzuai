@@ -91,6 +91,8 @@ export type ChatMessageData = {
   emailSubject?: string | null;
   aiGenerated: boolean;
   createdAt: string;
+  /** Provider send time; falls back to createdAt when absent. */
+  sentAt: string;
   deletedForAllAt: string | null;
   hiddenForBusiness: boolean;
   editedAt: string | null;

@@ -339,6 +339,7 @@ async function ingestTelegramMessage(
     channel: "telegram",
     content,
     externalMessageId: message.externalMessageId,
+    sentAt: message.sentAt,
   });
 
   if (!insertResult || insertResult.isDuplicate) {

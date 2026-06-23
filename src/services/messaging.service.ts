@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   generateFastAssistantReply,
   isChannelAutoReplyEnabled,
-  runAutoReplyBackgroundOrchestration,
 } from "@/services/auto-reply-pipeline.service";
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
+import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
@@ -43,6 +43,7 @@ export type InsertedChannelMessageRow = {
   email_subject?: string | null;
   ai_generated: boolean;
   created_at: string;
+  sent_at?: string;
   external_message_id?: string | null;
 };
 
@@ -54,7 +55,7 @@ export async function findMessageByExternalId(
   const { data } = await admin
     .from("messages")
     .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, external_message_id",
+      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, sent_at, external_message_id",
     )
     .eq("channel", channel)
     .eq("external_message_id", externalMessageId)
@@ -92,7 +93,7 @@ export async function insertChannelMessage(
       external_message_id: input.externalMessageId ?? null,
     })
     .select(
-      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at, external_message_id",
+      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at, sent_at, external_message_id",
     )
     .single();
 
@@ -119,7 +120,7 @@ export async function insertChannelMessage(
     channel: input.channel,
     senderType: input.senderType,
     aiGenerated: input.aiGenerated,
-    createdAt: inserted.created_at,
+    createdAt: inserted.sent_at ?? inserted.created_at,
   });
 
   return inserted;
@@ -491,15 +492,13 @@ export async function processChannelAutoReply(input: {
     aiReplies: 1,
   });
 
-  void runAutoReplyBackgroundOrchestration({
-    admin,
+  await enqueueAiOrchestrationJob({
     businessId,
     channel,
     conversationId,
     clientMessage,
-    language: reply.language,
   }).catch((error) => {
-    console.error("[messaging] background CRM orchestration failed", error);
+    console.error("[messaging] failed to enqueue CRM orchestration", error);
   });
 }
 

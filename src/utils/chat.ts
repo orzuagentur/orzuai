@@ -17,6 +17,7 @@ type RawMessageRow = {
   edited_at?: string | null;
   is_edited?: boolean;
   created_at: string;
+  sent_at?: string;
 };
 
 type RawConversationRow = {
@@ -60,6 +61,7 @@ export function mapChatMessage(row: RawMessageRow): ChatMessageData {
     emailSubject: row.email_subject ?? null,
     aiGenerated: row.ai_generated,
     createdAt: row.created_at,
+    sentAt: row.sent_at ?? row.created_at,
     deletedForAllAt: row.deleted_for_all_at ?? null,
     hiddenForBusiness: row.hidden_for_business ?? false,
     editedAt: row.edited_at ?? null,

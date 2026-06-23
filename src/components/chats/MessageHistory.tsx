@@ -180,7 +180,7 @@ function messageContentEqual(
     left.emailSubject === right.emailSubject &&
     left.senderType === right.senderType &&
     left.aiGenerated === right.aiGenerated &&
-    left.createdAt === right.createdAt &&
+    left.sentAt === right.sentAt &&
     left.isPending === right.isPending &&
     left.deliveryStatus === right.deliveryStatus &&
     left.attachmentPending === right.attachmentPending &&
@@ -245,7 +245,7 @@ function MessageUploadStatus({
           CHAT_MESSAGES.messageSending
         )
       ) : (
-        <MessageDateTime value={message.createdAt} />
+        <MessageDateTime value={message.sentAt} />
       )}
       <OutboundDeliveryIndicator message={message} />
     </p>
@@ -334,7 +334,7 @@ function MessageHistoryItem({
         const entry = entries[0];
 
         if (entry?.isIntersecting) {
-          onReadProgress(message.createdAt);
+          onReadProgress(message.sentAt);
         }
       },
       {
@@ -351,7 +351,7 @@ function MessageHistoryItem({
   }, [
     isInbox,
     isUnreadMessage,
-    message.createdAt,
+    message.sentAt,
     message.senderType,
     onReadProgress,
     scrollRootRef,

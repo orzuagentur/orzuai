@@ -63,7 +63,7 @@ type RealtimeMessageRow = {
 
 function toReconnectCursor(message: ChatMessageData): ConversationReconnectCursor {
   return {
-    afterCreatedAt: message.createdAt,
+    afterCreatedAt: message.sentAt,
     afterMessageId: message.id,
   };
 }

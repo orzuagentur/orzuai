@@ -32,6 +32,7 @@ type InsertInboundChannelMessageInput = {
   content: string;
   emailSubject?: string | null;
   externalMessageId?: string | null;
+  sentAt?: string | null;
 };
 
 export type InsertInboundChannelMessageResult = {
@@ -95,6 +96,7 @@ export async function insertInboundChannelMessage(
     p_external_message_id: input.externalMessageId ?? undefined,
     p_message_preview: preview,
     p_email_subject: input.emailSubject ?? undefined,
+    p_sent_at: input.sentAt ?? undefined,
   });
 
   if (error) {
@@ -116,6 +118,7 @@ export async function insertInboundChannelMessage(
       content: row.content,
       ai_generated: row.ai_generated,
       created_at: row.created_at,
+      sent_at: row.sent_at ?? row.created_at,
       external_message_id: row.external_message_id,
     },
     isDuplicate: row.is_duplicate ?? false,

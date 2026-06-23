@@ -62,6 +62,7 @@ import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
 } from "@/utils/chat-media";
+import { parseUnixSecondsToIso } from "@/utils/message-timestamp";
 import {
   mapWhatsAppConnection,
   normalizePhoneNumber,
@@ -766,6 +767,7 @@ async function ingestIncomingMessage(
     channel: "whatsapp",
     content,
     externalMessageId: message.messageId,
+    sentAt: parseUnixSecondsToIso(message.timestamp),
   });
 
   if (!insertResult || insertResult.isDuplicate) {

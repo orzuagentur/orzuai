@@ -2,6 +2,7 @@ import type {
   TelegramInboundMessage,
   TelegramWebhookPayload,
 } from "@/types/telegram.types";
+import { parseUnixSecondsToIso } from "@/utils/message-timestamp";
 
 function buildContactName(from: {
   first_name?: string;
@@ -38,6 +39,7 @@ export function parseTelegramWebhookPayload(
   }
 
   const contactName = buildContactName(message.from ?? {});
+  const sentAt = parseUnixSecondsToIso(message.date);
 
   if (message.text?.trim()) {
     const externalMessageId =
@@ -53,6 +55,7 @@ export function parseTelegramWebhookPayload(
         body: message.text.trim(),
         contactName,
         externalMessageId,
+        sentAt,
       },
     ];
   }
@@ -81,6 +84,7 @@ export function parseTelegramWebhookPayload(
         fileName: "photo.jpg",
         caption: message.caption?.trim(),
         externalMessageId,
+        sentAt,
       },
     ];
   }
@@ -98,6 +102,7 @@ export function parseTelegramWebhookPayload(
         fileName: "voice.ogg",
         caption: message.caption?.trim(),
         externalMessageId,
+        sentAt,
       },
     ];
   }
@@ -115,6 +120,7 @@ export function parseTelegramWebhookPayload(
         fileName: "video.mp4",
         caption: message.caption?.trim(),
         externalMessageId,
+        sentAt,
       },
     ];
   }
@@ -132,6 +138,7 @@ export function parseTelegramWebhookPayload(
         fileName: message.audio.file_name || "audio",
         caption: message.caption?.trim(),
         externalMessageId,
+        sentAt,
       },
     ];
   }
@@ -149,6 +156,7 @@ export function parseTelegramWebhookPayload(
         fileName: message.document.file_name || "document",
         caption: message.caption?.trim(),
         externalMessageId,
+        sentAt,
       },
     ];
   }

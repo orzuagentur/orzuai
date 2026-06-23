@@ -419,6 +419,7 @@ async function ingestGmailMessage(
     content: parsed.body,
     emailSubject: parsed.subject,
     externalMessageId: parsed.id,
+    sentAt: parsed.sentAt,
   });
 
   if (!inserted || inserted.isDuplicate) {

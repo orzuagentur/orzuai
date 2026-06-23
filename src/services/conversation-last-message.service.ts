@@ -13,11 +13,11 @@ export async function recomputeConversationLastMessage(
 ): Promise<void> {
   const { data: latest } = await client
     .from("messages")
-    .select("content, created_at, sender_type, ai_generated")
+    .select("content, sent_at, sender_type, ai_generated")
     .eq("conversation_id", conversationId)
     .eq("hidden_for_business", false)
     .is("deleted_for_all_at", null)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -36,12 +36,12 @@ export async function recomputeConversationLastMessage(
 
   const { data: latestClient } = await client
     .from("messages")
-    .select("created_at")
+    .select("sent_at")
     .eq("conversation_id", conversationId)
     .eq("sender_type", "client")
     .eq("hidden_for_business", false)
     .is("deleted_for_all_at", null)
-    .order("created_at", { ascending: false })
+    .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -52,8 +52,8 @@ export async function recomputeConversationLastMessage(
         content: latest.content,
         senderType: latest.sender_type,
         aiGenerated: latest.ai_generated,
-        createdAt: latest.created_at,
-        previousLastClientMessageAt: latestClient?.created_at ?? null,
+        createdAt: latest.sent_at,
+        previousLastClientMessageAt: latestClient?.sent_at ?? null,
       }),
     )
     .eq("id", conversationId);

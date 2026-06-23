@@ -38,6 +38,10 @@ import {
   normalizeOutboundDeliveryStatus,
   shouldIgnoreOutboundDeliveryDowngrade,
 } from "@/utils/message-metadata";
+import {
+  getMessageSortTime,
+  sortMessagesBySentAt,
+} from "@/utils/message-timestamp";
 
 type UseInboxActiveConversationOptions = {
   initialConversationId: string | null;
@@ -229,7 +233,7 @@ export function useInboxActiveConversation({
     try {
       const result = await fetchOlderConversationMessagesAction({
         conversationId: conversation.id,
-        beforeCreatedAt: conversation.messages[0]!.createdAt,
+        beforeCreatedAt: conversation.messages[0]!.sentAt,
       });
 
       if (!result.success) {
@@ -297,7 +301,7 @@ export function useInboxActiveConversation({
       (message) =>
         message.senderType === "client" &&
         (!conversation.lastReadAt ||
-          new Date(message.createdAt).getTime() >
+          new Date(getMessageSortTime(message)).getTime() >
             new Date(conversation.lastReadAt).getTime()),
     );
 
@@ -367,10 +371,13 @@ export function useInboxActiveConversation({
 
       return {
         ...current,
-        messages: [...withoutMatchingPending, normalizedMessage],
+        messages: sortMessagesBySentAt([
+          ...withoutMatchingPending,
+          normalizedMessage,
+        ]),
         totalMessageCount:
           current.totalMessageCount - removedPendingCount + 1,
-        updatedAt: message.createdAt,
+        updatedAt: normalizedMessage.sentAt,
       };
     });
   }, []);
@@ -470,7 +477,7 @@ export function useInboxActiveConversation({
           totalMessageCount: hadPending
             ? current.totalMessageCount
             : current.totalMessageCount + 1,
-          updatedAt: resolvedMessage.createdAt,
+          updatedAt: resolvedMessage.sentAt,
         };
       });
     },
@@ -495,7 +502,7 @@ export function useInboxActiveConversation({
           ...current,
           messages: [...current.messages, normalizedMessage],
           totalMessageCount: current.totalMessageCount + 1,
-          updatedAt: message.editedAt ?? message.createdAt,
+          updatedAt: message.editedAt ?? message.sentAt,
         };
       }
 
@@ -512,7 +519,7 @@ export function useInboxActiveConversation({
       return {
         ...current,
         messages,
-        updatedAt: message.editedAt ?? message.createdAt,
+        updatedAt: message.editedAt ?? message.sentAt,
       };
     });
   }, []);
@@ -569,7 +576,7 @@ export function useInboxActiveConversation({
     }
 
     return (
-      conversation.messages.at(-1)?.createdAt ?? "1970-01-01T00:00:00.000Z"
+      conversation.messages.at(-1)?.sentAt ?? "1970-01-01T00:00:00.000Z"
     );
   }, [conversation]);
 

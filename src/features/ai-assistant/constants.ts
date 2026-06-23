@@ -5,10 +5,10 @@ export const AI_ASSISTANT_MESSAGES = {
     "Create an AI agent that talks to customers and works autonomously on your channels.",
   hubAssistantTitle: "AI channels",
   hubAssistantDescription:
-    "Turn your AI agents on for each messaging channel.",
+    "Turn AI Assistant auto-replies on for each messaging channel.",
   hubAssistantInfoTitle: "Channels",
   hubAssistantInfoBody:
-    "Enable auto-reply per channel. Your enabled AI agent handles customer conversations 24/7 on WhatsApp, Telegram, and other channels.",
+    "Enable auto-reply per channel. AI Assistant can answer 24/7 on WhatsApp, Telegram, and other channels even before you create CRM agents.",
   hubAgentsTitle: "AI Agents",
   hubAgentsDescription:
     "Autonomous agents that chat with customers and update your CRM.",
@@ -25,15 +25,15 @@ export const AI_ASSISTANT_MESSAGES = {
   tabAssistant: "Channels",
   tabAgents: "AI Agents",
   assistantTabDescription:
-    "Turn AI on for each channel. Your enabled agent replies to all customers.",
+    "Turn AI on for each channel. AI Assistant replies to customers as soon as the channel is enabled.",
   assistantReplyEngineNote:
-    "Replies use your enabled AI agent (Gemini first, then OpenAI or Claude if needed). Intent is detected automatically — no keywords required.",
+    "Replies use the AI Assistant profile with Gemini by default. Enabled CRM agents can still detect intent and save tasks, deals, and notes.",
   assistantContextLimitsNote:
     "Context: rolling conversation summary + last 20 messages (40 on Pro). Knowledge Base uses semantic search when available.",
   assistantEdit: "Edit",
-  assistantEditTitle: "Legacy assistant profile",
+  assistantEditTitle: "AI Assistant profile",
   assistantEditFormDescription:
-    "Used only when no AI agent is enabled on this channel. Prefer creating an agent instead.",
+    "Used for auto-replies on enabled channels. CRM agents can add automation on top.",
   assistantEditDescription:
     "Name, behavior, and communication style — available in the next update.",
   assistantEditBack: "Back to channels",
@@ -51,11 +51,11 @@ export const AI_ASSISTANT_MESSAGES = {
   assistantChannelNotConnected: "Not connected",
   assistantConnectChannel: "Connect",
   channelsTitle: "Channels",
-  channelAgentActive: "AI agent enabled on this channel",
-  channelAgentInactive: "No enabled AI agent on this channel",
+  channelAgentActive: "CRM agent enabled on this channel",
+  channelAgentInactive: "No CRM agent on this channel",
   searchPlaceholder: "Search agents…",
   channelsTabDescription:
-    "Turn AI auto-reply on or off for each channel. Uses your enabled AI agent.",
+    "Turn AI Assistant auto-reply on or off for each channel.",
   channelsSummaryTitle: "Overview",
   channelsSummaryEnabled: (count: number, total: number) =>
     `${count} of ${total} channels active`,

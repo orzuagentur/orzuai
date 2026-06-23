@@ -32,6 +32,7 @@ export function createOptimisticChatMessage(input: {
     emailSubject: input.emailSubject ?? null,
     aiGenerated: false,
     createdAt: new Date().toISOString(),
+    sentAt: new Date().toISOString(),
     deletedForAllAt: null,
     hiddenForBusiness: false,
     editedAt: null,

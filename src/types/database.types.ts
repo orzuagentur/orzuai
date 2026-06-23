@@ -1090,6 +1090,7 @@ export type Database = {
           external_message_id: string | null;
           business_id: string | null;
           created_at: string;
+          sent_at: string;
         };
         Insert: {
           id?: string;
@@ -1107,6 +1108,7 @@ export type Database = {
           external_message_id?: string | null;
           business_id?: string | null;
           created_at?: string;
+          sent_at?: string;
         };
         Update: {
           id?: string;
@@ -1124,6 +1126,7 @@ export type Database = {
           external_message_id?: string | null;
           business_id?: string | null;
           created_at?: string;
+          sent_at?: string;
         };
         Relationships: [
           {
@@ -2512,6 +2515,7 @@ export type Database = {
           p_external_message_id?: string | null;
           p_message_preview?: string | null;
           p_email_subject?: string | null;
+          p_sent_at?: string | null;
         };
         Returns: {
           id: string;
@@ -2522,6 +2526,7 @@ export type Database = {
           email_subject: string | null;
           ai_generated: boolean;
           created_at: string;
+          sent_at: string;
           external_message_id: string | null;
           is_duplicate: boolean;
         }[];

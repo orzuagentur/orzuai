@@ -58,6 +58,7 @@ export type TelegramWebhookPayload = {
 
 type TelegramWebhookMessage = {
   message_id?: number;
+  date?: number;
   text?: string;
   caption?: string;
   from?: {
@@ -103,6 +104,7 @@ export type TelegramInboundMessage =
       body: string;
       contactName: string;
       externalMessageId?: string;
+      sentAt?: string;
     }
   | {
       kind: "media";
@@ -115,4 +117,5 @@ export type TelegramInboundMessage =
       fileName?: string;
       caption?: string;
       externalMessageId?: string;
+      sentAt?: string;
     };

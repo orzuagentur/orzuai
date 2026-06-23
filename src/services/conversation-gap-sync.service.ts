@@ -47,7 +47,7 @@ export async function syncConversationMessageGap(
     await updateConversationSyncCursor(createAdminClient(), {
       conversationId,
       businessId,
-      lastMessageAt: lastNewMessage.createdAt,
+      lastMessageAt: lastNewMessage.sentAt,
       lastMessageId: lastNewMessage.id,
     });
   }
@@ -59,12 +59,12 @@ export async function syncConversationMessageGap(
     recentMessages,
     cursor: lastNewMessage
       ? {
-          afterCreatedAt: lastNewMessage.createdAt,
+          afterCreatedAt: lastNewMessage.sentAt,
           afterMessageId: lastNewMessage.id,
         }
       : tailCursor
         ? {
-            afterCreatedAt: tailCursor.createdAt,
+            afterCreatedAt: tailCursor.sentAt,
             afterMessageId: tailCursor.id,
           }
         : cursor,

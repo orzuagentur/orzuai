@@ -1,3 +1,5 @@
+import { parseMillisToIso } from "@/utils/message-timestamp";
+
 type GmailHeader = { name?: string; value?: string };
 
 type GmailMessagePart = {
@@ -15,6 +17,7 @@ export type ParsedGmailMessage = {
   subject: string;
   body: string;
   snippet: string;
+  sentAt?: string;
 };
 
 function decodeBase64Url(data: string): string {
@@ -63,6 +66,7 @@ export function parseGmailApiMessage(message: {
   id?: string;
   threadId?: string;
   snippet?: string;
+  internalDate?: string;
   payload?: GmailMessagePart & { headers?: GmailHeader[] };
 }): ParsedGmailMessage | null {
   if (!message.id || !message.payload) {
@@ -89,5 +93,6 @@ export function parseGmailApiMessage(message: {
     subject,
     body,
     snippet: message.snippet ?? body.slice(0, 200),
+    sentAt: parseMillisToIso(message.internalDate),
   };
 }
