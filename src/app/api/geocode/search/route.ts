@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getCurrentUser } from "@/services/auth.service";
+
 type NominatimResult = {
   display_name: string;
   lat: string;
@@ -7,6 +9,12 @@ type NominatimResult = {
 };
 
 export async function GET(request: Request) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 
   if (query.length < 3) {

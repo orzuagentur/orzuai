@@ -2,6 +2,10 @@ import "server-only";
 
 import { sendTelegramMediaMessage, sendTelegramMediaMessageByUrl } from "@/lib/telegram/client";
 import {
+  getCachedTelegramDeliveryConnection,
+  getCachedWhatsAppDeliveryConnection,
+} from "@/services/channels/connection-cache";
+import {
   sendWhatsAppMediaMessage,
   sendWhatsAppMediaMessageByUrl,
   uploadWhatsAppMedia,
@@ -47,14 +51,10 @@ export async function deliverChannelMediaMessage(
   }
 
   if (input.channel === "whatsapp") {
-    const { data: connection } = await input.admin
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", input.businessId)
-      .eq("whatsapp_status", "connected")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connection = await getCachedWhatsAppDeliveryConnection(
+      input.admin,
+      input.businessId,
+    );
 
     if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
       return { success: false, error: "WhatsApp is not connected." };
@@ -135,14 +135,10 @@ export async function deliverChannelMediaMessage(
   }
 
   if (input.channel === "telegram") {
-    const { data: connection } = await input.admin
-      .from("telegram_connections")
-      .select("bot_token")
-      .eq("business_id", input.businessId)
-      .eq("telegram_status", "connected")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connection = await getCachedTelegramDeliveryConnection(
+      input.admin,
+      input.businessId,
+    );
 
     if (!connection?.bot_token) {
       return { success: false, error: "Telegram is not connected." };

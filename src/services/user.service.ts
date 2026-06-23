@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 
 import { DEFAULT_SUBSCRIPTION_PLAN } from "@/features/dashboard/constants";
@@ -12,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
-export async function getUserProfile(
+export const getUserProfile = cache(async function getUserProfile(
   authUser: User,
 ): Promise<DashboardUserProfile> {
   const email = authUser.email ?? "";
@@ -57,4 +58,4 @@ export async function getUserProfile(
       null,
     plan: SUBSCRIPTION_PLANS[planId]?.label ?? DEFAULT_SUBSCRIPTION_PLAN,
   };
-}
+});

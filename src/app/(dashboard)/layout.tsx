@@ -7,6 +7,13 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
 import { getUserProfile } from "@/services/user.service";
 
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
 export default async function DashboardLayout({
   children,
 }: Readonly<{

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
@@ -122,7 +123,7 @@ function mapPayloadToRow(payload: BusinessPayload) {
   };
 }
 
-export async function getPrimaryBusiness(
+export const getPrimaryBusiness = cache(async function getPrimaryBusiness(
   userId: string,
 ): Promise<Business | null> {
   if (!hasSupabaseEnv()) {
@@ -143,7 +144,7 @@ export async function getPrimaryBusiness(
   }
 
   return data;
-}
+});
 
 export async function createBusiness(
   input: BusinessPayload,

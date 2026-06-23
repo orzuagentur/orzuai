@@ -18,8 +18,42 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_ORIGIN),
-  title: "OrzuX",
-  description: "AI Business Communication Platform",
+  title: {
+    default: "OrzuX | AI Business Communication Platform",
+    template: "%s | OrzuX",
+  },
+  description:
+    "OrzuX helps businesses reply to customers, manage CRM, automate follow-ups, and run an autonomous AI agent across messaging channels.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: APP_ORIGIN,
+    siteName: "OrzuX",
+    title: "OrzuX | AI Business Communication Platform",
+    description:
+      "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
+    images: [
+      {
+        url: "/platform-icon.png",
+        width: 512,
+        height: 512,
+        alt: "OrzuX",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OrzuX | AI Business Communication Platform",
+    description:
+      "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
+    images: ["/platform-icon.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { EmailOtpType, User } from "@supabase/supabase-js";
 
 import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
@@ -102,14 +103,14 @@ function isEmailNotVerifiedError(message: string): boolean {
   );
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   return user;
-}
+});
 
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();

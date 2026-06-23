@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { AnalyticsChromeProvider } from "@/components/analytics/analytics-chrome-context";
@@ -9,17 +10,45 @@ import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistan
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardInboundAlerts } from "@/components/dashboard/DashboardInboundAlerts";
-import { AiHumanRequestOverlay } from "@/components/dashboard/AiHumanRequestOverlay";
-import { DashboardAiHumanAlerts } from "@/components/dashboard/DashboardAiHumanAlerts";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { AiHumanRequestsProvider } from "@/contexts/ai-human-requests-context";
 import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
 import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
-import { PlatformCopilotWidget } from "@/components/platform-copilot/PlatformCopilotWidget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
 import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-bootstrap";
+
+const DashboardInboundAlerts = dynamic(
+  () =>
+    import("@/components/dashboard/DashboardInboundAlerts").then(
+      (mod) => mod.DashboardInboundAlerts,
+    ),
+  { ssr: false },
+);
+
+const DashboardAiHumanAlerts = dynamic(
+  () =>
+    import("@/components/dashboard/DashboardAiHumanAlerts").then(
+      (mod) => mod.DashboardAiHumanAlerts,
+    ),
+  { ssr: false },
+);
+
+const AiHumanRequestOverlay = dynamic(
+  () =>
+    import("@/components/dashboard/AiHumanRequestOverlay").then(
+      (mod) => mod.AiHumanRequestOverlay,
+    ),
+  { ssr: false },
+);
+
+const PlatformCopilotWidget = dynamic(
+  () =>
+    import("@/components/platform-copilot/PlatformCopilotWidget").then(
+      (mod) => mod.PlatformCopilotWidget,
+    ),
+  { ssr: false },
+);
 
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
