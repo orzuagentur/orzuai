@@ -663,9 +663,21 @@ export async function isChannelAutoReplyEnabled(input: {
   businessId: string;
   channel: MessagingChannel;
 }): Promise<boolean> {
-  return ensureChannelAiSettingsRow(
+  const channelEnabled = await ensureChannelAiSettingsRow(
     input.admin,
     input.businessId,
     input.channel,
   );
+
+  if (!channelEnabled) {
+    return false;
+  }
+
+  const { data: profile } = await input.admin
+    .from("ai_assistant_profile")
+    .select("can_reply")
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  return profile?.can_reply ?? true;
 }

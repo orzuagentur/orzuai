@@ -439,7 +439,11 @@ export async function processChannelAutoReply(input: {
   });
 
   if (!aiEnabled) {
-    return;
+    await notifyAutoReplyError(conversationId, {
+      errorCode: "ai_disabled",
+      errorMessage: CHAT_MESSAGES.autoReplyErrorAiDisabled,
+    });
+    throw new Error("[ai_disabled] Auto-reply is off for this channel.");
   }
 
   const reply = await generateFastAssistantReply({

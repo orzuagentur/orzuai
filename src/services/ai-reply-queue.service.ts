@@ -4,12 +4,17 @@ import { createHash } from "crypto";
 
 import { claimAiReplyJobs } from "@/lib/queue/claim-jobs";
 import { dispatchAiReplyQueueWorker } from "@/lib/queue/qstash-ai-reply-worker";
+import { scheduleAfterResponse } from "@/lib/queue/schedule-deferred";
+import { sleep } from "@/lib/queue/sleep";
 import {
   getWorkerConcurrency,
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifyAutoReplyTyping } from "@/services/auto-reply-inbox-status.service";
+import {
+  notifyAutoReplyError,
+  notifyAutoReplyTyping,
+} from "@/services/auto-reply-inbox-status.service";
 import { isChannelAutoReplyEnabled } from "@/services/auto-reply-pipeline.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -51,9 +56,6 @@ type ChannelAutoReplyScheduleInput = {
   conversationId: string;
   clientMessage: string;
 };
-
-let replyDrainPromise: Promise<AiReplyQueueDrainResult> | null = null;
-let debouncedDrainTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce window + small buffer so claim runs after upsert_ai_reply_job timer. */
 function getDebouncedDrainDelayMs(): number {
@@ -157,45 +159,17 @@ async function upsertAiReplyJob(
   return data ?? null;
 }
 
-function startAiReplyQueueDrain(): void {
-  if (replyDrainPromise) {
-    return;
-  }
-
-  replyDrainPromise = drainAiReplyQueue()
-    .catch((error) => {
-      console.error("[ai-reply-queue] in-process drain failed", error);
-      return {
-        processed: 0,
-        completed: 0,
-        requeued: 0,
-        retried: 0,
-        failed: 0,
-        batches: 0,
-        recoveredStale: 0,
-        durationMs: 0,
-      };
-    })
-    .finally(() => {
-      replyDrainPromise = null;
-    });
-}
-
 function scheduleDebouncedAiReplyDrain(): void {
-  if (debouncedDrainTimer) {
-    clearTimeout(debouncedDrainTimer);
-  }
-
-  debouncedDrainTimer = setTimeout(() => {
-    debouncedDrainTimer = null;
-    startAiReplyQueueDrain();
-  }, getDebouncedDrainDelayMs());
+  scheduleAfterResponse(getDebouncedDrainDelayMs(), async () => {
+    await drainAiReplyQueue().catch((error) => {
+      console.error("[ai-reply-queue] deferred drain failed", error);
+    });
+  });
 }
 
 export function dispatchAiReplyWorker(
   source: "enqueue" | "retry" = "enqueue",
 ): void {
-  startAiReplyQueueDrain();
   scheduleDebouncedAiReplyDrain();
   void dispatchAiReplyQueueWorker({
     source,
@@ -203,7 +177,7 @@ export function dispatchAiReplyWorker(
   }).then((result) => {
     if (!result.dispatched) {
       console.warn(
-        "[ai-reply-queue] QStash not configured; relying on in-process drain and cron",
+        "[ai-reply-queue] QStash not configured; relying on deferred in-process drain and cron",
       );
     }
   });
@@ -235,26 +209,47 @@ export async function scheduleDebouncedChannelAutoReply(
         conversationId: input.conversationId,
       }),
     );
+    void notifyAutoReplyError(input.conversationId, {
+      errorCode: "ai_disabled",
+      errorMessage: "Auto-reply is off for this channel. Enable it in AI Agent → Channels.",
+    });
     return;
   }
 
   try {
     await upsertAiReplyJob(admin, input);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error(
       "[ai-reply-queue] failed to enqueue auto-reply job",
       JSON.stringify({
         businessId: input.businessId,
         channel: input.channel,
         conversationId: input.conversationId,
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       }),
     );
+    void notifyAutoReplyError(input.conversationId, {
+      errorCode: "queue_enqueue_failed",
+      errorMessage: "Auto-reply queue failed. Check server configuration.",
+    });
     return;
   }
 
   void notifyAutoReplyTyping(input.conversationId, true);
-  dispatchAiReplyWorker("enqueue");
+
+  // Process in the same request after the DB debounce window (webhook/cron stay alive).
+  await sleep(getDebouncedDrainDelayMs());
+
+  try {
+    await drainAiReplyQueue();
+  } catch (error) {
+    console.error(
+      "[ai-reply-queue] inline drain failed after enqueue",
+      error instanceof Error ? error.message : String(error),
+    );
+    dispatchAiReplyWorker("enqueue");
+  }
 }
 
 async function markAiReplyJobRetry(

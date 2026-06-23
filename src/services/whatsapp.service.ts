@@ -325,6 +325,8 @@ export async function connectManualWhatsApp(
 
   revalidateWhatsAppPaths();
 
+  await enableChannelAiIfAgentActive(businessId, "whatsapp", supabase);
+
   return {
     success: true,
     data: {
