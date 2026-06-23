@@ -109,6 +109,10 @@ export function isConversationDetailFresh(conversationId: string): boolean {
   return conversationDetailCache.isFresh(conversationId);
 }
 
+export function clearConversationDetailCache(): void {
+  conversationDetailCache.clear();
+}
+
 function getListCacheKey(input: {
   scope: "monitor" | "channel" | "favorites";
   channel?: MessagingChannel;

@@ -22,6 +22,7 @@ import { disconnectGmailAction } from "@/features/email/actions/disconnect";
 import { enableGmailPushWatchAction } from "@/features/email/actions/enable-push-watch";
 import { syncGmailNowAction } from "@/features/email/actions/sync-now";
 import { EMAIL_INTEGRATION_HREF, EMAIL_MESSAGES } from "@/features/email/constants";
+import { clearConversationDetailCache } from "@/lib/client-cache/inbox-messenger-cache";
 import type {
   GmailConnectConfig,
   GmailConnectionData,
@@ -47,6 +48,7 @@ export function EmailActivatePanel({
 
   useEffect(() => {
     if (searchParams.get("connected") === "1") {
+      clearConversationDetailCache();
       toast.success(EMAIL_MESSAGES.oauthSuccess);
       router.replace(EMAIL_INTEGRATION_HREF);
     } else if (searchParams.get("error")) {

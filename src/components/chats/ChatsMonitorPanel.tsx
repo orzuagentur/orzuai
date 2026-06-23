@@ -300,6 +300,17 @@ function ChatsMonitorPanelContent({
   const { detailsOpen } = useInboxLayout();
   const chatAiChannel =
     activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp";
+  const channelStatsConnected = useMemo(() => {
+    const channel = activeConversation?.channel ?? selectedListItem?.channel;
+
+    if (!channel) {
+      return false;
+    }
+
+    return channelStats.find((item) => item.channel === channel)?.connected ?? false;
+  }, [activeConversation?.channel, channelStats, selectedListItem?.channel]);
+  const resolvedChannelConnected =
+    activeChannelConnected || channelStatsConnected;
   const syncedActiveAiEnabled = useChannelAiEnabled(
     chatAiChannel,
     activeAiEnabled,
@@ -505,7 +516,7 @@ function ChatsMonitorPanelContent({
             onDismissAutoReplyError={dismissAutoReplyError}
             aiEnabled={syncedActiveAiEnabled}
             onAiEnabledChange={setActiveAiEnabled}
-            channelConnected={activeChannelConnected}
+            channelConnected={resolvedChannelConnected}
             channel={activeConversation?.channel ?? selectedListItem?.channel ?? "whatsapp"}
             cannedResponses={activeCannedResponses}
             isLoadingConversation={isLoadingConversation}

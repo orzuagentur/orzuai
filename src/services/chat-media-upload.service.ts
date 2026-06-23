@@ -16,6 +16,7 @@ import {
   insertChannelMessage,
 } from "@/services/messaging.service";
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
+import { isGmailConnected } from "@/services/gmail-integration.service";
 import { buildPendingOutboundChatMessage } from "@/services/outbound-message.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import { normalizeStoredVoiceNoteAsset } from "@/services/voice-note-transcode.service";
@@ -126,13 +127,7 @@ async function isChannelConnected(
   }
 
   if (channel === "email") {
-    const { data } = await supabase
-      .from("email_connections")
-      .select("email_status")
-      .eq("business_id", businessId)
-      .maybeSingle();
-
-    return data?.email_status === "connected";
+    return isGmailConnected(businessId);
   }
 
   return false;

@@ -339,7 +339,7 @@ function ChatsChannelPanelContent({
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
   const resolvedChannelConnected = activeConversation
-    ? activeChannelConnected
+    ? activeChannelConnected || channelConnected
     : channelConnected;
 
   return (

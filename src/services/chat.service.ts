@@ -59,7 +59,7 @@ import {
   resolveContactFromRow,
 } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
-import { getGmailConnection } from "@/services/gmail-integration.service";
+import { isGmailConnected } from "@/services/gmail-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
 
 const CHAT_MESSAGE_SELECT =
@@ -379,8 +379,7 @@ export async function isChatChannelConnected(
   }
 
   if (channel === "email") {
-    const connection = await getGmailConnection(businessId);
-    return connection?.status === "connected";
+    return isGmailConnected(businessId);
   }
 
   return isWebsiteFormsConnected(businessId);
@@ -915,9 +914,9 @@ export async function sendChatMessage(
       };
     }
   } else if (conversation.channel === "email") {
-    const gmailConnection = await getGmailConnection(businessId);
+    const gmailConnected = await isGmailConnected(businessId);
 
-    if (gmailConnection?.status !== "connected") {
+    if (!gmailConnected) {
       return {
         success: false,
         error: {

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { INTEGRATIONS_MESSAGES } from "@/features/integrations";
+import { clearConversationDetailCache } from "@/lib/client-cache/inbox-messenger-cache";
 
 type IntegrationDangerZoneProps = {
   resourceLabel: string;
@@ -35,6 +36,7 @@ export function IntegrationDangerZone({
       }
 
       toast.success(successMessage);
+      clearConversationDetailCache();
       setStep("idle");
       router.refresh();
     } catch (error) {

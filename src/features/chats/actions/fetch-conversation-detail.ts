@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { hasSupabaseEnv } from "@/lib/env";
-import { getPrimaryBusiness } from "@/services/business.service";
+import { getAccessibleBusiness } from "@/services/business-access.service";
 import { requireUser } from "@/services/auth.service";
 import { getActiveConversationContext } from "@/services/chat.service";
 
@@ -38,7 +38,7 @@ export async function fetchConversationDetailAction(
   }
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return {

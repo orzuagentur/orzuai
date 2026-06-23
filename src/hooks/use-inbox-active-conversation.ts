@@ -736,6 +736,7 @@ export function useInboxActiveConversation({
     }
 
     if (cached && isConversationDetailFresh(selectedConversationId)) {
+      void loadConversation(selectedConversationId, true);
       return;
     }
 

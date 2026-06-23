@@ -95,6 +95,23 @@ export async function getGmailConnection(
   return data ? mapGmailConnection(data) : null;
 }
 
+/** Authoritative server check — bypasses RLS for inbox send eligibility. */
+export async function isGmailConnected(businessId: string): Promise<boolean> {
+  if (!hasSupabaseEnv()) {
+    return false;
+  }
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("email_connections")
+    .select("email_status")
+    .eq("business_id", businessId)
+    .eq("email_status", "connected")
+    .maybeSingle();
+
+  return Boolean(data);
+}
+
 export function getGmailConnectConfig(): GmailConnectConfig {
   return {
     isConfigured: hasGoogleOAuthEnv(),
