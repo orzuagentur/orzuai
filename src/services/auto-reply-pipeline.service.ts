@@ -26,6 +26,7 @@ import {
   applyPreparedExecutorPlan,
   loadContactSnapshot,
 } from "@/services/agent-task-executor.service";
+import { reportAgentActions } from "@/services/agent-action-reporting.service";
 import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
 import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
@@ -129,7 +130,7 @@ async function resolveAssistantProfile(
   const { data } = await admin
     .from("ai_assistant_profile")
     .select(
-      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner",
+      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat",
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -146,9 +147,13 @@ async function resolveAssistantProfile(
       canCreateTask: data.can_create_task ?? true,
       canCreateDeal: data.can_create_deal ?? true,
       canUpdateContact: data.can_update_contact ?? true,
+      canAddNote: data.can_add_note ?? true,
+      canAddInternalNote: data.can_add_internal_note ?? true,
       canCreateCalendarEvent: data.can_create_calendar_event ?? false,
       canRequestHuman: data.can_request_human ?? true,
       canNotifyOwner: data.can_notify_owner ?? true,
+      canNotifyOnActions: data.can_notify_on_actions ?? true,
+      canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? true,
     };
   }
 
@@ -163,9 +168,13 @@ async function resolveAssistantProfile(
     can_create_task: defaults.canCreateTask,
     can_create_deal: defaults.canCreateDeal,
     can_update_contact: defaults.canUpdateContact,
+    can_add_note: defaults.canAddNote,
+    can_add_internal_note: defaults.canAddInternalNote,
     can_create_calendar_event: defaults.canCreateCalendarEvent,
     can_request_human: defaults.canRequestHuman,
     can_notify_owner: defaults.canNotifyOwner,
+    can_notify_on_actions: defaults.canNotifyOnActions,
+    can_summarize_actions_in_chat: defaults.canSummarizeActionsInChat,
   });
 
   return { ...defaults, fallbackReplyMessage: null };
@@ -258,7 +267,15 @@ function applyAgentPermissionsToPlan(
         return profile.canCreateCalendarEvent;
       }
 
-      return true;
+      if (action.type === "add_note") {
+        return profile.canAddNote;
+      }
+
+      if (action.type === "add_internal_note") {
+        return profile.canAddInternalNote;
+      }
+
+      return false;
     }),
   };
 }
@@ -586,8 +603,11 @@ export async function runAutoReplyBackgroundOrchestration(input: {
 
   const orchestration = orchestrationResult.data;
 
+  let executorResult: Awaited<ReturnType<typeof applyPreparedExecutorPlan>> | null =
+    null;
+
   if (contactId != null) {
-    await applyPreparedExecutorPlan({
+    executorResult = await applyPreparedExecutorPlan({
       admin: input.admin,
       businessId: input.businessId,
       contactId,
@@ -601,6 +621,27 @@ export async function runAutoReplyBackgroundOrchestration(input: {
         orchestratorResponseToExecutorPlan(orchestration),
         profile,
       ),
+    });
+  }
+
+  if (executorResult?.actionsApplied.length) {
+    await reportAgentActions({
+      admin: input.admin,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      channel: input.channel,
+      contactName: contact?.name,
+      profile: {
+        name: profile.name,
+        language: profile.language,
+        canAddInternalNote: profile.canAddInternalNote,
+        canNotifyOnActions: profile.canNotifyOnActions,
+        canNotifyOwner: profile.canNotifyOwner,
+        canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
+      },
+      actionsApplied: executorResult.actionsApplied,
+      clientSummary: executorResult.clientSummary,
+      sendFollowUp: input.sendFollowUp,
     });
   }
 

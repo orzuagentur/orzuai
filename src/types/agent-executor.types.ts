@@ -35,6 +35,11 @@ export const executorAddNoteActionSchema = z.object({
   content: z.string().trim().min(1).max(2000),
 });
 
+export const executorAddInternalNoteActionSchema = z.object({
+  type: z.literal("add_internal_note"),
+  content: z.string().trim().min(1).max(2000),
+});
+
 export const executorCreateCalendarEventActionSchema = z.object({
   type: z.literal("create_calendar_event"),
   summary: z.string().trim().min(1).max(200),
@@ -48,6 +53,7 @@ export const executorActionSchema = z.discriminatedUnion("type", [
   executorCreateTaskActionSchema,
   executorCreateDealActionSchema,
   executorAddNoteActionSchema,
+  executorAddInternalNoteActionSchema,
   executorCreateCalendarEventActionSchema,
 ]);
 

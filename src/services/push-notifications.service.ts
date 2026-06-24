@@ -257,3 +257,46 @@ export function scheduleAiHumanRequestPush(input: AiHumanRequestPushInput): void
     console.error("[push] failed to schedule ai human request", error);
   });
 }
+
+export type AgentActionPushInput = {
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  contactName: string;
+  agentName: string;
+  actionsSummary: string;
+};
+
+export async function notifyAgentActionPush(
+  input: AgentActionPushInput,
+): Promise<PushDeliveryResult> {
+  const channelLabel = getChannelLabel(input.channel);
+  const contactName = input.contactName.trim() || "Customer";
+  const agentName = input.agentName.trim() || "AI Agent";
+  const summary = input.actionsSummary.trim();
+  const title = `${agentName} — ${contactName}`;
+  const body = summary
+    ? `${channelLabel}: ${summary}`
+    : `${channelLabel}: CRM action completed`;
+
+  const payload = JSON.stringify({
+    title,
+    body,
+    url: buildConversationUrl(input.channel, input.conversationId),
+    tag: `agent-action-${input.conversationId}-${Date.now()}`,
+    sound: "/sounds/new-lead.wav",
+  });
+
+  try {
+    return await deliverPushToBusiness(input.businessId, payload);
+  } catch (error) {
+    console.error("[push] failed to notify agent action", error);
+    return { sent: 0, failed: 0, skipped: true };
+  }
+}
+
+export function scheduleAgentActionPush(input: AgentActionPushInput): void {
+  void notifyAgentActionPush(input).catch((error) => {
+    console.error("[push] failed to schedule agent action", error);
+  });
+}

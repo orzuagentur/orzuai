@@ -53,7 +53,9 @@ export const AI_ASSISTANT_MESSAGES = {
   assistantLanguageLabel: "Reply language",
   agentPermissionsTitle: "Permissions",
   agentPermissionsHint:
-    "Only enabled permissions can be executed by the AI Agent after a customer message.",
+    "Control what the AI Agent can do after each customer message. Disabled actions are skipped silently.",
+  agentPermissionsCrmTitle: "CRM & calendar",
+  agentPermissionsAlertsTitle: "Alerts & customer updates",
   assistantChannelConnected: "Connected",
   assistantChannelNotConnected: "Not connected",
   assistantConnectChannel: "Connect",

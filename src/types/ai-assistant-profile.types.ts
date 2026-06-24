@@ -23,9 +23,13 @@ export const saveAiAssistantProfileSchema = z.object({
   canCreateTask: z.boolean().default(true),
   canCreateDeal: z.boolean().default(true),
   canUpdateContact: z.boolean().default(true),
+  canAddNote: z.boolean().default(true),
+  canAddInternalNote: z.boolean().default(true),
   canCreateCalendarEvent: z.boolean().default(false),
   canRequestHuman: z.boolean().default(true),
   canNotifyOwner: z.boolean().default(true),
+  canNotifyOnActions: z.boolean().default(true),
+  canSummarizeActionsInChat: z.boolean().default(true),
 });
 
 export type SaveAiAssistantProfileInput = z.infer<
@@ -42,7 +46,11 @@ export type AiAssistantProfileData = {
   canCreateTask: boolean;
   canCreateDeal: boolean;
   canUpdateContact: boolean;
+  canAddNote: boolean;
+  canAddInternalNote: boolean;
   canCreateCalendarEvent: boolean;
   canRequestHuman: boolean;
   canNotifyOwner: boolean;
+  canNotifyOnActions: boolean;
+  canSummarizeActionsInChat: boolean;
 };

@@ -38,9 +38,13 @@ export async function activateAiAgentAction(): Promise<{
     canCreateTask: profile.canCreateTask,
     canCreateDeal: profile.canCreateDeal,
     canUpdateContact: profile.canUpdateContact,
+    canAddNote: profile.canAddNote,
+    canAddInternalNote: profile.canAddInternalNote,
     canCreateCalendarEvent: profile.canCreateCalendarEvent,
     canRequestHuman: profile.canRequestHuman,
     canNotifyOwner: profile.canNotifyOwner,
+    canNotifyOnActions: profile.canNotifyOnActions,
+    canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
   });
 
   if (!saved.success) {

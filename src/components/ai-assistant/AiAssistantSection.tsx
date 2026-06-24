@@ -72,9 +72,13 @@ function permissionSummary(data: AiAssistantPageData): Array<[string, boolean]> 
     ["Tasks", profile.canCreateTask],
     ["Deals", profile.canCreateDeal],
     ["Contact updates", profile.canUpdateContact],
+    ["Contact notes", profile.canAddNote],
+    ["Manager notes", profile.canAddInternalNote],
     ["Calendar", profile.canCreateCalendarEvent],
     ["Human handoff", profile.canRequestHuman],
-    ["Owner notifications", profile.canNotifyOwner],
+    ["Handoff alerts", profile.canNotifyOwner],
+    ["Action alerts", profile.canNotifyOnActions],
+    ["Customer summaries", profile.canSummarizeActionsInChat],
   ];
 }
 

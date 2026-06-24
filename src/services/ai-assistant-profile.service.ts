@@ -41,9 +41,13 @@ function mapProfileRow(row: {
   can_create_task?: boolean | null;
   can_create_deal?: boolean | null;
   can_update_contact?: boolean | null;
+  can_add_note?: boolean | null;
+  can_add_internal_note?: boolean | null;
   can_create_calendar_event?: boolean | null;
   can_request_human?: boolean | null;
   can_notify_owner?: boolean | null;
+  can_notify_on_actions?: boolean | null;
+  can_summarize_actions_in_chat?: boolean | null;
 }): AiAssistantProfileData {
   return {
     businessId: row.business_id,
@@ -55,9 +59,13 @@ function mapProfileRow(row: {
     canCreateTask: row.can_create_task ?? true,
     canCreateDeal: row.can_create_deal ?? true,
     canUpdateContact: row.can_update_contact ?? true,
+    canAddNote: row.can_add_note ?? true,
+    canAddInternalNote: row.can_add_internal_note ?? true,
     canCreateCalendarEvent: row.can_create_calendar_event ?? false,
     canRequestHuman: row.can_request_human ?? true,
     canNotifyOwner: row.can_notify_owner ?? true,
+    canNotifyOnActions: row.can_notify_on_actions ?? true,
+    canSummarizeActionsInChat: row.can_summarize_actions_in_chat ?? true,
   };
 }
 
@@ -74,9 +82,13 @@ export function getDefaultAiAssistantProfile(
     canCreateTask: true,
     canCreateDeal: true,
     canUpdateContact: true,
+    canAddNote: true,
+    canAddInternalNote: true,
     canCreateCalendarEvent: false,
     canRequestHuman: true,
     canNotifyOwner: true,
+    canNotifyOnActions: true,
+    canSummarizeActionsInChat: true,
   };
 }
 
@@ -90,7 +102,7 @@ export async function ensureAiAssistantProfile(
   const supabase = await createClient();
   const { data } = await supabase
     .from("ai_assistant_profile")
-    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner")
+    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat")
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -111,11 +123,15 @@ export async function ensureAiAssistantProfile(
       can_create_task: defaults.canCreateTask,
       can_create_deal: defaults.canCreateDeal,
       can_update_contact: defaults.canUpdateContact,
+      can_add_note: defaults.canAddNote,
+      can_add_internal_note: defaults.canAddInternalNote,
       can_create_calendar_event: defaults.canCreateCalendarEvent,
       can_request_human: defaults.canRequestHuman,
       can_notify_owner: defaults.canNotifyOwner,
+      can_notify_on_actions: defaults.canNotifyOnActions,
+      can_summarize_actions_in_chat: defaults.canSummarizeActionsInChat,
     })
-    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_create_calendar_event, can_request_human, can_notify_owner")
+    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat")
     .single();
 
   return created ? mapProfileRow(created) : defaults;
@@ -162,9 +178,13 @@ export async function saveAiAssistantProfile(
       can_create_task: parsed.data.canCreateTask,
       can_create_deal: parsed.data.canCreateDeal,
       can_update_contact: parsed.data.canUpdateContact,
+      can_add_note: parsed.data.canAddNote,
+      can_add_internal_note: parsed.data.canAddInternalNote,
       can_create_calendar_event: parsed.data.canCreateCalendarEvent,
       can_request_human: parsed.data.canRequestHuman,
       can_notify_owner: parsed.data.canNotifyOwner,
+      can_notify_on_actions: parsed.data.canNotifyOnActions,
+      can_summarize_actions_in_chat: parsed.data.canSummarizeActionsInChat,
     },
     { onConflict: "business_id" },
   );

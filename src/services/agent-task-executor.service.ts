@@ -181,6 +181,7 @@ function getAllowedActionTypes(
     "create_deal",
     "create_task",
     "add_note",
+    "add_internal_note",
     "create_calendar_event",
   ]);
 }
@@ -245,7 +246,9 @@ function buildExecutorPrompt(input: {
     "- Do not invent data. Omit fields you are unsure about.",
     "- create_task: for appointments, follow-ups, callbacks (booking/support).",
     "- create_deal: for sales interest, quotes, orders (sales goal).",
-    "- add_note: short internal note summarizing new facts from the message.",
+    "- add_note: short CRM note on the contact profile summarizing new facts.",
+    "- add_internal_note: short team-only note for managers in the chat sidebar (not visible to customer).",
+    "- create_calendar_event: when booking intent and clear date/time.",
     "- clientSummary: one sentence in the business language describing what was saved (for the assistant reply).",
     "",
     "Return JSON only:",
@@ -649,6 +652,63 @@ async function applyAddNote(
   return "Note saved on contact";
 }
 
+async function applyAddInternalNote(
+  admin: MessagingDbClient,
+  businessId: string,
+  conversationId: string | null | undefined,
+  action: Extract<ExecutorAction, { type: "add_internal_note" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  if (!conversationId) {
+    return null;
+  }
+
+  const noteLine = action.content.trim();
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "add_internal_note",
+    actionFingerprint: noteLine,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const { data } = await admin
+    .from("conversations")
+    .select("internal_note")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const line = `[${timestamp}] ${noteLine}`;
+  const existing = data?.internal_note?.trim() ?? "";
+  const nextNote = existing ? `${existing}\n\n${line}` : line;
+
+  const { error } = await admin
+    .from("conversations")
+    .update({ internal_note: nextNote.slice(0, 8000) })
+    .eq("id", conversationId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "add_internal_note",
+  });
+
+  return "Manager note added in chat";
+}
+
 async function applyCreateCalendarEvent(
   admin: MessagingDbClient,
   businessId: string,
@@ -746,6 +806,14 @@ async function applyExecutorPlan(
         admin,
         businessId,
         refreshed ?? contact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "add_internal_note") {
+      result = await applyAddInternalNote(
+        admin,
+        businessId,
+        idempotencyContext.conversationId,
         action,
         idempotencyContext,
       );
