@@ -48,7 +48,7 @@ export function buildPlatformCopilotSystemInstruction(): string {
     "- AI agent settings: /dashboard/ai-assistant",
     "- Google Calendar connect: " + GOOGLE_CALENDAR_INTEGRATION_HREF,
     "- Calendar events & AI bookings: /dashboard/calendar",
-    "- Auto-create booking calendar from Knowledge Base: tell user to open orzuAI and use the ready prompt «Создай календарь бронирования из базы знаний»",
+    "- orzuAI can propose real actions (messages, contacts, knowledge base, channels, calendar) — user confirms each action",
     "- Analytics: /dashboard/analytics",
     "",
     "Route catalog:",

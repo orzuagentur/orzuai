@@ -1,20 +1,13 @@
 import "server-only";
 
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { hasSupabaseEnv } from "@/lib/env";
-import {
-  buildPlatformCopilotPrompt,
-  buildPlatformCopilotSystemInstruction,
-} from "@/lib/platform-copilot/prompts";
-import { parsePlatformCopilotResponse } from "@/lib/platform-copilot/parse-copilot-response";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { generateBusinessCalendarFromKnowledgeForUser } from "@/services/business-calendar-setup.service";
-import { generateText } from "@/services/llm.service";
-import {
-  buildCalendarSetupSuccessReply,
-  isCalendarSetupFromKnowledgeRequest,
-} from "@/utils/calendar-setup-from-knowledge";
+import { planPlatformCopilotActions } from "@/services/platform-copilot-agent.service";
+import type {
+  CopilotProposedAction,
+  PlatformCopilotMode,
+} from "@/types/platform-copilot.types";
 
 export type PlatformCopilotHistoryEntry = {
   role: "user" | "assistant";
@@ -24,11 +17,14 @@ export type PlatformCopilotHistoryEntry = {
 export async function askPlatformCopilot(input: {
   question: string;
   currentPath: string;
+  mode: PlatformCopilotMode;
   history?: PlatformCopilotHistoryEntry[];
 }): Promise<
   | {
       success: true;
       reply: string;
+      quickReplies: string[];
+      actions: CopilotProposedAction[];
       navigateTo: string | null;
       navigateLabel: string | null;
       autoNavigate: boolean;
@@ -41,7 +37,7 @@ export async function askPlatformCopilot(input: {
     return { success: false, message: "Введите вопрос." };
   }
 
-  if (question.length > 500) {
+  if (question.length > 800) {
     return { success: false, message: "Вопрос слишком длинный." };
   }
 
@@ -52,49 +48,29 @@ export async function askPlatformCopilot(input: {
     return { success: false, message: "Бизнес не найден." };
   }
 
-  if (isCalendarSetupFromKnowledgeRequest(question)) {
-    const setupResult = await generateBusinessCalendarFromKnowledgeForUser();
-
-    if (!setupResult.success) {
-      return { success: false, message: setupResult.message };
-    }
-
-    return {
-      success: true,
-      reply: buildCalendarSetupSuccessReply({
-        businessTypeLabel: setupResult.setup.businessTypeLabel,
-        resourceCount: setupResult.replacedCount,
-        resourceNames: setupResult.resources.map((resource) => resource.name),
-      }),
-      navigateTo: DASHBOARD_ROUTES.calendar,
-      navigateLabel: "Открыть календарь",
-      autoNavigate: true,
-    };
-  }
-
-  const history = (input.history ?? []).slice(-6);
-
-  const aiResult = await generateText({
+  const plan = await planPlatformCopilotActions({
     businessId: business.id,
-    prompt: buildPlatformCopilotPrompt({
-      question,
-      currentPath: input.currentPath,
-      history,
-    }),
-    systemInstruction: buildPlatformCopilotSystemInstruction(),
+    question,
+    currentPath: input.currentPath,
+    mode: input.mode,
+    history: input.history,
   });
 
-  if (!aiResult.success) {
-    return { success: false, message: aiResult.error.message };
+  if (!plan.success) {
+    return { success: false, message: plan.message };
   }
 
-  const parsed = parsePlatformCopilotResponse(aiResult.data.text);
+  const navigateAction = (plan.data.actions ?? []).find(
+    (action) => action.type === "navigate",
+  );
 
   return {
     success: true,
-    reply: parsed.reply,
-    navigateTo: parsed.navigateTo ?? null,
-    navigateLabel: parsed.navigateLabel ?? null,
-    autoNavigate: parsed.autoNavigate ?? false,
+    reply: plan.data.reply,
+    quickReplies: plan.data.quickReplies ?? [],
+    actions: plan.data.actions ?? [],
+    navigateTo: navigateAction?.params.path ?? null,
+    navigateLabel: navigateAction?.label ?? null,
+    autoNavigate: false,
   };
 }

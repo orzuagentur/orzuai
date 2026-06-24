@@ -7,7 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { mapKnowledgeEntry } from "@/utils/knowledge";
-import { generateText } from "@/services/llm.service";
+import { generateTextWithFallback } from "@/services/llm.service";
+import { buildHeuristicCalendarExtraction } from "@/utils/calendar-heuristic";
 import type {
   BusinessBookingSetup,
   BusinessCalendarResource,
@@ -181,10 +182,12 @@ export function formatCalendarResourcesForAiPrompt(
 async function extractCalendarResourcesFromKnowledge(input: {
   businessId: string;
   knowledgeContext: string;
-}): Promise<CalendarResourceExtraction | null> {
-  const result = await generateText({
+  entries: KnowledgeEntryData[];
+}): Promise<CalendarResourceExtraction> {
+  const result = await generateTextWithFallback({
     businessId: input.businessId,
     callType: "crm_plan",
+    preferredProvider: "gemini",
     systemInstruction:
       "You analyze business knowledge and design a booking calendar structure. Reply with valid JSON only.",
     prompt: [
@@ -206,14 +209,16 @@ async function extractCalendarResourcesFromKnowledge(input: {
     ].join("\n"),
   });
 
-  if (!result.success) {
-    return null;
+  if (result.success) {
+    const parsed = parseJsonObject(result.data.text);
+    const validated = calendarResourceExtractionSchema.safeParse(parsed);
+
+    if (validated.success) {
+      return validated.data;
+    }
   }
 
-  const parsed = parseJsonObject(result.data.text);
-  const validated = calendarResourceExtractionSchema.safeParse(parsed);
-
-  return validated.success ? validated.data : null;
+  return buildHeuristicCalendarExtraction(input.entries);
 }
 
 export async function generateBusinessCalendarFromKnowledge(
@@ -240,14 +245,8 @@ export async function generateBusinessCalendarFromKnowledge(
   const extraction = await extractCalendarResourcesFromKnowledge({
     businessId,
     knowledgeContext: buildKnowledgeContext(entries),
+    entries,
   });
-
-  if (!extraction) {
-    return {
-      success: false,
-      message: "Could not analyze knowledge base. Try again or add more details.",
-    };
-  }
 
   const admin = createAdminClient();
   const now = new Date().toISOString();
