@@ -11,6 +11,7 @@ import {
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatSupabaseError } from "@/lib/supabase/format-error";
 import {
   notifyAutoReplyError,
   notifyAutoReplyTyping,
@@ -145,18 +146,74 @@ async function upsertAiReplyJob(
   admin: MessagingDbClient,
   input: ChannelAutoReplyScheduleInput,
 ): Promise<string | null> {
-  const { data, error } = await admin.rpc("upsert_ai_reply_job", {
-    p_business_id: input.businessId,
-    p_conversation_id: input.conversationId,
-    p_channel: input.channel,
-    p_message: input.clientMessage,
-  });
-
-  if (error) {
-    throw error;
+  const trimmed = input.clientMessage.trim();
+  if (!trimmed) {
+    return null;
   }
 
-  return data ?? null;
+  const debouncedAt = new Date(Date.now() + AUTO_REPLY_DEBOUNCE_MS).toISOString();
+  const now = new Date().toISOString();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data: existing, error: fetchError } = await admin
+      .from("ai_reply_jobs")
+      .select("id, status, pending_messages, needs_reprocess")
+      .eq("business_id", input.businessId)
+      .eq("conversation_id", input.conversationId)
+      .maybeSingle();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (existing) {
+      const isProcessing = existing.status === "processing";
+      const pendingMessages = [...(existing.pending_messages ?? []), trimmed];
+
+      const { error: updateError } = await admin
+        .from("ai_reply_jobs")
+        .update({
+          channel: input.channel,
+          pending_messages: pendingMessages,
+          next_attempt_at: debouncedAt,
+          needs_reprocess: isProcessing ? true : existing.needs_reprocess,
+          status: isProcessing ? "processing" : "pending",
+          updated_at: now,
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      return existing.id;
+    }
+
+    const { data: inserted, error: insertError } = await admin
+      .from("ai_reply_jobs")
+      .insert({
+        business_id: input.businessId,
+        conversation_id: input.conversationId,
+        channel: input.channel,
+        pending_messages: [trimmed],
+        next_attempt_at: debouncedAt,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+
+    if (!insertError) {
+      return inserted.id;
+    }
+
+    if (insertError.code === "23505" && attempt === 0) {
+      continue;
+    }
+
+    throw insertError;
+  }
+
+  return null;
 }
 
 function scheduleDebouncedAiReplyDrain(): void {
@@ -219,7 +276,7 @@ export async function scheduleDebouncedChannelAutoReply(
   try {
     await upsertAiReplyJob(admin, input);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatSupabaseError(error);
     console.error(
       "[ai-reply-queue] failed to enqueue auto-reply job",
       JSON.stringify({
@@ -246,7 +303,7 @@ export async function scheduleDebouncedChannelAutoReply(
   } catch (error) {
     console.error(
       "[ai-reply-queue] inline drain failed after enqueue",
-      error instanceof Error ? error.message : String(error),
+      formatSupabaseError(error),
     );
     dispatchAiReplyWorker("enqueue");
   }

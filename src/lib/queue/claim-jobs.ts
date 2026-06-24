@@ -1,7 +1,10 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatSupabaseError } from "@/lib/supabase/format-error";
 import type { Database } from "@/types/database.types";
+
+type AiReplyJobRow = Database["public"]["Tables"]["ai_reply_jobs"]["Row"];
 
 type WebhookJob = Database["public"]["Tables"]["inbound_webhook_queue"]["Row"];
 type DeliveryJob = Database["public"]["Tables"]["message_deliveries"]["Row"];
@@ -84,17 +87,75 @@ export async function claimInboundMediaHydrationJob(
 
 export async function claimAiReplyJobs(
   limit: number,
-): Promise<Database["public"]["Tables"]["ai_reply_jobs"]["Row"][]> {
+): Promise<AiReplyJobRow[]> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("claim_ai_reply_jobs", {
     p_limit: limit,
   });
 
+  if (!error) {
+    return data ?? [];
+  }
+
+  console.warn(
+    "[claim-jobs] claim_ai_reply_jobs RPC failed, falling back to direct claim",
+    formatSupabaseError(error),
+  );
+
+  return claimAiReplyJobsDirect(admin, limit);
+}
+
+async function claimAiReplyJobsDirect(
+  admin: ReturnType<typeof createAdminClient>,
+  limit: number,
+): Promise<AiReplyJobRow[]> {
+  const now = new Date().toISOString();
+
+  const { data: candidates, error } = await admin
+    .from("ai_reply_jobs")
+    .select("*")
+    .eq("status", "pending")
+    .lte("next_attempt_at", now)
+    .order("next_attempt_at", { ascending: true })
+    .limit(limit);
+
   if (error) {
     throw error;
   }
 
-  return data ?? [];
+  if (!candidates?.length) {
+    return [];
+  }
+
+  const claimed: AiReplyJobRow[] = [];
+
+  for (const job of candidates) {
+    if ((job.pending_messages?.length ?? 0) === 0) {
+      continue;
+    }
+
+    const { data: updated, error: claimError } = await admin
+      .from("ai_reply_jobs")
+      .update({ status: "processing", updated_at: now })
+      .eq("id", job.id)
+      .eq("status", "pending")
+      .select("*")
+      .maybeSingle();
+
+    if (claimError) {
+      console.warn(
+        "[claim-jobs] direct ai reply claim failed",
+        formatSupabaseError(claimError),
+      );
+      continue;
+    }
+
+    if (updated) {
+      claimed.push(updated);
+    }
+  }
+
+  return claimed;
 }
 
 export async function claimAiOrchestrationJobs(
