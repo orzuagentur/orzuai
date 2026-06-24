@@ -100,5 +100,14 @@ export function resolveLlmModel(
     return trimmed;
   }
 
+  // Fallback chain passes the preferred provider's model (e.g. gemini-2.5-flash).
+  if (
+    isValidAiModel("gemini", trimmed) ||
+    isValidAiModel("openai", trimmed) ||
+    isValidAiModel("claude", trimmed)
+  ) {
+    return getDefaultModelForProvider(provider);
+  }
+
   return trimmed;
 }

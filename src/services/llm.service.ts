@@ -389,6 +389,16 @@ export async function generateAssistantReplyWithFallback(
     }
 
     lastError = result;
+
+    console.warn(
+      "[llm] provider failed",
+      JSON.stringify({
+        provider,
+        model: resolveLlmModel(provider, input.model),
+        errorCode: result.error?.code,
+        errorMessage: result.error?.message?.slice(0, 300),
+      }),
+    );
   }
 
   if (lastError) {
@@ -434,6 +444,16 @@ export async function generateTextWithFallback(
     }
 
     lastError = result;
+
+    console.warn(
+      "[llm] provider failed",
+      JSON.stringify({
+        provider,
+        model: resolveLlmModel(provider, input.model),
+        errorCode: result.error?.code,
+        errorMessage: result.error?.message?.slice(0, 300),
+      }),
+    );
   }
 
   if (lastError) {
