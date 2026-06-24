@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runAutoReplyBackgroundOrchestration } from "@/services/auto-reply-pipeline.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { buildAiOrchestrationIdempotencyKey } from "@/services/ai-reply-queue.service";
+import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -229,12 +230,18 @@ async function processClaimedAiOrchestrationJob(
       clientMessage: job.client_message,
       language,
       sendFollowUp: async (text) => {
+        const customerText = sanitizeCustomerFacingSummary(text);
+
+        if (!customerText) {
+          return { success: true };
+        }
+
         const result = await sendChannelAutoReplyText({
           admin,
           businessId: job.business_id,
           channel: job.channel,
           conversationId: job.conversation_id,
-          text,
+          text: customerText,
         });
 
         if (result.success) {
@@ -245,7 +252,7 @@ async function processClaimedAiOrchestrationJob(
             conversationId: job.conversation_id,
             channel: job.channel,
             senderType: "ai",
-            content: text,
+            content: customerText,
             aiGenerated: true,
           });
 

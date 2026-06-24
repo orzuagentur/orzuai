@@ -30,7 +30,7 @@ export const saveAiAssistantProfileSchema = z.object({
   canRequestHuman: z.boolean().default(true),
   canNotifyOwner: z.boolean().default(true),
   canNotifyOnActions: z.boolean().default(true),
-  canSummarizeActionsInChat: z.boolean().default(true),
+  canSummarizeActionsInChat: z.boolean().default(false),
 });
 
 export type SaveAiAssistantProfileInput = z.infer<

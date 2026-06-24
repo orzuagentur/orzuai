@@ -11,12 +11,17 @@ import {
   type ReactNode,
 } from "react";
 
+import type { AiAgentTab } from "@/types/agent-dashboard.types";
+
 export type AiAssistantChromeConfig = {
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
+  activeTab: AiAgentTab;
+  onTabChange: (tab: AiAgentTab) => void;
+  showTabs: boolean;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  showSearch?: boolean;
+  showNewAgent?: boolean;
   onNewAgent?: () => void;
-  showSearch: boolean;
-  showNewAgent: boolean;
 };
 
 type AiAssistantChromeContextValue = {
@@ -32,6 +37,8 @@ function chromePrimitivesEqual(
   b: AiAssistantChromeConfig,
 ): boolean {
   return (
+    a.activeTab === b.activeTab &&
+    a.showTabs === b.showTabs &&
     a.searchQuery === b.searchQuery &&
     a.showSearch === b.showSearch &&
     a.showNewAgent === b.showNewAgent
@@ -58,6 +65,7 @@ export function AiAssistantChromeProvider({ children }: { children: ReactNode })
       }
 
       if (
+        prev.onTabChange !== next.onTabChange ||
         prev.onSearchChange !== next.onSearchChange ||
         prev.onNewAgent !== next.onNewAgent
       ) {
@@ -96,11 +104,16 @@ export function useAiAssistantChromeRegistration(
   setChromeRef.current = context?.setChrome;
 
   const enabled =
-    config !== null && typeof config.onSearchChange === "function";
+    config !== null &&
+    typeof config.onTabChange === "function" &&
+    config.showTabs;
 
+  const activeTab = config?.activeTab ?? "dashboard";
+  const showTabs = config?.showTabs ?? false;
   const searchQuery = config?.searchQuery ?? "";
   const showSearch = config?.showSearch ?? false;
   const showNewAgent = config?.showNewAgent ?? false;
+  const onTabChange = config?.onTabChange;
   const onSearchChange = config?.onSearchChange;
   const onNewAgent = config?.onNewAgent;
 
@@ -111,17 +124,20 @@ export function useAiAssistantChromeRegistration(
       return;
     }
 
-    if (!enabled || !onSearchChange) {
+    if (!enabled || !onTabChange) {
       setChrome(null);
       return;
     }
 
     setChrome({
+      activeTab,
+      onTabChange,
+      showTabs,
       searchQuery,
       onSearchChange,
-      onNewAgent,
       showSearch,
       showNewAgent,
+      onNewAgent,
     });
 
     return () => {
@@ -129,9 +145,12 @@ export function useAiAssistantChromeRegistration(
     };
   }, [
     enabled,
+    activeTab,
+    showTabs,
     searchQuery,
     showSearch,
     showNewAgent,
+    onTabChange,
     onSearchChange,
     onNewAgent,
   ]);

@@ -21,6 +21,11 @@ import type {
 import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
 import type { AiAgentItem } from "./ai-agent.types";
 import type { AiAssistantProfileData } from "./ai-assistant-profile.types";
+import type {
+  AgentActivityPoint,
+  AgentDashboardStats,
+  AgentRecentDialogue,
+} from "./agent-dashboard.types";
 import type { KnowledgeEntryData } from "./knowledge.types";
 import type { WebsiteKnowledgeSyncData } from "./website-knowledge.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
@@ -152,6 +157,9 @@ export type AiAssistantPageData = {
   knowledgeHasActiveFilters: boolean;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
   recentAgentRuns: AgentRunListItem[];
+  agentDashboardStats: AgentDashboardStats;
+  recentDialogues: AgentRecentDialogue[];
+  aiActivity: AgentActivityPoint[];
 };
 
 export type ChannelAnalyticsActivityPoint = {

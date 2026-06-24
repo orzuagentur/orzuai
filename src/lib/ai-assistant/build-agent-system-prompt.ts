@@ -44,10 +44,10 @@ export function formatOrchestrationReplyContext(input: {
 
   if (input.clientSummary?.trim()) {
     sections.push(
-      `CRM actions just completed for this message: ${input.clientSummary.trim()}`,
+      `Background context for your reply (do not quote verbatim): ${input.clientSummary.trim()}`,
     );
     sections.push(
-      "Confirm naturally in your reply what was saved or proposed. Do not mention internal systems.",
+      "Acknowledge the outcome naturally in your own words. Never mention CRM, internal systems, or manager notes.",
     );
   }
 

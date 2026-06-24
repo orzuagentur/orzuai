@@ -87,6 +87,101 @@ export function buildPeriodActivity(
   return buckets.map(({ label, value }) => ({ label, value }));
 }
 
+export function buildHourlyActivity(
+  timestamps: string[],
+  hours = 24,
+): Array<{ label: string; value: number; key: string }> {
+  const now = new Date();
+  const safeHours = Math.max(1, Math.min(hours, 48));
+  const start = new Date(now);
+  start.setMinutes(0, 0, 0);
+  start.setHours(start.getHours() - (safeHours - 1));
+
+  const buckets = Array.from({ length: safeHours }, (_, index) => {
+    const date = new Date(start);
+    date.setHours(start.getHours() + index);
+
+    return {
+      key: date.toISOString().slice(0, 13),
+      label: date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      value: 0,
+    };
+  });
+
+  const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  for (const timestamp of timestamps) {
+    const date = new Date(timestamp);
+
+    if (Number.isNaN(date.getTime())) {
+      continue;
+    }
+
+    const key = date.toISOString().slice(0, 13);
+    const bucket = bucketMap.get(key);
+
+    if (bucket) {
+      bucket.value += 1;
+    }
+  }
+
+  return buckets;
+}
+
+export function buildPeriodActivityWithKeys(
+  timestamps: string[],
+  days: number,
+): Array<{ label: string; value: number; key: string }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const safeDays = Math.max(1, Math.min(days, 90));
+
+  const buckets = Array.from({ length: safeDays }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (safeDays - 1 - index));
+
+    return {
+      key: date.toISOString().slice(0, 10),
+      label:
+        safeDays <= 7
+          ? date.toLocaleDateString("en-US", { weekday: "short" })
+          : date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      value: 0,
+    };
+  });
+
+  const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  for (const timestamp of timestamps) {
+    const key = timestamp.slice(0, 10);
+    const bucket = bucketMap.get(key);
+
+    if (bucket) {
+      bucket.value += 1;
+    }
+  }
+
+  return buckets;
+}
+
+export function formatDurationMinutes(totalMinutes: number): string {
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
 export function buildLastSevenDaysActivity(
   timestamps: string[],
 ): Array<{ label: string; value: number }> {

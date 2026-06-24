@@ -32,6 +32,11 @@ import {
 import { listKnowledgeEntries, parseKnowledgeCategory } from "@/services/knowledge.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { listRecentAgentRuns } from "@/services/analytics-ai-ops.service";
+import {
+  getAgentAiActivity,
+  getAgentDashboardStats,
+  listAgentRecentDialogues,
+} from "@/services/agent-dashboard.service";
 import type {
   AiAssistantPageData,
   ApplyGlobalAiDefaultsInput,
@@ -116,6 +121,15 @@ export async function getAiAssistantPageData(
       knowledgeHasActiveFilters: false,
       websiteKnowledgeSync: null,
       recentAgentRuns: [],
+      agentDashboardStats: {
+        aiTextReplies: 0,
+        voiceAiReplies: 0,
+        voiceAiReplyMinutes: 0,
+        totalCallMinutes: 0,
+        contactsServed: 0,
+      },
+      recentDialogues: [],
+      aiActivity: [],
     };
   }
 
@@ -131,6 +145,9 @@ export async function getAiAssistantPageData(
     knowledgeEntries,
     websiteKnowledgeSync,
     recentAgentRuns,
+    agentDashboardStats,
+    recentDialogues,
+    aiActivity,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     listBusinessProviderCredentials(businessId),
@@ -142,6 +159,9 @@ export async function getAiAssistantPageData(
     }),
     getWebsiteKnowledgeSync(businessId),
     listRecentAgentRuns(businessId, 8),
+    getAgentDashboardStats(businessId),
+    listAgentRecentDialogues(businessId, 12),
+    getAgentAiActivity(businessId, 1),
   ]);
 
   const providerAvailability = mergeProviderAvailability(
@@ -205,6 +225,9 @@ export async function getAiAssistantPageData(
     knowledgeHasActiveFilters,
     websiteKnowledgeSync,
     recentAgentRuns,
+    agentDashboardStats,
+    recentDialogues,
+    aiActivity,
   };
 }
 

@@ -2,11 +2,18 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, MessagingChannel } from "@/types/database.types";
+import { createAiActionNotification } from "@/services/business-notifications.service";
 import {
   scheduleAgentActionPush,
   type AgentActionPushInput,
 } from "@/services/push-notifications.service";
+import type { Database, MessagingChannel } from "@/types/database.types";
+import {
+  filterCustomerVisibleActionLabels,
+  messagesAreLikelyDuplicates,
+  sanitizeCustomerFacingSummary,
+  shouldSendCustomerActionFollowUp,
+} from "@/utils/customer-facing-agent-summary";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -29,28 +36,30 @@ export function buildCustomerFacingActionSummary(input: {
   actionsApplied: string[];
   clientSummary?: string;
 }): string | null {
-  const custom = input.clientSummary?.trim();
+  const custom = sanitizeCustomerFacingSummary(input.clientSummary);
 
   if (custom) {
     return custom;
   }
 
-  if (input.actionsApplied.length === 0) {
+  const visibleActions = filterCustomerVisibleActionLabels(input.actionsApplied);
+
+  if (visibleActions.length === 0) {
     return null;
   }
 
-  const actionsText = input.actionsApplied.join("; ");
+  const actionsText = visibleActions.join("; ");
   const language = input.language.trim();
 
   if (language === "Russian") {
-    return `Я обработал ваш запрос: ${actionsText}.`;
+    return `Готово: ${actionsText}.`;
   }
 
   if (language === "Uzbek") {
-    return `So'rovingizni qayta ishladim: ${actionsText}.`;
+    return `Tayyor: ${actionsText}.`;
   }
 
-  return `I've taken care of your request: ${actionsText}.`;
+  return `Done: ${actionsText}.`;
 }
 
 async function appendConversationInternalNoteAdmin(
@@ -108,6 +117,16 @@ export async function reportAgentActions(input: {
     });
   }
 
+  await createAiActionNotification({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    contactName: input.contactName,
+    agentName,
+    actionsApplied: input.actionsApplied,
+  });
+
   if (input.profile.canNotifyOnActions && input.profile.canNotifyOwner) {
     const pushInput: AgentActionPushInput = {
       businessId: input.businessId,
@@ -125,6 +144,15 @@ export async function reportAgentActions(input: {
     return;
   }
 
+  if (
+    !shouldSendCustomerActionFollowUp({
+      actionsApplied: input.actionsApplied,
+      clientSummary: input.clientSummary,
+    })
+  ) {
+    return;
+  }
+
   const customerSummary = buildCustomerFacingActionSummary({
     agentName,
     language: input.profile.language,
@@ -134,6 +162,28 @@ export async function reportAgentActions(input: {
 
   if (!customerSummary) {
     return;
+  }
+
+  const { data: recentAiMessage } = await input.admin
+    .from("messages")
+    .select("content, created_at")
+    .eq("conversation_id", input.conversationId)
+    .eq("sender_type", "ai")
+    .eq("hidden_for_business", false)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentAiMessage?.content) {
+    const ageMs =
+      Date.now() - new Date(recentAiMessage.created_at).getTime();
+
+    if (
+      ageMs < 2 * 60 * 1000 &&
+      messagesAreLikelyDuplicates(recentAiMessage.content, customerSummary)
+    ) {
+      return;
+    }
   }
 
   const followUpResult = await input.sendFollowUp(customerSummary);

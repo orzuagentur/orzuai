@@ -1607,6 +1607,79 @@ export type Database = {
           },
         ];
       };
+      business_notifications: {
+        Row: {
+          id: string;
+          business_id: string;
+          kind: string;
+          conversation_id: string;
+          contact_id: string | null;
+          channel: string;
+          contact_name: string;
+          title: string;
+          body: string;
+          details: Json;
+          source_id: string | null;
+          read_at: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          kind: string;
+          conversation_id: string;
+          contact_id?: string | null;
+          channel: string;
+          contact_name?: string;
+          title: string;
+          body?: string;
+          details?: Json;
+          source_id?: string | null;
+          read_at?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          kind?: string;
+          conversation_id?: string;
+          contact_id?: string | null;
+          channel?: string;
+          contact_name?: string;
+          title?: string;
+          body?: string;
+          details?: Json;
+          source_id?: string | null;
+          read_at?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_notifications_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_notifications_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_notifications_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       ai_human_requests: {
         Row: {
           id: string;

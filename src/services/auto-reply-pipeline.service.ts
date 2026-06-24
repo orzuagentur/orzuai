@@ -28,6 +28,7 @@ import {
 } from "@/services/agent-task-executor.service";
 import { reportAgentActions } from "@/services/agent-action-reporting.service";
 import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
+import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
 import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
@@ -153,7 +154,7 @@ async function resolveAssistantProfile(
       canRequestHuman: data.can_request_human ?? true,
       canNotifyOwner: data.can_notify_owner ?? true,
       canNotifyOnActions: data.can_notify_on_actions ?? true,
-      canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? true,
+      canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? false,
     };
   }
 
@@ -682,6 +683,30 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   }
 
   const followUpText = buildHumanHandoffFollowUpMessage(input.language);
+
+  const { data: recentAiMessage } = await input.admin
+    .from("messages")
+    .select("content, created_at")
+    .eq("conversation_id", input.conversationId)
+    .eq("sender_type", "ai")
+    .eq("hidden_for_business", false)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (
+    recentAiMessage?.content &&
+    Date.now() - new Date(recentAiMessage.created_at).getTime() < 2 * 60 * 1000 &&
+    messagesAreLikelyDuplicates(recentAiMessage.content, followUpText)
+  ) {
+    void refreshConversationSummaryIfNeeded({
+      admin: input.admin,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+    });
+    return;
+  }
+
   const followUpResult = await input.sendFollowUp(followUpText);
 
   if (!followUpResult.success) {

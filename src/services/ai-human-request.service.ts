@@ -2,6 +2,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  resolveHumanRequestNotification,
+  upsertHumanRequestNotification,
+} from "@/services/business-notifications.service";
 import { scheduleAiHumanRequestPush } from "@/services/push-notifications.service";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
@@ -115,6 +119,18 @@ export async function createAiHumanRequest(input: {
       requestId: request.id,
     });
 
+    await upsertHumanRequestNotification({
+      admin: input.admin,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      channel: input.channel,
+      contactId: input.contactId,
+      contactName,
+      reason,
+      messagePreview,
+      requestId: request.id,
+    });
+
     console.info(
       "[ai-human-request]",
       JSON.stringify({
@@ -159,6 +175,18 @@ export async function createAiHumanRequest(input: {
     requestId: request.id,
   });
 
+  await upsertHumanRequestNotification({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    contactId: input.contactId,
+    contactName,
+    reason,
+    messagePreview,
+    requestId: request.id,
+  });
+
   console.info(
     "[ai-human-request]",
     JSON.stringify({
@@ -184,6 +212,14 @@ export async function dismissAiHumanRequest(input: {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if ((count ?? 0) > 0) {
+    await resolveHumanRequestNotification({
+      admin: input.admin,
+      businessId: input.businessId,
+      requestId: input.requestId,
+    });
   }
 
   return (count ?? 0) > 0;

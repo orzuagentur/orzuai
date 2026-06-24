@@ -147,14 +147,18 @@ export const INBOUND_ALERT_MESSAGES = {
 
 export const AI_HUMAN_REQUEST_MESSAGES = {
   buttonLabel: "Notifications",
-  panelTitle: "Human help requests",
+  panelTitle: "Notifications",
   panelDescription:
-    "When AI cannot handle a conversation, it calls you here — not as a new message.",
-  emptyState: "No human help requests from AI",
+    "AI action reports and manager call-outs stay here until you review them.",
+  emptyState: "No notifications yet",
+  aiActionLabel: "AI action report",
+  humanRequestLabel: "Manager call-out",
+  resolvedLabel: "Handled",
   connect: "Connect",
   dismiss: "Dismiss",
   accept: "Accept",
   decline: "Decline",
+  openChat: "Open chat",
   overlayTitle: "Customer wants a manager",
   overlayDescription: "AI asked for a real person to join this conversation.",
   declineSuccess: "Request declined. The customer was notified.",

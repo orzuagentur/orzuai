@@ -121,10 +121,10 @@ function buildOrchestratorPrompt(input: {
     "- booking/support intent: prefer create_task and add_note when a real calendar event is not certain",
     "- sales intent: prefer create_deal, create_task, add_note",
     "- general/none: add_note, add_internal_note, and contactUpdates only when customer shares new details",
-    "- add_internal_note: team-only context for managers (not sent to customer). Use for action summaries managers should see.",
+    "- add_internal_note: team-only context for managers (not sent to customer). Use for impatience, owner requests, or internal observations.",
     "- Do not invent contact data. Omit uncertain fields.",
     "- create_calendar_event requires summary, startDateTime, endDateTime, timeZone, optional description. Use ISO date-times.",
-    "- clientSummary: one short sentence for the agent's customer-facing reply (what was saved or proposed).",
+    "- clientSummary: optional one short sentence spoken DIRECTLY to the customer (use I/we). Never mention CRM, systems, or internal notes. Never describe the customer in third person (avoid \"the customer wants...\"). Leave empty when the main reply already covers it.",
   ].join("\n");
 }
 

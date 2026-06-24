@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
+
 import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
 import {
   buildCrmActionIdempotencyKey,
@@ -247,9 +249,9 @@ function buildExecutorPrompt(input: {
     "- create_task: for appointments, follow-ups, callbacks (booking/support).",
     "- create_deal: for sales interest, quotes, orders (sales goal).",
     "- add_note: short CRM note on the contact profile summarizing new facts.",
-    "- add_internal_note: short team-only note for managers in the chat sidebar (not visible to customer).",
+    "- add_internal_note: short team-only note for managers in the chat sidebar (not visible to customer). Put owner requests, impatience, or internal observations here — never in clientSummary.",
     "- create_calendar_event: when booking intent and clear date/time.",
-    "- clientSummary: one sentence in the business language describing what was saved (for the assistant reply).",
+    "- clientSummary: optional one short sentence spoken DIRECTLY to the customer (use I/we). Never mention CRM, internal notes, managers, or describe the customer in third person. Leave empty when there is nothing new to tell the customer.",
     "",
     "Return JSON only:",
     '{"contactUpdates":{"name":"...","email":"...","phone":"...","company":"..."},"actions":[{"type":"create_task","title":"...","dueAt":"2025-06-03T10:00:00Z"}],"clientSummary":"..."}',
@@ -935,11 +937,9 @@ async function executePlanOnContact(input: {
       },
     );
 
-    const clientSummary =
-      input.plan.clientSummary?.trim() ||
-      (actionsApplied.length > 0
-        ? `Saved to CRM: ${actionsApplied.join("; ")}`
-        : "");
+    const clientSummary = sanitizeCustomerFacingSummary(
+      input.plan.clientSummary,
+    ) ?? "";
 
     await logAgentRun(input.admin, {
       businessId: input.businessId,
