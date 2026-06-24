@@ -62,6 +62,7 @@ import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydratio
 import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
+  shouldDeferAutoReplyForInboundVoice,
 } from "@/utils/chat-media";
 import { parseUnixSecondsToIso } from "@/utils/message-timestamp";
 import {
@@ -858,13 +859,15 @@ async function completeInboundWhatsAppMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await scheduleInboundMessageProcessing({
-    admin,
-    businessId,
-    channel: "whatsapp",
-    conversationId,
-    clientMessage: getMessagePlainText(content),
-  });
+  if (!shouldDeferAutoReplyForInboundVoice(content)) {
+    await scheduleInboundMessageProcessing({
+      admin,
+      businessId,
+      channel: "whatsapp",
+      conversationId,
+      clientMessage: getMessagePlainText(content),
+    });
+  }
 }
 
 export async function processWhatsAppWebhook(

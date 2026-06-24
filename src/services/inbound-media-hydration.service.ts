@@ -22,6 +22,7 @@ import {
   resetMessageAttachmentForRetry,
   saveMessageAttachmentHydrationContext,
 } from "@/services/message-attachment.service";
+import { processInboundVoiceAfterHydration } from "@/services/inbound-voice-processing.service";
 import { updateChannelMessageContent } from "@/services/messaging.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -394,7 +395,14 @@ async function processClaimedInboundMediaHydration(
     content,
   });
 
-  const { media } = parseMediaMessage(content);
+  const hydratedContent = await processInboundVoiceAfterHydration({
+    admin,
+    businessId: attachment.business_id,
+    message: message as MessageRow,
+    content,
+  });
+
+  const { media } = parseMediaMessage(hydratedContent);
 
   if (media) {
     await markMessageAttachmentReady(admin, {
@@ -405,7 +413,7 @@ async function processClaimedInboundMediaHydration(
 
   const updatedMessage = {
     ...(message as MessageRow),
-    content,
+    content: hydratedContent,
   };
 
   if (updatedMessage.conversation_id) {
@@ -418,7 +426,7 @@ async function processClaimedInboundMediaHydration(
   await broadcastHydrationState(updatedMessage, {
     attachment_pending: false,
     attachment_failed: false,
-    content,
+    content: hydratedContent,
   });
 
   return { completed: true, skipped: false };

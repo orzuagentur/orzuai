@@ -45,6 +45,7 @@ import { scheduleInboundMediaHydration } from "@/services/inbound-media-hydratio
 import {
   buildInboundMediaFallbackContent,
   getMessagePlainText,
+  shouldDeferAutoReplyForInboundVoice,
 } from "@/utils/chat-media";
 import { mapTelegramConnection } from "@/utils/telegram";
 import { parseTelegramWebhookPayload } from "@/utils/telegram-webhook";
@@ -432,13 +433,15 @@ async function completeInboundTelegramMessage(input: {
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  await scheduleInboundMessageProcessing({
-    admin,
-    businessId,
-    channel: "telegram",
-    conversationId,
-    clientMessage: getMessagePlainText(content),
-  });
+  if (!shouldDeferAutoReplyForInboundVoice(content)) {
+    await scheduleInboundMessageProcessing({
+      admin,
+      businessId,
+      channel: "telegram",
+      conversationId,
+      clientMessage: getMessagePlainText(content),
+    });
+  }
 }
 
 export async function processTelegramWebhook(

@@ -218,6 +218,12 @@ export function resolveWhatsAppMediaKind(mimeType: string): ChatMediaKind {
   return resolveMediaKind(mimeType);
 }
 
+export function shouldDeferAutoReplyForInboundVoice(content: string): boolean {
+  const { media } = parseMediaMessage(content);
+
+  return media?.kind === "audio";
+}
+
 export function getMessagePlainText(content: string): string {
   const { media, text } = parseMediaMessage(content);
 
