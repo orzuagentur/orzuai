@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { isCommunicationStyleId } from "@/features/ai-assistant/communication-styles";
 import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
+import type { VoiceReplyMode } from "@/types/elevenlabs.types";
 
 const languageValues = AI_LANGUAGE_OPTIONS.map((option) => option.value) as [
   string,
@@ -53,4 +54,8 @@ export type AiAssistantProfileData = {
   canNotifyOwner: boolean;
   canNotifyOnActions: boolean;
   canSummarizeActionsInChat: boolean;
+  voiceReplyEnabled: boolean;
+  elevenlabsVoiceId: string | null;
+  elevenlabsVoiceName: string | null;
+  voiceReplyMode: VoiceReplyMode;
 };

@@ -13,7 +13,7 @@ import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-
 import { parseAiAssistantSearchParams } from "@/utils/ai-assistant-url";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { AiProvider } from "@/lib/ai/constants";
-import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
+import { getDefaultGeminiModel, hasElevenLabsEnv, hasGeminiEnv } from "@/lib/env";
 import { mergeProviderAvailability } from "@/features/ai-assistant/provider-availability";
 import {
   getBusinessPreferCustomerAiKeys,
@@ -84,6 +84,7 @@ export async function getAiAssistantPageData(
     return {
       hasBusiness: false,
       geminiConfigured: hasGeminiEnv(),
+      elevenLabsConfigured: hasElevenLabsEnv(),
       providerAvailability: platformProviderAvailability,
       platformProviderAvailability,
       businessProviderCredentials: [],
@@ -170,6 +171,7 @@ export async function getAiAssistantPageData(
   return {
     hasBusiness: true,
     geminiConfigured: hasGeminiEnv(),
+    elevenLabsConfigured: hasElevenLabsEnv(),
     providerAvailability,
     platformProviderAvailability,
     businessProviderCredentials,

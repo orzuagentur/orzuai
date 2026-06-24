@@ -10,6 +10,12 @@ import {
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
 import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
+import {
+  attachVoiceReplyMetadata,
+  loadVoiceReplySettings,
+  sendChannelAutoReplyVoice,
+  shouldUseVoiceAutoReply,
+} from "@/services/ai-voice-reply.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
@@ -479,13 +485,53 @@ export async function processChannelAutoReply(input: {
     });
   }
 
-  const sendResult = await sendChannelAutoReplyText({
+  const voiceDecision = await shouldUseVoiceAutoReply({
     admin,
     businessId,
     channel,
     conversationId,
-    text: reply.text,
   });
+
+  let messageContent = reply.text;
+  let sendResult: { success: boolean; error?: string; emailSubject?: string };
+
+  if (voiceDecision.useVoice && voiceDecision.voiceId) {
+    const voiceSettings = await loadVoiceReplySettings(admin, businessId);
+    const voiceSendResult = await sendChannelAutoReplyVoice({
+      admin,
+      businessId,
+      channel,
+      conversationId,
+      text: reply.text,
+      voiceId: voiceDecision.voiceId,
+      language: voiceSettings.language,
+    });
+
+    if (voiceSendResult.success && voiceSendResult.content) {
+      messageContent = voiceSendResult.content;
+      sendResult = { success: true };
+    } else {
+      console.warn(
+        "[messaging] voice auto-reply failed, falling back to text",
+        voiceSendResult.error,
+      );
+      sendResult = await sendChannelAutoReplyText({
+        admin,
+        businessId,
+        channel,
+        conversationId,
+        text: reply.text,
+      });
+    }
+  } else {
+    sendResult = await sendChannelAutoReplyText({
+      admin,
+      businessId,
+      channel,
+      conversationId,
+      text: reply.text,
+    });
+  }
 
   if (!sendResult.success) {
     await notifyAutoReplyError(conversationId, {
@@ -495,14 +541,22 @@ export async function processChannelAutoReply(input: {
     throw new Error("[send_failed] Unable to deliver auto-reply.");
   }
 
-  await insertChannelMessage(admin, {
+  const inserted = await insertChannelMessage(admin, {
     conversationId,
     channel,
     senderType: "ai",
-    content: reply.text,
+    content: messageContent,
     emailSubject: sendResult.emailSubject,
     aiGenerated: true,
   });
+
+  if (voiceDecision.useVoice && voiceDecision.voiceId) {
+    await attachVoiceReplyMetadata(admin, {
+      messageId: inserted.id,
+      businessId,
+      content: messageContent,
+    });
+  }
 
   await incrementMessagingAnalytics(admin, businessId, channel, {
     totalMessages: 1,

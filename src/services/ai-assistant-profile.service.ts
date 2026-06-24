@@ -24,6 +24,11 @@ import type {
   SaveAiAssistantProfileInput,
 } from "@/types/ai-assistant-profile.types";
 import { saveAiAssistantProfileSchema } from "@/types/ai-assistant-profile.types";
+import type { SaveVoiceAgentSettingsInput } from "@/types/elevenlabs.types";
+import { saveVoiceAgentSettingsSchema } from "@/types/elevenlabs.types";
+
+const PROFILE_SELECT =
+  "business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
 
 function revalidateAssistantProfilePaths(): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
@@ -48,6 +53,10 @@ function mapProfileRow(row: {
   can_notify_owner?: boolean | null;
   can_notify_on_actions?: boolean | null;
   can_summarize_actions_in_chat?: boolean | null;
+  voice_reply_enabled?: boolean | null;
+  elevenlabs_voice_id?: string | null;
+  elevenlabs_voice_name?: string | null;
+  voice_reply_mode?: string | null;
 }): AiAssistantProfileData {
   return {
     businessId: row.business_id,
@@ -66,6 +75,10 @@ function mapProfileRow(row: {
     canNotifyOwner: row.can_notify_owner ?? true,
     canNotifyOnActions: row.can_notify_on_actions ?? true,
     canSummarizeActionsInChat: row.can_summarize_actions_in_chat ?? true,
+    voiceReplyEnabled: row.voice_reply_enabled ?? false,
+    elevenlabsVoiceId: row.elevenlabs_voice_id?.trim() || null,
+    elevenlabsVoiceName: row.elevenlabs_voice_name?.trim() || null,
+    voiceReplyMode: row.voice_reply_mode === "always" ? "always" : "mirror",
   };
 }
 
@@ -89,6 +102,10 @@ export function getDefaultAiAssistantProfile(
     canNotifyOwner: true,
     canNotifyOnActions: true,
     canSummarizeActionsInChat: true,
+    voiceReplyEnabled: false,
+    elevenlabsVoiceId: null,
+    elevenlabsVoiceName: null,
+    voiceReplyMode: "mirror",
   };
 }
 
@@ -102,7 +119,7 @@ export async function ensureAiAssistantProfile(
   const supabase = await createClient();
   const { data } = await supabase
     .from("ai_assistant_profile")
-    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat")
+    .select(PROFILE_SELECT)
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -131,7 +148,7 @@ export async function ensureAiAssistantProfile(
       can_notify_on_actions: defaults.canNotifyOnActions,
       can_summarize_actions_in_chat: defaults.canSummarizeActionsInChat,
     })
-    .select("business_id, name, system_prompt, communication_style, language, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat")
+    .select(PROFILE_SELECT)
     .single();
 
   return created ? mapProfileRow(created) : defaults;
@@ -211,6 +228,57 @@ export async function saveAiAssistantProfile(
     await enableAiForChannels(business.id, connectedChannels);
   } else {
     await disableAiForAllChannels(business.id);
+  }
+
+  revalidateAssistantProfilePaths();
+  return { success: true };
+}
+
+export async function saveVoiceAgentSettings(
+  input: SaveVoiceAgentSettingsInput,
+): Promise<{ success: boolean; message?: string }> {
+  const parsed = saveVoiceAgentSettingsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid voice settings.",
+    };
+  }
+
+  if (parsed.data.voiceReplyEnabled && !parsed.data.elevenlabsVoiceId) {
+    return {
+      success: false,
+      message: "Select a voice before enabling voice replies.",
+    };
+  }
+
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const user = await requireUser();
+  const business = await getPrimaryBusiness(user.id);
+
+  if (!business) {
+    return { success: false, message: "Business not found." };
+  }
+
+  await ensureAiAssistantProfile(business.id);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ai_assistant_profile")
+    .update({
+      voice_reply_enabled: parsed.data.voiceReplyEnabled,
+      elevenlabs_voice_id: parsed.data.elevenlabsVoiceId,
+      elevenlabs_voice_name: parsed.data.elevenlabsVoiceName,
+      voice_reply_mode: parsed.data.voiceReplyMode,
+    })
+    .eq("business_id", business.id);
+
+  if (error) {
+    return { success: false, message: "Unable to save voice agent settings." };
   }
 
   revalidateAssistantProfilePaths();

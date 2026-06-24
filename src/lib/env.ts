@@ -149,6 +149,14 @@ export function hasPushEnv(): boolean {
   return Boolean(getVapidPublicKey() && getVapidPrivateKey());
 }
 
+export function getElevenLabsApiKey(): string | undefined {
+  return process.env[ENV_KEYS.ELEVENLABS_API_KEY]?.trim() || undefined;
+}
+
+export function hasElevenLabsEnv(): boolean {
+  return Boolean(getElevenLabsApiKey());
+}
+
 export {
   getDefaultGeminiModel,
   getMissingEnvKeys,

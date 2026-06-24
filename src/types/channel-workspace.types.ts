@@ -123,6 +123,7 @@ export type AiAssistantChannelEntry = {
 export type AiAssistantPageData = {
   hasBusiness: boolean;
   geminiConfigured: boolean;
+  elevenLabsConfigured: boolean;
   providerAvailability: AiProviderAvailability;
   platformProviderAvailability: AiProviderAvailability;
   businessProviderCredentials: BusinessProviderCredential[];

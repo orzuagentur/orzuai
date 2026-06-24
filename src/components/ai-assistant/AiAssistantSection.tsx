@@ -13,11 +13,13 @@ import {
   Settings2Icon,
   SlidersHorizontalIcon,
   SparklesIcon,
+  Volume2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AiAssistantEditPanel } from "@/components/ai-assistant/AiAssistantEditPanel";
 import { AiAssistantHubPanel } from "@/components/ai-assistant/AiAssistantHubPanel";
+import { AiVoiceAgentPanel } from "@/components/ai-assistant/AiVoiceAgentPanel";
 import { WebsiteKnowledgeSection } from "@/components/knowledge-base/WebsiteKnowledgeSection";
 import { KnowledgeBasePanel } from "@/components/knowledge-base/KnowledgeBasePanel";
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,7 @@ type AiAssistantSectionProps = {
   data: AiAssistantPageData;
 };
 
-type AiAgentTab = "dashboard" | "channels" | "knowledge" | "settings" | "test";
+type AiAgentTab = "dashboard" | "channels" | "knowledge" | "voice" | "settings" | "test";
 
 const TEST_PROMPTS = [
   "Клиент хочет записаться завтра в 15:00. Что ты ответишь и что сохранишь?",
@@ -56,6 +58,7 @@ const TAB_ITEMS: Array<{
   { id: "dashboard", label: "Agent Dashboard", icon: ActivityIcon },
   { id: "channels", label: "Channels", icon: SlidersHorizontalIcon },
   { id: "knowledge", label: "Knowledge Base", icon: BookOpenIcon },
+  { id: "voice", label: "Voice Agent", icon: Volume2Icon },
   { id: "settings", label: "Agent Settings", icon: Settings2Icon },
   { id: "test", label: "Test Agent", icon: MessageSquareTextIcon },
 ];
@@ -79,6 +82,7 @@ function permissionSummary(data: AiAssistantPageData): Array<[string, boolean]> 
     ["Handoff alerts", profile.canNotifyOwner],
     ["Action alerts", profile.canNotifyOnActions],
     ["Customer summaries", profile.canSummarizeActionsInChat],
+    ["Voice replies", profile.voiceReplyEnabled],
   ];
 }
 
@@ -476,6 +480,12 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
           />
         ) : null}
         {activeTab === "knowledge" ? <KnowledgeTab data={data} /> : null}
+        {activeTab === "voice" && data.assistantProfile ? (
+          <AiVoiceAgentPanel
+            profile={data.assistantProfile}
+            elevenLabsConfigured={data.elevenLabsConfigured}
+          />
+        ) : null}
         {activeTab === "settings" && data.assistantProfile ? (
           <AiAssistantEditPanel
             profile={data.assistantProfile}

@@ -1684,6 +1684,10 @@ export type Database = {
           can_notify_owner: boolean;
           can_notify_on_actions: boolean;
           can_summarize_actions_in_chat: boolean;
+          voice_reply_enabled: boolean;
+          elevenlabs_voice_id: string | null;
+          elevenlabs_voice_name: string | null;
+          voice_reply_mode: string;
           created_at: string;
           updated_at: string;
         };
@@ -1705,6 +1709,10 @@ export type Database = {
           can_notify_owner?: boolean;
           can_notify_on_actions?: boolean;
           can_summarize_actions_in_chat?: boolean;
+          voice_reply_enabled?: boolean;
+          elevenlabs_voice_id?: string | null;
+          elevenlabs_voice_name?: string | null;
+          voice_reply_mode?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1726,6 +1734,10 @@ export type Database = {
           can_notify_owner?: boolean;
           can_notify_on_actions?: boolean;
           can_summarize_actions_in_chat?: boolean;
+          voice_reply_enabled?: boolean;
+          elevenlabs_voice_id?: string | null;
+          elevenlabs_voice_name?: string | null;
+          voice_reply_mode?: string;
           created_at?: string;
           updated_at?: string;
         };
