@@ -9,7 +9,8 @@
     "lint": "eslint",
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
-    "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts"
+    "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -52,6 +53,7 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "^15.5.18",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5"
