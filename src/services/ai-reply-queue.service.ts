@@ -273,6 +273,12 @@ export async function scheduleDebouncedChannelAutoReply(
     return;
   }
 
+  const typingContext = {
+    businessId: input.businessId,
+    channel: input.channel,
+    admin,
+  };
+
   try {
     await upsertAiReplyJob(admin, input);
   } catch (error) {
@@ -293,7 +299,7 @@ export async function scheduleDebouncedChannelAutoReply(
     return;
   }
 
-  void notifyAutoReplyTyping(input.conversationId, true);
+  await notifyAutoReplyTyping(input.conversationId, true, typingContext);
 
   // Process in the same request after the DB debounce window (webhook/cron stay alive).
   await sleep(getDebouncedDrainDelayMs());
@@ -425,6 +431,12 @@ async function processClaimedAiReplyJob(
     return "completed";
   }
 
+  await notifyAutoReplyTyping(job.conversation_id, true, {
+    businessId: job.business_id,
+    channel: job.channel,
+    admin,
+  });
+
   try {
     const { processChannelAutoReply } = await import("@/services/messaging.service");
 
@@ -459,7 +471,11 @@ async function processClaimedAiReplyJob(
 
     return outcome;
   } finally {
-    await notifyAutoReplyTyping(job.conversation_id, false);
+    await notifyAutoReplyTyping(job.conversation_id, false, {
+      businessId: job.business_id,
+      channel: job.channel,
+      admin,
+    });
   }
 }
 

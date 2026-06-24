@@ -477,6 +477,18 @@ export async function generateFastAssistantReply(input: {
   });
 
   if (!reply.success) {
+    console.warn(
+      "[auto-reply-pipeline] LLM failed; sending fallback reply",
+      JSON.stringify({
+        businessId: prep.businessId,
+        conversationId: prep.conversationId,
+        channel: prep.channel,
+        errorCode: reply.error?.code,
+        errorMessage: reply.error?.message,
+        attemptedProviders: reply.attemptedProviders,
+      }),
+    );
+
     const fallbackText = resolveAssistantFallbackReplyMessage({
       language: voice.language,
       customMessage: prep.fallbackReplyMessage,

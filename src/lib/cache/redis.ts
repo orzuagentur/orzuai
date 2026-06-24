@@ -92,10 +92,10 @@ export async function probeRedisCacheOnStartup(): Promise<{
 
   try {
     await redis.set(STARTUP_PROBE_KEY, "1", { ex: 60 });
-    const value = await redis.get<string>(STARTUP_PROBE_KEY);
+    const value = await redis.get<string | number>(STARTUP_PROBE_KEY);
 
-    if (value !== "1") {
-      console.error("[redis-cache] startup probe: read mismatch");
+    if (String(value) !== "1") {
+      console.error("[redis-cache] startup probe: read mismatch", { value });
       return { ok: false, reason: "read_mismatch" };
     }
 

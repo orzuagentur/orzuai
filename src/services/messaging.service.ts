@@ -463,6 +463,22 @@ export async function processChannelAutoReply(input: {
     throw new Error(`[${error.code}] ${error.message}`);
   }
 
+  if (reply.isFallback) {
+    console.warn(
+      "[messaging] delivered fallback auto-reply",
+      JSON.stringify({
+        businessId,
+        channel,
+        conversationId,
+      }),
+    );
+    void notifyAutoReplyError(conversationId, {
+      errorCode: "llm_fallback",
+      errorMessage:
+        "AI could not generate a reply. A default message was sent to the customer. Check API keys and monthly AI limits.",
+    });
+  }
+
   const sendResult = await sendChannelAutoReplyText({
     admin,
     businessId,
