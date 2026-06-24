@@ -1,13 +1,17 @@
 import "server-only";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-import { getGeminiApiKey, hasGeminiEnv } from "@/lib/env";
+import {
+  normalizeEmbeddingVector,
+  requestGeminiEmbedding,
+  type GeminiEmbedTaskType,
+} from "@/lib/gemini/embed-content";
+import { hasGeminiEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const KNOWLEDGE_EMBEDDING_MODEL = "text-embedding-004";
+export const KNOWLEDGE_EMBEDDING_MODEL = "gemini-embedding-001";
 export const KNOWLEDGE_EMBEDDING_DIMENSIONS = 768;
+const KNOWLEDGE_EMBEDDING_MAX_CHARS = 7_500;
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -27,7 +31,13 @@ export function buildKnowledgeEmbeddingText(input: {
     .join("\n\n");
 }
 
-export async function embedKnowledgeText(text: string): Promise<number[] | null> {
+export async function embedKnowledgeText(
+  text: string,
+  options?: {
+    taskType?: GeminiEmbedTaskType;
+    title?: string;
+  },
+): Promise<number[] | null> {
   if (!hasGeminiEnv()) {
     return null;
   }
@@ -39,16 +49,19 @@ export async function embedKnowledgeText(text: string): Promise<number[] | null>
   }
 
   try {
-    const client = new GoogleGenerativeAI(getGeminiApiKey());
-    const model = client.getGenerativeModel({ model: KNOWLEDGE_EMBEDDING_MODEL });
-    const result = await model.embedContent(trimmed.slice(0, 8_000));
-    const values = result.embedding.values;
+    const values = await requestGeminiEmbedding({
+      model: KNOWLEDGE_EMBEDDING_MODEL,
+      text: trimmed.slice(0, KNOWLEDGE_EMBEDDING_MAX_CHARS),
+      outputDimensionality: KNOWLEDGE_EMBEDDING_DIMENSIONS,
+      taskType: options?.taskType,
+      title: options?.title,
+    });
 
-    if (!values.length) {
+    if (!values?.length) {
       return null;
     }
 
-    return values;
+    return normalizeEmbeddingVector(values);
   } catch (error) {
     console.warn(
       "[knowledge-embedding]",
@@ -76,6 +89,10 @@ export async function storeKnowledgeEntryEmbedding(
       content: input.content,
       category: input.category,
     }),
+    {
+      taskType: "RETRIEVAL_DOCUMENT",
+      title: input.title,
+    },
   );
 
   if (!embedding) {
@@ -111,7 +128,9 @@ export async function reindexMissingKnowledgeEmbeddings(input: {
   let query = input.admin
     .from("knowledge_base")
     .select("id, business_id, title, content, category")
-    .is("embedding", null)
+    .or(
+      `embedding.is.null,embedding_model.is.null,embedding_model.neq.${KNOWLEDGE_EMBEDDING_MODEL}`,
+    )
     .order("updated_at", { ascending: false })
     .limit(limit);
 

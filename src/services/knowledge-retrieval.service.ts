@@ -36,7 +36,9 @@ async function retrieveKnowledgeByEmbedding(input: {
   limit?: number;
 }): Promise<RetrievedKnowledgeEntry[] | null> {
   const limit = input.limit ?? GEMINI_MAX_KNOWLEDGE_ENTRIES;
-  const queryEmbedding = await embedKnowledgeText(input.query.trim());
+  const queryEmbedding = await embedKnowledgeText(input.query.trim(), {
+    taskType: "RETRIEVAL_QUERY",
+  });
 
   if (!queryEmbedding) {
     return null;
