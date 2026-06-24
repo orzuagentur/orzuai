@@ -1607,6 +1607,97 @@ export type Database = {
           },
         ];
       };
+      business_booking_setup: {
+        Row: {
+          business_id: string;
+          business_type: string;
+          business_type_label: string;
+          operating_hours_note: string;
+          generated_from_knowledge_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          business_type?: string;
+          business_type_label?: string;
+          operating_hours_note?: string;
+          generated_from_knowledge_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          business_type?: string;
+          business_type_label?: string;
+          operating_hours_note?: string;
+          generated_from_knowledge_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_booking_setup_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_calendar_resources: {
+        Row: {
+          id: string;
+          business_id: string;
+          resource_type: string;
+          name: string;
+          description: string;
+          capacity: number;
+          duration_minutes: number;
+          sort_order: number;
+          active: boolean;
+          source: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          resource_type: string;
+          name: string;
+          description?: string;
+          capacity?: number;
+          duration_minutes?: number;
+          sort_order?: number;
+          active?: boolean;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          resource_type?: string;
+          name?: string;
+          description?: string;
+          capacity?: number;
+          duration_minutes?: number;
+          sort_order?: number;
+          active?: boolean;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_calendar_resources_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       business_notifications: {
         Row: {
           id: string;
@@ -1745,6 +1836,10 @@ export type Database = {
           system_prompt: string;
           communication_style: string;
           language: string;
+          reply_wait_ms: number;
+          schedule_enabled: boolean;
+          schedule_timezone: string;
+          schedule_slots: Json;
           fallback_reply_message: string | null;
           can_reply: boolean;
           can_create_task: boolean;
@@ -1770,6 +1865,10 @@ export type Database = {
           system_prompt: string;
           communication_style?: string;
           language?: string;
+          reply_wait_ms?: number;
+          schedule_enabled?: boolean;
+          schedule_timezone?: string;
+          schedule_slots?: Json;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;
@@ -1795,6 +1894,10 @@ export type Database = {
           system_prompt?: string;
           communication_style?: string;
           language?: string;
+          reply_wait_ms?: number;
+          schedule_enabled?: boolean;
+          schedule_timezone?: string;
+          schedule_slots?: Json;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;

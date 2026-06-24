@@ -155,12 +155,29 @@ export async function unsubscribeFromPushNotifications(): Promise<boolean> {
   return subscription.unsubscribe();
 }
 
+import {
+  LEAD_NOTIFICATION_SOUND,
+  MANAGER_CALLOUT_SOUND,
+} from "@/lib/push/notification-sounds";
+
 export function playLeadNotificationSound(
-  soundPath = "/sounds/new-lead.wav",
+  soundPath = LEAD_NOTIFICATION_SOUND,
 ): void {
   try {
     const audio = new Audio(soundPath);
     audio.volume = 0.85;
+    void audio.play();
+  } catch {
+    // Browsers may block autoplay without prior user interaction.
+  }
+}
+
+export function playManagerCalloutSound(
+  soundPath = MANAGER_CALLOUT_SOUND,
+): void {
+  try {
+    const audio = new Audio(soundPath);
+    audio.volume = 1;
     void audio.play();
   } catch {
     // Browsers may block autoplay without prior user interaction.

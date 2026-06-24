@@ -21,6 +21,7 @@ import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 const DEFAULT_COUNTS: DashboardNavBadgeCounts = {
   inboxUnread: 0,
   crmUnread: 0,
+  calendarAiUnread: 0,
   unreadByChannel: createEmptyUnreadByChannel(),
 };
 
@@ -96,9 +97,9 @@ export function DashboardNavBadgesProvider({
         };
 
         return {
+          ...current,
           unreadByChannel,
           inboxUnread: sumUnreadByChannel(unreadByChannel),
-          crmUnread: current.crmUnread,
         };
       });
     },
@@ -125,9 +126,9 @@ export function DashboardNavBadgesProvider({
         };
 
         return {
+          ...current,
           unreadByChannel,
           inboxUnread: sumUnreadByChannel(unreadByChannel),
-          crmUnread: current.crmUnread,
         };
       });
     },
@@ -193,6 +194,17 @@ export function DashboardNavBadgesProvider({
             event: "*",
             schema: "public",
             table: "contacts",
+          },
+          () => {
+            scheduleRefresh();
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "business_notifications",
           },
           () => {
             scheduleRefresh();

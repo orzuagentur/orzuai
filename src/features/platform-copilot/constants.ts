@@ -1,3 +1,6 @@
+export const PLATFORM_COPILOT_CALENDAR_SETUP_PROMPT =
+  "Создай календарь бронирования из базы знаний (номера, столики, мастера)";
+
 export const PLATFORM_COPILOT_MESSAGES = {
   name: "orzuAI",
   sidebarLabel: "orzuAI",
@@ -5,13 +8,15 @@ export const PLATFORM_COPILOT_MESSAGES = {
   openAria: "Open orzuAI assistant",
   closeAria: "Close assistant",
   emptyHint:
-    "Ask how to use OrzuX — I can guide you and open the right page.",
-  placeholder: "What would you like to do?",
+    "Спросите, как пользоваться OrzuX — или создайте календарь из базы знаний одним запросом.",
+  placeholder: "Что вы хотите сделать?",
   sendAria: "Send message",
-  thinking: "Thinking…",
-  openPage: "Open page",
-  navigated: "Opening page…",
+  thinking: "Анализирую базу знаний…",
+  openPage: "Открыть страницу",
+  navigated: "Открываю страницу…",
+  calendarSetupThinking: "Создаю календарь из базы знаний…",
   examples: [
+    PLATFORM_COPILOT_CALENDAR_SETUP_PROMPT,
     "How do I connect WhatsApp?",
     "Where can I reply to customer messages?",
     "How do I set up the AI agent?",

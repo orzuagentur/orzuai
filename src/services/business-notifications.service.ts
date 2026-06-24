@@ -138,6 +138,80 @@ export async function createAiActionNotification(input: {
   return mapRowToBusinessNotification(data);
 }
 
+export async function createAiCalendarEventNotification(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  contactId?: string | null;
+  contactName?: string | null;
+  summary: string;
+  startDateTime: string;
+}): Promise<BusinessNotification | null> {
+  const contactName = input.contactName?.trim() || "Customer";
+  const summary = input.summary.trim() || "Appointment";
+  const title = `AI booking — ${contactName}`;
+  const body = summary;
+
+  const { data, error } = await input.admin
+    .from("business_notifications")
+    .insert({
+      business_id: input.businessId,
+      kind: "ai_calendar_event",
+      conversation_id: input.conversationId,
+      contact_id: input.contactId ?? null,
+      channel: input.channel,
+      contact_name: contactName,
+      title,
+      body,
+      details: {
+        summary,
+        startDateTime: input.startDateTime,
+      },
+    })
+    .select(NOTIFICATION_SELECT)
+    .single();
+
+  if (error || !data) {
+    console.error("[business-notifications] failed to create calendar event", error);
+    return null;
+  }
+
+  return mapRowToBusinessNotification(data);
+}
+
+export async function countUnreadCalendarNotifications(
+  admin: MessagingDbClient,
+  businessId: string,
+): Promise<number> {
+  const { count, error } = await admin
+    .from("business_notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .eq("kind", "ai_calendar_event")
+    .is("read_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+export async function markCalendarNotificationsRead(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+
+  await input.admin
+    .from("business_notifications")
+    .update({ read_at: now })
+    .eq("business_id", input.businessId)
+    .eq("kind", "ai_calendar_event")
+    .is("read_at", null);
+}
+
 export async function upsertHumanRequestNotification(input: {
   admin: MessagingDbClient;
   businessId: string;

@@ -51,6 +51,26 @@ export const AI_ASSISTANT_MESSAGES = {
   assistantBehaviorHint:
     "This guides every auto-reply. Add FAQs and policies in Knowledge Base for accuracy.",
   assistantLanguageLabel: "Reply language",
+  assistantLanguageHint:
+    "Multilingual auto-detects the customer's language. Or pick one fixed language for every reply.",
+  multilingualDescription:
+    "Automatically detects the customer's language and replies in the same language.",
+  languageSearchPlaceholder: "Search languages…",
+  languageSearchEmpty: "No languages match your search.",
+  replyWaitLabel: "Reply wait time",
+  replyWaitHint:
+    "How long the agent waits after a new message before replying. Useful when customers send several messages in a row.",
+  agentScheduleLabel: "Active schedule",
+  agentScheduleHint:
+    "When enabled, the agent replies only during the hours you set. Outside that window, auto-reply is paused.",
+  agentScheduleEnabledLabel: "Limit agent to scheduled hours",
+  agentScheduleTimezoneLabel: "Timezone",
+  agentScheduleEmpty: "Add at least one time range.",
+  agentScheduleSlotLabel: "Range",
+  agentScheduleRemoveSlot: "Remove range",
+  agentScheduleStartLabel: "From",
+  agentScheduleEndLabel: "To",
+  agentScheduleAddSlot: "Add time range",
   agentPermissionsTitle: "Permissions",
   agentPermissionsHint:
     "Control what the AI Agent can do after each customer message. Disabled actions are skipped silently.",

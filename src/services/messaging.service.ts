@@ -10,6 +10,7 @@ import {
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
 import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
+import { maybeQueueImmediateHumanRequest } from "@/services/ai-human-request.service";
 import {
   attachVoiceReplyMetadata,
   loadVoiceReplySettings,
@@ -596,6 +597,17 @@ export async function scheduleInboundMessageProcessing(input: {
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
   });
+
+  void maybeQueueImmediateHumanRequest({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    clientMessage: input.clientMessage,
+  }).catch((error) => {
+    console.error("[messaging] immediate human request failed", error);
+  });
+
   await scheduleChannelAutoReply({
     businessId: input.businessId,
     channel: input.channel,

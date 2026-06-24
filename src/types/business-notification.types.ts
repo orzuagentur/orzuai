@@ -1,6 +1,9 @@
 import type { MessagingChannel } from "@/types/database.types";
 
-export type BusinessNotificationKind = "ai_action" | "human_request";
+export type BusinessNotificationKind =
+  | "ai_action"
+  | "human_request"
+  | "ai_calendar_event";
 
 export type BusinessNotificationDetails = {
   agentName?: string;

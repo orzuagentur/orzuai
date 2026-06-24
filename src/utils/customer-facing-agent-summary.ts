@@ -10,6 +10,10 @@ const INTERNAL_SUMMARY_PATTERNS = [
   /\bowner as soon as possible\b/i,
   /\bhuman handoff\b/i,
   /\borchestrator\b/i,
+  /\bnotified\b.*\b(team|manager)\b/i,
+  /\bmanager\b.*\b(join|connect)\b/i,
+  /\bпередал\b.*\bменеджер/i,
+  /\bmenejerga yetkazdim\b/i,
 ];
 
 const INTERNAL_ACTION_LABEL_PATTERNS = [
@@ -24,7 +28,8 @@ const CUSTOMER_VISIBLE_ACTION_PATTERNS = [
   /task created:/i,
   /deal created:/i,
   /appointment/i,
-  /booking/i,
+  /booking request saved/i,
+  /manager will confirm/i,
 ];
 
 function normalizeText(value: string): string {

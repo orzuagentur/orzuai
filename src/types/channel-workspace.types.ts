@@ -37,11 +37,11 @@ import type { MessageSenderType, MessagingChannel } from "./database.types";
 
 export type { MessagingChannel };
 
-export const AI_LANGUAGE_OPTIONS = [
-  { value: "English", label: "English" },
-  { value: "Russian", label: "Русский" },
-  { value: "Uzbek", label: "O'zbek" },
-] as const;
+export {
+  AI_LANGUAGE_OPTIONS,
+  AI_REPLY_LANGUAGE_OPTIONS,
+  MULTILINGUAL_LANGUAGE_VALUE,
+} from "@/lib/ai/languages";
 
 export const saveChannelAiSettingsSchema = z.object({
   channel: z.enum([

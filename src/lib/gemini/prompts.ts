@@ -5,6 +5,17 @@ import {
 } from "@google/generative-ai";
 
 import type { GeminiKnowledgeContext } from "@/types/gemini.types";
+import { MULTILINGUAL_LANGUAGE_VALUE } from "@/lib/ai/languages";
+
+export function buildLanguageInstruction(language: string): string {
+  const normalized = language.trim();
+
+  if (normalized === MULTILINGUAL_LANGUAGE_VALUE) {
+    return "Detect the customer's language from their messages and always reply in that same language. If the language is unclear, use English.";
+  }
+
+  return `Always respond in ${normalized}.`;
+}
 
 export function buildAssistantSystemInstruction({
   systemPrompt,
@@ -28,7 +39,7 @@ export function buildAssistantSystemInstruction({
   return [
     "You are OrzuX, a professional AI assistant for a small business.",
     "Respond clearly, helpfully, and concisely in a customer-friendly tone.",
-    `Always respond in ${language}.`,
+    buildLanguageInstruction(language),
     "Use only the business knowledge and conversation context provided below.",
     "If you cannot answer from the available information, politely say you will connect the customer with the business owner.",
     "Never invent prices, policies, or services that are not supported by the provided knowledge.",

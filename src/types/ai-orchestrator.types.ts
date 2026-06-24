@@ -10,7 +10,10 @@ import { CUSTOMER_INTENTS } from "@/types/intent-router.types";
 export const orchestratorResponseSchema = z.object({
   intent: z.enum(CUSTOMER_INTENTS),
   confidence: z.number().min(0).max(1),
-  needsHuman: z.boolean().default(false),
+  /** @deprecated Use managerAlert / handoffConfirmed */
+  needsHuman: z.boolean().optional(),
+  managerAlert: z.boolean().default(false),
+  handoffConfirmed: z.boolean().default(false),
   humanReason: z.string().trim().max(300).optional(),
   contactUpdates: executorContactUpdatesSchema.optional(),
   actions: z.array(executorActionSchema).max(5).default([]),

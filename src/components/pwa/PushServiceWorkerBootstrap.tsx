@@ -6,8 +6,10 @@ import {
   ensurePushServiceWorkerReady,
   isPushSupported,
   playLeadNotificationSound,
+  playManagerCalloutSound,
   syncPushSubscriptionToServer,
 } from "@/lib/push/client";
+import { isManagerCalloutSound } from "@/lib/push/notification-sounds";
 
 /**
  * Registers the push service worker as early as possible (any page load),
@@ -27,7 +29,11 @@ export function PushServiceWorkerBootstrap() {
         | undefined;
 
       if (data?.type === "PLAY_LEAD_SOUND") {
-        playLeadNotificationSound(data.sound);
+        if (isManagerCalloutSound(data.sound)) {
+          playManagerCalloutSound(data.sound);
+        } else {
+          playLeadNotificationSound(data.sound);
+        }
       }
 
       if (data?.type === "OPEN_URL" && typeof data.url === "string") {

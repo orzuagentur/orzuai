@@ -34,6 +34,10 @@ export async function activateAiAgentAction(): Promise<{
       ? profile.communicationStyle
       : DEFAULT_COMMUNICATION_STYLE,
     language: profile.language,
+    replyWaitMs: profile.replyWaitMs,
+    scheduleEnabled: profile.scheduleEnabled,
+    scheduleTimezone: profile.scheduleTimezone,
+    scheduleSlots: profile.scheduleSlots,
     canReply: true,
     canCreateTask: profile.canCreateTask,
     canCreateDeal: profile.canCreateDeal,

@@ -18,6 +18,7 @@ import { usePlatformCopilot } from "@/contexts/platform-copilot-context";
 import { askPlatformCopilotAction } from "@/features/platform-copilot/actions/ask-platform-copilot";
 import { PLATFORM_COPILOT_MESSAGES } from "@/features/platform-copilot/constants";
 import { cn } from "@/lib/utils";
+import { isCalendarSetupFromKnowledgeRequest } from "@/utils/calendar-setup-from-knowledge";
 
 type ChatEntry = {
   id: string;
@@ -53,6 +54,9 @@ export function PlatformCopilotWidget() {
   const [question, setQuestion] = useState("");
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [isAsking, setIsAsking] = useState(false);
+  const [askingMode, setAskingMode] = useState<"default" | "calendar_setup">(
+    "default",
+  );
   const [dragOffset, setDragOffset] = useState<WidgetOffset>({ x: 0, y: 0 });
   const [panelHeight, setPanelHeight] = useState(PANEL_DEFAULT_HEIGHT);
 
@@ -97,6 +101,9 @@ export function PlatformCopilotWidget() {
     setEntries((current) => [...current, userEntry]);
     setQuestion("");
     setIsAsking(true);
+    setAskingMode(
+      isCalendarSetupFromKnowledgeRequest(trimmed) ? "calendar_setup" : "default",
+    );
 
     try {
       const history = [...entries, userEntry].map((entry) => ({
@@ -132,6 +139,7 @@ export function PlatformCopilotWidget() {
       }
     } finally {
       setIsAsking(false);
+      setAskingMode("default");
     }
   }
 
@@ -325,7 +333,9 @@ export function PlatformCopilotWidget() {
               {isAsking ? (
                 <li className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                   <Loader2Icon className="size-3.5 animate-spin" />
-                  {PLATFORM_COPILOT_MESSAGES.thinking}
+                  {askingMode === "calendar_setup"
+                    ? PLATFORM_COPILOT_MESSAGES.calendarSetupThinking
+                    : PLATFORM_COPILOT_MESSAGES.thinking}
                 </li>
               ) : null}
             </ul>

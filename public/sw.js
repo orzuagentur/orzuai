@@ -1,4 +1,6 @@
 const LEAD_SOUND_PATH = "/sounds/new-lead.wav";
+const MANAGER_CALLOUT_SOUND_PATH = "/sounds/manager-callout.wav";
+const MANAGER_VIBRATE_PATTERN = [300, 120, 300, 120, 300, 120, 400];
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -15,6 +17,7 @@ self.addEventListener("push", (event) => {
     url: "/dashboard/chats",
     tag: "inbound-message",
     sound: LEAD_SOUND_PATH,
+    alertKind: "inbound",
   };
 
   try {
@@ -34,10 +37,14 @@ self.addEventListener("push", (event) => {
         tag: data.tag,
         renotify: true,
         silent: false,
-        vibrate: [180, 80, 180],
+        vibrate:
+          data.alertKind === "human_request" || String(data.tag || "").startsWith("human-request-")
+            ? MANAGER_VIBRATE_PATTERN
+            : [180, 80, 180],
         data: {
           url: data.url,
           sound: data.sound || LEAD_SOUND_PATH,
+          alertKind: data.alertKind,
         },
       });
 

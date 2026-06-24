@@ -22,7 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-export const AUTO_REPLY_DEBOUNCE_MS = 1_500;
+export const DEFAULT_AUTO_REPLY_DEBOUNCE_MS = 1_500;
 
 const BATCH_SIZE = 20;
 const MAX_DRAIN_BATCHES = 20;
@@ -58,9 +58,35 @@ type ChannelAutoReplyScheduleInput = {
   clientMessage: string;
 };
 
-/** Debounce window + small buffer so claim runs after upsert_ai_reply_job timer. */
-function getDebouncedDrainDelayMs(): number {
-  return AUTO_REPLY_DEBOUNCE_MS + 250;
+/** @deprecated Use getBusinessReplyWaitMs */
+export const AUTO_REPLY_DEBOUNCE_MS = DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
+
+/** Debounce window + small buffer so claim runs after job timer. */
+function getDebouncedDrainDelayMs(replyWaitMs: number): number {
+  return replyWaitMs + 250;
+}
+
+async function getBusinessReplyWaitMs(
+  admin: MessagingDbClient,
+  businessId: string,
+): Promise<number> {
+  const { data } = await admin
+    .from("ai_assistant_profile")
+    .select("reply_wait_ms")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const waitMs = data?.reply_wait_ms ?? DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
+
+  if (
+    waitMs >= 1500 &&
+    waitMs <= 8000 &&
+    waitMs % 500 === 0
+  ) {
+    return waitMs;
+  }
+
+  return DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
 }
 
 function combineClientMessages(messages: string[]): string {
@@ -71,7 +97,14 @@ function combineClientMessages(messages: string[]): string {
 }
 
 export function getAutoReplyDebounceMs(): number {
-  return AUTO_REPLY_DEBOUNCE_MS;
+  return DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
+}
+
+export async function resolveBusinessReplyWaitMs(
+  admin: MessagingDbClient,
+  businessId: string,
+): Promise<number> {
+  return getBusinessReplyWaitMs(admin, businessId);
 }
 
 export async function recoverStaleAiReplyJobs(): Promise<number> {
@@ -145,13 +178,14 @@ export async function getAiReplyQueueLagMetrics(): Promise<AiReplyQueueLagMetric
 async function upsertAiReplyJob(
   admin: MessagingDbClient,
   input: ChannelAutoReplyScheduleInput,
+  replyWaitMs: number,
 ): Promise<string | null> {
   const trimmed = input.clientMessage.trim();
   if (!trimmed) {
     return null;
   }
 
-  const debouncedAt = new Date(Date.now() + AUTO_REPLY_DEBOUNCE_MS).toISOString();
+  const debouncedAt = new Date(Date.now() + replyWaitMs).toISOString();
   const now = new Date().toISOString();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -216,8 +250,8 @@ async function upsertAiReplyJob(
   return null;
 }
 
-function scheduleDebouncedAiReplyDrain(): void {
-  scheduleAfterResponse(getDebouncedDrainDelayMs(), async () => {
+function scheduleDebouncedAiReplyDrain(replyWaitMs: number): void {
+  scheduleAfterResponse(getDebouncedDrainDelayMs(replyWaitMs), async () => {
     await drainAiReplyQueue().catch((error) => {
       console.error("[ai-reply-queue] deferred drain failed", error);
     });
@@ -226,11 +260,12 @@ function scheduleDebouncedAiReplyDrain(): void {
 
 export function dispatchAiReplyWorker(
   source: "enqueue" | "retry" = "enqueue",
+  replyWaitMs: number = DEFAULT_AUTO_REPLY_DEBOUNCE_MS,
 ): void {
-  scheduleDebouncedAiReplyDrain();
+  scheduleDebouncedAiReplyDrain(replyWaitMs);
   void dispatchAiReplyQueueWorker({
     source,
-    delaySeconds: Math.ceil(AUTO_REPLY_DEBOUNCE_MS / 1000) + 1,
+    delaySeconds: Math.ceil(replyWaitMs / 1000) + 1,
   }).then((result) => {
     if (!result.dispatched) {
       console.warn(
@@ -279,8 +314,11 @@ export async function scheduleDebouncedChannelAutoReply(
     admin,
   };
 
+  let replyWaitMs = DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
+
   try {
-    await upsertAiReplyJob(admin, input);
+    replyWaitMs = await getBusinessReplyWaitMs(admin, input.businessId);
+    await upsertAiReplyJob(admin, input, replyWaitMs);
   } catch (error) {
     const message = formatSupabaseError(error);
     console.error(
@@ -302,7 +340,7 @@ export async function scheduleDebouncedChannelAutoReply(
   await notifyAutoReplyTyping(input.conversationId, true, typingContext);
 
   // Process in the same request after the DB debounce window (webhook/cron stay alive).
-  await sleep(getDebouncedDrainDelayMs());
+  await sleep(getDebouncedDrainDelayMs(replyWaitMs));
 
   try {
     await drainAiReplyQueue();
@@ -311,7 +349,7 @@ export async function scheduleDebouncedChannelAutoReply(
       "[ai-reply-queue] inline drain failed after enqueue",
       formatSupabaseError(error),
     );
-    dispatchAiReplyWorker("enqueue");
+    dispatchAiReplyWorker("enqueue", replyWaitMs);
   }
 }
 
@@ -351,19 +389,19 @@ async function finalizeAiReplyJob(
   const now = new Date().toISOString();
 
   if (outcome === "requeued") {
+    const replyWaitMs = await getBusinessReplyWaitMs(admin, job.business_id);
+
     await admin
       .from("ai_reply_jobs")
       .update({
         status: "pending",
         needs_reprocess: false,
-        next_attempt_at: new Date(
-          Date.now() + AUTO_REPLY_DEBOUNCE_MS,
-        ).toISOString(),
+        next_attempt_at: new Date(Date.now() + replyWaitMs).toISOString(),
         updated_at: now,
       })
       .eq("id", job.id);
 
-    dispatchAiReplyWorker("retry");
+    dispatchAiReplyWorker("retry", replyWaitMs);
     return "requeued";
   }
 
@@ -378,19 +416,19 @@ async function finalizeAiReplyJob(
       (current?.pending_messages?.length ?? 0) > 0 || current?.needs_reprocess;
 
     if (hasPendingMessages) {
+      const replyWaitMs = await getBusinessReplyWaitMs(admin, job.business_id);
+
       await admin
         .from("ai_reply_jobs")
         .update({
           status: "pending",
           needs_reprocess: false,
-          next_attempt_at: new Date(
-            Date.now() + AUTO_REPLY_DEBOUNCE_MS,
-          ).toISOString(),
+          next_attempt_at: new Date(Date.now() + replyWaitMs).toISOString(),
           processed_at: now,
         })
         .eq("id", job.id);
 
-      dispatchAiReplyWorker("retry");
+      dispatchAiReplyWorker("retry", replyWaitMs);
       return "requeued";
     }
 

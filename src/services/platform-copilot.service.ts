@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
   buildPlatformCopilotPrompt,
@@ -8,7 +9,12 @@ import {
 import { parsePlatformCopilotResponse } from "@/lib/platform-copilot/parse-copilot-response";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { generateBusinessCalendarFromKnowledgeForUser } from "@/services/business-calendar-setup.service";
 import { generateText } from "@/services/llm.service";
+import {
+  buildCalendarSetupSuccessReply,
+  isCalendarSetupFromKnowledgeRequest,
+} from "@/utils/calendar-setup-from-knowledge";
 
 export type PlatformCopilotHistoryEntry = {
   role: "user" | "assistant";
@@ -44,6 +50,26 @@ export async function askPlatformCopilot(input: {
 
   if (!business || !hasSupabaseEnv()) {
     return { success: false, message: "Бизнес не найден." };
+  }
+
+  if (isCalendarSetupFromKnowledgeRequest(question)) {
+    const setupResult = await generateBusinessCalendarFromKnowledgeForUser();
+
+    if (!setupResult.success) {
+      return { success: false, message: setupResult.message };
+    }
+
+    return {
+      success: true,
+      reply: buildCalendarSetupSuccessReply({
+        businessTypeLabel: setupResult.setup.businessTypeLabel,
+        resourceCount: setupResult.replacedCount,
+        resourceNames: setupResult.resources.map((resource) => resource.name),
+      }),
+      navigateTo: DASHBOARD_ROUTES.calendar,
+      navigateLabel: "Открыть календарь",
+      autoNavigate: true,
+    };
   }
 
   const history = (input.history ?? []).slice(-6);

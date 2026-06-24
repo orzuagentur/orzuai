@@ -21,7 +21,7 @@ import type { AiHumanRequest } from "@/types/ai-human-request.types";
 import type { BusinessNotification } from "@/types/business-notification.types";
 import type { MessagingChannel } from "@/types/database.types";
 
-const POLL_MS = 60_000;
+const POLL_MS = 15_000;
 const REALTIME_REFRESH_DEBOUNCE_MS = 500;
 
 type AiHumanRequestsContextValue = {

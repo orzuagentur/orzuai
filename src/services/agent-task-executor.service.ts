@@ -21,7 +21,7 @@ import type {
 import { executorPlanSchema } from "@/types/agent-executor.types";
 import type { ContactCustomFields, PipelineStage } from "@/types/contact.types";
 import { PIPELINE_STAGES } from "@/types/contact.types";
-import type { Database } from "@/types/database.types";
+import type { Database, MessagingChannel } from "@/types/database.types";
 import type { AgentRoutingMethod } from "@/types/intent-router.types";
 import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
 import {
@@ -30,6 +30,7 @@ import {
   type AdditionalContactEntry,
 } from "@/utils/contact-additional-contacts";
 import { createGoogleCalendarEventForBusinessWithAdmin } from "@/services/google-calendar.service";
+import { createAiCalendarEventNotification } from "@/services/business-notifications.service";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -718,6 +719,9 @@ async function applyCreateCalendarEvent(
   idempotencyContext: {
     conversationId?: string | null;
     clientMessage: string;
+    channel?: MessagingChannel;
+    contactId?: string;
+    contactName?: string;
   },
 ): Promise<string | null> {
   const idempotencyKey = buildCrmActionIdempotencyKey({
@@ -742,6 +746,32 @@ async function applyCreateCalendarEvent(
   });
 
   if (!result.success) {
+    if (!idempotencyContext.contactId) {
+      return null;
+    }
+
+    const fallbackTitle = `Booking request: ${action.summary.trim() || "Appointment"}`;
+    const fallbackTask = await applyCreateTask(
+      admin,
+      businessId,
+      idempotencyContext.contactId,
+      {
+        type: "create_task",
+        title: fallbackTitle,
+        dueAt: action.startDateTime,
+      },
+      idempotencyContext,
+    );
+
+    if (fallbackTask) {
+      await recordCrmIdempotencyKey(admin, {
+        businessId,
+        idempotencyKey,
+        actionType: "create_calendar_event",
+      });
+      return "Booking request saved — manager will confirm the appointment";
+    }
+
     return null;
   }
 
@@ -750,6 +780,22 @@ async function applyCreateCalendarEvent(
     idempotencyKey,
     actionType: "create_calendar_event",
   });
+
+  if (
+    idempotencyContext.conversationId &&
+    idempotencyContext.channel
+  ) {
+    await createAiCalendarEventNotification({
+      admin,
+      businessId,
+      conversationId: idempotencyContext.conversationId,
+      channel: idempotencyContext.channel,
+      contactId: idempotencyContext.contactId ?? null,
+      contactName: idempotencyContext.contactName ?? null,
+      summary: action.summary,
+      startDateTime: action.startDateTime,
+    });
+  }
 
   return `Calendar event created: ${action.summary}`;
 }
@@ -763,6 +809,9 @@ async function applyExecutorPlan(
   idempotencyContext: {
     conversationId?: string | null;
     clientMessage: string;
+    channel?: MessagingChannel;
+    contactId?: string;
+    contactName?: string;
   },
 ): Promise<string[]> {
   const applied: string[] = [];
@@ -934,6 +983,9 @@ async function executePlanOnContact(input: {
       {
         conversationId: input.conversationId,
         clientMessage: input.clientMessage,
+        channel: input.channel as MessagingChannel,
+        contactId: input.contactId,
+        contactName: input.contact.name,
       },
     );
 

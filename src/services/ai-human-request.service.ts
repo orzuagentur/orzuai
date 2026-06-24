@@ -16,6 +16,7 @@ import {
 import type { AiHumanRequest } from "@/types/ai-human-request.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { getMessagePreviewText } from "@/utils/chat-media";
+import { customerExplicitlyRequestedHuman } from "@/utils/human-handoff-policy";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -62,6 +63,43 @@ export async function listAiHumanRequests(
   }
 
   return (data ?? []).map(mapRowToAiHumanRequest);
+}
+
+export async function maybeQueueImmediateHumanRequest(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  clientMessage: string;
+  contactId?: string | null;
+  contactName?: string | null;
+}): Promise<void> {
+  const trimmed = input.clientMessage.trim();
+
+  if (!trimmed || !customerExplicitlyRequestedHuman(trimmed)) {
+    return;
+  }
+
+  const { data: profile } = await input.admin
+    .from("ai_assistant_profile")
+    .select("can_request_human, can_notify_owner")
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (profile?.can_request_human === false || profile?.can_notify_owner === false) {
+    return;
+  }
+
+  await createAiHumanRequest({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    channel: input.channel,
+    contactId: input.contactId,
+    contactName: input.contactName ?? undefined,
+    reason: "Customer asked to speak with a manager",
+    messagePreview: trimmed,
+  });
 }
 
 export async function createAiHumanRequest(input: {

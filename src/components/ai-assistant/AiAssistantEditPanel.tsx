@@ -5,7 +5,10 @@ import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AiAgentScheduleEditor } from "@/components/ai-assistant/AiAgentScheduleEditor";
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
+import { AiLanguageSelect } from "@/components/ai-assistant/AiLanguageSelect";
+import { AiReplyWaitSelect } from "@/components/ai-assistant/AiReplyWaitSelect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +28,7 @@ import {
   type CommunicationStyleId,
 } from "@/features/ai-assistant/communication-styles";
 import type { AiAssistantProfileData } from "@/types/ai-assistant-profile.types";
-import { AI_LANGUAGE_OPTIONS } from "@/types/channel-workspace.types";
+import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 
 type AiAssistantEditPanelProps = {
   profile: AiAssistantProfileData;
@@ -124,6 +127,14 @@ export function AiAssistantEditPanel({
       : DEFAULT_COMMUNICATION_STYLE,
   );
   const [language, setLanguage] = useState(profile.language);
+  const [replyWaitMs, setReplyWaitMs] = useState(profile.replyWaitMs);
+  const [scheduleEnabled, setScheduleEnabled] = useState(profile.scheduleEnabled);
+  const [scheduleTimezone, setScheduleTimezone] = useState(
+    profile.scheduleTimezone,
+  );
+  const [scheduleSlots, setScheduleSlots] = useState<AgentScheduleSlot[]>(
+    profile.scheduleSlots,
+  );
   const [permissions, setPermissions] = useState<AgentPermissions>({
     canReply: profile.canReply,
     canCreateTask: profile.canCreateTask,
@@ -149,6 +160,10 @@ export function AiAssistantEditPanel({
         systemPrompt,
         communicationStyle,
         language,
+        replyWaitMs,
+        scheduleEnabled,
+        scheduleTimezone,
+        scheduleSlots,
         ...permissions,
       });
 
@@ -174,6 +189,10 @@ export function AiAssistantEditPanel({
         systemPrompt,
         communicationStyle,
         language,
+        replyWaitMs,
+        scheduleEnabled,
+        scheduleTimezone,
+        scheduleSlots,
         ...nextPermissions,
       });
 
@@ -310,24 +329,27 @@ export function AiAssistantEditPanel({
               onChange={setCommunicationStyle}
             />
 
-            <div className="space-y-2">
-              <Label htmlFor="assistant-language">
-                {AI_ASSISTANT_MESSAGES.assistantLanguageLabel}
-              </Label>
-              <select
-                id="assistant-language"
-                className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={language}
-                disabled={isSaving}
-                onChange={(event) => setLanguage(event.target.value)}
-              >
-                {AI_LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <AiReplyWaitSelect
+              value={replyWaitMs}
+              disabled={isSaving}
+              onChange={setReplyWaitMs}
+            />
+
+            <AiLanguageSelect
+              value={language}
+              disabled={isSaving}
+              onChange={setLanguage}
+            />
+
+            <AiAgentScheduleEditor
+              enabled={scheduleEnabled}
+              timezone={scheduleTimezone}
+              slots={scheduleSlots}
+              disabled={isSaving}
+              onEnabledChange={setScheduleEnabled}
+              onTimezoneChange={setScheduleTimezone}
+              onSlotsChange={setScheduleSlots}
+            />
 
             <div className="space-y-4">
               <div>

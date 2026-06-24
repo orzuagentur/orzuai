@@ -1,4 +1,5 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { GOOGLE_CALENDAR_INTEGRATION_HREF } from "@/features/google-calendar/constants";
 import { DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
 
 const INTEGRATION_CHANNELS = [
@@ -22,6 +23,8 @@ function buildRouteCatalog(): string {
 
   return [
     ...mainRoutes,
+    `- Calendar: ${DASHBOARD_ROUTES.calendar}`,
+    `- Google Calendar integration: ${GOOGLE_CALENDAR_INTEGRATION_HREF}`,
     `- Onboarding: ${DASHBOARD_ROUTES.onboarding}`,
     `- Integrations hub: ${DASHBOARD_ROUTES.integrations}`,
     `- Marketplace: ${DASHBOARD_ROUTES.marketplace}`,
@@ -42,7 +45,10 @@ export function buildPlatformCopilotSystemInstruction(): string {
     "Common tasks:",
     "- WhatsApp (360dialog): /dashboard/integrations/whatsapp",
     "- Reply to messages: /dashboard/chats",
-    "- AI agent: /dashboard/ai-assistant",
+    "- AI agent settings: /dashboard/ai-assistant",
+    "- Google Calendar connect: " + GOOGLE_CALENDAR_INTEGRATION_HREF,
+    "- Calendar events & AI bookings: /dashboard/calendar",
+    "- Auto-create booking calendar from Knowledge Base: tell user to open orzuAI and use the ready prompt «Создай календарь бронирования из базы знаний»",
     "- Analytics: /dashboard/analytics",
     "",
     "Route catalog:",

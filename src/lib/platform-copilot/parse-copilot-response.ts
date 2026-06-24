@@ -13,6 +13,7 @@ const ALLOWED_PATH_PREFIXES = [
   DASHBOARD_ROUTES.analytics,
   DASHBOARD_ROUTES.integrations,
   DASHBOARD_ROUTES.knowledgeBase,
+  DASHBOARD_ROUTES.calendar,
   DASHBOARD_ROUTES.settings,
   DASHBOARD_ROUTES.subscription,
   DASHBOARD_ROUTES.marketplace,

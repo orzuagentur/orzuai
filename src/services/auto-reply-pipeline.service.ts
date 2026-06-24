@@ -19,6 +19,11 @@ import {
 } from "@/lib/ai/crm-reply-context";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
+  formatCalendarResourcesForAiPrompt,
+  getBusinessBookingSetup,
+  listBusinessCalendarResources,
+} from "@/services/business-calendar-setup.service";
+import {
   buildHumanHandoffFollowUpMessage,
   createAiHumanRequest,
 } from "@/services/ai-human-request.service";
@@ -29,6 +34,7 @@ import {
 import { reportAgentActions } from "@/services/agent-action-reporting.service";
 import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
+import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
 import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
 import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
@@ -42,6 +48,9 @@ import {
   loadConversationMemory,
   refreshConversationSummaryIfNeeded,
 } from "@/services/conversation-memory.service";
+import { isAgentWithinSchedule } from "@/lib/ai/agent-schedule";
+import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
+import { agentScheduleSlotsSchema } from "@/types/ai-assistant-schedule.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -576,11 +585,32 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       ? await loadContactSnapshot(input.admin, input.businessId, contactId)
       : null;
 
+  const calendarConnection = await input.admin
+    .from("google_calendar_connections")
+    .select("google_calendar_status")
+    .eq("business_id", input.businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const calendarConnected =
+    calendarConnection.data?.google_calendar_status === "connected";
+
+  const [bookingSetup, calendarResources] = await Promise.all([
+    getBusinessBookingSetup(input.businessId),
+    listBusinessCalendarResources(input.businessId),
+  ]);
+  const bookableResourcesText = formatCalendarResourcesForAiPrompt(
+    calendarResources,
+    bookingSetup,
+  );
+
   const orchestrationResult = await runAutoReplyOrchestrator({
     businessId: input.businessId,
     message: input.clientMessage,
     conversationHistory,
     contact,
+    calendarConnected,
+    bookableResourcesText,
   });
 
   if (!orchestrationResult.success) {
@@ -647,7 +677,6 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   }
 
   if (
-    !orchestration.needsHuman ||
     !profile.canRequestHuman ||
     !profile.canNotifyOwner
   ) {
@@ -659,8 +688,20 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     return;
   }
 
-  const humanReason =
-    orchestration.humanReason?.trim() || "Customer needs a real person";
+  const handoffPlan = resolveManagerHandoffPlan({
+    orchestration,
+    clientMessage: input.clientMessage,
+    conversationHistory,
+  });
+
+  if (!handoffPlan.notifyManager) {
+    void refreshConversationSummaryIfNeeded({
+      admin: input.admin,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+    });
+    return;
+  }
 
   await createAiHumanRequest({
     admin: input.admin,
@@ -669,11 +710,11 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     channel: input.channel,
     contactId,
     contactName: contact?.name,
-    reason: humanReason,
+    reason: handoffPlan.reason,
     messagePreview: input.clientMessage,
   });
 
-  if (!input.sendFollowUp) {
+  if (!handoffPlan.tellCustomerConfirmed || !input.sendFollowUp) {
     void refreshConversationSummaryIfNeeded({
       admin: input.admin,
       businessId: input.businessId,
@@ -753,9 +794,25 @@ export async function isChannelAutoReplyEnabled(input: {
 
   const { data: profile } = await input.admin
     .from("ai_assistant_profile")
-    .select("can_reply")
+    .select(
+      "can_reply, schedule_enabled, schedule_timezone, schedule_slots",
+    )
     .eq("business_id", input.businessId)
     .maybeSingle();
 
-  return profile?.can_reply ?? true;
+  if (profile?.can_reply === false) {
+    return false;
+  }
+
+  const scheduleSlots = agentScheduleSlotsSchema.safeParse(
+    profile?.schedule_slots,
+  ).success
+    ? (profile?.schedule_slots as AgentScheduleSlot[])
+    : [];
+
+  return isAgentWithinSchedule({
+    scheduleEnabled: profile?.schedule_enabled ?? false,
+    timezone: profile?.schedule_timezone?.trim() || "UTC",
+    slots: scheduleSlots,
+  });
 }

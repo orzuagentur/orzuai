@@ -8,7 +8,7 @@ const GOAL_CUSTOMER_GUIDANCE: Record<AgentWizardGoalId, string> = {
   sales:
     "You qualify leads and answer product questions using the knowledge base. Guide interested customers toward purchase or a call. Update CRM when they share budget, timeline, or buying intent.",
   support:
-    "You resolve common questions from the knowledge base. For complex or sensitive issues, acknowledge the customer and offer to connect them with a team member.",
+    "You resolve common questions from the knowledge base first. For complex issues, keep helping and only offer a human teammate after the customer clearly wants one.",
   custom:
     "You are the autonomous customer-facing agent for this business. Understand intent from context — keywords are not required. Take initiative to help and update CRM when appropriate.",
 };
@@ -54,12 +54,6 @@ export function formatOrchestrationReplyContext(input: {
   if (input.intent === "booking") {
     sections.push(
       "If the customer wants to visit or book, offer to schedule, ask for date/time if needed, and confirm before treating the appointment as final.",
-    );
-  }
-
-  if (input.needsHuman) {
-    sections.push(
-      `A human teammate should take over soon (${input.humanReason?.trim() || "customer requested a person"}). Reply politely and set expectations.`,
     );
   }
 

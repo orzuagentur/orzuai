@@ -13,8 +13,12 @@ import {
   hasPushEnv,
 } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { MessagingChannel } from "@/types/database.types";
+import {
+  LEAD_NOTIFICATION_SOUND,
+  MANAGER_CALLOUT_SOUND,
+} from "@/lib/push/notification-sounds";
 import { getMessagePreviewText } from "@/utils/chat-media";
+import type { MessagingChannel } from "@/types/database.types";
 
 let vapidConfigured = false;
 
@@ -145,7 +149,7 @@ export async function notifyInboundMessagePush(
     body,
     url: buildConversationUrl(input.channel, input.conversationId),
     tag: `inbound-${input.conversationId}`,
-    sound: "/sounds/new-lead.wav",
+    sound: LEAD_NOTIFICATION_SOUND,
   });
 
   try {
@@ -207,7 +211,7 @@ export async function sendTestPushNotification(
     body: "Push notifications are working on this device.",
     url: `${appUrl}${DASHBOARD_ROUTES.chats}`,
     tag: "push-test",
-    sound: "/sounds/new-lead.wav",
+    sound: LEAD_NOTIFICATION_SOUND,
   });
 
   try {
@@ -241,7 +245,8 @@ export async function notifyAiHumanRequestPush(
     body,
     url: buildConversationUrl(input.channel, input.conversationId),
     tag: `human-request-${input.requestId}`,
-    sound: "/sounds/new-lead.wav",
+    sound: MANAGER_CALLOUT_SOUND,
+    alertKind: "human_request",
   });
 
   try {
@@ -284,7 +289,7 @@ export async function notifyAgentActionPush(
     body,
     url: buildConversationUrl(input.channel, input.conversationId),
     tag: `agent-action-${input.conversationId}-${Date.now()}`,
-    sound: "/sounds/new-lead.wav",
+    sound: LEAD_NOTIFICATION_SOUND,
   });
 
   try {

@@ -48,6 +48,10 @@ function getNavBadgeCount(
     return counts.crmUnread;
   }
 
+  if (itemId === "calendar") {
+    return counts.calendarAiUnread;
+  }
+
   return 0;
 }
 

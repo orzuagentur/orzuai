@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/env";
+import { countUnreadCalendarNotifications } from "@/services/business-notifications.service";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { MessagingChannel } from "@/types/database.types";
 import { sumUnreadByChannel } from "@/utils/conversation-unread";
 import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
@@ -59,6 +61,7 @@ export async function markConversationRead(
 export type DashboardNavBadgeCounts = {
   inboxUnread: number;
   crmUnread: number;
+  calendarAiUnread: number;
   unreadByChannel: Record<MessagingChannel, number>;
 };
 
@@ -69,6 +72,7 @@ export async function getDashboardNavBadgeCounts(
   const empty: DashboardNavBadgeCounts = {
     inboxUnread: 0,
     crmUnread: 0,
+    calendarAiUnread: 0,
     unreadByChannel: createEmptyUnreadByChannel(),
   };
 
@@ -153,9 +157,16 @@ export async function getDashboardNavBadgeCounts(
     }
   }
 
+  const admin = createAdminClient();
+  const calendarAiUnread = await countUnreadCalendarNotifications(
+    admin,
+    businessId,
+  );
+
   return {
     inboxUnread: sumUnreadByChannel(empty.unreadByChannel),
     crmUnread: unreadContactIds.size,
+    calendarAiUnread,
     unreadByChannel: empty.unreadByChannel,
   };
 }
