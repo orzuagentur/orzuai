@@ -1,13 +1,5 @@
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") {
-    return;
-  }
-
-  const [{ probeRedisCacheOnStartup }, { ensureSecretsCacheWarm }] =
-    await Promise.all([
-      import("@/lib/cache/redis"),
-      import("@/lib/secrets/warm-cache"),
-    ]);
-
-  await Promise.all([probeRedisCacheOnStartup(), ensureSecretsCacheWarm()]);
+  // Node-only startup (redis probe, secrets cache warm) runs lazily from
+  // server code — see src/lib/startup/node.ts. Keeping this hook empty
+  // avoids bundling node:crypto into the Edge middleware deploy artifact.
 }
