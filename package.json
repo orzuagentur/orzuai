@@ -14,6 +14,7 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:secrets": "tsx --env-file=.env.local scripts/migrate-vercel-secrets.ts",
+    "cleanup:secrets": "tsx --env-file=.env.local scripts/cleanup-invalid-app-secrets.ts",
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
     "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",

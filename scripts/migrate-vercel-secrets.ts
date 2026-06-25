@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     await setSecret(admin, {
       keyName: entry.key,
       value: entry.value,
-      description: "Imported from Vercel environment",
+      description: "Imported from environment (OrzuAI app secret)",
       actorEmail: "migrate-vercel-secrets",
     });
 
