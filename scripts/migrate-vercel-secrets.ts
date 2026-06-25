@@ -7,8 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 
 import {
   collectMigratableEnvKeys,
-  getEncryptionKeyFromEnv,
 } from "@orzu/secrets";
+import { getEncryptionKeyFromEnv } from "@orzu/secrets/crypto";
 import { setSecret } from "@orzu/secrets/server";
 
 function requireEnv(name: string): string {

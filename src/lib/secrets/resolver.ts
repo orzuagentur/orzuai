@@ -1,4 +1,4 @@
-import { resolveSecretValue as resolveFromPackage } from "@orzu/secrets/server";
+import { resolveSecretValue as resolveFromPackage } from "@orzu/secrets";
 
 export function resolveSecretValue(
   keyName: string,

@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/**/*": ["./node_modules/ffmpeg-static/**/*"],
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externalsPresets = {
+        ...config.externalsPresets,
+        node: true,
+      };
+    }
+
+    return config;
+  },
   async headers() {
     const securityHeaders = [
       {

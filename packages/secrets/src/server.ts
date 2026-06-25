@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -6,6 +8,11 @@ import {
   getEncryptionKeyFromEnv,
 } from "./crypto";
 import { maskSecretValue } from "./mask";
+import {
+  applySecretCache,
+  deleteCachedSecret,
+  setCachedSecret,
+} from "./runtime";
 import type { AppSecretAuditRecord, AppSecretRecord } from "./types";
 
 type SecretRow = {
@@ -30,16 +37,6 @@ type AuditRow = {
   metadata: Record<string, unknown> | null;
   created_at: string;
 };
-
-const CACHE_TTL_MS = 60_000;
-
-let secretCache = new Map<string, string>();
-let cacheExpiresAt = 0;
-
-export function clearSecretCache(): void {
-  secretCache = new Map();
-  cacheExpiresAt = 0;
-}
 
 export async function warmSecretCache(admin: SupabaseClient): Promise<number> {
   const { data, error } = await admin
@@ -72,32 +69,8 @@ export async function warmSecretCache(admin: SupabaseClient): Promise<number> {
     }
   }
 
-  secretCache = nextCache;
-  cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+  applySecretCache(nextCache);
   return nextCache.size;
-}
-
-export function resolveSecretFromCache(keyName: string): string | undefined {
-  if (Date.now() > cacheExpiresAt) {
-    return undefined;
-  }
-
-  return secretCache.get(keyName);
-}
-
-export function resolveSecretValue(
-  keyName: string,
-  options?: { required?: boolean },
-): string | undefined {
-  const fromCache = resolveSecretFromCache(keyName);
-  const fromEnv = process.env[keyName]?.trim();
-  const value = fromCache ?? fromEnv;
-
-  if (!value && options?.required) {
-    throw new Error(`Missing required secret: ${keyName}`);
-  }
-
-  return value || undefined;
 }
 
 async function writeAuditLog(
@@ -197,8 +170,7 @@ export async function getSecret(
 
   const value = decryptSecretValue(row.encrypted_value, getEncryptionKeyFromEnv());
 
-  secretCache.set(keyName, value);
-  cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+  setCachedSecret(keyName, value);
 
   if (options?.auditView) {
     await writeAuditLog(admin, {
@@ -300,8 +272,7 @@ export async function setSecret(
     });
   }
 
-  secretCache.set(keyName, input.value.trim());
-  cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+  setCachedSecret(keyName, input.value.trim());
 
   return mapSecretRow(row, input.value.trim());
 }
@@ -332,7 +303,7 @@ export async function deleteSecret(
     throw new Error(error.message);
   }
 
-  secretCache.delete(keyName);
+  deleteCachedSecret(keyName);
 
   await writeAuditLog(admin, {
     secretId: row.id,
