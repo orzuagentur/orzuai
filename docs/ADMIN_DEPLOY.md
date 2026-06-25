@@ -14,12 +14,14 @@ npx supabase db push
 - `app_secret_audit_log` — журнал аудита
 - `platform_admins` — доступ к админке
 
-Добавьте первого администратора:
+Добавьте первого администратора (один раз, через SQL или после деплоя admin UI):
 
 ```sql
-INSERT INTO public.platform_admins (user_id)
-VALUES ('<auth.users uuid>');
+INSERT INTO public.platform_admins (user_id, role)
+VALUES ('<auth.users uuid>', 'owner');
 ```
+
+Либо в админке: **Команда → Add Admin** (пользователь должен уже быть зарегистрирован в Supabase Auth).
 
 ## 2. Переменные окружения (оба проекта Vercel)
 

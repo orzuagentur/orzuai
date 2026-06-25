@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient as createSsrClient } from "@supabase/ssr";
 
+import type { PlatformAdminRole } from "@/features/team/types";
+
 export async function createAdminSupabaseServerClient() {
   const cookieStore = await cookies();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.trim();
@@ -47,7 +49,7 @@ export async function requirePlatformAdmin() {
 
   const { data: adminRow } = await supabase
     .from("platform_admins")
-    .select("user_id")
+    .select("user_id, role")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -55,5 +57,9 @@ export async function requirePlatformAdmin() {
     throw new Error("Forbidden");
   }
 
-  return { supabase, user };
+  return {
+    supabase,
+    user,
+    role: adminRow.role as PlatformAdminRole,
+  };
 }
