@@ -2,9 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { APP_ROUTES, AUTH_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
-import { getSupabaseAnonKey, getSupabaseUrl, hasSupabaseEnv } from "@/lib/env";
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  hasSupabaseEnv,
+} from "@/lib/env.edge";
 import type { Database } from "@/types/database.types";
-import { isAuthEntryRoute, isProtectedRoute } from "@/utils/auth";
+import { isAuthEntryRoute, isProtectedRoute } from "@/utils/auth-routes";
 
 export async function updateSession(request: NextRequest) {
   if (!hasSupabaseEnv()) {
