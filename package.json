@@ -2,17 +2,25 @@
   "name": "orzuai",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
+    "dev:admin": "npm run dev --workspace=@orzu/admin",
     "build": "next build",
+    "build:admin": "npm run build --workspace=@orzu/admin",
     "start": "next start",
     "lint": "eslint",
+    "migrate:secrets": "tsx --env-file=.env.local scripts/migrate-vercel-secrets.ts",
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
     "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@orzu/secrets": "*",
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",

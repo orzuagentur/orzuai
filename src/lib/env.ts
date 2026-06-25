@@ -1,9 +1,14 @@
 import { SUPPORT_EMAIL } from "@/constants/app-origin";
 import { ENV_KEYS } from "@/constants/env-keys";
+import { resolveSecretValue } from "@/lib/secrets/resolver";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
 
+function readEnv(name: string): string | undefined {
+  return resolveSecretValue(name);
+}
+
 function getRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
+  const value = readEnv(name);
 
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -66,38 +71,38 @@ export function getGeminiDefaultModel(): string {
 }
 
 export function hasGeminiEnv(): boolean {
-  return Boolean(process.env[ENV_KEYS.GEMINI_API_KEY]?.trim());
+  return Boolean(readEnv(ENV_KEYS.GEMINI_API_KEY));
 }
 
 export function hasOpenAiEnv(): boolean {
-  return Boolean(process.env[ENV_KEYS.OPENAI_API_KEY]?.trim());
+  return Boolean(readEnv(ENV_KEYS.OPENAI_API_KEY));
 }
 
 export function hasClaudeEnv(): boolean {
-  return Boolean(process.env[ENV_KEYS.ANTHROPIC_API_KEY]?.trim());
+  return Boolean(readEnv(ENV_KEYS.ANTHROPIC_API_KEY));
 }
 
 export function hasTwilioEnv(): boolean {
   return Boolean(
-    process.env[ENV_KEYS.TWILIO_ACCOUNT_SID]?.trim() &&
-      process.env[ENV_KEYS.TWILIO_AUTH_TOKEN]?.trim(),
+    readEnv(ENV_KEYS.TWILIO_ACCOUNT_SID) &&
+      readEnv(ENV_KEYS.TWILIO_AUTH_TOKEN),
   );
 }
 
 export function hasRetellEnv(): boolean {
-  return Boolean(process.env[ENV_KEYS.RETELL_API_KEY]?.trim());
+  return Boolean(readEnv(ENV_KEYS.RETELL_API_KEY));
 }
 
 export function hasVapiEnv(): boolean {
-  return Boolean(process.env[ENV_KEYS.VAPI_API_KEY]?.trim());
+  return Boolean(readEnv(ENV_KEYS.VAPI_API_KEY));
 }
 
 export function getGoogleClientId(): string | undefined {
-  return process.env[ENV_KEYS.GOOGLE_CLIENT_ID]?.trim() || undefined;
+  return readEnv(ENV_KEYS.GOOGLE_CLIENT_ID);
 }
 
 export function getGoogleClientSecret(): string | undefined {
-  return process.env[ENV_KEYS.GOOGLE_CLIENT_SECRET]?.trim() || undefined;
+  return readEnv(ENV_KEYS.GOOGLE_CLIENT_SECRET);
 }
 
 export function hasGoogleOAuthEnv(): boolean {
@@ -105,11 +110,11 @@ export function hasGoogleOAuthEnv(): boolean {
 }
 
 export function getGmailPubsubTopic(): string | undefined {
-  return process.env[ENV_KEYS.GMAIL_PUBSUB_TOPIC]?.trim() || undefined;
+  return readEnv(ENV_KEYS.GMAIL_PUBSUB_TOPIC);
 }
 
 export function getGmailPubsubPushSecret(): string | undefined {
-  return process.env[ENV_KEYS.GMAIL_PUBSUB_PUSH_SECRET]?.trim() || undefined;
+  return readEnv(ENV_KEYS.GMAIL_PUBSUB_PUSH_SECRET);
 }
 
 export function hasGmailPushEnv(): boolean {
@@ -117,7 +122,7 @@ export function hasGmailPushEnv(): boolean {
 }
 
 export function getTelegramWebhookSecret(): string | undefined {
-  return process.env[ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]?.trim() || undefined;
+  return readEnv(ENV_KEYS.TELEGRAM_WEBHOOK_SECRET);
 }
 
 export function hasTelegramEnv(): boolean {
@@ -132,17 +137,15 @@ export function hasTelegramWebhookEnv(): boolean {
 }
 
 export function getVapidPublicKey(): string | undefined {
-  return process.env[ENV_KEYS.NEXT_PUBLIC_VAPID_PUBLIC_KEY]?.trim() || undefined;
+  return readEnv(ENV_KEYS.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
 }
 
 export function getVapidPrivateKey(): string | undefined {
-  return process.env[ENV_KEYS.VAPID_PRIVATE_KEY]?.trim() || undefined;
+  return readEnv(ENV_KEYS.VAPID_PRIVATE_KEY);
 }
 
 export function getVapidSubject(): string {
-  return (
-    process.env[ENV_KEYS.VAPID_SUBJECT]?.trim() || `mailto:${SUPPORT_EMAIL}`
-  );
+  return readEnv(ENV_KEYS.VAPID_SUBJECT) || `mailto:${SUPPORT_EMAIL}`;
 }
 
 export function hasPushEnv(): boolean {
@@ -150,7 +153,7 @@ export function hasPushEnv(): boolean {
 }
 
 export function getElevenLabsApiKey(): string | undefined {
-  return process.env[ENV_KEYS.ELEVENLABS_API_KEY]?.trim() || undefined;
+  return readEnv(ENV_KEYS.ELEVENLABS_API_KEY);
 }
 
 export function hasElevenLabsEnv(): boolean {

@@ -1607,6 +1607,93 @@ export type Database = {
           },
         ];
       };
+      app_secrets: {
+        Row: {
+          id: string;
+          key_name: string;
+          encrypted_value: string;
+          description: string;
+          is_active: boolean;
+          last_used_at: string | null;
+          created_at: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          key_name: string;
+          encrypted_value: string;
+          description?: string;
+          is_active?: boolean;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          key_name?: string;
+          encrypted_value?: string;
+          description?: string;
+          is_active?: boolean;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      app_secret_audit_log: {
+        Row: {
+          id: string;
+          secret_id: string | null;
+          key_name: string;
+          action: string;
+          actor_user_id: string | null;
+          actor_email: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          secret_id?: string | null;
+          key_name: string;
+          action: string;
+          actor_user_id?: string | null;
+          actor_email?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          secret_id?: string | null;
+          key_name?: string;
+          action?: string;
+          actor_user_id?: string | null;
+          actor_email?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_admins: {
+        Row: {
+          user_id: string;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          user_id: string;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [];
+      };
       business_booking_setup: {
         Row: {
           business_id: string;

@@ -3,6 +3,11 @@ export async function register() {
     return;
   }
 
-  const { probeRedisCacheOnStartup } = await import("@/lib/cache/redis");
-  await probeRedisCacheOnStartup();
+  const [{ probeRedisCacheOnStartup }, { ensureSecretsCacheWarm }] =
+    await Promise.all([
+      import("@/lib/cache/redis"),
+      import("@/lib/secrets/warm-cache"),
+    ]);
+
+  await Promise.all([probeRedisCacheOnStartup(), ensureSecretsCacheWarm()]);
 }
