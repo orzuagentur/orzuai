@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { LogOutIcon } from "lucide-react";
 
+import { markOfflineAction } from "@/features/team/presence-actions";
 import { createAdminSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function AdminSignOutButton() {
   const router = useRouter();
 
   async function handleSignOut() {
+    await markOfflineAction({ eventType: "logout" });
     const supabase = createAdminSupabaseBrowserClient();
     await supabase.auth.signOut();
     router.replace("/login");

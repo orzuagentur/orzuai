@@ -9,17 +9,19 @@ import {
   canManageTeam,
   canRemoveMember,
 } from "@/features/team/permissions";
+import { isAdminPresent } from "@/features/team/presence";
 import type {
   PlatformAdminAuditEntry,
   PlatformAdminMember,
   PlatformAdminRole,
 } from "@/features/team/types";
+import { sendAdminEmail } from "@/lib/email/send";
+import { renderAdminInviteEmail } from "@/lib/email/team-templates";
+import { getAdminAppUrl } from "@/lib/env";
 import {
   createServiceRoleClient,
   requirePlatformAdmin,
 } from "@/lib/supabase/server";
-
-const ONLINE_WINDOW_MS = 15 * 60 * 1000;
 
 const roleSchema = z.enum(["owner", "admin", "support"]);
 
@@ -42,6 +44,10 @@ type AdminRow = {
   role: PlatformAdminRole;
   created_at: string;
   created_by: string | null;
+  invited_at: string | null;
+  accepted_at: string | null;
+  last_seen_at: string | null;
+  is_present: boolean;
 };
 
 type AuditRow = {
@@ -54,18 +60,26 @@ type AuditRow = {
   created_at: string;
 };
 
-function isOnline(lastSignInAt: string | null | undefined): boolean {
-  if (!lastSignInAt) {
-    return false;
+async function reconcileStalePresence(rows: AdminRow[]): Promise<void> {
+  const stale = rows.filter(
+    (row) =>
+      row.is_present && !isAdminPresent(row.is_present, row.last_seen_at),
+  );
+
+  if (stale.length === 0) {
+    return;
   }
 
-  const timestamp = new Date(lastSignInAt).getTime();
+  const service = createServiceRoleClient();
 
-  if (Number.isNaN(timestamp)) {
-    return false;
-  }
-
-  return Date.now() - timestamp < ONLINE_WINDOW_MS;
+  await Promise.all(
+    stale.map((row) =>
+      service
+        .from("platform_admins")
+        .update({ is_present: false })
+        .eq("user_id", row.user_id),
+    ),
+  );
 }
 
 async function findUserIdByEmail(email: string): Promise<{
@@ -142,7 +156,9 @@ async function listAdminRows(): Promise<AdminRow[]> {
   const { supabase } = await requirePlatformAdmin();
   const { data, error } = await supabase
     .from("platform_admins")
-    .select("user_id, role, created_at, created_by")
+    .select(
+      "user_id, role, created_at, created_by, invited_at, accepted_at, last_seen_at, is_present",
+    )
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -168,10 +184,12 @@ export async function fetchTeamAction(): Promise<{
 }> {
   const { user, role: actorRole } = await requirePlatformAdmin();
   const rows = await listAdminRows();
+  await reconcileStalePresence(rows);
 
   const members = await Promise.all(
     rows.map(async (row) => {
       const authUser = await fetchAuthUser(row.user_id);
+      const present = isAdminPresent(row.is_present, row.last_seen_at);
 
       return {
         userId: row.user_id,
@@ -180,7 +198,10 @@ export async function fetchTeamAction(): Promise<{
         createdAt: row.created_at,
         createdBy: row.created_by,
         lastSignInAt: authUser.last_sign_in_at ?? null,
-        isOnline: isOnline(authUser.last_sign_in_at),
+        lastSeenAt: row.last_seen_at,
+        invitedAt: row.invited_at,
+        acceptedAt: row.accepted_at,
+        isOnline: present,
       } satisfies PlatformAdminMember;
     }),
   );
@@ -259,15 +280,32 @@ export async function addAdminAction(input: z.infer<typeof addAdminSchema>) {
   }
 
   const service = createServiceRoleClient();
+  const invitedAt = new Date().toISOString();
   const { error } = await service.from("platform_admins").insert({
     user_id: authUser.id,
     role: parsed.data.role,
     created_by: user.id,
+    invited_at: invitedAt,
+    accepted_at: null,
+    is_present: false,
   });
 
   if (error) {
     return { success: false as const, message: error.message };
   }
+
+  const loginUrl = `${getAdminAppUrl()}/login`;
+  const inviteEmail = renderAdminInviteEmail({
+    inviteeEmail: authUser.email,
+    role: parsed.data.role,
+    inviterEmail: user.email ?? "",
+    loginUrl,
+  });
+  const emailResult = await sendAdminEmail({
+    to: authUser.email,
+    subject: inviteEmail.subject,
+    html: inviteEmail.html,
+  });
 
   await writeTeamAudit({
     targetUserId: authUser.id,
@@ -279,6 +317,16 @@ export async function addAdminAction(input: z.infer<typeof addAdminSchema>) {
   });
 
   revalidatePath("/team");
+
+  if (!emailResult.success) {
+    return {
+      success: true as const,
+      message:
+        "Администратор добавлен, но письмо не отправлено: " +
+        (emailResult.message ?? "ошибка Resend"),
+    };
+  }
+
   return { success: true as const };
 }
 

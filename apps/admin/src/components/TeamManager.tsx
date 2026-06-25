@@ -96,7 +96,11 @@ export function TeamManager({ members, auditLog, actor }: TeamManagerProps) {
         return;
       }
 
-      toast.success("Администратор добавлен");
+      toast.success(
+        "message" in result && result.message
+          ? result.message
+          : "Администратор добавлен, приглашение отправлено на email",
+      );
       setShowAddForm(false);
       setAddForm({ email: "", role: "admin" });
       window.location.reload();

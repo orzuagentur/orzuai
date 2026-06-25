@@ -14,6 +14,12 @@ npx supabase db push
 - `app_secret_audit_log` — журнал аудита
 - `platform_admins` — доступ к админке
 
+Миграция `20250719130000_platform_admin_presence_notifications.sql` добавляет:
+
+- присутствие в админке (heartbeat, зелёный статус только при активной вкладке)
+- `platform_admin_activity` — вход/выход/онлайн/оффлайн
+- `platform_admin_notifications` — уведомления (например, «приглашение принято»)
+
 Добавьте первого администратора (один раз, через SQL или после деплоя admin UI):
 
 ```sql
@@ -36,6 +42,8 @@ VALUES ('<auth.users uuid>', 'owner');
 **Admin project дополнительно:**
 
 - Те же Supabase + `ENCRYPTION_KEY`
+- `NEXT_PUBLIC_ADMIN_APP_URL` — публичный URL админки (для ссылок в письмах), например `https://admin.orzux.com`
+- `RESEND_API_KEY` и `RESEND_FROM_EMAIL` — письма приглашения и уведомления о входе
 - Отдельный домен, например `admin.orzux.com`
 
 ## 3. Миграция секретов из Vercel в БД
