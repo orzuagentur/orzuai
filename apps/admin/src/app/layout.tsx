@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 
+import { AdminPwaRegister } from "@/components/AdminPwaRegister";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,13 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "OrzuX Admin",
+  description: "Панель управления платформой OrzuX",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "OrzuX Admin",
+    statusBarStyle: "default",
+  },
   robots: {
     index: false,
     follow: false,
@@ -37,6 +45,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background font-sans antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AdminPwaRegister />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

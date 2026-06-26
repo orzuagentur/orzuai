@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const LOGIN_PATH = "/login";
-const SECRETS_PATH = "/settings/secrets";
+const DASHBOARD_PATH = "/dashboard";
 
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -66,7 +66,7 @@ export async function middleware(request: NextRequest) {
 
   if (isLogin || pathname === "/") {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = SECRETS_PATH;
+    redirectUrl.pathname = DASHBOARD_PATH;
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
@@ -75,5 +75,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|manifest.webmanifest|sw.js|icon-.*).*)",
+  ],
 };

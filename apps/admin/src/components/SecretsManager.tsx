@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   CheckIcon,
   CopyIcon,
   EyeIcon,
   Loader2Icon,
+  MoreVerticalIcon,
   PlusIcon,
   SearchIcon,
   Trash2Icon,
@@ -19,6 +20,11 @@ import {
   testSecretAction,
   upsertSecretAction,
 } from "@/features/secrets/actions";
+import {
+  getSecretKeyHint,
+  getSecretPlaceholder,
+} from "@/lib/secret-placeholders";
+import { cn } from "@/lib/utils";
 import type { AppSecretAuditRecord, AppSecretRecord } from "@orzu/secrets";
 
 type SecretsManagerProps = {
@@ -33,12 +39,21 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   const [sortKey, setSortKey] = useState<SortKey>("key");
   const [isPending, startTransition] = useTransition();
   const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [form, setForm] = useState({
     keyName: "",
     value: "",
     description: "",
   });
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const valuePlaceholder = useMemo(
+    () => getSecretPlaceholder(form.keyName),
+    [form.keyName],
+  );
+
+  const keyHint = useMemo(() => getSecretKeyHint(form.keyName), [form.keyName]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -63,6 +78,20 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
     });
   }, [query, secrets, sortKey]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
+        setOpenMenuId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   function resetForm() {
     setEditingKey(null);
     setForm({ keyName: "", value: "", description: "" });
@@ -70,6 +99,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
 
   function startEdit(secret: AppSecretRecord) {
     setEditingKey(secret.id);
+    setOpenMenuId(null);
     setForm({
       keyName: secret.keyName,
       value: "",
@@ -93,6 +123,8 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   }
 
   function handleDelete(keyName: string) {
+    setOpenMenuId(null);
+
     if (!window.confirm(`Удалить секрет ${keyName}?`)) {
       return;
     }
@@ -105,6 +137,8 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   }
 
   function handleReveal(keyName: string) {
+    setOpenMenuId(null);
+
     startTransition(async () => {
       const result = await revealSecretAction(keyName);
 
@@ -125,6 +159,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   }
 
   async function handleCopy(keyName: string) {
+    setOpenMenuId(null);
     const cached = revealed[keyName];
 
     if (cached) {
@@ -147,6 +182,8 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   }
 
   function handleTest(keyName: string) {
+    setOpenMenuId(null);
+
     startTransition(async () => {
       const result = await testSecretAction(keyName);
       toast[result.tested ? "success" : "error"](result.message);
@@ -157,10 +194,9 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Секреты и API ключи</h1>
+          <h1 className="text-2xl font-semibold">API ключи</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Управление зашифрованными секретами платформы. Значения хранятся в
-            Supabase и никогда не показываются полностью по умолчанию.
+            Зашифрованные секреты платформы. Каждый ключ — отдельная карточка.
           </p>
         </div>
         <button
@@ -169,11 +205,11 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
           <PlusIcon className="size-4" />
-          Новый секрет
+          Новый ключ
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="space-y-4">
           <div className="flex flex-wrap gap-3">
             <label className="relative min-w-[220px] flex-1">
@@ -195,83 +231,112 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
             </select>
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <div className="hidden grid-cols-[1.4fr_1fr_140px] gap-3 border-b px-4 py-3 text-xs font-medium text-muted-foreground md:grid">
-              <span>Ключ</span>
-              <span>Значение</span>
-              <span>Действия</span>
-            </div>
-            <ul className="divide-y">
-              {filtered.map((secret) => (
-                <li
-                  key={secret.id}
-                  className="grid gap-3 px-4 py-4 md:grid-cols-[1.4fr_1fr_140px] md:items-center"
-                >
-                  <div>
-                    <p className="font-mono text-sm font-medium">{secret.keyName}</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {filtered.map((secret) => (
+              <article
+                key={secret.id}
+                className="relative rounded-xl border bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "size-2 rounded-full",
+                          secret.isActive
+                            ? "bg-emerald-500"
+                            : "bg-muted-foreground",
+                        )}
+                        title={secret.isActive ? "Активен" : "Неактивен"}
+                      />
+                      <p className="truncate font-mono text-sm font-semibold">
+                        {secret.keyName}
+                      </p>
+                    </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {secret.description || "Без описания"}
                     </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Обновлён {new Date(secret.updatedAt).toLocaleString()}
-                    </p>
                   </div>
-                  <p className="font-mono text-sm">
-                    {revealed[secret.keyName] ?? secret.maskedValue}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <ActionIcon
-                      label="Показать"
-                      onClick={() => handleReveal(secret.keyName)}
-                      disabled={isPending}
+
+                  <div className="relative" ref={openMenuId === secret.id ? menuRef : null}>
+                    <button
+                      type="button"
+                      aria-label="Действия"
+                      onClick={() =>
+                        setOpenMenuId((current) =>
+                          current === secret.id ? null : secret.id,
+                        )
+                      }
+                      className="inline-flex size-8 items-center justify-center rounded-lg border hover:bg-muted"
                     >
-                      <EyeIcon className="size-3.5" />
-                    </ActionIcon>
-                    <ActionIcon
-                      label="Копировать"
-                      onClick={() => void handleCopy(secret.keyName)}
-                      disabled={isPending}
-                    >
-                      <CopyIcon className="size-3.5" />
-                    </ActionIcon>
-                    <ActionIcon
-                      label="Изменить"
-                      onClick={() => startEdit(secret)}
-                      disabled={isPending}
-                    >
-                      <CheckIcon className="size-3.5" />
-                    </ActionIcon>
-                    <ActionIcon
-                      label="Проверить"
-                      onClick={() => handleTest(secret.keyName)}
-                      disabled={isPending}
-                    >
-                      <WrenchIcon className="size-3.5" />
-                    </ActionIcon>
-                    <ActionIcon
-                      label="Удалить"
-                      onClick={() => handleDelete(secret.keyName)}
-                      disabled={isPending}
-                      destructive
-                    >
-                      <Trash2Icon className="size-3.5" />
-                    </ActionIcon>
+                      <MoreVerticalIcon className="size-4" />
+                    </button>
+
+                    {openMenuId === secret.id ? (
+                      <div className="absolute top-9 right-0 z-20 min-w-40 rounded-lg border bg-card p-1 shadow-lg">
+                        <MenuAction
+                          icon={EyeIcon}
+                          label="Показать"
+                          onClick={() => handleReveal(secret.keyName)}
+                        />
+                        <MenuAction
+                          icon={CopyIcon}
+                          label="Копировать"
+                          onClick={() => void handleCopy(secret.keyName)}
+                        />
+                        <MenuAction
+                          icon={CheckIcon}
+                          label="Изменить"
+                          onClick={() => startEdit(secret)}
+                        />
+                        <MenuAction
+                          icon={WrenchIcon}
+                          label="Проверить"
+                          onClick={() => handleTest(secret.keyName)}
+                        />
+                        <MenuAction
+                          icon={Trash2Icon}
+                          label="Удалить"
+                          destructive
+                          onClick={() => handleDelete(secret.keyName)}
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                </li>
-              ))}
-              {filtered.length === 0 ? (
-                <li className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  Секреты не найдены
-                </li>
-              ) : null}
-            </ul>
+                </div>
+
+                <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2 font-mono text-sm break-all">
+                  {revealed[secret.keyName] ?? secret.maskedValue}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                  <span>
+                    Обновлён {new Date(secret.updatedAt).toLocaleString("ru-RU")}
+                  </span>
+                  {secret.lastUsedAt ? (
+                    <span>
+                      Использован{" "}
+                      {new Date(secret.lastUsedAt).toLocaleString("ru-RU")}
+                    </span>
+                  ) : (
+                    <span>Ещё не использовался</span>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
+
+          {filtered.length === 0 ? (
+            <div className="rounded-xl border bg-card px-6 py-12 text-center text-sm text-muted-foreground">
+              Ключи не найдены
+            </div>
+          ) : null}
         </section>
 
         <aside className="space-y-4">
           <div className="rounded-xl border bg-card p-4">
             <h2 className="text-sm font-semibold">
-              {editingKey ? "Изменить секрет" : "Создать секрет"}
+              {editingKey ? "Изменить ключ" : "Добавить ключ"}
             </h2>
             <div className="mt-4 space-y-3">
               <input
@@ -291,10 +356,13 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, value: event.target.value }))
                 }
-                placeholder="Значение секрета"
+                placeholder={valuePlaceholder}
                 rows={4}
-                className="w-full rounded-lg border bg-background px-3 py-2 font-mono text-sm"
+                className="w-full rounded-lg border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground/70"
               />
+              {keyHint ? (
+                <p className="text-xs text-muted-foreground">{keyHint}</p>
+              ) : null}
               <input
                 value={form.description}
                 onChange={(event) =>
@@ -331,7 +399,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
                   </p>
                   <p className="text-muted-foreground">
                     {entry.actorEmail || "system"} ·{" "}
-                    {new Date(entry.createdAt).toLocaleString()}
+                    {new Date(entry.createdAt).toLocaleString("ru-RU")}
                   </p>
                 </li>
               ))}
@@ -343,31 +411,28 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
   );
 }
 
-function ActionIcon({
-  children,
+function MenuAction({
+  icon: Icon,
   label,
   onClick,
-  disabled,
   destructive,
 }: {
-  children: React.ReactNode;
+  icon: typeof EyeIcon;
   label: string;
   onClick: () => void;
-  disabled?: boolean;
   destructive?: boolean;
 }) {
   return (
     <button
       type="button"
-      title={label}
-      aria-label={label}
-      disabled={disabled}
       onClick={onClick}
-      className={`inline-flex size-8 items-center justify-center rounded-lg border hover:bg-muted disabled:opacity-50 ${
-        destructive ? "text-destructive" : ""
-      }`}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted",
+        destructive ? "text-destructive" : "",
+      )}
     >
-      {children}
+      <Icon className="size-3.5" />
+      {label}
     </button>
   );
 }

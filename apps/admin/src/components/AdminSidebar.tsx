@@ -2,15 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRoundIcon, ShieldIcon, UsersIcon } from "lucide-react";
+import {
+  BotIcon,
+  KeyRoundIcon,
+  LayoutDashboardIcon,
+  ShieldIcon,
+  UsersIcon,
+} from "lucide-react";
 
 import { AdminNotifications } from "@/components/AdminNotifications";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   {
+    href: "/dashboard",
+    label: "Дашборд",
+    icon: LayoutDashboardIcon,
+  },
+  {
+    href: "/ai-expenses",
+    label: "AI расходы",
+    icon: BotIcon,
+  },
+  {
     href: "/settings/secrets",
-    label: "Секреты и API",
+    label: "API ключи",
     icon: KeyRoundIcon,
   },
   {

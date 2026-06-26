@@ -2,7 +2,7 @@ import { SecretsManager } from "@/components/SecretsManager";
 import { fetchAuditLogAction, fetchSecretsAction } from "@/features/secrets/actions";
 
 export const metadata = {
-  title: "Секреты | OrzuX Admin",
+  title: "API ключи | OrzuX Admin",
   robots: { index: false, follow: false },
 };
 
