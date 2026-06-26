@@ -18,15 +18,17 @@ import {
   configureTwilioPhoneNumberWebhooks,
   fetchTwilioAccount,
   listTwilioIncomingPhoneNumbers,
+  purchaseTwilioPhoneNumber,
+  searchTwilioAvailablePhoneNumbers,
   type TwilioApiCredentials,
 } from "@/lib/twilio/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { TwilioConnection } from "@/types/database.types";
 import type {
+  TwilioAvailablePhoneNumber,
   TwilioConnectConfig,
   TwilioConnectionData,
   TwilioPhoneNumberOption,
@@ -88,14 +90,32 @@ export async function getTwilioConnection(
     return null;
   }
 
-  const supabase = await createClient();
-  const { data } = await supabase
+  const admin = createAdminClient();
+  const { data } = await admin
     .from("twilio_connections")
     .select("*")
     .eq("business_id", businessId)
     .maybeSingle();
 
   return data ? mapTwilioConnection(data) : null;
+}
+
+async function getTwilioCredentialsForBusiness(
+  businessId: string,
+): Promise<{ connection: TwilioConnectionData; credentials: TwilioApiCredentials } | null> {
+  const connection = await getTwilioConnection(businessId);
+
+  if (!connection || connection.status === "disconnected") {
+    return null;
+  }
+
+  const credentials = resolveTwilioCredentialsForBusiness(connection);
+
+  if (!credentials) {
+    return null;
+  }
+
+  return { connection, credentials };
 }
 
 export async function getTwilioConnectionByAccountSid(
@@ -137,29 +157,133 @@ export function resolveTwilioCredentialsForBusiness(
 export async function listTwilioPhoneNumbersForBusiness(
   businessId: string,
 ): Promise<TwilioPhoneNumberOption[]> {
-  const connection = await getTwilioConnection(businessId);
+  const result = await refreshTwilioPhoneNumbers(businessId);
+  return result.numbers;
+}
 
-  if (!connection || connection.status === "disconnected") {
-    return [];
-  }
+export async function refreshTwilioPhoneNumbers(
+  businessId: string,
+): Promise<{
+  success: boolean;
+  numbers: TwilioPhoneNumberOption[];
+  message?: string;
+}> {
+  const ctx = await getTwilioCredentialsForBusiness(businessId);
 
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  if (!ctx) {
+    const connection = await getTwilioConnection(businessId);
 
-  if (!credentials) {
-    return [];
+    if (!connection || connection.status === "disconnected") {
+      return {
+        success: false,
+        numbers: [],
+        message: TWILIO_MESSAGES.notAuthorized,
+      };
+    }
+
+    return {
+      success: false,
+      numbers: [],
+      message: TWILIO_MESSAGES.platformKeysMissing,
+    };
   }
 
   try {
-    return await listTwilioIncomingPhoneNumbers(credentials);
+    const numbers = await listTwilioIncomingPhoneNumbers(ctx.credentials);
+    const admin = createAdminClient();
+
+    await upsertTwilioConnectionRow(admin, businessId, {
+      last_synced_at: new Date().toISOString(),
+    });
+
+    revalidateTwilioPaths();
+
+    return { success: true, numbers };
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : TWILIO_MESSAGES.listNumbersFailed;
+
     console.warn(
-      "[twilio] list phone numbers failed",
-      JSON.stringify({
-        businessId,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
+      "[twilio] refresh phone numbers failed",
+      JSON.stringify({ businessId, message }),
     );
-    return [];
+
+    return {
+      success: false,
+      numbers: [],
+      message,
+    };
+  }
+}
+
+export async function searchAvailableTwilioNumbersForBusiness(input: {
+  businessId: string;
+  countryCode: string;
+  areaCode?: string;
+}): Promise<{
+  success: boolean;
+  numbers: TwilioAvailablePhoneNumber[];
+  message?: string;
+}> {
+  const ctx = await getTwilioCredentialsForBusiness(input.businessId);
+
+  if (!ctx) {
+    return {
+      success: false,
+      numbers: [],
+      message: TWILIO_MESSAGES.platformKeysMissing,
+    };
+  }
+
+  try {
+    const numbers = await searchTwilioAvailablePhoneNumbers({
+      credentials: ctx.credentials,
+      countryCode: input.countryCode,
+      areaCode: input.areaCode,
+      limit: 10,
+    });
+
+    return { success: true, numbers };
+  } catch (error) {
+    return {
+      success: false,
+      numbers: [],
+      message:
+        error instanceof Error
+          ? error.message
+          : TWILIO_MESSAGES.searchNumbersFailed,
+    };
+  }
+}
+
+export async function purchaseAndConnectTwilioNumber(input: {
+  businessId: string;
+  phoneNumber: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const ctx = await getTwilioCredentialsForBusiness(input.businessId);
+
+  if (!ctx) {
+    return { success: false, message: TWILIO_MESSAGES.platformKeysMissing };
+  }
+
+  try {
+    const purchased = await purchaseTwilioPhoneNumber({
+      credentials: ctx.credentials,
+      phoneNumber: input.phoneNumber,
+    });
+
+    return selectTwilioPhoneNumber({
+      businessId: input.businessId,
+      phoneSid: purchased.sid,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : TWILIO_MESSAGES.purchaseNumberFailed,
+    };
   }
 }
 
@@ -221,7 +345,7 @@ async function upsertTwilioConnectionRow(
 export async function completeTwilioConnectAuthorization(input: {
   businessId: string;
   connectedAccountSid: string;
-}): Promise<{ success: boolean; message?: string }> {
+}): Promise<{ success: boolean; message?: string; autoConnected?: boolean }> {
   if (!hasSupabaseEnv() || !hasTwilioPlatformEnv()) {
     return { success: false, message: TWILIO_MESSAGES.notConfiguredTitle };
   }
@@ -265,35 +389,63 @@ export async function completeTwilioConnectAuthorization(input: {
     last_synced_at: new Date().toISOString(),
   });
 
+  const numbers = await listTwilioIncomingPhoneNumbers(credentials);
+
+  if (numbers.length === 1) {
+    const singleNumber = numbers[0];
+    if (singleNumber) {
+      const autoResult = await selectTwilioPhoneNumber({
+        businessId: input.businessId,
+        phoneSid: singleNumber.sid,
+        phoneNumber: singleNumber.phoneNumber,
+      });
+
+      if (autoResult.success) {
+        revalidateTwilioPaths();
+        return {
+          success: true,
+          autoConnected: true,
+          message: TWILIO_MESSAGES.autoConnectedSingleNumber,
+        };
+      }
+    }
+  }
+
   revalidateTwilioPaths();
-  return { success: true };
+  return { success: true, autoConnected: false };
 }
 
 export async function selectTwilioPhoneNumber(input: {
   businessId: string;
   phoneSid: string;
+  phoneNumber?: string;
 }): Promise<{ success: boolean; message?: string }> {
   if (!hasSupabaseEnv()) {
     return { success: false, message: TWILIO_MESSAGES.saveFailed };
   }
 
-  const connection = await getTwilioConnection(input.businessId);
+  const ctx = await getTwilioCredentialsForBusiness(input.businessId);
 
-  if (!connection || connection.status === "disconnected") {
-    return { success: false, message: TWILIO_MESSAGES.notAuthorized };
+  if (!ctx) {
+    return {
+      success: false,
+      message: TWILIO_MESSAGES.notAuthorized,
+    };
   }
 
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  let selectedNumber = input.phoneNumber;
+  let selectedSid = input.phoneSid;
 
-  if (!credentials) {
-    return { success: false, message: TWILIO_MESSAGES.notConfiguredTitle };
-  }
+  if (!selectedNumber) {
+    const numbers = await listTwilioIncomingPhoneNumbers(ctx.credentials);
+    const selected = numbers.find((entry) => entry.sid === input.phoneSid);
 
-  const numbers = await listTwilioIncomingPhoneNumbers(credentials);
-  const selected = numbers.find((entry) => entry.sid === input.phoneSid);
+    if (!selected) {
+      return { success: false, message: TWILIO_MESSAGES.phoneNotFound };
+    }
 
-  if (!selected) {
-    return { success: false, message: TWILIO_MESSAGES.phoneNotFound };
+    selectedNumber = selected.phoneNumber;
+    selectedSid = selected.sid;
   }
 
   const webhooks = buildVoiceWebhookUrls(input.businessId);
@@ -301,8 +453,8 @@ export async function selectTwilioPhoneNumber(input: {
 
   try {
     await configureTwilioPhoneNumberWebhooks({
-      credentials,
-      phoneSid: selected.sid,
+      credentials: ctx.credentials,
+      phoneSid: selectedSid,
       voiceUrl: webhooks.inboundWebhookUrl,
       smsUrl: webhooks.inboundWebhookUrl,
       statusCallbackUrl: webhooks.inboundWebhookUrl,
@@ -312,7 +464,7 @@ export async function selectTwilioPhoneNumber(input: {
       "[twilio] webhook setup failed",
       JSON.stringify({
         businessId: input.businessId,
-        phoneSid: selected.sid,
+        phoneSid: selectedSid,
         error: error instanceof Error ? error.message : "unknown",
       }),
     );
@@ -323,9 +475,9 @@ export async function selectTwilioPhoneNumber(input: {
 
   await upsertTwilioConnectionRow(admin, input.businessId, {
     twilio_status: "connected",
-    phone_number: selected.phoneNumber,
-    phone_sid: selected.sid,
-    connected_at: connection.connectedAt ?? now,
+    phone_number: selectedNumber,
+    phone_sid: selectedSid,
+    connected_at: ctx.connection.connectedAt ?? now,
     last_synced_at: now,
   });
 
@@ -334,7 +486,7 @@ export async function selectTwilioPhoneNumber(input: {
       module.saveVoiceAgentSettings(input.businessId, {
     enabled: true,
     provider: "twilio",
-    phoneNumber: selected.phoneNumber,
+    phoneNumber: selectedNumber,
     outboundEnabled: true,
     inboundEnabled: true,
     callbackAfterOrder: true,
@@ -344,7 +496,7 @@ export async function selectTwilioPhoneNumber(input: {
     inboundGreeting: "Thank you for calling. How can we help you today?",
     retellAgentId: "",
     vapiAssistantId: "",
-    twilioPhoneSid: selected.sid,
+    twilioPhoneSid: selectedSid,
     aiEnabled: true,
     voiceLanguage: "English",
     voiceSystemPrompt: "",
@@ -364,21 +516,35 @@ export async function resyncTwilioConnection(
 ): Promise<{ success: boolean; message?: string }> {
   const connection = await getTwilioConnection(businessId);
 
-  if (!connection?.phoneSid || connection.status !== "connected") {
+  if (!connection) {
+    return { success: false, message: TWILIO_MESSAGES.notAuthorized };
+  }
+
+  if (connection.status === "authorized") {
+    const refreshed = await refreshTwilioPhoneNumbers(businessId);
+    return {
+      success: refreshed.success,
+      message: refreshed.success
+        ? TWILIO_MESSAGES.refreshSuccess
+        : refreshed.message ?? TWILIO_MESSAGES.refreshFailed,
+    };
+  }
+
+  if (!connection.phoneSid || connection.status !== "connected") {
     return { success: false, message: TWILIO_MESSAGES.notConnected };
   }
 
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  const ctx = await getTwilioCredentialsForBusiness(businessId);
 
-  if (!credentials) {
-    return { success: false, message: TWILIO_MESSAGES.notConfiguredTitle };
+  if (!ctx) {
+    return { success: false, message: TWILIO_MESSAGES.platformKeysMissing };
   }
 
   const webhooks = buildVoiceWebhookUrls(businessId);
 
   try {
     await configureTwilioPhoneNumberWebhooks({
-      credentials,
+      credentials: ctx.credentials,
       phoneSid: connection.phoneSid,
       voiceUrl: webhooks.inboundWebhookUrl,
       smsUrl: webhooks.inboundWebhookUrl,
@@ -517,6 +683,60 @@ export async function selectTwilioPhoneNumberForCurrentUser(
   }
 
   return selectTwilioPhoneNumber({ businessId, phoneSid });
+}
+
+export async function refreshTwilioForCurrentUser(): Promise<{
+  success: boolean;
+  message?: string;
+  numbers?: TwilioPhoneNumberOption[];
+}> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: TWILIO_MESSAGES.noBusiness };
+  }
+
+  const result = await refreshTwilioPhoneNumbers(businessId);
+  return {
+    success: result.success,
+    message: result.success
+      ? TWILIO_MESSAGES.refreshSuccess
+      : result.message ?? TWILIO_MESSAGES.refreshFailed,
+    numbers: result.numbers,
+  };
+}
+
+export async function searchAvailableTwilioNumbersForCurrentUser(input: {
+  countryCode: string;
+  areaCode?: string;
+}): Promise<{
+  success: boolean;
+  numbers: TwilioAvailablePhoneNumber[];
+  message?: string;
+}> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, numbers: [], message: TWILIO_MESSAGES.noBusiness };
+  }
+
+  return searchAvailableTwilioNumbersForBusiness({
+    businessId,
+    countryCode: input.countryCode,
+    areaCode: input.areaCode,
+  });
+}
+
+export async function purchaseTwilioNumberForCurrentUser(
+  phoneNumber: string,
+): Promise<{ success: boolean; message?: string }> {
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: TWILIO_MESSAGES.noBusiness };
+  }
+
+  return purchaseAndConnectTwilioNumber({ businessId, phoneNumber });
 }
 
 export async function resyncTwilioForCurrentUser(): Promise<{

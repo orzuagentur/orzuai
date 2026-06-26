@@ -1,6 +1,9 @@
 import "server-only";
 
-import type { TwilioPhoneNumberOption } from "@/types/twilio-integration.types";
+import type {
+  TwilioAvailablePhoneNumber,
+  TwilioPhoneNumberOption,
+} from "@/types/twilio-integration.types";
 
 const TWILIO_API_BASE = "https://api.twilio.com/2010-04-01";
 
@@ -181,4 +184,70 @@ export async function createTwilioOutboundCall(input: {
   );
 
   return response.sid ?? "unknown";
+}
+
+type AvailablePhoneNumberResource = {
+  phone_number: string;
+  friendly_name?: string;
+  locality?: string;
+  region?: string;
+};
+
+type AvailablePhoneNumberListResponse = {
+  available_phone_numbers: AvailablePhoneNumberResource[];
+};
+
+type PurchasedPhoneNumberResponse = {
+  sid: string;
+  phone_number: string;
+};
+
+export async function searchTwilioAvailablePhoneNumbers(input: {
+  credentials: TwilioApiCredentials;
+  countryCode: string;
+  areaCode?: string;
+  limit?: number;
+}): Promise<TwilioAvailablePhoneNumber[]> {
+  const country = input.countryCode.trim().toUpperCase();
+  const params = new URLSearchParams({
+    PageSize: String(Math.min(input.limit ?? 10, 20)),
+    VoiceEnabled: "true",
+    SmsEnabled: "true",
+  });
+
+  if (input.areaCode?.trim()) {
+    params.set("AreaCode", input.areaCode.trim());
+  }
+
+  const response = await twilioRequest<AvailablePhoneNumberListResponse>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/AvailablePhoneNumbers/${country}/Local.json?${params.toString()}`,
+  );
+
+  return (response.available_phone_numbers ?? []).map((entry) => ({
+    phoneNumber: entry.phone_number,
+    friendlyName: entry.friendly_name ?? null,
+    locality: entry.locality ?? null,
+    region: entry.region ?? null,
+  }));
+}
+
+export async function purchaseTwilioPhoneNumber(input: {
+  credentials: TwilioApiCredentials;
+  phoneNumber: string;
+}): Promise<{ sid: string; phoneNumber: string }> {
+  const body = new URLSearchParams({
+    PhoneNumber: input.phoneNumber,
+  });
+
+  const response = await twilioRequest<PurchasedPhoneNumberResponse>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/IncomingPhoneNumbers.json`,
+    { method: "POST", body },
+  );
+
+  return {
+    sid: response.sid,
+    phoneNumber: response.phone_number,
+  };
 }

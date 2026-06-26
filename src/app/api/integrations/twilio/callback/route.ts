@@ -67,6 +67,9 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.redirect(
-    new URL(`${TWILIO_INTEGRATION_HREF}?authorized=1`, request.url),
+    new URL(
+      `${TWILIO_INTEGRATION_HREF}?${result.autoConnected ? "connected=1" : "authorized=1"}`,
+      request.url,
+    ),
   );
 }

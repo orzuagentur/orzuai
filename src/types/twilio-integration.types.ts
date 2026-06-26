@@ -3,6 +3,13 @@ export type TwilioConnectionStatus =
   | "authorized"
   | "connected";
 
+export type TwilioAvailablePhoneNumber = {
+  phoneNumber: string;
+  friendlyName: string | null;
+  locality: string | null;
+  region: string | null;
+};
+
 export type TwilioPhoneNumberOption = {
   sid: string;
   phoneNumber: string;

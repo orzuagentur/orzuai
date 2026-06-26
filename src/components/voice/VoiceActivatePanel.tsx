@@ -23,14 +23,22 @@ import {
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { disconnectTwilioAction } from "@/features/twilio/actions/disconnect";
+import { purchaseTwilioPhoneNumberAction } from "@/features/twilio/actions/purchase-phone-number";
+import { refreshTwilioPhoneNumbersAction } from "@/features/twilio/actions/refresh-phone-numbers";
 import { resyncTwilioAction } from "@/features/twilio/actions/resync";
+import { searchTwilioPhoneNumbersAction } from "@/features/twilio/actions/search-phone-numbers";
 import { selectTwilioPhoneNumberAction } from "@/features/twilio/actions/select-phone";
 import { TWILIO_INTEGRATION_HREF, TWILIO_MESSAGES } from "@/features/twilio/constants";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { triggerTestVoiceCallAction } from "@/features/voice/actions/trigger-test-voice-call";
 import { toggleVoiceAiAction } from "@/features/voice/actions/toggle-voice-ai";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
-import type { TwilioPhoneNumberOption } from "@/types/twilio-integration.types";
+import type {
+  TwilioAvailablePhoneNumber,
+  TwilioPhoneNumberOption,
+} from "@/types/twilio-integration.types";
 import type {
   VoiceAgentSettings,
   VoiceCallLogItem,
@@ -70,6 +78,13 @@ export function VoiceActivatePanel({
   const [selectedPhoneSid, setSelectedPhoneSid] = useState<string | null>(null);
   const [isSelectingPhone, setIsSelectingPhone] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
+  const [isRefreshingNumbers, setIsRefreshingNumbers] = useState(false);
+  const [localPhoneNumbers, setLocalPhoneNumbers] = useState(availablePhoneNumbers);
+  const [countryCode, setCountryCode] = useState("US");
+  const [areaCode, setAreaCode] = useState("");
+  const [availableToBuy, setAvailableToBuy] = useState<TwilioAvailablePhoneNumber[]>([]);
+  const [isSearchingNumbers, setIsSearchingNumbers] = useState(false);
+  const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(settings.aiEnabled);
@@ -82,7 +97,14 @@ export function VoiceActivatePanel({
   const contentClassName = embeddedInHub ? "px-0 pb-0" : undefined;
 
   useEffect(() => {
-    if (searchParams.get("authorized") === "1") {
+    setLocalPhoneNumbers(availablePhoneNumbers);
+  }, [availablePhoneNumbers]);
+
+  useEffect(() => {
+    if (searchParams.get("connected") === "1") {
+      toast.success(TWILIO_MESSAGES.connectedTitle);
+      router.replace(TWILIO_INTEGRATION_HREF);
+    } else if (searchParams.get("authorized") === "1") {
       toast.success(TWILIO_MESSAGES.oauthSuccess);
       router.replace(TWILIO_INTEGRATION_HREF);
     } else if (searchParams.get("error") === "denied") {
@@ -154,6 +176,71 @@ export function VoiceActivatePanel({
       router.refresh();
     } finally {
       setIsSelectingPhone(false);
+    }
+  }
+
+  async function handleRefreshNumbers() {
+    setIsRefreshingNumbers(true);
+
+    try {
+      const result = await refreshTwilioPhoneNumbersAction();
+
+      if (!result.success) {
+        toast.error(result.message ?? TWILIO_MESSAGES.refreshFailed);
+        return;
+      }
+
+      if (result.numbers) {
+        setLocalPhoneNumbers(result.numbers);
+      }
+
+      toast.success(TWILIO_MESSAGES.refreshSuccess);
+      router.refresh();
+    } finally {
+      setIsRefreshingNumbers(false);
+    }
+  }
+
+  async function handleSearchNumbers() {
+    setIsSearchingNumbers(true);
+
+    try {
+      const result = await searchTwilioPhoneNumbersAction({
+        countryCode,
+        areaCode: areaCode.trim() || undefined,
+      });
+
+      if (!result.success) {
+        toast.error(result.message ?? TWILIO_MESSAGES.searchNumbersFailed);
+        setAvailableToBuy([]);
+        return;
+      }
+
+      setAvailableToBuy(result.numbers);
+
+      if (result.numbers.length === 0) {
+        toast.message("Доступных номеров не найдено. Попробуйте другой код региона.");
+      }
+    } finally {
+      setIsSearchingNumbers(false);
+    }
+  }
+
+  async function handlePurchaseNumber(phoneNumber: string) {
+    setPurchasingNumber(phoneNumber);
+
+    try {
+      const result = await purchaseTwilioPhoneNumberAction({ phoneNumber });
+
+      if (!result.success) {
+        toast.error(result.message ?? TWILIO_MESSAGES.purchaseNumberFailed);
+        return;
+      }
+
+      toast.success(TWILIO_MESSAGES.buyNumberSuccess);
+      router.refresh();
+    } finally {
+      setPurchasingNumber(null);
     }
   }
 
@@ -232,32 +319,46 @@ export function VoiceActivatePanel({
             </p>
           ) : null}
 
-          {availablePhoneNumbers.length === 0 ? (
-            <div className="space-y-3 rounded-lg border border-dashed p-4 text-sm">
-              <p className="font-medium">{TWILIO_MESSAGES.noPhoneNumbersTitle}</p>
-              <p className="text-muted-foreground">
-                {TWILIO_MESSAGES.noPhoneNumbersDescription}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isResyncing}
-                onClick={() => void handleResync()}
-              >
-                {isResyncing ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <>
-                    <RefreshCwIcon className="size-4" />
-                    {TWILIO_MESSAGES.resyncButton}
-                  </>
-                )}
-              </Button>
+          {localPhoneNumbers.length === 0 ? (
+            <div className="space-y-4">
+              <div className="space-y-3 rounded-lg border border-dashed p-4 text-sm">
+                <p className="font-medium">{TWILIO_MESSAGES.noPhoneNumbersTitle}</p>
+                <p className="text-muted-foreground">
+                  {TWILIO_MESSAGES.noPhoneNumbersDescription}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshingNumbers}
+                  onClick={() => void handleRefreshNumbers()}
+                >
+                  {isRefreshingNumbers ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      <RefreshCwIcon className="size-4" />
+                      {TWILIO_MESSAGES.refreshButton}
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <TwilioBuyNumberSection
+                countryCode={countryCode}
+                areaCode={areaCode}
+                availableToBuy={availableToBuy}
+                isSearching={isSearchingNumbers}
+                purchasingNumber={purchasingNumber}
+                onCountryChange={setCountryCode}
+                onAreaCodeChange={setAreaCode}
+                onSearch={() => void handleSearchNumbers()}
+                onPurchase={(phoneNumber) => void handlePurchaseNumber(phoneNumber)}
+              />
             </div>
           ) : (
             <div className="grid gap-2">
-              {availablePhoneNumbers.map((phone) => (
+              {localPhoneNumbers.map((phone) => (
                 <button
                   key={phone.sid}
                   type="button"
@@ -286,7 +387,7 @@ export function VoiceActivatePanel({
             </div>
           )}
 
-          {availablePhoneNumbers.length > 0 ? (
+          {localPhoneNumbers.length > 0 ? (
             <Button
               type="button"
               disabled={!selectedPhoneSid || isSelectingPhone}
@@ -454,6 +555,112 @@ export function VoiceActivatePanel({
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function TwilioBuyNumberSection({
+  countryCode,
+  areaCode,
+  availableToBuy,
+  isSearching,
+  purchasingNumber,
+  onCountryChange,
+  onAreaCodeChange,
+  onSearch,
+  onPurchase,
+}: {
+  countryCode: string;
+  areaCode: string;
+  availableToBuy: TwilioAvailablePhoneNumber[];
+  isSearching: boolean;
+  purchasingNumber: string | null;
+  onCountryChange: (value: string) => void;
+  onAreaCodeChange: (value: string) => void;
+  onSearch: () => void;
+  onPurchase: (phoneNumber: string) => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-lg border p-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{TWILIO_MESSAGES.buyNumberTitle}</p>
+        <p className="text-sm text-muted-foreground">
+          {TWILIO_MESSAGES.buyNumberDescription}
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="twilio-country">{TWILIO_MESSAGES.buyNumberCountryLabel}</Label>
+          <select
+            id="twilio-country"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={countryCode}
+            onChange={(event) => onCountryChange(event.target.value)}
+          >
+            <option value="US">United States (US)</option>
+            <option value="CA">Canada (CA)</option>
+            <option value="GB">United Kingdom (GB)</option>
+            <option value="DE">Germany (DE)</option>
+            <option value="AU">Australia (AU)</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="twilio-area">{TWILIO_MESSAGES.buyNumberAreaCodeLabel}</Label>
+          <Input
+            id="twilio-area"
+            value={areaCode}
+            onChange={(event) => onAreaCodeChange(event.target.value)}
+            placeholder="415"
+          />
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={isSearching}
+        onClick={onSearch}
+      >
+        {isSearching ? (
+          <>
+            <Loader2Icon className="size-4 animate-spin" />
+            {TWILIO_MESSAGES.buyNumberSearching}
+          </>
+        ) : (
+          TWILIO_MESSAGES.buyNumberSearchButton
+        )}
+      </Button>
+
+      {availableToBuy.length > 0 ? (
+        <ul className="divide-y rounded-lg border text-sm">
+          {availableToBuy.map((entry) => (
+            <li
+              key={entry.phoneNumber}
+              className="flex flex-wrap items-center justify-between gap-3 p-3"
+            >
+              <div>
+                <p className="font-medium">{entry.phoneNumber}</p>
+                <p className="text-xs text-muted-foreground">
+                  {[entry.locality, entry.region].filter(Boolean).join(", ")}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={purchasingNumber !== null}
+                onClick={() => onPurchase(entry.phoneNumber)}
+              >
+                {purchasingNumber === entry.phoneNumber ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  TWILIO_MESSAGES.buyNumberPurchaseButton
+                )}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
