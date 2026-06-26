@@ -86,7 +86,6 @@ const EMPTY_AI_COST: AiCostMetrics = {
   monthReplies: 0,
   avgCostPerReplyUsd: 0,
   byProvider: [],
-  hasCustomBilling: false,
 };
 
 const SLA_TARGET_MINUTES = 60;

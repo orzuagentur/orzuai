@@ -762,7 +762,7 @@ export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {
   }
 
   const syncedAt = new Date().toISOString();
-  await supabase
+  await admin
     .from("whatsapp_connections")
     .update({ last_synced_at: syncedAt })
     .eq("id", connection.id);

@@ -92,9 +92,7 @@ export function AnalyticsAgentsRollupPanel({
                       >
                         <Link
                           href={buildAiAssistantHref({
-                            section: "agents",
-                            agent: agent.agentId,
-                            analytics: true,
+                            section: "assistant",
                           })}
                         >
                           {ANALYTICS_MESSAGES.aiOpsViewAgent}

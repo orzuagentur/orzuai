@@ -3,7 +3,6 @@ import type { AutomationRuleId } from "@/features/automations/rule-catalog";
 import type { AutomationWorkflowItem } from "@/features/automations/workflow-types";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import type { AutomationsTab } from "@/utils/automations-url";
-import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { AiUsageSummary, SalesAgentSettings } from "@/types/ai-usage.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 
@@ -41,7 +40,6 @@ export type AutomationsPageData = {
   stats: AutomationStats;
   activity: AutomationActivityItem[];
   workflows: AutomationWorkflowItem[];
-  agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
 };

@@ -4,6 +4,7 @@ import { sendTelegramChatAction } from "@/lib/telegram/client";
 import type { AutoReplyStatusPayload } from "@/lib/realtime/conversation-channel";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { broadcastAutoReplyStatus } from "@/services/conversation-realtime-broadcast.service";
+import { getCachedTelegramDeliveryConnection } from "@/services/channels/connection-cache";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -49,14 +50,10 @@ async function sendTelegramAutoReplyTyping(
     return;
   }
 
-  const { data: connection } = await admin
-    .from("telegram_connections")
-    .select("bot_token")
-    .eq("business_id", context.businessId)
-    .eq("telegram_status", "connected")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const connection = await getCachedTelegramDeliveryConnection(
+    admin,
+    context.businessId,
+  );
 
   if (!connection?.bot_token) {
     return;

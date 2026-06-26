@@ -20,6 +20,7 @@ import {
 } from "@/lib/website-forms/auth";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
 import { createClient } from "@/lib/supabase/server";
 import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
 import { requireUser } from "@/services/auth.service";
@@ -434,12 +435,10 @@ async function processWebsiteFormFollowUp(input: {
   let outboundSent = false;
 
   if (channel === "whatsapp" && submission.phone) {
-    const { data: whatsappConnection } = await admin
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", businessId)
-      .eq("whatsapp_status", "connected")
-      .maybeSingle();
+    const whatsappConnection = await getCachedWhatsAppDeliveryConnection(
+      admin,
+      businessId,
+    );
 
     if (
       whatsappConnection?.meta_phone_number_id &&

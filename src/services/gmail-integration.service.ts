@@ -386,9 +386,8 @@ export async function disconnectGmail(): Promise<{
       return { success: false, message: EMAIL_MESSAGES.noBusinessDescription };
     }
 
-    const supabase = await createClient();
     const admin = createAdminClient();
-    const { data: connection } = await supabase
+    const { data: connection } = await admin
       .from("email_connections")
       .select("*")
       .eq("business_id", businessId)
@@ -405,7 +404,9 @@ export async function disconnectGmail(): Promise<{
         email_status: "disconnected",
         gmail_address: null,
         access_token: null,
+        access_token_secret_key_name: null,
         refresh_token: null,
+        refresh_token_secret_key_name: null,
         token_expires_at: null,
         history_id: null,
         watch_expiration: null,
@@ -427,6 +428,11 @@ export async function disconnectGmail(): Promise<{
         message: "Could not disconnect Gmail. Please try again.",
       };
     }
+
+    await Promise.all([
+      deleteIntegrationSecret(admin, connection?.access_token_secret_key_name),
+      deleteIntegrationSecret(admin, connection?.refresh_token_secret_key_name),
+    ]);
 
     revalidateGmailPaths();
     return { success: true };

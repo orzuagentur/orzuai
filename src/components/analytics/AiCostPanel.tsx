@@ -27,28 +27,15 @@ function formatUsd(value: number): string {
 }
 
 export function AiCostPanel({ metrics }: AiCostPanelProps) {
-  if (!metrics.hasCustomBilling) {
-    return (
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle className="text-base">
-            {ANALYTICS_MESSAGES.aiCostPlatformIncludedTitle}
-          </CardTitle>
-          <CardDescription>
-            {ANALYTICS_MESSAGES.aiCostPlatformIncludedDescription}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   return (
     <Card className="shadow-none">
       <CardHeader>
         <CardTitle className="text-base">
-          {ANALYTICS_MESSAGES.aiCostTitle}
+          {ANALYTICS_MESSAGES.aiCostPlatformIncludedTitle}
         </CardTitle>
-        <CardDescription>{ANALYTICS_MESSAGES.aiCostDescription}</CardDescription>
+        <CardDescription>
+          {ANALYTICS_MESSAGES.aiCostPlatformIncludedDescription}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -57,8 +44,9 @@ export function AiCostPanel({ metrics }: AiCostPanelProps) {
               {ANALYTICS_MESSAGES.aiCostMonth}
             </p>
             <p className="mt-1 text-xl font-semibold tabular-nums">
-              {formatUsd(metrics.monthCostUsd)}
+              {metrics.monthReplies}
             </p>
+            <p className="text-xs text-muted-foreground">AI replies</p>
           </div>
           <div className="rounded-lg border bg-muted/20 p-3">
             <p className="text-xs text-muted-foreground">
@@ -67,13 +55,9 @@ export function AiCostPanel({ metrics }: AiCostPanelProps) {
             <p className="mt-1 text-xl font-semibold tabular-nums">
               {formatUsd(metrics.avgCostPerReplyUsd)}
             </p>
+            <p className="text-xs text-muted-foreground">platform estimate</p>
           </div>
         </div>
-
-        <p className="text-sm text-muted-foreground">
-          {metrics.monthReplies} AI replies this month ·{" "}
-          {formatUsd(metrics.totalCostUsd)} all-time
-        </p>
 
         {metrics.byProvider.length > 0 ? (
           <ul className="space-y-2 text-sm">
@@ -84,7 +68,7 @@ export function AiCostPanel({ metrics }: AiCostPanelProps) {
               >
                 <span className="capitalize">{entry.provider}</span>
                 <span className="tabular-nums text-muted-foreground">
-                  {entry.replies} replies · {formatUsd(entry.costUsd)}
+                  {entry.replies} replies
                 </span>
               </li>
             ))}

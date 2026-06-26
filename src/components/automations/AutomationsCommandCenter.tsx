@@ -187,7 +187,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
               ) : activeWorkflow ? (
                 <AutomationWorkflowDetailPanel
                   workflow={activeWorkflow}
-                  agents={data.agents}
                   channelStatuses={data.channelStatuses}
                   visibleChannelIds={data.visibleChannelIds}
                   onBack={

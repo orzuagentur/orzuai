@@ -476,20 +476,10 @@ export async function saveChannelAiSettings(
   const supabase = await createClient();
   await ensureChannelAiSettings(supabase, businessId, parsed.data.channel);
 
-  const provider = parsed.data.provider;
-  const model =
-    provider === "gemini"
-      ? resolveGeminiModel(parsed.data.model)
-      : resolveAiModel(provider, parsed.data.model);
-
   const { error } = await supabase
     .from("ai_settings")
     .update({
       ai_enabled: parsed.data.aiEnabled,
-      provider,
-      language: parsed.data.language,
-      system_prompt: parsed.data.systemPrompt,
-      model,
     })
     .eq("business_id", businessId)
     .eq("channel", parsed.data.channel);

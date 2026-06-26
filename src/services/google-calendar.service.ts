@@ -24,6 +24,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import {
+  deleteIntegrationSecret,
+  resolveIntegrationSecret,
+  storeIntegrationSecret,
+} from "@/services/integration-secrets.service";
 import type { GoogleCalendarConnection } from "@/types/database.types";
 import type {
   GoogleCalendarConnectConfig,
@@ -112,7 +117,24 @@ export async function buildGoogleCalendarOAuthUrlForBusiness(
 async function getValidAccessToken(
   connection: GoogleCalendarConnection,
 ): Promise<string | null> {
-  if (!connection.access_token) {
+  const admin = createAdminClient();
+  const accessToken = await resolveIntegrationSecret(admin, {
+    businessId: connection.business_id,
+    kind: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+    secretKeyName: connection.access_token_secret_key_name,
+    legacyValue: connection.access_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("google_calendar_connections")
+        .update({
+          access_token: null,
+          access_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", connection.id);
+    },
+  });
+
+  if (!accessToken) {
     return null;
   }
 
@@ -124,23 +146,53 @@ async function getValidAccessToken(
     expiresAt !== null && expiresAt <= Date.now() + 60_000;
 
   if (!isExpired) {
-    return connection.access_token;
+    return accessToken;
   }
 
-  if (!connection.refresh_token) {
+  const refreshToken = await resolveIntegrationSecret(admin, {
+    businessId: connection.business_id,
+    kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
+    secretKeyName: connection.refresh_token_secret_key_name,
+    legacyValue: connection.refresh_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("google_calendar_connections")
+        .update({
+          refresh_token: null,
+          refresh_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", connection.id);
+    },
+  });
+
+  if (!refreshToken) {
     return null;
   }
 
   const refreshed = await refreshGoogleCalendarAccessToken(
-    connection.refresh_token,
+    refreshToken,
   );
+  const nextRefreshToken = refreshed.refreshToken ?? refreshToken;
+  const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
+    storeIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+      value: refreshed.accessToken,
+    }),
+    storeIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
+      value: nextRefreshToken,
+    }),
+  ]);
 
-  const admin = createAdminClient();
   await admin
     .from("google_calendar_connections")
     .update({
-      access_token: refreshed.accessToken,
-      refresh_token: refreshed.refreshToken ?? connection.refresh_token,
+      access_token: null,
+      access_token_secret_key_name: accessSecretKeyName,
+      refresh_token: null,
+      refresh_token_secret_key_name: refreshSecretKeyName,
       token_expires_at: refreshed.expiresAt,
       updated_at: new Date().toISOString(),
     })
@@ -164,18 +216,32 @@ export async function completeGoogleCalendarOAuth(
       fetchPrimaryGoogleCalendar(tokens.accessToken),
     ]);
 
-    const supabase = await createClient();
+    const admin = createAdminClient();
     const now = new Date().toISOString();
+    const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
+      storeIntegrationSecret(admin, {
+        businessId,
+        kind: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+        value: tokens.accessToken,
+      }),
+      storeIntegrationSecret(admin, {
+        businessId,
+        kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
+        value: tokens.refreshToken,
+      }),
+    ]);
 
-    const { error } = await supabase.from("google_calendar_connections").upsert(
+    const { error } = await admin.from("google_calendar_connections").upsert(
       {
         business_id: businessId,
         google_calendar_status: "connected",
         google_account_email: email,
         calendar_id: primaryCalendar?.id ?? "primary",
         calendar_summary: primaryCalendar?.summary ?? "Primary calendar",
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        access_token: null,
+        access_token_secret_key_name: accessSecretKeyName,
+        refresh_token: null,
+        refresh_token_secret_key_name: refreshSecretKeyName,
         token_expires_at: tokens.expiresAt,
         connected_at: now,
         last_synced_at: now,
@@ -211,29 +277,62 @@ export async function disconnectGoogleCalendar(): Promise<{
     return { success: false, message: GOOGLE_CALENDAR_MESSAGES.noBusinessDescription };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("google_calendar_connections")
-    .update({
-      google_calendar_status: "disconnected",
-      google_account_email: null,
-      calendar_id: null,
-      calendar_summary: null,
-      access_token: null,
-      refresh_token: null,
-      token_expires_at: null,
-      connected_at: null,
-      last_synced_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("business_id", businessId);
+  try {
+    const admin = createAdminClient();
+    const { data: connection } = await admin
+      .from("google_calendar_connections")
+      .select(
+        "id, access_token_secret_key_name, refresh_token_secret_key_name",
+      )
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    return { success: false, message: error.message };
+    const now = new Date().toISOString();
+    const { data: updated, error } = await admin
+      .from("google_calendar_connections")
+      .update({
+        google_calendar_status: "disconnected",
+        google_account_email: null,
+        calendar_id: null,
+        calendar_summary: null,
+        access_token: null,
+        access_token_secret_key_name: null,
+        refresh_token: null,
+        refresh_token_secret_key_name: null,
+        token_expires_at: null,
+        connected_at: null,
+        last_synced_at: null,
+        updated_at: now,
+      })
+      .eq("business_id", businessId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    if (connection && !updated?.id) {
+      return {
+        success: false,
+        message: "Could not disconnect Google Calendar. Please try again.",
+      };
+    }
+
+    await Promise.all([
+      deleteIntegrationSecret(admin, connection?.access_token_secret_key_name),
+      deleteIntegrationSecret(admin, connection?.refresh_token_secret_key_name),
+    ]);
+
+    revalidateGoogleCalendarPaths();
+    return { success: true };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : GOOGLE_CALENDAR_MESSAGES.oauthError;
+    return { success: false, message };
   }
-
-  revalidateGoogleCalendarPaths();
-  return { success: true };
 }
 
 export async function getGoogleCalendarEventsForBusiness(

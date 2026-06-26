@@ -15,7 +15,6 @@ import {
   UNLIMITED_AI_REPLIES,
   type SubscriptionPlanId,
 } from "@/features/subscription/plans";
-import { businessHasCustomAiCredentials } from "@/services/business-ai-credentials.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import type { AiCostMetrics, AiUsageSummary } from "@/types/ai-usage.types";
@@ -172,7 +171,6 @@ export async function getAiCostMetrics(
     monthReplies: 0,
     avgCostPerReplyUsd: 0,
     byProvider: [],
-    hasCustomBilling: false,
   };
 
   if (!hasSupabaseEnv()) {
@@ -182,13 +180,11 @@ export async function getAiCostMetrics(
   const admin = createAdminClient();
   const monthStart = getMonthStartIso();
 
-  const hasCustomBilling = await businessHasCustomAiCredentials(businessId);
-
   const { data: allLogs } = await admin
     .from("ai_usage_logs")
     .select("provider, estimated_cost_usd, created_at")
     .eq("business_id", businessId)
-    .eq("billing_source", "customer");
+    .eq("billing_source", "platform");
 
   const logs = allLogs ?? [];
   const monthLogs = logs.filter((log) => log.created_at >= monthStart);
@@ -225,7 +221,6 @@ export async function getAiCostMetrics(
       replies: stats.replies,
       costUsd: Number(stats.costUsd.toFixed(4)),
     })),
-    hasCustomBilling,
   };
 }
 

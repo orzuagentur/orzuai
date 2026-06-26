@@ -36,11 +36,11 @@ import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
-import type { AiProvider } from "@/lib/ai/constants";
+import { resolveLlmModel, type AiProvider } from "@/lib/ai/constants";
+import { getPrimaryPlatformLlmProvider } from "@/lib/ai/platform-llm-config";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
 import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
 import { getDefaultAiAssistantProfile } from "@/services/ai-assistant-profile.service";
-import { getDefaultGeminiModel } from "@/lib/env";
 import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
 import type { ExecutorPlan } from "@/types/agent-executor.types";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
@@ -349,8 +349,8 @@ function buildPrepFromProfile(input: {
       conversationSummary: input.conversationSummary,
       crmContext: input.crmContext,
     }),
-    provider: "gemini",
-    model: getDefaultGeminiModel(),
+    provider: getPrimaryPlatformLlmProvider(),
+    model: resolveLlmModel(getPrimaryPlatformLlmProvider(), undefined),
     language: input.profile.language,
   };
 }
@@ -374,8 +374,8 @@ async function ensureChannelAiSettingsRow(
   await admin.from("ai_settings").insert({
     business_id: businessId,
     channel,
-    provider: "gemini",
-    model: getDefaultGeminiModel(),
+    provider: getPrimaryPlatformLlmProvider(),
+    model: resolveLlmModel(getPrimaryPlatformLlmProvider(), undefined),
     language: DEFAULT_AI_LANGUAGE,
     system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
     ai_enabled: false,
@@ -515,8 +515,6 @@ export async function generateFastAssistantReply(input: {
     businessId: prep.businessId,
     conversationId: prep.conversationId ?? undefined,
     callType: "auto_reply",
-    preferredProvider: voice.provider,
-    model: voice.model,
     systemPrompt: voice.systemPrompt,
     language: voice.language,
     userMessage: prep.clientMessage,
@@ -688,7 +686,6 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       channel: input.channel,
       clientMessage: input.clientMessage,
       agent: null,
-      goal: null,
       routingMethod: "none",
       plan: applyAgentPermissionsToPlan(
         orchestratorResponseToExecutorPlan(orchestration),

@@ -3,15 +3,13 @@ import "server-only";
 import { estimateTokensFromText } from "@/lib/ai/cost";
 import {
   CUSTOMER_FACING_AI_CALL_TYPES,
-  DEFAULT_LLM_FALLBACK_PROVIDERS,
   type AiCallType,
 } from "@/lib/ai/call-types";
 import { resolveLlmModel, type AiProvider } from "@/lib/ai/constants";
-import { hasGeminiEnv } from "@/lib/env";
 import {
-  getBusinessPreferCustomerAiKeys,
-  resolveBusinessLlmCredentials,
-} from "@/services/business-ai-credentials.service";
+  getPlatformLlmProviderQueue,
+} from "@/lib/ai/platform-llm-config";
+import { hasGeminiEnv } from "@/lib/env";
 import {
   generateClaudeAssistantReply,
   generateClaudeText,
@@ -50,14 +48,12 @@ export type LlmAssistantInput = GenerateAssistantReplyInput &
   LlmTrackingContext & {
     provider?: AiProvider;
     apiKey?: string;
-    billingSource?: "platform" | "customer";
   };
 
 export type LlmTextInput = GenerateTextInput &
   LlmTrackingContext & {
     provider?: AiProvider;
     apiKey?: string;
-    billingSource?: "platform" | "customer";
   };
 
 export type LlmFallbackResult = GeminiServiceResult & {
@@ -128,22 +124,19 @@ type GenerationWithUsage = GeminiServiceResult & {
 };
 
 async function resolveGenerationContext(input: {
-  businessId?: string;
   provider?: AiProvider;
   model?: string;
   apiKey?: string;
-  billingSource?: "platform" | "customer";
 }) {
   const provider = resolveProvider(input.provider);
-  const credentials = await resolveBusinessLlmCredentials(
-    input.businessId,
-    provider,
-  );
-  const apiKey = input.apiKey ?? credentials.apiKey ?? undefined;
-  const billingSource = input.billingSource ?? credentials.billingSource;
   const model = resolveLlmModel(provider, input.model);
 
-  return { provider, apiKey, billingSource, model };
+  return {
+    provider,
+    apiKey: input.apiKey,
+    billingSource: "platform" as const,
+    model,
+  };
 }
 
 async function runAssistantGeneration(input: {
@@ -232,8 +225,7 @@ export async function generateAssistantReply(
 
   if (
     input.businessId &&
-    shouldEnforceUsageLimit(input) &&
-    billingSource === "platform"
+    shouldEnforceUsageLimit(input)
   ) {
     const allowed = await assertAiUsageAllowed(input.businessId);
 
@@ -301,8 +293,7 @@ export async function generateText(
 
   if (
     input.businessId &&
-    shouldEnforceUsageLimit(input) &&
-    billingSource === "platform"
+    shouldEnforceUsageLimit(input)
   ) {
     const allowed = await assertAiUsageAllowed(input.businessId);
 
@@ -353,14 +344,19 @@ export async function generateText(
 function getFallbackProviderOrder(
   preferred?: AiProvider,
 ): readonly AiProvider[] {
+  const queue = getPlatformLlmProviderQueue();
+
   if (!preferred) {
-    return DEFAULT_LLM_FALLBACK_PROVIDERS;
+    return queue;
   }
 
-  return [
-    preferred,
-    ...DEFAULT_LLM_FALLBACK_PROVIDERS.filter((provider) => provider !== preferred),
-  ];
+  return [preferred, ...queue.filter((provider) => provider !== preferred)];
+}
+
+export function getPlatformLlmFallbackOrder(
+  preferred?: AiProvider,
+): AiProvider[] {
+  return [...getFallbackProviderOrder(preferred)];
 }
 
 export async function generateAssistantReplyWithFallback(
@@ -471,10 +467,4 @@ export async function generateTextWithFallback(
     },
     attemptedProviders,
   };
-}
-
-export async function businessPrefersCustomerAiKeys(
-  businessId: string,
-): Promise<boolean> {
-  return getBusinessPreferCustomerAiKeys(businessId);
 }

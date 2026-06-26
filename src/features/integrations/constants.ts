@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from "react";
 import {
   GmailIcon,
   GoogleCalendarIcon,
+  InstagramIcon,
   TelegramIcon,
   VoiceIcon,
   WebsiteFormsIcon,
@@ -22,6 +23,7 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
 
 export const INTEGRATION_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
+  "instagram",
   "voice",
   "email",
   "google_calendar",
@@ -92,6 +94,13 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
     description: "Telegram Bot API",
     icon: TelegramIcon,
     available: true,
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    description: "Instagram Direct messaging",
+    icon: InstagramIcon,
+    available: false,
   },
   {
     id: "website_forms",

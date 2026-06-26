@@ -11,6 +11,10 @@ import {
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  getCachedTelegramDeliveryConnection,
+  getCachedWhatsAppDeliveryConnection,
+} from "@/services/channels/connection-cache";
+import {
   downloadAndStoreTelegramInboundMedia,
   downloadAndStoreWhatsAppInboundMedia,
 } from "@/services/inbound-media.service";
@@ -476,13 +480,10 @@ async function resolveInboundMediaContent(
   const messageId = attachment.message_id;
 
   if (message.channel === "whatsapp") {
-    const { data: connection } = await admin
-      .from("whatsapp_connections")
-      .select("meta_access_token")
-      .eq("business_id", attachment.business_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connection = await getCachedWhatsAppDeliveryConnection(
+      admin,
+      attachment.business_id,
+    );
 
     if (!connection?.meta_access_token || !attachment.provider_media_id) {
       throw new Error("WhatsApp media credentials are unavailable.");
@@ -502,13 +503,10 @@ async function resolveInboundMediaContent(
   }
 
   if (message.channel === "telegram") {
-    const { data: connection } = await admin
-      .from("telegram_connections")
-      .select("bot_token")
-      .eq("business_id", attachment.business_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connection = await getCachedTelegramDeliveryConnection(
+      admin,
+      attachment.business_id,
+    );
 
     if (!connection?.bot_token || !attachment.provider_media_id) {
       throw new Error("Telegram media credentials are unavailable.");

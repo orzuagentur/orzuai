@@ -69,10 +69,6 @@ export default async function IntegrationsChannelPage({
     redirect(`${DASHBOARD_ROUTES.integrations}/google_calendar?section=activate`);
   }
 
-  if (channelParam === "instagram") {
-    notFound();
-  }
-
   if (!isIntegrationChannelId(channelParam)) {
     notFound();
   }

@@ -18,13 +18,11 @@ import {
   type AutomationWorkflowItem,
 } from "@/features/automations/workflow-types";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
-import type { AiAgentItem } from "@/types/ai-agent.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationWorkflowDetailPanelProps = {
   workflow: AutomationWorkflowItem;
-  agents: AiAgentItem[];
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
   onBack?: () => void;
@@ -32,7 +30,6 @@ type AutomationWorkflowDetailPanelProps = {
 
 export function AutomationWorkflowDetailPanel({
   workflow,
-  agents,
   channelStatuses,
   visibleChannelIds,
   onBack,
@@ -47,10 +44,7 @@ export function AutomationWorkflowDetailPanel({
       ? workflow.config.channels
       : visibleChannelIds;
 
-  const agentName =
-    workflow.config.aiAgentId != null
-      ? agents.find((agent) => agent.id === workflow.config.aiAgentId)?.name
-      : null;
+  const usesPlatformAgent = workflow.config.aiAgentId != null;
 
   async function handleToggle(next: boolean) {
     setEnabled(next);
@@ -164,9 +158,10 @@ export function AutomationWorkflowDetailPanel({
               {workflow.config.notifyTitle}
             </p>
           ) : null}
-          {agentName ? (
+          {usesPlatformAgent ? (
             <p>
-              <span className="text-muted-foreground">Agent:</span> {agentName}
+              <span className="text-muted-foreground">Agent:</span> Platform AI
+              Agent
             </p>
           ) : null}
         </div>

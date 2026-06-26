@@ -58,7 +58,6 @@ export async function getAutomationsPageData(input?: {
       },
       activity: [],
       workflows: [],
-      agents: [],
       channelStatuses: {},
       visibleChannelIds: [],
     };
@@ -99,7 +98,6 @@ export async function getAutomationsPageData(input?: {
     stats: { ...stats, activeRules: builtinActive + customActive },
     activity,
     workflows,
-    agents: [],
     channelStatuses,
     visibleChannelIds,
   };

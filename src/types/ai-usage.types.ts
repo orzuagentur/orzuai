@@ -22,7 +22,6 @@ export type AiCostMetrics = {
   monthReplies: number;
   avgCostPerReplyUsd: number;
   byProvider: AiCostProviderBreakdown[];
-  hasCustomBilling: boolean;
 };
 
 export type SalesAgentSettings = {

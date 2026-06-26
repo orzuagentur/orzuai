@@ -6,6 +6,7 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { broadcastConversationTyping } from "@/services/conversation-realtime-broadcast.service";
+import { getCachedTelegramDeliveryConnection } from "@/services/channels/connection-cache";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { findContactForChannel } from "@/services/messaging.service";
@@ -116,14 +117,11 @@ export async function sendAgentTypingToChannel(
   await broadcastConversationTyping(conversationId, "agent", true);
 
   if (conversation.channel === "telegram") {
-    const { data: connection } = await supabase
-      .from("telegram_connections")
-      .select("bot_token")
-      .eq("business_id", business.id)
-      .eq("telegram_status", "connected")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const admin = createAdminClient();
+    const connection = await getCachedTelegramDeliveryConnection(
+      admin,
+      business.id,
+    );
 
     if (connection?.bot_token) {
       await sendTelegramChatAction(

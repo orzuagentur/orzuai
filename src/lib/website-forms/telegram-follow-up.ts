@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { sendTelegramTextMessage } from "@/lib/telegram/client";
+import { getCachedTelegramDeliveryConnection } from "@/services/channels/connection-cache";
 import type { WebsiteFormSubmissionInput } from "@/types/website-forms.types";
 import type { Database } from "@/types/database.types";
 
@@ -61,14 +62,7 @@ export async function sendWebsiteFormTelegramFollowUp(input: {
 }): Promise<boolean> {
   const { admin, businessId, submission, message } = input;
 
-  const { data: connection } = await admin
-    .from("telegram_connections")
-    .select("bot_token, telegram_status")
-    .eq("business_id", businessId)
-    .eq("telegram_status", "connected")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const connection = await getCachedTelegramDeliveryConnection(admin, businessId);
 
   if (!connection?.bot_token) {
     return false;

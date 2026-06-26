@@ -4,13 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
 
-import type { AgentWizardGoalId } from "@/features/ai-assistant/agent-wizard-catalog";
+import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
 import {
   buildCrmActionIdempotencyKey,
   buildExecutorPlanIdempotencyKey,
   hasCrmIdempotencyKey,
   recordCrmIdempotencyKey,
 } from "@/lib/crm/executor-idempotency";
+import { getPrimaryPlatformLlmProvider } from "@/lib/ai/platform-llm-config";
 import { generateText } from "@/services/llm.service";
 import type {
   AgentExecutorResult,
@@ -23,7 +24,6 @@ import type { ContactCustomFields, PipelineStage } from "@/types/contact.types";
 import { PIPELINE_STAGES } from "@/types/contact.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { AgentRoutingMethod } from "@/types/intent-router.types";
-import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
 import {
   createAdditionalContactId,
   parseAdditionalContacts,
@@ -176,10 +176,7 @@ function mapDealStatus(stage: PipelineStage): string {
   return "open";
 }
 
-function getAllowedActionTypes(
-  goal: AgentWizardGoalId | null,
-): Set<ExecutorAction["type"]> {
-  void goal;
+function getAllowedActionTypes(): Set<ExecutorAction["type"]> {
   return new Set([
     "create_deal",
     "create_task",
@@ -194,7 +191,6 @@ function buildExecutorPrompt(input: {
   message: string;
   conversationHistory: ConversationTurn[];
   agent: RoutableAiAgent | null;
-  goal: AgentWizardGoalId | null;
 }): string {
   const historySection =
     input.conversationHistory.length > 0
@@ -207,12 +203,12 @@ function buildExecutorPrompt(input: {
           .join("\n")
       : "No prior messages.";
 
-  const allowed = [...getAllowedActionTypes(input.goal), "contactUpdates"];
+  const allowed = [...getAllowedActionTypes(), "contactUpdates"];
 
   return [
     "Extract customer data and plan CRM updates from the latest message.",
     input.agent
-      ? `Active specialized agent: ${input.agent.name} (goal: ${input.goal ?? "custom"}).`
+      ? `Active AI agent: ${input.agent.name}.`
       : "No specialized agent matched — only update contact profile when the customer shares new details.",
     "",
     "Current CRM contact:",
@@ -805,7 +801,6 @@ async function applyExecutorPlan(
   businessId: string,
   contact: ContactSnapshot,
   plan: ExecutorPlan,
-  goal: AgentWizardGoalId | null,
   idempotencyContext: {
     conversationId?: string | null;
     clientMessage: string;
@@ -815,7 +810,7 @@ async function applyExecutorPlan(
   },
 ): Promise<string[]> {
   const applied: string[] = [];
-  const allowed = getAllowedActionTypes(goal);
+  const allowed = getAllowedActionTypes();
 
   if (plan.contactUpdates && Object.keys(plan.contactUpdates).length > 0) {
     applied.push(
@@ -918,11 +913,10 @@ export async function planAgentCrmActions(input: {
   message: string;
   conversationHistory: ConversationTurn[];
   agent: RoutableAiAgent | null;
-  goal: AgentWizardGoalId | null;
 }): Promise<ExecutorPlan | null> {
   const result = await generateText({
     businessId: input.businessId,
-    provider: "gemini",
+    provider: getPrimaryPlatformLlmProvider(),
     callType: "crm_plan",
     systemInstruction:
       "You extract structured CRM data from customer messages. Reply with valid JSON only. Never invent contact details.",
@@ -953,7 +947,6 @@ async function executePlanOnContact(input: {
   channel: string;
   clientMessage: string;
   agent: RoutableAiAgent | null;
-  goal: AgentWizardGoalId | null;
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
 }): Promise<AgentExecutorResult> {
@@ -979,7 +972,6 @@ async function executePlanOnContact(input: {
       input.businessId,
       input.contact,
       input.plan,
-      input.goal,
       {
         conversationId: input.conversationId,
         clientMessage: input.clientMessage,
@@ -1014,7 +1006,6 @@ async function executePlanOnContact(input: {
       "[agent-executor]",
       JSON.stringify({
         contactId: input.contactId,
-        goal: input.goal,
         actionsApplied,
       }),
     );
@@ -1059,7 +1050,6 @@ export async function applyPreparedExecutorPlan(input: {
   channel: string;
   clientMessage: string;
   agent: RoutableAiAgent | null;
-  goal: AgentWizardGoalId | null;
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
 }): Promise<AgentExecutorResult> {
@@ -1088,7 +1078,6 @@ export async function applyPreparedExecutorPlan(input: {
     channel: input.channel,
     clientMessage: input.clientMessage,
     agent: input.agent,
-    goal: input.goal,
     routingMethod: input.routingMethod,
     plan: input.plan,
   });

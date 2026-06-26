@@ -10,6 +10,7 @@ import {
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
+import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
 import type { MessagingChannel } from "@/types/database.types";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -143,14 +144,10 @@ async function sendFollowUpOnChannel(input: {
       ? conversation.contact[0]
       : conversation?.contact;
 
-    const { data: whatsappConnection } = await admin
-      .from("whatsapp_connections")
-      .select("meta_phone_number_id, meta_access_token")
-      .eq("business_id", candidate.businessId)
-      .eq("whatsapp_status", "connected")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const whatsappConnection = await getCachedWhatsAppDeliveryConnection(
+      admin,
+      candidate.businessId,
+    );
 
     if (
       !contact?.phone_number ||

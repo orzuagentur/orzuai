@@ -115,7 +115,6 @@ export type Database = {
           subscription_status: string;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
-          prefer_customer_ai_keys: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -133,7 +132,6 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
-          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -151,7 +149,6 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
-          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -2081,50 +2078,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_settings_business_id_fkey";
-            columns: ["business_id"];
-            isOneToOne: false;
-            referencedRelation: "businesses";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      business_ai_provider_keys: {
-        Row: {
-          business_id: string;
-          provider: string;
-          api_key: string | null;
-          secret_key_name: string | null;
-          api_key_preview: string | null;
-          encrypted_at: string | null;
-          key_name: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          business_id: string;
-          provider: string;
-          api_key?: string | null;
-          secret_key_name?: string | null;
-          api_key_preview?: string | null;
-          encrypted_at?: string | null;
-          key_name?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          business_id?: string;
-          provider?: string;
-          api_key?: string | null;
-          secret_key_name?: string | null;
-          api_key_preview?: string | null;
-          encrypted_at?: string | null;
-          key_name?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "business_ai_provider_keys_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";

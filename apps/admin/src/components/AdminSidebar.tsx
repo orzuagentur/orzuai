@@ -6,6 +6,7 @@ import {
   BotIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
+  Settings2Icon,
   ShieldIcon,
   UsersIcon,
 } from "lucide-react";
@@ -23,6 +24,11 @@ const NAV_ITEMS = [
     href: "/ai-expenses",
     label: "AI расходы",
     icon: BotIcon,
+  },
+  {
+    href: "/ai-management",
+    label: "Управление AI",
+    icon: Settings2Icon,
   },
   {
     href: "/settings/secrets",
