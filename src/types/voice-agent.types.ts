@@ -22,11 +22,17 @@ export type VoiceConnectionData = {
   phoneNumber: string | null;
   enabled: boolean;
   callbackAfterOrder: boolean;
+  connectedAt: string | null;
+  lastSyncedAt: string | null;
+  accountFriendlyName: string | null;
+  pendingPhoneSelection: boolean;
 };
 
 export type VoiceConnectConfig = {
   isConfigured: boolean;
   aiConfigured: boolean;
+  connectUrl: string;
+  authorizeRedirectUri: string;
 };
 
 export const saveVoiceAgentSettingsSchema = z.object({

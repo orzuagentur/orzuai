@@ -4,6 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ENV_KEYS } from "@/constants/env-keys";
+import {
+  getTwilioConnection,
+  getTwilioConnectConfig as getPlatformTwilioConnectConfig,
+  resolveTwilioCredentialsForBusiness,
+} from "@/services/twilio-integration.service";
+import {
+  createTwilioOutboundCall,
+} from "@/lib/twilio/client";
+import { hasTwilioPlatformEnv } from "@/lib/twilio/connect";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   buildVoiceConversationTwiml,
@@ -24,7 +33,6 @@ import type {
   VoiceProvider,
 } from "@/types/voice-agent.types";
 import {
-  connectVoiceAgentSchema,
   saveVoiceAgentSettingsSchema,
 } from "@/types/voice-agent.types";
 
@@ -55,12 +63,12 @@ const DEFAULT_SETTINGS: Omit<
   voiceSystemPrompt: "",
 };
 
-function isVoiceProviderConfigured(provider: VoiceProvider): boolean {
+function isVoiceProviderConfigured(
+  provider: VoiceProvider,
+  twilioConnected: boolean,
+): boolean {
   if (provider === "twilio") {
-    return Boolean(
-      process.env[ENV_KEYS.TWILIO_ACCOUNT_SID]?.trim() &&
-        process.env[ENV_KEYS.TWILIO_AUTH_TOKEN]?.trim(),
-    );
+    return twilioConnected || hasTwilioPlatformEnv();
   }
 
   if (provider === "retell") {
@@ -81,23 +89,59 @@ function revalidateVoicePaths(): void {
 }
 
 export function getVoiceConnectConfig(): VoiceConnectConfig {
+  const twilioConfig = getPlatformTwilioConnectConfig();
+
   return {
-    isConfigured: isVoiceProviderConfigured("twilio"),
+    isConfigured: twilioConfig.isConfigured,
     aiConfigured: isVoiceAiConfigured(),
+    connectUrl: twilioConfig.connectUrl,
+    authorizeRedirectUri: twilioConfig.authorizeRedirectUri,
   };
 }
 
 export async function getVoiceConnection(
   businessId: string,
 ): Promise<VoiceConnectionData> {
-  const settings = await getVoiceAgentSettings(businessId);
+  const [settings, twilio] = await Promise.all([
+    getVoiceAgentSettings(businessId),
+    getTwilioConnection(businessId),
+  ]);
+
+  const base = {
+    callbackAfterOrder: settings.callbackAfterOrder,
+    connectedAt: twilio?.connectedAt ?? null,
+    lastSyncedAt: twilio?.lastSyncedAt ?? null,
+    accountFriendlyName: twilio?.accountFriendlyName ?? null,
+    pendingPhoneSelection: twilio?.status === "authorized",
+  };
+
+  if (twilio?.status === "connected" && settings.phoneNumber) {
+    return {
+      status: "connected",
+      phoneNumber: settings.phoneNumber,
+      enabled: settings.enabled,
+      ...base,
+      pendingPhoneSelection: false,
+    };
+  }
+
+  if (twilio?.status === "authorized") {
+    return {
+      status: "pending",
+      phoneNumber: null,
+      enabled: false,
+      ...base,
+      pendingPhoneSelection: true,
+    };
+  }
 
   if (!settings.phoneNumber) {
     return {
       status: "disconnected",
       phoneNumber: null,
       enabled: false,
-      callbackAfterOrder: settings.callbackAfterOrder,
+      ...base,
+      pendingPhoneSelection: false,
     };
   }
 
@@ -110,7 +154,8 @@ export async function getVoiceConnection(
       status: "connected",
       phoneNumber: settings.phoneNumber,
       enabled: true,
-      callbackAfterOrder: settings.callbackAfterOrder,
+      ...base,
+      pendingPhoneSelection: false,
     };
   }
 
@@ -118,7 +163,8 @@ export async function getVoiceConnection(
     status: "pending",
     phoneNumber: settings.phoneNumber,
     enabled: settings.enabled,
-    callbackAfterOrder: settings.callbackAfterOrder,
+    ...base,
+    pendingPhoneSelection: false,
   };
 }
 
@@ -126,66 +172,22 @@ export async function connectVoiceAgent(
   businessId: string,
   input: ConnectVoiceAgentInput,
 ): Promise<{ success: boolean; message?: string }> {
-  const parsed = connectVoiceAgentSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      message: parsed.error.issues[0]?.message ?? VOICE_MESSAGES.saveFailed,
-    };
-  }
-
-  if (!getVoiceConnectConfig().isConfigured) {
-    return { success: false, message: VOICE_MESSAGES.platformMissing };
-  }
-
-  const existing = await getVoiceAgentSettings(businessId);
-
-  return saveVoiceAgentSettings(businessId, {
-    enabled: true,
-    provider: "twilio",
-    phoneNumber: parsed.data.phoneNumber,
-    outboundEnabled: true,
-    inboundEnabled: true,
-    callbackAfterOrder: true,
-    callbackDelayMinutes: existing.callbackDelayMinutes,
-    outboundScript: existing.outboundScript,
-    inboundGreeting: existing.inboundGreeting,
-    retellAgentId: "",
-    vapiAssistantId: "",
-    twilioPhoneSid: "",
-    aiEnabled: true,
-    voiceLanguage: existing.voiceLanguage,
-    voiceSystemPrompt: existing.voiceSystemPrompt,
-  });
+  void businessId;
+  void input;
+  return {
+    success: false,
+    message:
+      "Подключите Twilio через кнопку «Подключить Twilio» в разделе Интеграции.",
+  };
 }
 
 export async function disconnectVoiceAgent(
   businessId: string,
 ): Promise<{ success: boolean; message?: string }> {
-  const existing = await getVoiceAgentSettings(businessId);
-
-  if (!existing.phoneNumber) {
-    return { success: true };
-  }
-
-  return saveVoiceAgentSettings(businessId, {
-    enabled: false,
-    provider: existing.provider,
-    phoneNumber: existing.phoneNumber,
-    outboundEnabled: existing.outboundEnabled,
-    inboundEnabled: existing.inboundEnabled,
-    callbackAfterOrder: existing.callbackAfterOrder,
-    callbackDelayMinutes: existing.callbackDelayMinutes,
-    outboundScript: existing.outboundScript,
-    inboundGreeting: existing.inboundGreeting,
-    retellAgentId: existing.retellAgentId,
-    vapiAssistantId: existing.vapiAssistantId,
-    twilioPhoneSid: existing.twilioPhoneSid,
-    aiEnabled: existing.aiEnabled,
-    voiceLanguage: existing.voiceLanguage,
-    voiceSystemPrompt: existing.voiceSystemPrompt,
-  });
+  const { disconnectTwilioIntegration } = await import(
+    "@/services/twilio-integration.service"
+  );
+  return disconnectTwilioIntegration(businessId);
 }
 
 function buildWebhookUrls(businessId: string) {
@@ -199,11 +201,18 @@ export async function getVoiceAgentSettings(
   businessId: string,
 ): Promise<VoiceAgentSettings> {
   const webhooks = buildWebhookUrls(businessId);
+  const twilioConnection = hasSupabaseEnv()
+    ? await getTwilioConnection(businessId)
+    : null;
+  const twilioConnected = twilioConnection?.status === "connected";
 
   if (!hasSupabaseEnv()) {
     return {
       ...DEFAULT_SETTINGS,
-      providerConfigured: false,
+      providerConfigured: isVoiceProviderConfigured(
+        DEFAULT_SETTINGS.provider,
+        false,
+      ),
       aiConfigured: isVoiceAiConfigured(),
       ...webhooks,
     };
@@ -219,7 +228,10 @@ export async function getVoiceAgentSettings(
   if (!data) {
     return {
       ...DEFAULT_SETTINGS,
-      providerConfigured: isVoiceProviderConfigured(DEFAULT_SETTINGS.provider),
+      providerConfigured: isVoiceProviderConfigured(
+        DEFAULT_SETTINGS.provider,
+        twilioConnected,
+      ),
       aiConfigured: isVoiceAiConfigured(),
       ...webhooks,
     };
@@ -243,7 +255,7 @@ export async function getVoiceAgentSettings(
     aiEnabled: data.ai_enabled ?? true,
     voiceLanguage: data.voice_language ?? "English",
     voiceSystemPrompt: data.voice_system_prompt ?? "",
-    providerConfigured: isVoiceProviderConfigured(provider),
+    providerConfigured: isVoiceProviderConfigured(provider, twilioConnected),
     aiConfigured: isVoiceAiConfigured(),
     ...webhooks,
   };
@@ -352,44 +364,28 @@ async function logVoiceCall(input: {
 }
 
 async function twilioCreateCall(input: {
+  credentials: { accountSid: string; authToken: string };
   from: string;
   to: string;
   twimlUrl: string;
 }): Promise<{ success: true; callSid: string } | { success: false; message: string }> {
-  const accountSid = process.env[ENV_KEYS.TWILIO_ACCOUNT_SID]?.trim();
-  const authToken = process.env[ENV_KEYS.TWILIO_AUTH_TOKEN]?.trim();
-
-  if (!accountSid || !authToken) {
-    return { success: false, message: "Twilio credentials missing." };
-  }
-
-  const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        To: input.to,
-        From: input.from,
-        Url: input.twimlUrl,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
+  try {
+    const callSid = await createTwilioOutboundCall({
+      credentials: input.credentials,
+      from: input.from,
+      to: input.to,
+      twimlUrl: input.twimlUrl,
+    });
+    return { success: true, callSid };
+  } catch (error) {
     return {
       success: false,
-      message: body.slice(0, 300) || `Twilio error (${response.status}).`,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : "Twilio call failed.",
     };
   }
-
-  const payload = (await response.json()) as { sid?: string };
-  return { success: true, callSid: payload.sid ?? "unknown" };
 }
 
 async function retellCreateCall(input: {
@@ -481,7 +477,18 @@ export async function placeOutboundVoiceCall(input: {
     return { success: false, message: "Configure a business phone number first." };
   }
 
-  if (!isVoiceProviderConfigured(settings.provider)) {
+  const twilioConnection = await getTwilioConnection(input.businessId);
+  const twilioCredentials = resolveTwilioCredentialsForBusiness(twilioConnection);
+
+  if (
+    settings.provider === "twilio" &&
+    !twilioCredentials &&
+    !hasTwilioPlatformEnv()
+  ) {
+    return { success: false, message: VOICE_MESSAGES.platformMissing };
+  }
+
+  if (!isVoiceProviderConfigured(settings.provider, Boolean(twilioCredentials))) {
     return { success: false, message: VOICE_MESSAGES.platformMissing };
   }
 
@@ -490,10 +497,15 @@ export async function placeOutboundVoiceCall(input: {
   let status = "queued";
 
   if (settings.provider === "twilio") {
+    if (!twilioCredentials) {
+      return { success: false, message: VOICE_MESSAGES.platformMissing };
+    }
+
     const outboundUrl = new URL(webhooks.outboundWebhookUrl);
     outboundUrl.searchParams.set("triggerReason", input.triggerReason);
 
     const result = await twilioCreateCall({
+      credentials: twilioCredentials,
       from: settings.phoneNumber,
       to: input.phoneNumber,
       twimlUrl: outboundUrl.toString(),

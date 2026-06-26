@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2Icon,
-  CopyIcon,
   Loader2Icon,
   PhoneCallIcon,
+  RefreshCwIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,16 +21,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import {
-  connectVoiceAgentAction,
-  disconnectVoiceAgentAction,
-} from "@/features/voice/actions/connect-voice";
+import { disconnectTwilioAction } from "@/features/twilio/actions/disconnect";
+import { resyncTwilioAction } from "@/features/twilio/actions/resync";
+import { selectTwilioPhoneNumberAction } from "@/features/twilio/actions/select-phone";
+import { TWILIO_INTEGRATION_HREF, TWILIO_MESSAGES } from "@/features/twilio/constants";
 import { triggerTestVoiceCallAction } from "@/features/voice/actions/trigger-test-voice-call";
 import { toggleVoiceAiAction } from "@/features/voice/actions/toggle-voice-ai";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { cn } from "@/lib/utils";
+import type { TwilioPhoneNumberOption } from "@/types/twilio-integration.types";
 import type {
   VoiceAgentSettings,
   VoiceCallLogItem,
@@ -42,22 +43,17 @@ type VoiceActivatePanelProps = {
   settings: VoiceAgentSettings;
   recentCalls: VoiceCallLogItem[];
   config: VoiceConnectConfig;
+  availablePhoneNumbers: TwilioPhoneNumberOption[];
   hasBusiness: boolean;
   embeddedInHub?: boolean;
 };
 
-function getStatusVariant(
-  status: VoiceConnectionData["status"],
-): "default" | "secondary" | "outline" {
-  if (status === "connected") {
-    return "default";
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "—";
   }
 
-  if (status === "pending") {
-    return "secondary";
-  }
-
-  return "outline";
+  return new Date(value).toLocaleString();
 }
 
 export function VoiceActivatePanel({
@@ -65,16 +61,16 @@ export function VoiceActivatePanel({
   settings,
   recentCalls,
   config,
+  availablePhoneNumbers,
   hasBusiness,
   embeddedInHub = false,
 }: VoiceActivatePanelProps) {
   const router = useRouter();
-  const [phoneNumber, setPhoneNumber] = useState(
-    connection.phoneNumber ?? settings.phoneNumber ?? "",
-  );
+  const searchParams = useSearchParams();
+  const [selectedPhoneSid, setSelectedPhoneSid] = useState<string | null>(null);
+  const [isSelectingPhone, setIsSelectingPhone] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
   const [testPhone, setTestPhone] = useState("");
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(settings.aiEnabled);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
@@ -84,6 +80,19 @@ export function VoiceActivatePanel({
     : "max-w-2xl shadow-none";
   const headerClassName = embeddedInHub ? "px-0 pt-0" : undefined;
   const contentClassName = embeddedInHub ? "px-0 pb-0" : undefined;
+
+  useEffect(() => {
+    if (searchParams.get("authorized") === "1") {
+      toast.success(TWILIO_MESSAGES.oauthSuccess);
+      router.replace(TWILIO_INTEGRATION_HREF);
+    } else if (searchParams.get("error") === "denied") {
+      toast.error(TWILIO_MESSAGES.oauthDenied);
+      router.replace(TWILIO_INTEGRATION_HREF);
+    } else if (searchParams.get("error")) {
+      toast.error(TWILIO_MESSAGES.oauthError);
+      router.replace(TWILIO_INTEGRATION_HREF);
+    }
+  }, [router, searchParams]);
 
   if (!hasBusiness) {
     return (
@@ -105,50 +114,60 @@ export function VoiceActivatePanel({
     return (
       <Card className={cardClassName}>
         <CardHeader className={headerClassName}>
-          <CardTitle>{VOICE_MESSAGES.connectTitle}</CardTitle>
-          <CardDescription>{VOICE_MESSAGES.platformMissing}</CardDescription>
+          <CardTitle>{TWILIO_MESSAGES.notConfiguredTitle}</CardTitle>
+          <CardDescription>{TWILIO_MESSAGES.notConfiguredDescription}</CardDescription>
         </CardHeader>
+        <CardContent className={embeddedInHub ? "space-y-3 px-0 pb-0" : "space-y-3"}>
+          <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+            <p className="font-medium">{TWILIO_MESSAGES.authorizeRedirectLabel}</p>
+            <code className="mt-1 block break-all text-xs">
+              {config.authorizeRedirectUri}
+            </code>
+          </div>
+        </CardContent>
       </Card>
     );
   }
 
-  async function handleConnect() {
-    if (!phoneNumber.trim()) {
+  async function handleSelectPhone() {
+    if (!selectedPhoneSid) {
       return;
     }
 
-    setIsConnecting(true);
+    setIsSelectingPhone(true);
 
     try {
-      const result = await connectVoiceAgentAction({ phoneNumber });
+      const result = await selectTwilioPhoneNumberAction({
+        phoneSid: selectedPhoneSid,
+      });
 
       if (!result.success) {
-        toast.error(result.message ?? VOICE_MESSAGES.saveFailed);
+        toast.error(result.message ?? TWILIO_MESSAGES.saveFailed);
         return;
       }
 
       toast.success(VOICE_MESSAGES.saved);
       router.refresh();
     } finally {
-      setIsConnecting(false);
+      setIsSelectingPhone(false);
     }
   }
 
-  async function handleDisconnect() {
-    setIsDisconnecting(true);
+  async function handleResync() {
+    setIsResyncing(true);
 
     try {
-      const result = await disconnectVoiceAgentAction();
+      const result = await resyncTwilioAction();
 
       if (!result.success) {
-        toast.error(result.message ?? VOICE_MESSAGES.saveFailed);
+        toast.error(result.message ?? TWILIO_MESSAGES.resyncFailed);
         return;
       }
 
-      toast.message(VOICE_MESSAGES.disconnected);
+      toast.success(TWILIO_MESSAGES.resyncSuccess);
       router.refresh();
     } finally {
-      setIsDisconnecting(false);
+      setIsResyncing(false);
     }
   }
 
@@ -195,89 +214,214 @@ export function VoiceActivatePanel({
     }
   }
 
-  if (connection.status === "connected") {
+  if (connection.pendingPhoneSelection) {
     return (
       <Card className={cardClassName}>
         <CardHeader className={headerClassName}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                <PhoneCallIcon className="size-5 text-indigo-600" />
-                {VOICE_MESSAGES.connectedTitle}
-              </CardTitle>
-              <CardDescription>{connection.phoneNumber}</CardDescription>
-            </div>
-            <Badge variant={getStatusVariant(connection.status)}>connected</Badge>
-          </div>
+          <CardTitle>{TWILIO_MESSAGES.selectPhoneTitle}</CardTitle>
+          <CardDescription>{TWILIO_MESSAGES.selectPhoneDescription}</CardDescription>
         </CardHeader>
-        <CardContent className={`space-y-6 ${contentClassName ?? ""}`}>
-          <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
-            <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-            <div className="space-y-1">
-              <p className="font-medium">{VOICE_MESSAGES.autoCallbackTitle}</p>
+        <CardContent className={`space-y-5 ${contentClassName ?? ""}`}>
+          {connection.accountFriendlyName ? (
+            <p className="text-sm text-muted-foreground">
+              {TWILIO_MESSAGES.accountLabel}: {connection.accountFriendlyName}
+            </p>
+          ) : null}
+
+          {availablePhoneNumbers.length === 0 ? (
+            <div className="space-y-3 rounded-lg border border-dashed p-4 text-sm">
+              <p className="font-medium">{TWILIO_MESSAGES.noPhoneNumbersTitle}</p>
               <p className="text-muted-foreground">
-                {VOICE_MESSAGES.autoCallbackDescription}
+                {TWILIO_MESSAGES.noPhoneNumbersDescription}
               </p>
-              <Button variant="link" className="h-auto p-0 text-sm" asChild>
-                <Link
-                  href={`${DASHBOARD_ROUTES.integrations}/website_forms?section=activate`}
-                >
-                  {VOICE_MESSAGES.websiteFormsLink}
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <VoiceAiSection
-            aiEnabled={aiEnabled}
-            aiConfigured={config.aiConfigured}
-            isToggling={isTogglingAi}
-            onToggle={handleToggleAi}
-          />
-
-          <VoiceCallHistory calls={recentCalls} />
-
-          <div className="space-y-3 rounded-lg border p-4">
-            <p className="text-sm font-medium">{VOICE_MESSAGES.testCallTitle}</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                value={testPhone}
-                onChange={(event) => setTestPhone(event.target.value)}
-                placeholder={VOICE_MESSAGES.phonePlaceholder}
-              />
               <Button
                 type="button"
-                variant="secondary"
-                disabled={isTesting || !testPhone.trim()}
-                onClick={handleTestCall}
+                variant="outline"
+                size="sm"
+                disabled={isResyncing}
+                onClick={() => void handleResync()}
               >
-                {isTesting ? (
+                {isResyncing ? (
                   <Loader2Icon className="size-4 animate-spin" />
                 ) : (
-                  VOICE_MESSAGES.testCallButton
+                  <>
+                    <RefreshCwIcon className="size-4" />
+                    {TWILIO_MESSAGES.resyncButton}
+                  </>
                 )}
               </Button>
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-2">
+              {availablePhoneNumbers.map((phone) => (
+                <button
+                  key={phone.sid}
+                  type="button"
+                  onClick={() => setSelectedPhoneSid(phone.sid)}
+                  className={cn(
+                    "rounded-lg border p-4 text-left transition-colors",
+                    selectedPhoneSid === phone.sid
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/40",
+                  )}
+                >
+                  <p className="font-medium">{phone.phoneNumber}</p>
+                  {phone.friendlyName ? (
+                    <p className="text-sm text-muted-foreground">{phone.friendlyName}</p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {[
+                      phone.capabilities.voice ? "Voice" : null,
+                      phone.capabilities.sms ? "SMS" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <VoiceAdvancedSetup settings={settings} />
-
-          <div className="flex flex-wrap gap-2">
+          {availablePhoneNumbers.length > 0 ? (
             <Button
               type="button"
-              variant="outline"
-              disabled={isDisconnecting}
-              onClick={handleDisconnect}
+              disabled={!selectedPhoneSid || isSelectingPhone}
+              onClick={() => void handleSelectPhone()}
             >
-              {isDisconnecting ? (
+              {isSelectingPhone ? (
                 <Loader2Icon className="size-4 animate-spin" />
               ) : (
-                VOICE_MESSAGES.disconnectButton
+                TWILIO_MESSAGES.selectPhoneButton
               )}
             </Button>
-          </div>
+          ) : null}
         </CardContent>
       </Card>
+    );
+  }
+
+  if (connection.status === "connected") {
+    return (
+      <div
+        className={
+          embeddedInHub
+            ? "flex w-full flex-col gap-6"
+            : "mx-auto flex w-full max-w-2xl flex-col gap-6"
+        }
+      >
+        <Card className={cardClassName}>
+          <CardHeader className={headerClassName}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <PhoneCallIcon className="size-5 text-indigo-600" />
+                  {TWILIO_MESSAGES.connectedTitle}
+                </CardTitle>
+                <CardDescription>{TWILIO_MESSAGES.connectDescription}</CardDescription>
+              </div>
+              <Badge>{TWILIO_MESSAGES.connectedStatus}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className={`space-y-6 ${contentClassName ?? ""}`}>
+            <div className="grid gap-3 rounded-lg border p-4 text-sm">
+              <p>
+                <span className="text-muted-foreground">
+                  {TWILIO_MESSAGES.phoneLabel}:{" "}
+                </span>
+                <span className="font-medium">{connection.phoneNumber}</span>
+              </p>
+              {connection.accountFriendlyName ? (
+                <p>
+                  <span className="text-muted-foreground">
+                    {TWILIO_MESSAGES.accountLabel}:{" "}
+                  </span>
+                  {connection.accountFriendlyName}
+                </p>
+              ) : null}
+              <p>
+                <span className="text-muted-foreground">
+                  {TWILIO_MESSAGES.connectedAtLabel}:{" "}
+                </span>
+                {formatDateTime(connection.connectedAt)}
+              </p>
+              <p>
+                <span className="text-muted-foreground">
+                  {TWILIO_MESSAGES.lastSyncLabel}:{" "}
+                </span>
+                {formatDateTime(connection.lastSyncedAt)}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isResyncing}
+                onClick={() => void handleResync()}
+              >
+                {isResyncing ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCwIcon className="size-4" />
+                    {TWILIO_MESSAGES.resyncButton}
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+              <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+              <div className="space-y-1">
+                <p className="font-medium">{VOICE_MESSAGES.autoCallbackTitle}</p>
+                <p className="text-muted-foreground">
+                  {VOICE_MESSAGES.autoCallbackDescription}
+                </p>
+              </div>
+            </div>
+
+            <VoiceAiSection
+              aiEnabled={aiEnabled}
+              aiConfigured={config.aiConfigured}
+              isToggling={isTogglingAi}
+              onToggle={handleToggleAi}
+            />
+
+            <VoiceCallHistory calls={recentCalls} />
+
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="text-sm font-medium">{VOICE_MESSAGES.testCallTitle}</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={testPhone}
+                  onChange={(event) => setTestPhone(event.target.value)}
+                  placeholder={VOICE_MESSAGES.phonePlaceholder}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={isTesting || !testPhone.trim()}
+                  onClick={() => void handleTestCall()}
+                >
+                  {isTesting ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    VOICE_MESSAGES.testCallButton
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <IntegrationDangerZone
+          resourceLabel="Twilio"
+          successMessage={TWILIO_MESSAGES.disconnected}
+          onDisconnect={disconnectTwilioAction}
+        />
+      </div>
     );
   }
 
@@ -286,29 +430,12 @@ export function VoiceActivatePanel({
       <CardHeader className={headerClassName}>
         <CardTitle className="flex items-center gap-2">
           <PhoneCallIcon className="size-5 text-indigo-600" />
-          {VOICE_MESSAGES.connectTitle}
+          {TWILIO_MESSAGES.connectTitle}
         </CardTitle>
-        <CardDescription>{VOICE_MESSAGES.connectDescription}</CardDescription>
+        <CardDescription>{TWILIO_MESSAGES.connectDescription}</CardDescription>
       </CardHeader>
       <CardContent className={`space-y-5 ${contentClassName ?? ""}`}>
-        <div className="space-y-2">
-          <Label htmlFor="voice-phone">{VOICE_MESSAGES.phoneLabel}</Label>
-          <Input
-            id="voice-phone"
-            value={phoneNumber}
-            onChange={(event) => setPhoneNumber(event.target.value)}
-            placeholder={VOICE_MESSAGES.phonePlaceholder}
-            autoComplete="tel"
-          />
-          <p className="text-xs text-muted-foreground">{VOICE_MESSAGES.phoneHint}</p>
-        </div>
-
-        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">
-            {VOICE_MESSAGES.autoCallbackTitle}
-          </p>
-          <p className="mt-1">{VOICE_MESSAGES.autoCallbackDescription}</p>
-        </div>
+        <p className="text-sm text-muted-foreground">{TWILIO_MESSAGES.connectNote}</p>
 
         {config.aiConfigured ? (
           <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.aiDescription}</p>
@@ -318,20 +445,8 @@ export function VoiceActivatePanel({
           </p>
         )}
 
-        <Button
-          type="button"
-          className="w-full sm:w-auto"
-          disabled={isConnecting || !phoneNumber.trim()}
-          onClick={handleConnect}
-        >
-          {isConnecting ? (
-            <>
-              <Loader2Icon className="size-4 animate-spin" />
-              …
-            </>
-          ) : (
-            VOICE_MESSAGES.activateButton
-          )}
+        <Button type="button" className="w-full sm:w-auto" asChild>
+          <a href={config.connectUrl}>{TWILIO_MESSAGES.connectButton}</a>
         </Button>
       </CardContent>
     </Card>
@@ -405,70 +520,6 @@ function VoiceCallHistory({ calls }: { calls: VoiceCallLogItem[] }) {
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-function VoiceAdvancedSetup({ settings }: { settings: VoiceAgentSettings }) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  async function copyUrl(label: string, value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopiedField(label);
-    toast.success(VOICE_MESSAGES.copied);
-    window.setTimeout(() => setCopiedField(null), 2000);
-  }
-
-  return (
-    <details className="rounded-lg border p-4 text-sm">
-      <summary className="cursor-pointer font-medium">
-        {VOICE_MESSAGES.advancedTitle}
-      </summary>
-      <p className="mt-2 text-muted-foreground">
-        {VOICE_MESSAGES.advancedDescription}
-      </p>
-      <div className="mt-3 space-y-3">
-        <WebhookCopyRow
-          label={VOICE_MESSAGES.webhookInbound}
-          value={settings.inboundWebhookUrl}
-          copied={copiedField === "inbound"}
-          onCopy={() => copyUrl("inbound", settings.inboundWebhookUrl)}
-        />
-        <WebhookCopyRow
-          label={VOICE_MESSAGES.webhookOutbound}
-          value={settings.outboundWebhookUrl}
-          copied={copiedField === "outbound"}
-          onCopy={() => copyUrl("outbound", settings.outboundWebhookUrl)}
-        />
-      </div>
-    </details>
-  );
-}
-
-function WebhookCopyRow({
-  label,
-  value,
-  copied,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  copied: boolean;
-  onCopy: () => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <span className="font-medium">{label}</span>
-      <div className="flex gap-2">
-        <Input readOnly value={value} className="font-mono text-xs" />
-        <Button type="button" variant="outline" size="icon" onClick={onCopy}>
-          {copied ? (
-            <CheckCircle2Icon className="size-4" />
-          ) : (
-            <CopyIcon className="size-4" />
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

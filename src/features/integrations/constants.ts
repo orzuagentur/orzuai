@@ -111,8 +111,8 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   },
   {
     id: "voice",
-    label: "AI Voice",
-    description: "AI calls leads after website forms",
+    label: "Twilio Voice",
+    description: "Подключите Twilio для AI-звонков и SMS",
     icon: VoiceIcon,
     available: true,
   },

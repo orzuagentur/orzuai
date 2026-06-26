@@ -23,6 +23,10 @@ export type TelegramStatus = "connected" | "disconnected" | "pending";
 export type EmailConnectionStatus = "connected" | "disconnected" | "pending";
 
 export type GoogleCalendarStatus = "connected" | "disconnected" | "pending";
+export type TwilioConnectionStatus =
+  | "connected"
+  | "disconnected"
+  | "authorized";
 
 export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
 
@@ -559,6 +563,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "google_calendar_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      twilio_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          twilio_status: TwilioConnectionStatus;
+          connected_account_sid: string | null;
+          account_friendly_name: string | null;
+          phone_number: string | null;
+          phone_sid: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          twilio_status?: TwilioConnectionStatus;
+          connected_account_sid?: string | null;
+          account_friendly_name?: string | null;
+          phone_number?: string | null;
+          phone_sid?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          twilio_status?: TwilioConnectionStatus;
+          connected_account_sid?: string | null;
+          account_friendly_name?: string | null;
+          phone_number?: string | null;
+          phone_sid?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "twilio_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
             referencedRelation: "businesses";
@@ -2769,6 +2823,7 @@ export type Database = {
       telegram_status: TelegramStatus;
       email_connection_status: EmailConnectionStatus;
       google_calendar_status: GoogleCalendarStatus;
+      twilio_connection_status: TwilioConnectionStatus;
       website_form_status: WebsiteFormStatus;
       website_form_follow_up: WebsiteFormFollowUp;
       website_knowledge_sync_status: WebsiteKnowledgeSyncStatus;
@@ -2797,6 +2852,8 @@ export type EmailConnection =
   Database["public"]["Tables"]["email_connections"]["Row"];
 export type GoogleCalendarConnection =
   Database["public"]["Tables"]["google_calendar_connections"]["Row"];
+export type TwilioConnection =
+  Database["public"]["Tables"]["twilio_connections"]["Row"];
 export type WebsiteFormConnection =
   Database["public"]["Tables"]["website_form_connections"]["Row"];
 export type WebsiteKnowledgeSync =
