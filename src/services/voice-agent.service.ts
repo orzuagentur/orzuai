@@ -96,6 +96,7 @@ export function getVoiceConnectConfig(): VoiceConnectConfig {
     aiConfigured: isVoiceAiConfigured(),
     connectUrl: twilioConfig.connectUrl,
     authorizeRedirectUri: twilioConfig.authorizeRedirectUri,
+    deauthorizeRedirectUri: twilioConfig.deauthorizeRedirectUri,
   };
 }
 

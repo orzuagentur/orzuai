@@ -8,6 +8,7 @@ import { buildAppUrl } from "@/lib/app-url";
 import {
   buildTwilioConnectAuthorizeUrl,
   createTwilioConnectState,
+  getTwilioConnectAppSid,
   getTwilioPlatformAuthToken,
   hasTwilioConnectEnv,
   hasTwilioPlatformEnv,
@@ -65,6 +66,7 @@ export function getTwilioConnectConfig(): TwilioConnectConfig {
     isConfigured: hasTwilioConnectEnv(),
     connectUrl: "/api/integrations/twilio/connect",
     authorizeRedirectUri: buildAppUrl("/api/integrations/twilio/callback"),
+    deauthorizeRedirectUri: buildAppUrl("/api/integrations/twilio/deauthorize"),
   };
 }
 
@@ -91,6 +93,23 @@ export async function getTwilioConnection(
     .from("twilio_connections")
     .select("*")
     .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data ? mapTwilioConnection(data) : null;
+}
+
+export async function getTwilioConnectionByAccountSid(
+  connectedAccountSid: string,
+): Promise<TwilioConnectionData | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("twilio_connections")
+    .select("*")
+    .eq("connected_account_sid", connectedAccountSid)
     .maybeSingle();
 
   return data ? mapTwilioConnection(data) : null;
@@ -378,8 +397,55 @@ export async function resyncTwilioConnection(
   return { success: true };
 }
 
+export async function handleTwilioConnectDeauthorization(input: {
+  accountSid: string;
+  connectAppSid?: string | null;
+}): Promise<{ success: boolean; processed: boolean }> {
+  const accountSid = input.accountSid.trim();
+  const expectedConnectAppSid = getTwilioConnectAppSid();
+
+  if (!accountSid.startsWith("AC")) {
+    return { success: false, processed: false };
+  }
+
+  if (
+    input.connectAppSid &&
+    expectedConnectAppSid &&
+    input.connectAppSid !== expectedConnectAppSid
+  ) {
+    console.warn(
+      "[twilio] deauthorize ignored — ConnectAppSid mismatch",
+      JSON.stringify({
+        received: input.connectAppSid,
+      }),
+    );
+    return { success: false, processed: false };
+  }
+
+  const connection = await getTwilioConnectionByAccountSid(accountSid);
+
+  if (!connection) {
+    return { success: true, processed: false };
+  }
+
+  await disconnectTwilioIntegration(connection.businessId, {
+    skipWebhookCleanup: true,
+  });
+
+  console.info(
+    "[twilio] deauthorized",
+    JSON.stringify({
+      businessId: connection.businessId,
+      accountSid,
+    }),
+  );
+
+  return { success: true, processed: true };
+}
+
 export async function disconnectTwilioIntegration(
   businessId: string,
+  options?: { skipWebhookCleanup?: boolean },
 ): Promise<{ success: boolean; message?: string }> {
   if (!hasSupabaseEnv()) {
     return { success: false, message: TWILIO_MESSAGES.saveFailed };
@@ -388,7 +454,7 @@ export async function disconnectTwilioIntegration(
   const connection = await getTwilioConnection(businessId);
   const credentials = resolveTwilioCredentialsForBusiness(connection);
 
-  if (connection?.phoneSid && credentials) {
+  if (connection?.phoneSid && credentials && !options?.skipWebhookCleanup) {
     try {
       await clearTwilioPhoneNumberWebhooks({
         credentials,

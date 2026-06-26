@@ -33,6 +33,7 @@ export type VoiceConnectConfig = {
   aiConfigured: boolean;
   connectUrl: string;
   authorizeRedirectUri: string;
+  deauthorizeRedirectUri: string;
 };
 
 export const saveVoiceAgentSettingsSchema = z.object({

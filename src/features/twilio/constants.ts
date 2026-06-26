@@ -35,6 +35,7 @@ export const TWILIO_MESSAGES = {
   notConfiguredDescription:
     "Администратору нужно указать TWILIO_CONNECT_APP_SID и платформенные ключи Twilio.",
   authorizeRedirectLabel: "Authorize URL (Twilio Console)",
+  deauthorizeRedirectLabel: "Deauthorize URL (Twilio Console)",
   notAuthorized: "Сначала подключите Twilio.",
   notConnected: "Twilio ещё не подключён полностью.",
   phoneNotFound: "Выбранный номер больше недоступен.",

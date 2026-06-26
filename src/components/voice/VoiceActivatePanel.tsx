@@ -123,6 +123,10 @@ export function VoiceActivatePanel({
             <code className="mt-1 block break-all text-xs">
               {config.authorizeRedirectUri}
             </code>
+            <p className="mt-3 font-medium">{TWILIO_MESSAGES.deauthorizeRedirectLabel}</p>
+            <code className="mt-1 block break-all text-xs">
+              {config.deauthorizeRedirectUri}
+            </code>
           </div>
         </CardContent>
       </Card>

@@ -31,4 +31,5 @@ export type TwilioConnectConfig = {
   isConfigured: boolean;
   connectUrl: string;
   authorizeRedirectUri: string;
+  deauthorizeRedirectUri: string;
 };
