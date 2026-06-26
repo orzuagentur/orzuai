@@ -494,7 +494,12 @@ export async function processChannelAutoReply(input: {
   });
 
   let messageContent = reply.text;
-  let sendResult: { success: boolean; error?: string; emailSubject?: string };
+  let sendResult: {
+    success: boolean;
+    error?: string;
+    emailSubject?: string;
+    sentText?: string;
+  };
 
   if (voiceDecision.useVoice && voiceDecision.voiceId) {
     const voiceSettings = await loadVoiceReplySettings(admin, businessId);
@@ -540,6 +545,10 @@ export async function processChannelAutoReply(input: {
       errorMessage: CHAT_MESSAGES.autoReplyErrorSendFailed,
     });
     throw new Error("[send_failed] Unable to deliver auto-reply.");
+  }
+
+  if (sendResult.sentText) {
+    messageContent = sendResult.sentText;
   }
 
   const inserted = await insertChannelMessage(admin, {

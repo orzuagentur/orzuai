@@ -1,3 +1,5 @@
+import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
+
 const INTERNAL_SUMMARY_PATTERNS = [
   /^saved to crm:/i,
   /manager note/i,
@@ -79,7 +81,9 @@ export function sanitizeCustomerFacingSummary(
     return null;
   }
 
-  return normalized;
+  const guarded = sanitizeCustomerFacingReply(normalized, { fallback: null });
+
+  return guarded.text;
 }
 
 export function messagesAreLikelyDuplicates(

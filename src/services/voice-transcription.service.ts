@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  estimateAudioDurationSeconds,
+} from "@/lib/ai/cost";
+import { logAiUsage } from "@/services/ai-usage.service";
 import { hasOpenAiEnv } from "@/services/openai.service";
 
 const WHISPER_MODEL = "whisper-1";
@@ -36,6 +40,8 @@ export async function transcribeAudioBuffer(input: {
   fileName: string;
   mimeType: string;
   language?: string;
+  businessId: string;
+  conversationId?: string | null;
 }): Promise<string | null> {
   if (!hasOpenAiEnv()) {
     console.warn("[voice-transcription] OPENAI_API_KEY missing, skipping Whisper");
@@ -50,6 +56,10 @@ export async function transcribeAudioBuffer(input: {
 
   const fileName = resolveTranscriptionFileName(input.fileName, input.mimeType);
   const mimeType = input.mimeType.trim() || "audio/ogg";
+  const durationSeconds = estimateAudioDurationSeconds(
+    input.buffer.length,
+    mimeType,
+  );
 
   const formData = new FormData();
   const uint8 = new Uint8Array(input.buffer);
@@ -87,9 +97,21 @@ export async function transcribeAudioBuffer(input: {
       return null;
     }
 
+    await logAiUsage({
+      businessId: input.businessId,
+      conversationId: input.conversationId ?? null,
+      provider: "openai",
+      model: WHISPER_MODEL,
+      inputTokens: durationSeconds,
+      outputTokens: text.length,
+      billingSource: "platform",
+      callType: "voice_stt",
+    });
+
     console.info("[voice-transcription] transcribed", {
       fileName,
       chars: text.length,
+      durationSeconds,
     });
 
     return text;

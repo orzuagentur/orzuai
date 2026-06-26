@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 
 import { buildAppUrl } from "@/lib/app-url";
@@ -31,6 +31,11 @@ import {
   insertChannelMessage,
   scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
+import {
+  deleteIntegrationSecret,
+  resolveIntegrationSecret,
+  storeIntegrationSecret,
+} from "@/services/integration-secrets.service";
 import type { InsertedChannelMessageRow } from "@/services/messaging.service";
 import type { TelegramConnection } from "@/types/database.types";
 import type {
@@ -79,6 +84,10 @@ function getTelegramWebhookUrl(): string {
   return buildAppUrl("/api/webhooks/telegram");
 }
 
+function hashTelegramWebhookSecret(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
 export async function disconnectTelegram(): Promise<{
   success: boolean;
   message?: string;
@@ -93,27 +102,50 @@ export async function disconnectTelegram(): Promise<{
     return { success: false, message: TELEGRAM_MESSAGES.noBusinessDescription };
   }
 
-  const supabase = await createClient();
-  const { data: connection } = await supabase
+  const admin = createAdminClient();
+  const { data: connection } = await admin
     .from("telegram_connections")
-    .select("id, bot_token")
+    .select(
+      "id, business_id, bot_token, bot_token_secret_key_name, webhook_secret_secret_key_name",
+    )
     .eq("business_id", businessId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (connection?.bot_token) {
-    await deleteTelegramWebhook(connection.bot_token);
+  const botToken = connection
+    ? await resolveIntegrationSecret(admin, {
+        businessId,
+        kind: "TELEGRAM_BOT_TOKEN",
+        secretKeyName: connection.bot_token_secret_key_name,
+        legacyValue: connection.bot_token,
+        onMigrated: async (secretKeyName) => {
+          await admin
+            .from("telegram_connections")
+            .update({
+              bot_token: null,
+              bot_token_secret_key_name: secretKeyName,
+            })
+            .eq("id", connection.id);
+        },
+      })
+    : null;
+
+  if (botToken) {
+    await deleteTelegramWebhook(botToken);
   }
 
-  const { error } = await supabase
+  const { error } = await admin
     .from("telegram_connections")
     .update({
       telegram_status: "disconnected",
       bot_username: "",
       telegram_bot_id: null,
       bot_token: null,
+      bot_token_secret_key_name: null,
       webhook_secret: null,
+      webhook_secret_secret_key_name: null,
+      webhook_secret_hash: null,
       connected_at: null,
       last_synced_at: null,
     })
@@ -122,6 +154,11 @@ export async function disconnectTelegram(): Promise<{
   if (error) {
     return { success: false, message: error.message };
   }
+
+  await Promise.all([
+    deleteIntegrationSecret(admin, connection?.bot_token_secret_key_name),
+    deleteIntegrationSecret(admin, connection?.webhook_secret_secret_key_name),
+  ]);
 
   revalidateTelegramPaths();
   return { success: true };
@@ -204,8 +241,8 @@ export async function connectTelegramBot(
     };
   }
 
-  const supabase = await createClient();
-  const { data: existingConnection } = await supabase
+  const admin = createAdminClient();
+  const { data: existingConnection } = await admin
     .from("telegram_connections")
     .select("id, telegram_status")
     .eq("business_id", businessId)
@@ -225,25 +262,40 @@ export async function connectTelegramBot(
 
   const webhookSecret = randomBytes(24).toString("hex");
   const connectedAt = new Date().toISOString();
+  const [botTokenSecretKeyName, webhookSecretKeyName] = await Promise.all([
+    storeIntegrationSecret(admin, {
+      businessId,
+      kind: "TELEGRAM_BOT_TOKEN",
+      value: parsed.data.botToken,
+    }),
+    storeIntegrationSecret(admin, {
+      businessId,
+      kind: "TELEGRAM_WEBHOOK_SECRET",
+      value: webhookSecret,
+    }),
+  ]);
   const connectionPayload = {
     business_id: businessId,
     bot_username: botInfoResult.bot.username,
     telegram_status: "connected" as const,
     telegram_bot_id: String(botInfoResult.bot.id),
-    bot_token: parsed.data.botToken,
-    webhook_secret: webhookSecret,
+    bot_token: null,
+    bot_token_secret_key_name: botTokenSecretKeyName,
+    webhook_secret: null,
+    webhook_secret_secret_key_name: webhookSecretKeyName,
+    webhook_secret_hash: hashTelegramWebhookSecret(webhookSecret),
     connected_at: connectedAt,
     last_synced_at: connectedAt,
   };
 
   const { data: savedConnection, error: saveError } = existingConnection
-    ? await supabase
+    ? await admin
         .from("telegram_connections")
         .update(connectionPayload)
         .eq("id", existingConnection.id)
         .select("*")
         .single()
-    : await supabase
+    : await admin
         .from("telegram_connections")
         .insert(connectionPayload)
         .select("*")
@@ -266,7 +318,7 @@ export async function connectTelegramBot(
   );
 
   if (!webhookResult.success) {
-    await supabase
+    await admin
       .from("telegram_connections")
       .update({ telegram_status: "disconnected" })
       .eq("id", savedConnection.id);
@@ -282,7 +334,7 @@ export async function connectTelegramBot(
 
   revalidateTelegramPaths();
 
-  await enableChannelAiIfAgentActive(businessId, "telegram");
+  await enableChannelAiIfAgentActive(businessId, "telegram", admin);
 
   return {
     success: true,
@@ -459,21 +511,72 @@ export async function processTelegramWebhook(
   }
 
   const admin = createAdminClient();
-  const { data: connection } = await admin
+  const secretHash = hashTelegramWebhookSecret(secretToken);
+  let connectionQuery = await admin
     .from("telegram_connections")
     .select("*")
-    .eq("webhook_secret", secretToken)
+    .eq("webhook_secret_hash", secretHash)
     .eq("telegram_status", "connected")
     .maybeSingle();
 
-  if (!connection?.bot_token) {
+  if (!connectionQuery.data) {
+    connectionQuery = await admin
+      .from("telegram_connections")
+      .select("*")
+      .eq("webhook_secret", secretToken)
+      .eq("telegram_status", "connected")
+      .maybeSingle();
+  }
+
+  const connection = connectionQuery.data;
+
+  if (!connection) {
     return { processed: 0 };
   }
 
+  const [botToken, webhookSecretKeyName] = await Promise.all([
+    resolveIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "TELEGRAM_BOT_TOKEN",
+      secretKeyName: connection.bot_token_secret_key_name,
+      legacyValue: connection.bot_token,
+      onMigrated: async (secretKeyName) => {
+        await admin
+          .from("telegram_connections")
+          .update({
+            bot_token: null,
+            bot_token_secret_key_name: secretKeyName,
+          })
+          .eq("id", connection.id);
+      },
+    }),
+    storeIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "TELEGRAM_WEBHOOK_SECRET",
+      value: secretToken,
+    }),
+  ]);
+
+  if (!botToken) {
+    return { processed: 0 };
+  }
+
+  if (!connection.webhook_secret_hash || connection.webhook_secret) {
+    await admin
+      .from("telegram_connections")
+      .update({
+        webhook_secret: null,
+        webhook_secret_secret_key_name: webhookSecretKeyName,
+        webhook_secret_hash: secretHash,
+      })
+      .eq("id", connection.id);
+  }
+
+  const hydratedConnection = { ...connection, bot_token: botToken };
   let processed = 0;
 
   for (const message of messages) {
-    await ingestTelegramMessage(admin, connection, message);
+    await ingestTelegramMessage(admin, hydratedConnection, message);
     processed += 1;
   }
 
@@ -514,14 +617,32 @@ export async function sendTelegramChatMessage(
 
   const { data: connection } = await admin
     .from("telegram_connections")
-    .select("*")
+    .select("id, business_id, bot_token, bot_token_secret_key_name")
     .eq("business_id", businessId)
     .eq("telegram_status", "connected")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!connection?.bot_token) {
+  const botToken = connection
+    ? await resolveIntegrationSecret(admin, {
+        businessId,
+        kind: "TELEGRAM_BOT_TOKEN",
+        secretKeyName: connection.bot_token_secret_key_name,
+        legacyValue: connection.bot_token,
+        onMigrated: async (secretKeyName) => {
+          await admin
+            .from("telegram_connections")
+            .update({
+              bot_token: null,
+              bot_token_secret_key_name: secretKeyName,
+            })
+            .eq("id", connection.id);
+        },
+      })
+    : null;
+
+  if (!botToken) {
     return { success: false, message: TELEGRAM_MESSAGES.notConfigured };
   }
 

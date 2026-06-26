@@ -1,6 +1,9 @@
 import "server-only";
 
-import { estimateAiCostUsd } from "@/lib/ai/cost";
+import {
+  estimateAiCostUsd,
+  estimateWhisperCostUsd,
+} from "@/lib/ai/cost";
 import type { AiCallType } from "@/lib/ai/call-types";
 import type { AiProvider } from "@/lib/ai/constants";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -64,7 +67,7 @@ export async function assertAiUsageAllowed(
 export async function logAiUsage(input: {
   businessId: string;
   conversationId?: string | null;
-  provider: AiProvider;
+  provider: AiProvider | string;
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -76,11 +79,14 @@ export async function logAiUsage(input: {
   }
 
   const admin = createAdminClient();
-  const estimatedCostUsd = estimateAiCostUsd({
-    provider: input.provider,
-    inputTokens: input.inputTokens,
-    outputTokens: input.outputTokens,
-  });
+  const estimatedCostUsd =
+    input.callType === "voice_stt"
+      ? estimateWhisperCostUsd(input.inputTokens)
+      : estimateAiCostUsd({
+          provider: input.provider,
+          inputTokens: input.inputTokens,
+          outputTokens: input.outputTokens,
+        });
 
   await admin.from("ai_usage_logs").insert({
     business_id: input.businessId,

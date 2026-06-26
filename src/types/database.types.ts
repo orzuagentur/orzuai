@@ -281,6 +281,7 @@ export type Database = {
           created_at: string;
           meta_phone_number_id: string | null;
           meta_access_token: string | null;
+          meta_access_token_secret_key_name: string | null;
           meta_waba_id: string | null;
           meta_business_account_id: string | null;
           dialog360_channel_id: string | null;
@@ -298,6 +299,7 @@ export type Database = {
           created_at?: string;
           meta_phone_number_id?: string | null;
           meta_access_token?: string | null;
+          meta_access_token_secret_key_name?: string | null;
           meta_waba_id?: string | null;
           meta_business_account_id?: string | null;
           dialog360_channel_id?: string | null;
@@ -315,6 +317,7 @@ export type Database = {
           created_at?: string;
           meta_phone_number_id?: string | null;
           meta_access_token?: string | null;
+          meta_access_token_secret_key_name?: string | null;
           meta_waba_id?: string | null;
           meta_business_account_id?: string | null;
           dialog360_channel_id?: string | null;
@@ -342,6 +345,7 @@ export type Database = {
           meta_page_id: string | null;
           meta_ig_user_id: string | null;
           meta_access_token: string | null;
+          meta_access_token_secret_key_name: string | null;
           meta_business_account_id: string | null;
           connected_at: string | null;
           last_synced_at: string | null;
@@ -355,6 +359,7 @@ export type Database = {
           meta_page_id?: string | null;
           meta_ig_user_id?: string | null;
           meta_access_token?: string | null;
+          meta_access_token_secret_key_name?: string | null;
           meta_business_account_id?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
@@ -368,6 +373,7 @@ export type Database = {
           meta_page_id?: string | null;
           meta_ig_user_id?: string | null;
           meta_access_token?: string | null;
+          meta_access_token_secret_key_name?: string | null;
           meta_business_account_id?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
@@ -391,7 +397,10 @@ export type Database = {
           telegram_status: TelegramStatus;
           telegram_bot_id: string | null;
           bot_token: string | null;
+          bot_token_secret_key_name: string | null;
           webhook_secret: string | null;
+          webhook_secret_secret_key_name: string | null;
+          webhook_secret_hash: string | null;
           connected_at: string | null;
           last_synced_at: string | null;
           created_at: string;
@@ -403,7 +412,10 @@ export type Database = {
           telegram_status?: TelegramStatus;
           telegram_bot_id?: string | null;
           bot_token?: string | null;
+          bot_token_secret_key_name?: string | null;
           webhook_secret?: string | null;
+          webhook_secret_secret_key_name?: string | null;
+          webhook_secret_hash?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
@@ -415,7 +427,10 @@ export type Database = {
           telegram_status?: TelegramStatus;
           telegram_bot_id?: string | null;
           bot_token?: string | null;
+          bot_token_secret_key_name?: string | null;
           webhook_secret?: string | null;
+          webhook_secret_secret_key_name?: string | null;
+          webhook_secret_hash?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
@@ -437,7 +452,9 @@ export type Database = {
           email_status: EmailConnectionStatus;
           gmail_address: string | null;
           access_token: string | null;
+          access_token_secret_key_name: string | null;
           refresh_token: string | null;
+          refresh_token_secret_key_name: string | null;
           token_expires_at: string | null;
           history_id: string | null;
           last_synced_at: string | null;
@@ -452,7 +469,9 @@ export type Database = {
           email_status?: EmailConnectionStatus;
           gmail_address?: string | null;
           access_token?: string | null;
+          access_token_secret_key_name?: string | null;
           refresh_token?: string | null;
+          refresh_token_secret_key_name?: string | null;
           token_expires_at?: string | null;
           history_id?: string | null;
           last_synced_at?: string | null;
@@ -467,7 +486,9 @@ export type Database = {
           email_status?: EmailConnectionStatus;
           gmail_address?: string | null;
           access_token?: string | null;
+          access_token_secret_key_name?: string | null;
           refresh_token?: string | null;
+          refresh_token_secret_key_name?: string | null;
           token_expires_at?: string | null;
           history_id?: string | null;
           last_synced_at?: string | null;
@@ -495,7 +516,9 @@ export type Database = {
           calendar_id: string | null;
           calendar_summary: string | null;
           access_token: string | null;
+          access_token_secret_key_name: string | null;
           refresh_token: string | null;
+          refresh_token_secret_key_name: string | null;
           token_expires_at: string | null;
           connected_at: string | null;
           last_synced_at: string | null;
@@ -510,7 +533,9 @@ export type Database = {
           calendar_id?: string | null;
           calendar_summary?: string | null;
           access_token?: string | null;
+          access_token_secret_key_name?: string | null;
           refresh_token?: string | null;
+          refresh_token_secret_key_name?: string | null;
           token_expires_at?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
@@ -525,7 +550,9 @@ export type Database = {
           calendar_id?: string | null;
           calendar_summary?: string | null;
           access_token?: string | null;
+          access_token_secret_key_name?: string | null;
           refresh_token?: string | null;
+          refresh_token_secret_key_name?: string | null;
           token_expires_at?: string | null;
           connected_at?: string | null;
           last_synced_at?: string | null;
@@ -2065,7 +2092,10 @@ export type Database = {
         Row: {
           business_id: string;
           provider: string;
-          api_key: string;
+          api_key: string | null;
+          secret_key_name: string | null;
+          api_key_preview: string | null;
+          encrypted_at: string | null;
           key_name: string;
           created_at: string;
           updated_at: string;
@@ -2073,7 +2103,10 @@ export type Database = {
         Insert: {
           business_id: string;
           provider: string;
-          api_key: string;
+          api_key?: string | null;
+          secret_key_name?: string | null;
+          api_key_preview?: string | null;
+          encrypted_at?: string | null;
           key_name?: string;
           created_at?: string;
           updated_at?: string;
@@ -2081,7 +2114,10 @@ export type Database = {
         Update: {
           business_id?: string;
           provider?: string;
-          api_key?: string;
+          api_key?: string | null;
+          secret_key_name?: string | null;
+          api_key_preview?: string | null;
+          encrypted_at?: string | null;
           key_name?: string;
           created_at?: string;
           updated_at?: string;

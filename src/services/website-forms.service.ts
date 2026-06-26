@@ -48,6 +48,7 @@ import type {
 import { parseWebsiteFormSubmissionPayload } from "@/types/website-forms.types";
 import { mapWebsiteFormConnection } from "@/utils/website-forms";
 import { normalizePhoneNumber } from "@/utils/whatsapp";
+import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
 
 function getWebsiteFormWebhookBaseUrl(): string {
   return buildAppUrl("/api/webhooks/website-forms");
@@ -411,7 +412,24 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
-  const followUpText = reply.text;
+  const safeFollowUp = sanitizeCustomerFacingReply(reply.text);
+
+  if (!safeFollowUp.text) {
+    return;
+  }
+
+  if (safeFollowUp.blocked) {
+    console.warn(
+      "[website-forms] blocked unsafe AI follow-up",
+      JSON.stringify({
+        businessId,
+        conversationId,
+        reason: safeFollowUp.reason,
+      }),
+    );
+  }
+
+  const followUpText = safeFollowUp.text;
   const channel = connection.follow_up_channel as WebsiteFormFollowUpChannel;
   let outboundSent = false;
 

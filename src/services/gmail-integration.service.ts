@@ -45,6 +45,11 @@ import {
   scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
+import {
+  deleteIntegrationSecret,
+  resolveIntegrationSecret,
+  storeIntegrationSecret,
+} from "@/services/integration-secrets.service";
 import type { EmailConnection } from "@/types/database.types";
 import type {
   GmailConnectConfig,
@@ -140,7 +145,24 @@ export async function buildGmailOAuthUrlForBusiness(
 async function getValidAccessToken(
   connection: EmailConnection,
 ): Promise<string | null> {
-  if (!connection.access_token) {
+  const admin = createAdminClient();
+  const accessToken = await resolveIntegrationSecret(admin, {
+    businessId: connection.business_id,
+    kind: "GMAIL_ACCESS_TOKEN",
+    secretKeyName: connection.access_token_secret_key_name,
+    legacyValue: connection.access_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("email_connections")
+        .update({
+          access_token: null,
+          access_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", connection.id);
+    },
+  });
+
+  if (!accessToken) {
     return null;
   }
 
@@ -152,21 +174,51 @@ async function getValidAccessToken(
     expiresAt !== null && expiresAt <= Date.now() + 60_000;
 
   if (!isExpired) {
-    return connection.access_token;
+    return accessToken;
   }
 
-  if (!connection.refresh_token) {
+  const refreshToken = await resolveIntegrationSecret(admin, {
+    businessId: connection.business_id,
+    kind: "GMAIL_REFRESH_TOKEN",
+    secretKeyName: connection.refresh_token_secret_key_name,
+    legacyValue: connection.refresh_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("email_connections")
+        .update({
+          refresh_token: null,
+          refresh_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", connection.id);
+    },
+  });
+
+  if (!refreshToken) {
     return null;
   }
 
-  const refreshed = await refreshGmailAccessToken(connection.refresh_token);
-  const admin = createAdminClient();
+  const refreshed = await refreshGmailAccessToken(refreshToken);
+  const nextRefreshToken = refreshed.refreshToken ?? refreshToken;
+  const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
+    storeIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "GMAIL_ACCESS_TOKEN",
+      value: refreshed.accessToken,
+    }),
+    storeIntegrationSecret(admin, {
+      businessId: connection.business_id,
+      kind: "GMAIL_REFRESH_TOKEN",
+      value: nextRefreshToken,
+    }),
+  ]);
 
   await admin
     .from("email_connections")
     .update({
-      access_token: refreshed.accessToken,
-      refresh_token: refreshed.refreshToken ?? connection.refresh_token,
+      access_token: null,
+      access_token_secret_key_name: accessSecretKeyName,
+      refresh_token: null,
+      refresh_token_secret_key_name: refreshSecretKeyName,
       token_expires_at: refreshed.expiresAt,
       updated_at: new Date().toISOString(),
     })
@@ -217,7 +269,12 @@ async function startGmailWatchForConnection(
 async function stopGmailWatchForConnection(
   connection: EmailConnection,
 ): Promise<void> {
-  const accessToken = connection.access_token;
+  const accessToken = await resolveIntegrationSecret(createAdminClient(), {
+    businessId: connection.business_id,
+    kind: "GMAIL_ACCESS_TOKEN",
+    secretKeyName: connection.access_token_secret_key_name,
+    legacyValue: connection.access_token,
+  });
 
   if (!accessToken) {
     return;
@@ -253,15 +310,29 @@ export async function completeGmailOAuth(
       profile && "emailAddress" in profile ? profile : null;
     const gmailAddress = profileData?.emailAddress ?? email;
     const now = new Date().toISOString();
-    const supabase = await createClient();
+    const admin = createAdminClient();
+    const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
+      storeIntegrationSecret(admin, {
+        businessId,
+        kind: "GMAIL_ACCESS_TOKEN",
+        value: tokens.accessToken,
+      }),
+      storeIntegrationSecret(admin, {
+        businessId,
+        kind: "GMAIL_REFRESH_TOKEN",
+        value: tokens.refreshToken,
+      }),
+    ]);
 
-    const { error } = await supabase.from("email_connections").upsert(
+    const { error } = await admin.from("email_connections").upsert(
       {
         business_id: businessId,
         email_status: "connected",
         gmail_address: gmailAddress,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        access_token: null,
+        access_token_secret_key_name: accessSecretKeyName,
+        refresh_token: null,
+        refresh_token_secret_key_name: refreshSecretKeyName,
         token_expires_at: tokens.expiresAt,
         history_id: profileData?.historyId ?? null,
         connected_at: now,
@@ -277,7 +348,6 @@ export async function completeGmailOAuth(
 
     await enableAiForChannels(businessId, ["email"]);
 
-    const admin = createAdminClient();
     await syncGmailInboxForBusiness(admin, businessId, { initial: true });
 
     if (hasGmailPushEnv()) {

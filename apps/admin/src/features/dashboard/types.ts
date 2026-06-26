@@ -1,3 +1,5 @@
+import type { AnalyticsPeriod } from "@/features/dashboard/period";
+
 export type ChannelConnectionStat = {
   channel: string;
   label: string;
@@ -55,29 +57,47 @@ export type AiDailyActivity = {
   replies: number;
 };
 
+export type VoiceModeExpense = {
+  mode: "stt" | "tts";
+  label: string;
+  provider: string;
+  providerLabel: string;
+  periodCostUsd: number;
+  periodCalls: number;
+};
+
 export type AiProviderExpense = {
   provider: string;
   label: string;
-  totalCostUsd: number;
-  monthCostUsd: number;
-  totalCalls: number;
-  monthCalls: number;
-  autoReplies: number;
-  monthAutoReplies: number;
+  description: string;
+  periodCostUsd: number;
+  allTimeCostUsd: number;
+  periodCalls: number;
+  periodAutoReplies: number;
+  periodVoiceSttCalls: number;
+  periodVoiceTtsCalls: number;
+  periodVoiceSttCostUsd: number;
+  periodVoiceTtsCostUsd: number;
   inputTokens: number;
   outputTokens: number;
   lastActivityAt: string | null;
   dailyActivity: AiDailyActivity[];
+  hasActivity: boolean;
 };
 
 export type AiExpensesOverview = {
+  period: AnalyticsPeriod;
+  periodLabel: string;
+  voiceModes: VoiceModeExpense[];
   totals: {
-    totalCostUsd: number;
-    monthCostUsd: number;
-    totalCalls: number;
-    monthCalls: number;
-    totalAutoReplies: number;
-    monthAutoReplies: number;
+    periodCostUsd: number;
+    allTimeCostUsd: number;
+    periodCalls: number;
+    periodAutoReplies: number;
+    periodVoiceSttCalls: number;
+    periodVoiceTtsCalls: number;
+    periodVoiceSttCostUsd: number;
+    periodVoiceTtsCostUsd: number;
   };
   providers: AiProviderExpense[];
 };

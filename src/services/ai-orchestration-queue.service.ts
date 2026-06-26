@@ -252,7 +252,7 @@ async function processClaimedAiOrchestrationJob(
             conversationId: job.conversation_id,
             channel: job.channel,
             senderType: "ai",
-            content: customerText,
+            content: result.sentText ?? customerText,
             aiGenerated: true,
           });
 

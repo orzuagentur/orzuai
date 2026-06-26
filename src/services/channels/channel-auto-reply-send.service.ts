@@ -4,6 +4,7 @@ import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import { resolveEmailReplySubjectForConversation } from "@/services/email-reply.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
+import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -14,7 +15,30 @@ export async function sendChannelAutoReplyText(input: {
   channel: MessagingChannel;
   conversationId: string;
   text: string;
-}): Promise<{ success: boolean; error?: string; emailSubject?: string }> {
+}): Promise<{
+  success: boolean;
+  error?: string;
+  emailSubject?: string;
+  sentText?: string;
+}> {
+  const safeText = sanitizeCustomerFacingReply(input.text);
+
+  if (!safeText.text) {
+    return { success: false, error: "Unsafe customer reply was blocked." };
+  }
+
+  if (safeText.blocked) {
+    console.warn(
+      "[channel-auto-reply-send] blocked unsafe customer text",
+      JSON.stringify({
+        businessId: input.businessId,
+        channel: input.channel,
+        conversationId: input.conversationId,
+        reason: safeText.reason,
+      }),
+    );
+  }
+
   const recipientId = await resolveChannelRecipient(input.admin, {
     businessId: input.businessId,
     conversationId: input.conversationId,
@@ -38,7 +62,7 @@ export async function sendChannelAutoReplyText(input: {
     businessId: input.businessId,
     channel: input.channel,
     recipientId: recipientId ?? "",
-    content: input.text,
+    content: safeText.text,
     emailSubject,
   });
 
@@ -46,5 +70,5 @@ export async function sendChannelAutoReplyText(input: {
     return { success: false, error: result.error };
   }
 
-  return { success: true, emailSubject };
+  return { success: true, emailSubject, sentText: safeText.text };
 }

@@ -9,6 +9,11 @@ import type {
   PlanRevenueStat,
 } from "@/features/dashboard/types";
 import { PLATFORM_PLANS, resolvePlanId, type PlatformPlanId } from "@/features/dashboard/plans";
+import { getPeriodRange, resolveAnalyticsPeriod } from "@/features/dashboard/period";
+import {
+  getPlatformAiProviderLabel,
+  PLATFORM_AI_PROVIDERS,
+} from "@/features/dashboard/providers";
 import {
   createServiceRoleClient,
   requirePlatformAdmin,
@@ -52,29 +57,37 @@ const CHANNEL_CONNECTIONS: Array<{
   },
 ];
 
-const AI_PROVIDER_LABELS: Record<string, string> = {
-  gemini: "Google Gemini",
-  openai: "OpenAI",
-  claude: "Anthropic Claude",
+type AiProviderStatsRow = {
+  provider: string;
+  total_calls: number;
+  auto_replies: number;
+  voice_stt_calls: number;
+  voice_tts_calls: number;
+  voice_stt_cost_usd: number;
+  voice_tts_cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  last_activity_at: string | null;
 };
 
-function getMonthStartIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-}
+type AiDailyActivityRow = {
+  provider: string;
+  activity_date: string;
+  calls: number;
+  cost_usd: number;
+  replies: number;
+};
 
-function getThirtyDaysAgoIso(): string {
-  const date = new Date();
-  date.setDate(date.getDate() - 30);
-  return date.toISOString();
-}
-
-function sumRows<T extends Record<string, unknown>>(
-  rows: T[],
-  field: keyof T,
-): number {
-  return rows.reduce((sum, row) => sum + Number(row[field] ?? 0), 0);
-}
+type AiTotalsRow = {
+  total_calls: number;
+  auto_replies: number;
+  voice_stt_calls: number;
+  voice_tts_calls: number;
+  voice_stt_cost_usd: number;
+  voice_tts_cost_usd: number;
+  cost_usd: number;
+};
 
 function formatUsd(value: number): number {
   return Number(value.toFixed(4));
@@ -199,10 +212,84 @@ async function safeSelect<T>(
   }
 }
 
+async function fetchAiProviderStats(input: {
+  start: string | null;
+  end: string;
+}): Promise<AiProviderStatsRow[]> {
+  const service = createServiceRoleClient();
+  const { data, error } = await service.rpc("platform_admin_ai_provider_stats", {
+    p_start: input.start,
+    p_end: input.end,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as AiProviderStatsRow[];
+}
+
+async function fetchAiDailyActivity(input: {
+  start: string;
+  end: string;
+}): Promise<AiDailyActivityRow[]> {
+  const service = createServiceRoleClient();
+  const { data, error } = await service.rpc("platform_admin_ai_daily_activity", {
+    p_start: input.start,
+    p_end: input.end,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as AiDailyActivityRow[];
+}
+
+async function fetchAiTotals(input: {
+  start: string | null;
+  end: string;
+}): Promise<AiTotalsRow> {
+  const service = createServiceRoleClient();
+  const { data, error } = await service.rpc("platform_admin_ai_totals", {
+    p_start: input.start,
+    p_end: input.end,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  return {
+    total_calls: Number(row?.total_calls ?? 0),
+    auto_replies: Number(row?.auto_replies ?? 0),
+    voice_stt_calls: Number(row?.voice_stt_calls ?? 0),
+    voice_tts_calls: Number(row?.voice_tts_calls ?? 0),
+    voice_stt_cost_usd: Number(row?.voice_stt_cost_usd ?? 0),
+    voice_tts_cost_usd: Number(row?.voice_tts_cost_usd ?? 0),
+    cost_usd: Number(row?.cost_usd ?? 0),
+  };
+}
+
+function sumRows<T extends Record<string, unknown>>(
+  rows: T[],
+  field: keyof T,
+): number {
+  return rows.reduce((sum, row) => sum + Number(row[field] ?? 0), 0);
+}
+
+function getMonthStartIso(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
 export async function fetchDashboardMetricsAction(): Promise<PlatformDashboardMetrics> {
   await requirePlatformAdmin();
 
   const monthStart = getMonthStartIso();
+  const monthEnd = new Date().toISOString();
   const service = createServiceRoleClient();
 
   const [
@@ -216,8 +303,8 @@ export async function fetchDashboardMetricsAction(): Promise<PlatformDashboardMe
     channelAnalytics,
     channelStats,
     subscriptionStats,
-    aiLogs,
-    aiMonthLogs,
+    aiAllTimeTotals,
+    aiMonthTotals,
     platformBillingCalls,
   ] = await Promise.all([
     countTable("users"),
@@ -242,21 +329,8 @@ export async function fetchDashboardMetricsAction(): Promise<PlatformDashboardMe
     ),
     countConnectedChannels(),
     getSubscriptionStats(),
-    safeSelect(
-      async () =>
-        service
-          .from("ai_usage_logs")
-          .select("estimated_cost_usd, billing_source"),
-      [],
-    ),
-    safeSelect(
-      async () =>
-        service
-          .from("ai_usage_logs")
-          .select("estimated_cost_usd")
-          .gte("created_at", monthStart),
-      [],
-    ),
+    fetchAiTotals({ start: null, end: monthEnd }),
+    fetchAiTotals({ start: monthStart, end: monthEnd }),
     safeCount(async () =>
       service
         .from("ai_usage_logs")
@@ -300,144 +374,185 @@ export async function fetchDashboardMetricsAction(): Promise<PlatformDashboardMe
       byPlan: subscriptionStats.byPlan,
     },
     ai: {
-      totalCostUsd: formatUsd(sumRows(aiLogs, "estimated_cost_usd")),
-      monthCostUsd: formatUsd(sumRows(aiMonthLogs, "estimated_cost_usd")),
-      totalCalls: aiLogs.length,
-      monthCalls: aiMonthLogs.length,
+      totalCostUsd: formatUsd(aiAllTimeTotals.cost_usd),
+      monthCostUsd: formatUsd(aiMonthTotals.cost_usd),
+      totalCalls: aiAllTimeTotals.total_calls,
+      monthCalls: aiMonthTotals.total_calls,
       platformBillingCalls,
     },
   };
 }
 
-export async function fetchAiExpensesAction(): Promise<AiExpensesOverview> {
+export async function fetchAiExpensesAction(
+  periodInput?: string,
+): Promise<AiExpensesOverview> {
   await requirePlatformAdmin();
 
-  const monthStart = getMonthStartIso();
-  const thirtyDaysAgo = getThirtyDaysAgoIso();
-  const service = createServiceRoleClient();
+  const period = resolveAnalyticsPeriod(periodInput);
+  const range = getPeriodRange(period);
+  const allTimeEnd = new Date().toISOString();
 
-  const { data: recentLogs, error } = await service
-    .from("ai_usage_logs")
-    .select(
-      "provider, estimated_cost_usd, call_type, input_tokens, output_tokens, created_at",
+  const [periodStats, allTimeStats, dailyRows, periodTotalsRow] =
+    await Promise.all([
+    fetchAiProviderStats({ start: range.start, end: range.end }),
+    fetchAiProviderStats({ start: null, end: allTimeEnd }),
+    range.start
+      ? fetchAiDailyActivity({ start: range.start, end: range.end })
+      : Promise.resolve([] as AiDailyActivityRow[]),
+    fetchAiTotals({ start: range.start, end: range.end }),
+  ]);
+
+  const periodByProvider = new Map(
+    periodStats.map((row) => [row.provider, row]),
+  );
+  const allTimeByProvider = new Map(
+    allTimeStats.map((row) => [row.provider, row]),
+  );
+
+  const dailyByProvider = new Map<string, AiDailyActivity[]>();
+
+  for (const row of dailyRows) {
+    const current = dailyByProvider.get(row.provider) ?? [];
+    current.push({
+      date: row.activity_date,
+      calls: Number(row.calls),
+      costUsd: formatUsd(Number(row.cost_usd)),
+      replies: Number(row.replies),
+    });
+    dailyByProvider.set(row.provider, current);
+  }
+
+  const knownProviderIds = new Set<string>(
+    PLATFORM_AI_PROVIDERS.map((provider) => provider.id),
+  );
+
+  for (const row of periodStats) {
+    knownProviderIds.add(row.provider);
+  }
+
+  for (const row of allTimeStats) {
+    knownProviderIds.add(row.provider);
+  }
+
+  function mapProviderExpense(
+    providerId: string,
+    label: string,
+    description: string,
+    periodRow?: AiProviderStatsRow,
+    allTimeRow?: AiProviderStatsRow,
+  ): AiProviderExpense {
+    return {
+      provider: providerId,
+      label,
+      description,
+      periodCostUsd: formatUsd(Number(periodRow?.cost_usd ?? 0)),
+      allTimeCostUsd: formatUsd(Number(allTimeRow?.cost_usd ?? 0)),
+      periodCalls: Number(periodRow?.total_calls ?? 0),
+      periodAutoReplies: Number(periodRow?.auto_replies ?? 0),
+      periodVoiceSttCalls: Number(periodRow?.voice_stt_calls ?? 0),
+      periodVoiceTtsCalls: Number(periodRow?.voice_tts_calls ?? 0),
+      periodVoiceSttCostUsd: formatUsd(Number(periodRow?.voice_stt_cost_usd ?? 0)),
+      periodVoiceTtsCostUsd: formatUsd(Number(periodRow?.voice_tts_cost_usd ?? 0)),
+      inputTokens: Number(periodRow?.input_tokens ?? 0),
+      outputTokens: Number(periodRow?.output_tokens ?? 0),
+      lastActivityAt: allTimeRow?.last_activity_at ?? null,
+      dailyActivity: dailyByProvider.get(providerId) ?? [],
+      hasActivity: Number(allTimeRow?.total_calls ?? 0) > 0,
+    };
+  }
+
+  const providers = PLATFORM_AI_PROVIDERS.map((config) =>
+    mapProviderExpense(
+      config.id,
+      config.label,
+      config.description,
+      periodByProvider.get(config.id),
+      allTimeByProvider.get(config.id),
+    ),
+  );
+
+  const extraProviders = Array.from(knownProviderIds)
+    .filter(
+      (providerId) =>
+        !PLATFORM_AI_PROVIDERS.some((entry) => entry.id === providerId),
     )
-    .gte("created_at", thirtyDaysAgo)
-    .order("created_at", { ascending: false });
+    .map((providerId) =>
+      mapProviderExpense(
+        providerId,
+        getPlatformAiProviderLabel(providerId),
+        "Дополнительный AI провайдер",
+        periodByProvider.get(providerId),
+        allTimeByProvider.get(providerId),
+      ),
+    );
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const logs = recentLogs ?? [];
-  const providerMap = new Map<string, AiProviderExpense>();
-
-  for (const log of logs) {
-    const provider = log.provider || "other";
-    const current = providerMap.get(provider) ?? {
-      provider,
-      label: AI_PROVIDER_LABELS[provider] ?? provider,
-      totalCostUsd: 0,
-      monthCostUsd: 0,
-      totalCalls: 0,
-      monthCalls: 0,
-      autoReplies: 0,
-      monthAutoReplies: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      lastActivityAt: null,
-      dailyActivity: [],
-    };
-
-    const cost = Number(log.estimated_cost_usd ?? 0);
-    const isMonth = log.created_at >= monthStart;
-    const isAutoReply = log.call_type === "auto_reply";
-
-    current.totalCalls += 1;
-    current.totalCostUsd += cost;
-    current.inputTokens += Number(log.input_tokens ?? 0);
-    current.outputTokens += Number(log.output_tokens ?? 0);
-
-    if (isAutoReply) {
-      current.autoReplies += 1;
-    }
-
-    if (isMonth) {
-      current.monthCalls += 1;
-      current.monthCostUsd += cost;
-
-      if (isAutoReply) {
-        current.monthAutoReplies += 1;
+  const providersSorted = [...providers, ...extraProviders].sort((left, right) => {
+      if (right.periodCostUsd !== left.periodCostUsd) {
+        return right.periodCostUsd - left.periodCostUsd;
       }
-    }
 
-    if (!current.lastActivityAt || log.created_at > current.lastActivityAt) {
-      current.lastActivityAt = log.created_at;
-    }
+      return left.label.localeCompare(right.label, "ru");
+    });
 
-    providerMap.set(provider, current);
-  }
-
-  const dailyByProvider = new Map<string, Map<string, AiDailyActivity>>();
-
-  for (const log of logs) {
-    const provider = log.provider || "other";
-    const date = log.created_at.slice(0, 10);
-    const providerDaily =
-      dailyByProvider.get(provider) ?? new Map<string, AiDailyActivity>();
-    const current = providerDaily.get(date) ?? {
-      date,
-      calls: 0,
-      costUsd: 0,
-      replies: 0,
-    };
-
-    current.calls += 1;
-    current.costUsd += Number(log.estimated_cost_usd ?? 0);
-
-    if (log.call_type === "auto_reply") {
-      current.replies += 1;
-    }
-
-    providerDaily.set(date, current);
-    dailyByProvider.set(provider, providerDaily);
-  }
-
-  const providers = Array.from(providerMap.values())
-    .map((provider) => ({
-      ...provider,
-      totalCostUsd: formatUsd(provider.totalCostUsd),
-      monthCostUsd: formatUsd(provider.monthCostUsd),
-      dailyActivity: Array.from(
-        dailyByProvider.get(provider.provider)?.values() ?? [],
-      ).sort((left, right) => left.date.localeCompare(right.date)),
-    }))
-    .sort((left, right) => right.monthCostUsd - left.monthCostUsd);
-
-  const totals = providers.reduce(
+  const periodTotals = providersSorted.reduce(
     (acc, provider) => ({
-      totalCostUsd: acc.totalCostUsd + provider.totalCostUsd,
-      monthCostUsd: acc.monthCostUsd + provider.monthCostUsd,
-      totalCalls: acc.totalCalls + provider.totalCalls,
-      monthCalls: acc.monthCalls + provider.monthCalls,
-      totalAutoReplies: acc.totalAutoReplies + provider.autoReplies,
-      monthAutoReplies: acc.monthAutoReplies + provider.monthAutoReplies,
+      periodCostUsd: acc.periodCostUsd + provider.periodCostUsd,
+      periodCalls: acc.periodCalls + provider.periodCalls,
+      periodAutoReplies: acc.periodAutoReplies + provider.periodAutoReplies,
+      periodVoiceSttCalls: acc.periodVoiceSttCalls + provider.periodVoiceSttCalls,
+      periodVoiceTtsCalls: acc.periodVoiceTtsCalls + provider.periodVoiceTtsCalls,
+      periodVoiceSttCostUsd:
+        acc.periodVoiceSttCostUsd + provider.periodVoiceSttCostUsd,
+      periodVoiceTtsCostUsd:
+        acc.periodVoiceTtsCostUsd + provider.periodVoiceTtsCostUsd,
     }),
     {
-      totalCostUsd: 0,
-      monthCostUsd: 0,
-      totalCalls: 0,
-      monthCalls: 0,
-      totalAutoReplies: 0,
-      monthAutoReplies: 0,
+      periodCostUsd: 0,
+      periodCalls: 0,
+      periodAutoReplies: 0,
+      periodVoiceSttCalls: 0,
+      periodVoiceTtsCalls: 0,
+      periodVoiceSttCostUsd: 0,
+      periodVoiceTtsCostUsd: 0,
     },
   );
 
+  const allTimeCostUsd = providersSorted.reduce(
+    (sum, provider) => sum + provider.allTimeCostUsd,
+    0,
+  );
+
   return {
+    period,
+    periodLabel: range.label,
+    voiceModes: [
+      {
+        mode: "stt",
+        label: "Голос → текст (STT)",
+        provider: "openai",
+        providerLabel: "OpenAI Whisper",
+        periodCostUsd: formatUsd(Number(periodTotalsRow.voice_stt_cost_usd)),
+        periodCalls: Number(periodTotalsRow.voice_stt_calls),
+      },
+      {
+        mode: "tts",
+        label: "Текст → голос (TTS)",
+        provider: "elevenlabs",
+        providerLabel: "ElevenLabs",
+        periodCostUsd: formatUsd(Number(periodTotalsRow.voice_tts_cost_usd)),
+        periodCalls: Number(periodTotalsRow.voice_tts_calls),
+      },
+    ],
     totals: {
-      ...totals,
-      totalCostUsd: formatUsd(totals.totalCostUsd),
-      monthCostUsd: formatUsd(totals.monthCostUsd),
+      periodCostUsd: formatUsd(periodTotals.periodCostUsd),
+      allTimeCostUsd: formatUsd(allTimeCostUsd),
+      periodCalls: periodTotals.periodCalls,
+      periodAutoReplies: periodTotals.periodAutoReplies,
+      periodVoiceSttCalls: Number(periodTotalsRow.voice_stt_calls),
+      periodVoiceTtsCalls: Number(periodTotalsRow.voice_tts_calls),
+      periodVoiceSttCostUsd: formatUsd(Number(periodTotalsRow.voice_stt_cost_usd)),
+      periodVoiceTtsCostUsd: formatUsd(Number(periodTotalsRow.voice_tts_cost_usd)),
     },
-    providers,
+    providers: providersSorted,
   };
 }

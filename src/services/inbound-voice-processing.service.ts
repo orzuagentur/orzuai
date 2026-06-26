@@ -61,6 +61,8 @@ export async function processInboundVoiceAfterHydration(input: {
     buffer,
     fileName: media.fileName,
     mimeType: media.mimeType,
+    businessId: input.businessId,
+    conversationId: input.message.conversation_id,
   });
 
   const transcriptText = transcript?.trim() ?? "";

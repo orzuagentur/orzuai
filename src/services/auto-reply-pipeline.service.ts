@@ -34,6 +34,7 @@ import {
 import { reportAgentActions } from "@/services/agent-action-reporting.service";
 import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
+import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
 import type { AiProvider } from "@/lib/ai/constants";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
@@ -107,13 +108,33 @@ async function fetchConversationHistory(
 ): Promise<ConversationTurn[]> {
   const { data } = await admin
     .from("messages")
-    .select("sender_type, content")
+    .select("id, sender_type, content")
     .eq("conversation_id", conversationId)
+    .eq("hidden_for_business", false)
+    .is("deleted_for_all_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  return [...(data ?? [])]
-    .reverse()
+  const visibleMessages = [...(data ?? [])].reverse();
+  const outboundMessageIds = visibleMessages
+    .filter((message) => message.sender_type !== "client")
+    .map((message) => message.id);
+  const failedMessageIds = new Set<string>();
+
+  if (outboundMessageIds.length > 0) {
+    const { data: failedDeliveries } = await admin
+      .from("message_deliveries")
+      .select("message_id")
+      .in("message_id", outboundMessageIds)
+      .eq("status", "failed");
+
+    for (const delivery of failedDeliveries ?? []) {
+      failedMessageIds.add(delivery.message_id);
+    }
+  }
+
+  return visibleMessages
+    .filter((message) => !failedMessageIds.has(message.id))
     .map((message) => ({
       role:
         message.sender_type === "client"
@@ -541,14 +562,35 @@ export async function generateFastAssistantReply(input: {
     });
   }
 
+  const fallbackText = resolveAssistantFallbackReplyMessage({
+    language: voice.language,
+    customMessage: prep.fallbackReplyMessage,
+  });
+  const safeReply = sanitizeCustomerFacingReply(reply.data.text, {
+    fallback: fallbackText,
+  });
+
+  if (safeReply.blocked) {
+    console.warn(
+      "[auto-reply-pipeline] blocked unsafe LLM reply",
+      JSON.stringify({
+        businessId: prep.businessId,
+        conversationId: prep.conversationId,
+        channel: prep.channel,
+        reason: safeReply.reason,
+      }),
+    );
+  }
+
   return {
     success: true,
-    text: reply.data.text,
+    text: safeReply.text ?? fallbackText,
     matchedAgentId: null,
     matchedAgentName: prep.profile.name,
     provider: reply.usedProvider ?? voice.provider,
     model: reply.data.model,
     language: voice.language,
+    isFallback: safeReply.blocked,
   };
 }
 

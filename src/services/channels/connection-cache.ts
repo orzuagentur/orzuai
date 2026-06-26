@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveIntegrationSecret } from "@/services/integration-secrets.service";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -61,15 +62,42 @@ export async function getCachedWhatsAppDeliveryConnection(
 
   const { data } = await admin
     .from("whatsapp_connections")
-    .select("meta_phone_number_id, meta_access_token")
+    .select(
+      "id, business_id, meta_phone_number_id, meta_access_token, meta_access_token_secret_key_name",
+    )
     .eq("business_id", businessId)
     .eq("whatsapp_status", "connected")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  setCached(whatsappCache, businessId, data ?? null);
-  return data ?? null;
+  if (!data) {
+    setCached(whatsappCache, businessId, null);
+    return null;
+  }
+
+  const accessToken = await resolveIntegrationSecret(admin, {
+    businessId,
+    kind: "WHATSAPP_META_ACCESS_TOKEN",
+    secretKeyName: data.meta_access_token_secret_key_name,
+    legacyValue: data.meta_access_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("whatsapp_connections")
+        .update({
+          meta_access_token: null,
+          meta_access_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", data.id);
+    },
+  });
+  const connection = {
+    meta_phone_number_id: data.meta_phone_number_id,
+    meta_access_token: accessToken,
+  };
+
+  setCached(whatsappCache, businessId, connection);
+  return connection;
 }
 
 export async function getCachedTelegramDeliveryConnection(
@@ -84,13 +112,35 @@ export async function getCachedTelegramDeliveryConnection(
 
   const { data } = await admin
     .from("telegram_connections")
-    .select("bot_token")
+    .select("id, business_id, bot_token, bot_token_secret_key_name")
     .eq("business_id", businessId)
     .eq("telegram_status", "connected")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  setCached(telegramCache, businessId, data ?? null);
-  return data ?? null;
+  if (!data) {
+    setCached(telegramCache, businessId, null);
+    return null;
+  }
+
+  const botToken = await resolveIntegrationSecret(admin, {
+    businessId,
+    kind: "TELEGRAM_BOT_TOKEN",
+    secretKeyName: data.bot_token_secret_key_name,
+    legacyValue: data.bot_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("telegram_connections")
+        .update({
+          bot_token: null,
+          bot_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", data.id);
+    },
+  });
+  const connection = { bot_token: botToken };
+
+  setCached(telegramCache, businessId, connection);
+  return connection;
 }

@@ -10,6 +10,8 @@ export const AI_CALL_TYPES = [
   "analytics",
   "conversation_summary",
   "voice",
+  "voice_stt",
+  "voice_tts",
   "other",
 ] as const;
 

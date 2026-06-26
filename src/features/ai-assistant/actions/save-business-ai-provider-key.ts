@@ -5,7 +5,6 @@ import { z } from "zod";
 import { AI_PROVIDERS } from "@/lib/ai/constants";
 import {
   deleteBusinessProviderApiKey,
-  getBusinessProviderApiKey,
   saveBusinessProviderApiKey,
   setBusinessPreferCustomerAiKeys,
 } from "@/services/business-ai-credentials.service";
@@ -20,10 +19,6 @@ const saveKeySchema = z.object({
 });
 
 const removeKeySchema = z.object({
-  provider: z.enum(AI_PROVIDERS),
-});
-
-const revealKeySchema = z.object({
   provider: z.enum(AI_PROVIDERS),
 });
 
@@ -57,6 +52,8 @@ export async function saveBusinessAiProviderKeyAction(
     {
       keyName: parsed.data.keyName,
       useForAllAgents: parsed.data.useForAllAgents,
+      actorUserId: user.id,
+      actorEmail: user.email,
     },
   );
 }
@@ -80,38 +77,14 @@ export async function removeBusinessAiProviderKeyAction(
     return { success: false as const, message: "Business not found." };
   }
 
-  return deleteBusinessProviderApiKey(business.id, parsed.data.provider);
-}
-
-export async function revealBusinessAiProviderKeyAction(
-  input: z.infer<typeof revealKeySchema>,
-) {
-  const parsed = revealKeySchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      success: false as const,
-      message: parsed.error.issues[0]?.message ?? "Invalid provider.",
-    };
-  }
-
-  const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
-
-  if (!business) {
-    return { success: false as const, message: "Business not found." };
-  }
-
-  const apiKey = await getBusinessProviderApiKey(
+  return deleteBusinessProviderApiKey(
     business.id,
     parsed.data.provider,
+    {
+      actorUserId: user.id,
+      actorEmail: user.email,
+    },
   );
-
-  if (!apiKey) {
-    return { success: false as const, message: "API key not found." };
-  }
-
-  return { success: true as const, apiKey };
 }
 
 export async function setPreferCustomerAiKeysAction(

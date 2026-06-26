@@ -20,6 +20,8 @@ npx supabase db push
 - `platform_admin_activity` — вход/выход/онлайн/оффлайн
 - `platform_admin_notifications` — уведомления (например, «приглашение принято»)
 
+Миграция `20250719150000_ai_voice_stt_tts_call_types.sql` добавляет типы `voice_stt` / `voice_tts` и обновляет SQL-аналитику.
+
 Добавьте первого администратора (один раз, через SQL или после деплоя admin UI):
 
 ```sql

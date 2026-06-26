@@ -43,6 +43,11 @@ import {
   incrementMessagingAnalytics,
   scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
+import {
+  deleteIntegrationSecret,
+  resolveIntegrationSecret,
+  storeIntegrationSecret,
+} from "@/services/integration-secrets.service";
 import type { WhatsappConnection, TablesInsert } from "@/types/database.types";
 import type {
   Complete360DialogEmbeddedSignupInput,
@@ -159,14 +164,21 @@ export async function disconnectWhatsApp(): Promise<{
     return { success: false, message: WHATSAPP_MESSAGES.noBusinessDescription };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("whatsapp_connections")
+    .select("meta_access_token_secret_key_name")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const { error } = await admin
     .from("whatsapp_connections")
     .update({
       whatsapp_status: "disconnected",
       phone_number: "",
       meta_phone_number_id: null,
       meta_access_token: null,
+      meta_access_token_secret_key_name: null,
       meta_waba_id: null,
       meta_business_account_id: null,
       dialog360_channel_id: null,
@@ -179,6 +191,8 @@ export async function disconnectWhatsApp(): Promise<{
   if (error) {
     return { success: false, message: error.message };
   }
+
+  await deleteIntegrationSecret(admin, existing?.meta_access_token_secret_key_name);
 
   revalidateWhatsAppPaths();
   return { success: true };
@@ -215,8 +229,8 @@ export async function connectManualWhatsApp(
     };
   }
 
-  const supabase = await createClient();
-  const { data: existingConnection } = await supabase
+  const admin = createAdminClient();
+  const { data: existingConnection } = await admin
     .from("whatsapp_connections")
     .select("id")
     .eq("business_id", businessId)
@@ -277,13 +291,19 @@ export async function connectManualWhatsApp(
   const phoneNumber = parsed.data.displayPhoneNumber
     ? normalizePhoneNumber(parsed.data.displayPhoneNumber)
     : parsed.data.phoneNumberId;
+  const secretKeyName = await storeIntegrationSecret(admin, {
+    businessId,
+    kind: "WHATSAPP_META_ACCESS_TOKEN",
+    value: apiKey,
+  });
 
   const connectionPayload = {
     business_id: businessId,
     phone_number: phoneNumber,
     whatsapp_status: "connected" as const,
     meta_phone_number_id: parsed.data.phoneNumberId,
-    meta_access_token: apiKey,
+    meta_access_token: null,
+    meta_access_token_secret_key_name: secretKeyName,
     meta_waba_id: null,
     meta_business_account_id: null,
     dialog360_channel_id: null,
@@ -294,7 +314,7 @@ export async function connectManualWhatsApp(
     last_synced_at: connectedAt,
   };
 
-  const { data: existingPending } = await supabase
+  const { data: existingPending } = await admin
     .from("whatsapp_connections")
     .select("id")
     .eq("business_id", businessId)
@@ -302,13 +322,13 @@ export async function connectManualWhatsApp(
     .maybeSingle();
 
   const { data, error } = existingPending
-    ? await supabase
+    ? await admin
         .from("whatsapp_connections")
         .update(connectionPayload)
         .eq("id", existingPending.id)
         .select("*")
         .single()
-    : await supabase
+    : await admin
         .from("whatsapp_connections")
         .insert(connectionPayload)
         .select("*")
@@ -326,7 +346,7 @@ export async function connectManualWhatsApp(
 
   revalidateWhatsAppPaths();
 
-  await enableChannelAiIfAgentActive(businessId, "whatsapp", supabase);
+  await enableChannelAiIfAgentActive(businessId, "whatsapp", admin);
 
   return {
     success: true,
@@ -489,13 +509,19 @@ async function activate360DialogChannel(input: {
   }
 
   const connectedAt = new Date().toISOString();
+  const secretKeyName = await storeIntegrationSecret(createAdminClient(), {
+    businessId,
+    kind: "WHATSAPP_META_ACCESS_TOKEN",
+    value: apiKeyResult.apiKey,
+  });
   const connection = await upsertWhatsAppConnection(supabase, businessId, {
     phone_number: normalizePhoneNumber(channelDetails.phoneNumber),
     whatsapp_status: "connected",
     dialog360_channel_id: channelId,
     dialog360_client_id: clientId,
     meta_phone_number_id: channelDetails.metaPhoneNumberId,
-    meta_access_token: apiKeyResult.apiKey,
+    meta_access_token: null,
+    meta_access_token_secret_key_name: secretKeyName,
     meta_waba_id: null,
     meta_business_account_id: null,
     verification_code_hash: null,
@@ -561,8 +587,8 @@ export async function complete360DialogEmbeddedSignup(
     };
   }
 
-  const supabase = await createClient();
-  const { data: existingConnection } = await supabase
+  const admin = createAdminClient();
+  const { data: existingConnection } = await admin
     .from("whatsapp_connections")
     .select("id, whatsapp_status")
     .eq("business_id", businessId)
@@ -591,7 +617,7 @@ export async function complete360DialogEmbeddedSignup(
   }
 
   const activation = await activate360DialogChannel({
-    supabase,
+    supabase: admin,
     businessId,
     clientId: parsed.data.clientId,
     channelId,
@@ -677,15 +703,35 @@ export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {
     };
   }
 
-  const supabase = await createClient();
-  const { data: connection } = await supabase
+  const admin = createAdminClient();
+  const { data: connection } = await admin
     .from("whatsapp_connections")
-    .select("*")
+    .select(
+      "id, business_id, whatsapp_status, meta_phone_number_id, meta_access_token, meta_access_token_secret_key_name",
+    )
     .eq("business_id", businessId)
     .eq("whatsapp_status", "connected")
     .maybeSingle();
 
-  if (!connection?.meta_phone_number_id || !connection.meta_access_token) {
+  const accessToken = connection
+    ? await resolveIntegrationSecret(admin, {
+        businessId,
+        kind: "WHATSAPP_META_ACCESS_TOKEN",
+        secretKeyName: connection.meta_access_token_secret_key_name,
+        legacyValue: connection.meta_access_token,
+        onMigrated: async (secretKeyName) => {
+          await admin
+            .from("whatsapp_connections")
+            .update({
+              meta_access_token: null,
+              meta_access_token_secret_key_name: secretKeyName,
+            })
+            .eq("id", connection.id);
+        },
+      })
+    : null;
+
+  if (!connection?.meta_phone_number_id || !accessToken) {
     return {
       success: false,
       error: {
@@ -697,11 +743,11 @@ export async function syncWhatsAppMessages(): Promise<SyncWhatsAppResult> {
 
   const credentialCheck = await verifyWhatsAppCredentials(
     connection.meta_phone_number_id,
-    connection.meta_access_token,
+    accessToken,
   );
 
   if (!credentialCheck.success) {
-    await supabase
+    await admin
       .from("whatsapp_connections")
       .update({ whatsapp_status: "disconnected" })
       .eq("id", connection.id);
@@ -801,7 +847,7 @@ async function ingestIncomingMessage(
     });
   }
 
-  if (message.kind === "media" && connection.meta_access_token) {
+  if (message.kind === "media") {
     scheduleInboundMediaHydration({
       admin,
       messageId: insertedMessage.id,

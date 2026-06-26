@@ -9,6 +9,7 @@ import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import { synthesizeElevenLabsSpeech } from "@/services/elevenlabs.service";
 import { markMessageAttachmentReady } from "@/services/message-attachment.service";
 import { transcodeVoiceNoteToOggOpus } from "@/services/voice-note-transcode.service";
+import { logAiUsage } from "@/services/ai-usage.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { VoiceReplyMode } from "@/types/elevenlabs.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -147,6 +148,17 @@ export async function sendChannelAutoReplyVoice(input: {
   if (!speech.success) {
     return { success: false, error: speech.message };
   }
+
+  await logAiUsage({
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    provider: "elevenlabs",
+    model: "eleven_multilingual_v2",
+    inputTokens: input.text.length,
+    outputTokens: 0,
+    billingSource: "platform",
+    callType: "voice_tts",
+  });
 
   let audioBuffer = speech.buffer;
   let mimeType = speech.mimeType;

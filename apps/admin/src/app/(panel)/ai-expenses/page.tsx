@@ -1,8 +1,15 @@
-import { AiExpensesOverview } from "@/components/AiExpensesOverview";
+import { AiExpensesPanel } from "@/components/AiExpensesPanel";
 import { fetchAiExpensesAction } from "@/features/dashboard/actions";
 
-export default async function AiExpensesPage() {
-  const data = await fetchAiExpensesAction();
+type AiExpensesPageProps = {
+  searchParams: Promise<{ period?: string }>;
+};
 
-  return <AiExpensesOverview data={data} />;
+export default async function AiExpensesPage({
+  searchParams,
+}: AiExpensesPageProps) {
+  const params = await searchParams;
+  const data = await fetchAiExpensesAction(params.period);
+
+  return <AiExpensesPanel initialData={data} />;
 }

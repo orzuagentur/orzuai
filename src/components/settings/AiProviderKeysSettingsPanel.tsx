@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  CopyIcon,
-  EyeIcon,
-  EyeOffIcon,
   KeyRoundIcon,
-  Loader2Icon,
   Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   removeBusinessAiProviderKeyAction,
-  revealBusinessAiProviderKeyAction,
   setPreferCustomerAiKeysAction,
 } from "@/features/ai-assistant/actions/save-business-ai-provider-key";
 import {
@@ -76,15 +71,6 @@ export function AiProviderKeysSettingsPanel({
   const [preferCustomerAiKeys, setPreferCustomerAiKeys] = useState(
     settings.preferCustomerAiKeys,
   );
-  const [revealedKeys, setRevealedKeys] = useState<
-    Partial<Record<AiProvider, string>>
-  >({});
-  const [visibleProviders, setVisibleProviders] = useState<
-    Partial<Record<AiProvider, boolean>>
-  >({});
-  const [loadingProvider, setLoadingProvider] = useState<AiProvider | null>(
-    null,
-  );
   const [isSavingPreference, setIsSavingPreference] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(
     null,
@@ -115,69 +101,6 @@ export function AiProviderKeysSettingsPanel({
       toast.success(AI_KEYS_SETTINGS_MESSAGES.preferAllAgentsSaved);
     } finally {
       setIsSavingPreference(false);
-    }
-  }
-
-  async function handleReveal(provider: AiProvider) {
-    if (revealedKeys[provider]) {
-      setVisibleProviders((current) => ({ ...current, [provider]: true }));
-      return;
-    }
-
-    setLoadingProvider(provider);
-
-    try {
-      const result = await revealBusinessAiProviderKeyAction({ provider });
-
-      if (!result.success) {
-        toast.error(
-          result.message ?? AI_KEYS_SETTINGS_MESSAGES.revealFailed,
-        );
-        return;
-      }
-
-      setRevealedKeys((current) => ({
-        ...current,
-        [provider]: result.apiKey,
-      }));
-      setVisibleProviders((current) => ({ ...current, [provider]: true }));
-    } finally {
-      setLoadingProvider(null);
-    }
-  }
-
-  function handleHide(provider: AiProvider) {
-    setVisibleProviders((current) => ({ ...current, [provider]: false }));
-  }
-
-  async function handleCopy(provider: AiProvider) {
-    let value = revealedKeys[provider];
-
-    if (!value) {
-      setLoadingProvider(provider);
-
-      try {
-        const result = await revealBusinessAiProviderKeyAction({ provider });
-
-        if (!result.success) {
-          toast.error(
-            result.message ?? AI_KEYS_SETTINGS_MESSAGES.revealFailed,
-          );
-          return;
-        }
-
-        value = result.apiKey;
-        setRevealedKeys((current) => ({ ...current, [provider]: value }));
-      } finally {
-        setLoadingProvider(null);
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success(AI_KEYS_SETTINGS_MESSAGES.copiedKey);
-    } catch {
-      toast.error(AI_KEYS_SETTINGS_MESSAGES.copyFailed);
     }
   }
 
@@ -267,10 +190,7 @@ export function AiProviderKeysSettingsPanel({
             <div className="space-y-4">
               {configuredCredentials.map((credential) => {
                 const provider = credential.provider;
-                const isVisible = visibleProviders[provider] ?? false;
-                const revealedValue = revealedKeys[provider];
                 const updatedLabel = formatUpdatedAt(credential.updatedAt);
-                const isLoading = loadingProvider === provider;
 
                 return (
                   <div
@@ -294,43 +214,6 @@ export function AiProviderKeysSettingsPanel({
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {isVisible ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => handleHide(provider)}
-                          >
-                            <EyeOffIcon className="size-4" />
-                            {AI_KEYS_SETTINGS_MESSAGES.hideKey}
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => void handleReveal(provider)}
-                          >
-                            {isLoading ? (
-                              <Loader2Icon className="size-4 animate-spin" />
-                            ) : (
-                              <EyeIcon className="size-4" />
-                            )}
-                            {AI_KEYS_SETTINGS_MESSAGES.showKey}
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={isLoading}
-                          onClick={() => void handleCopy(provider)}
-                        >
-                          <CopyIcon className="size-4" />
-                          {AI_KEYS_SETTINGS_MESSAGES.copyKey}
-                        </Button>
                         <Button
                           type="button"
                           variant="outline"
@@ -351,12 +234,8 @@ export function AiProviderKeysSettingsPanel({
                       <Input
                         id={`settings-key-${provider}`}
                         readOnly
-                        type={isVisible ? "text" : "password"}
-                        value={
-                          isVisible && revealedValue
-                            ? revealedValue
-                            : credential.keyPreview ?? "••••••••"
-                        }
+                        type="password"
+                        value={credential.keyPreview ?? "********"}
                         className="font-mono text-sm"
                       />
                     </div>
