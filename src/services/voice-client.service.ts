@@ -21,6 +21,7 @@ import {
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall } from "@/services/voice-inbox.service";
+import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
 
 export type VoiceClientConfig = {
   enabled: boolean;
@@ -170,6 +171,7 @@ export async function buildClientOutboundTwiml(input: {
   return buildDialPhoneNumberTwiml({
     callerId: phoneNumber,
     toNumber: to,
+    recordingStatusCallback: await resolveRecordingCallbackUrl(input.businessId),
   });
 }
 
@@ -180,11 +182,14 @@ export async function buildInboundBrowserTwiml(
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
   const webhooks = buildVoiceWebhookUrls(businessId);
 
+  const recordingCallback = await resolveRecordingCallbackUrl(businessId);
+
   return buildDialClientTwiml({
     clientIdentity: buildVoiceAgentClientIdentity(businessId),
     timeoutSeconds: 25,
     actionUrl: webhooks.clientNoAnswerUrl,
     speechLocale,
+    recordingStatusCallback: recordingCallback,
   });
 }
 

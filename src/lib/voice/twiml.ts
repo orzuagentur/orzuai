@@ -95,13 +95,17 @@ export function buildGoodbyeTwiml(speechLocale: string): string {
 export function buildDialPhoneNumberTwiml(input: {
   callerId: string;
   toNumber: string;
+  recordingStatusCallback?: string | null;
 }): string {
   const callerId = escapeXml(input.callerId);
   const toNumber = escapeXml(input.toNumber);
+  const recordingAttrs = input.recordingStatusCallback
+    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${callerId}">
+  <Dial callerId="${callerId}"${recordingAttrs}>
     <Number>${toNumber}</Number>
   </Dial>
 </Response>`;
@@ -112,16 +116,75 @@ export function buildDialClientTwiml(input: {
   timeoutSeconds?: number;
   actionUrl?: string;
   speechLocale: string;
+  recordingStatusCallback?: string | null;
 }): string {
   const identity = escapeXml(input.clientIdentity);
   const timeout = input.timeoutSeconds ?? 25;
   const actionAttr = input.actionUrl
     ? ` action="${escapeXml(input.actionUrl)}"`
     : "";
+  const recordingAttrs = input.recordingStatusCallback
+    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="${timeout}"${actionAttr}>
+  <Dial timeout="${timeout}"${actionAttr}${recordingAttrs}>
+    <Client>${identity}</Client>
+  </Dial>
+</Response>`;
+}
+
+export function buildRecordingStatusCallbackUrl(businessId: string): string {
+  const base = getAppUrl();
+  const url = new URL(`${base}/api/webhooks/voice/recording`);
+  url.searchParams.set("businessId", businessId);
+  return url.toString();
+}
+
+export function buildHandoffTwimlUrl(businessId: string): string {
+  const base = getAppUrl();
+  const url = new URL(`${base}/api/webhooks/voice/handoff`);
+  url.searchParams.set("businessId", businessId);
+  return url.toString();
+}
+
+export function withCallRecording(
+  twiml: string,
+  recordingStatusCallback: string | null | undefined,
+): string {
+  if (!recordingStatusCallback?.trim()) {
+    return twiml;
+  }
+
+  const callback = escapeXml(recordingStatusCallback.trim());
+  const recordingBlock = `<Start><Recording recordingStatusCallback="${callback}" recordingStatusCallbackMethod="POST"/></Start>`;
+
+  if (twiml.includes("<Start>")) {
+    return twiml;
+  }
+
+  return twiml.replace("<Response>", `<Response>${recordingBlock}`);
+}
+
+export function buildHandoffToAgentTwiml(input: {
+  speechLocale: string;
+  clientIdentity: string;
+  actionUrl?: string;
+  recordingStatusCallback?: string | null;
+}): string {
+  const identity = escapeXml(input.clientIdentity);
+  const actionAttr = input.actionUrl
+    ? ` action="${escapeXml(input.actionUrl)}"`
+    : "";
+  const recordingAttrs = input.recordingStatusCallback
+    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    : "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna" language="${input.speechLocale}">Please hold while I connect you with a team member.</Say>
+  <Dial timeout="25"${actionAttr}${recordingAttrs}>
     <Client>${identity}</Client>
   </Dial>
 </Response>`;

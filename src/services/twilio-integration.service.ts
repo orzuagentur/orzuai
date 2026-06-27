@@ -292,6 +292,7 @@ function buildVoiceWebhookUrls(businessId: string) {
     inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
     outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
     statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
+    smsWebhookUrl: `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`,
   };
 }
 
@@ -457,7 +458,7 @@ export async function selectTwilioPhoneNumber(input: {
       credentials: ctx.credentials,
       phoneSid: selectedSid,
       voiceUrl: webhooks.inboundWebhookUrl,
-      smsUrl: webhooks.inboundWebhookUrl,
+      smsUrl: webhooks.smsWebhookUrl,
       statusCallbackUrl: webhooks.statusCallbackUrl,
     });
   } catch (error) {
@@ -548,7 +549,7 @@ export async function resyncTwilioConnection(
       credentials: ctx.credentials,
       phoneSid: connection.phoneSid,
       voiceUrl: webhooks.inboundWebhookUrl,
-      smsUrl: webhooks.inboundWebhookUrl,
+      smsUrl: webhooks.smsWebhookUrl,
       statusCallbackUrl: webhooks.statusCallbackUrl,
     });
   } catch {

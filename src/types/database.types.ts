@@ -2433,6 +2433,14 @@ export type Database = {
           ai_enabled: boolean;
           voice_language: string;
           voice_system_prompt: string | null;
+          recording_enabled: boolean;
+          sms_enabled: boolean;
+          business_hours_enabled: boolean;
+          business_hours_start: string;
+          business_hours_end: string;
+          business_timezone: string;
+          business_days: number[];
+          after_hours_message: string;
           updated_at: string;
         };
         Insert: {
@@ -2452,6 +2460,14 @@ export type Database = {
           ai_enabled?: boolean;
           voice_language?: string;
           voice_system_prompt?: string | null;
+          recording_enabled?: boolean;
+          sms_enabled?: boolean;
+          business_hours_enabled?: boolean;
+          business_hours_start?: string;
+          business_hours_end?: string;
+          business_timezone?: string;
+          business_days?: number[];
+          after_hours_message?: string;
           updated_at?: string;
         };
         Update: {
@@ -2471,6 +2487,14 @@ export type Database = {
           ai_enabled?: boolean;
           voice_language?: string;
           voice_system_prompt?: string | null;
+          recording_enabled?: boolean;
+          sms_enabled?: boolean;
+          business_hours_enabled?: boolean;
+          business_hours_start?: string;
+          business_hours_end?: string;
+          business_timezone?: string;
+          business_days?: number[];
+          after_hours_message?: string;
           updated_at?: string;
         };
         Relationships: [
@@ -2539,6 +2563,11 @@ export type Database = {
           ended_at: string | null;
           duration_seconds: number | null;
           ai_handled: boolean;
+          recording_url: string | null;
+          recording_sid: string | null;
+          conversation_id: string | null;
+          handoff_at: string | null;
+          human_handled: boolean;
         };
         Insert: {
           id?: string;
@@ -2554,6 +2583,11 @@ export type Database = {
           ended_at?: string | null;
           duration_seconds?: number | null;
           ai_handled?: boolean;
+          recording_url?: string | null;
+          recording_sid?: string | null;
+          conversation_id?: string | null;
+          handoff_at?: string | null;
+          human_handled?: boolean;
         };
         Update: {
           id?: string;
@@ -2569,6 +2603,11 @@ export type Database = {
           ended_at?: string | null;
           duration_seconds?: number | null;
           ai_handled?: boolean;
+          recording_url?: string | null;
+          recording_sid?: string | null;
+          conversation_id?: string | null;
+          handoff_at?: string | null;
+          human_handled?: boolean;
         };
         Relationships: [
           {
@@ -2583,6 +2622,13 @@ export type Database = {
             columns: ["contact_id"];
             isOneToOne: false;
             referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_logs_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
             referencedColumns: ["id"];
           },
         ];

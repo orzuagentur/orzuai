@@ -11,14 +11,19 @@ export type VoiceInboxCallListItem = {
   endedAt: string | null;
   durationSeconds: number | null;
   aiHandled: boolean;
+  humanHandled: boolean;
+  handoffAt: string | null;
   contactId: string | null;
   contactName: string | null;
   externalCallId: string | null;
+  recordingUrl: string | null;
+  conversationId: string | null;
 };
 
 export type VoiceCallDetail = VoiceInboxCallListItem & {
   turns: VoiceCallSessionTurn[];
   turnCount: number;
+  hasRecording: boolean;
 };
 
 export type VoiceInboxPageData = {

@@ -28,6 +28,10 @@ type VoiceCallLogRealtimeRow = {
   duration_seconds: number | null;
   ai_handled: boolean;
   external_call_id: string | null;
+  recording_url: string | null;
+  conversation_id: string | null;
+  handoff_at: string | null;
+  human_handled: boolean;
 };
 
 type VoiceCallSessionRealtimeRow = {
@@ -63,9 +67,13 @@ function mapLogRowToListItem(row: VoiceCallLogRealtimeRow): VoiceInboxCallListIt
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
     aiHandled: row.ai_handled,
+    humanHandled: row.human_handled,
+    handoffAt: row.handoff_at,
     contactId: row.contact_id,
     contactName: null,
     externalCallId: row.external_call_id,
+    recordingUrl: row.recording_url,
+    conversationId: row.conversation_id,
   };
 }
 
@@ -154,9 +162,13 @@ export function useVoiceCallsRealtime({
           endedAt: result.data.endedAt,
           durationSeconds: result.data.durationSeconds,
           aiHandled: result.data.aiHandled,
+          humanHandled: result.data.humanHandled,
+          handoffAt: result.data.handoffAt,
           contactId: result.data.contactId,
           contactName: result.data.contactName,
           externalCallId: result.data.externalCallId,
+          recordingUrl: result.data.recordingUrl,
+          conversationId: result.data.conversationId,
         };
 
         onCallsChangeRef.current((current) => {
@@ -308,9 +320,13 @@ export function useVoiceCallsRealtime({
                     endedAt: result.data.endedAt,
                     durationSeconds: result.data.durationSeconds,
                     aiHandled: result.data.aiHandled,
+                    humanHandled: result.data.humanHandled,
+                    handoffAt: result.data.handoffAt,
                     contactId: result.data.contactId,
                     contactName: result.data.contactName,
                     externalCallId: result.data.externalCallId,
+                    recordingUrl: result.data.recordingUrl,
+                    conversationId: result.data.conversationId,
                   }
                 : call,
             ),

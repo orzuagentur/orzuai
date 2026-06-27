@@ -19,6 +19,9 @@ import {
   buildVoiceConversationTwiml,
 } from "@/services/voice-ai.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
+import { applyCallRecordingToTwiml } from "@/services/voice-recording.service";
+import { isWithinBusinessHours } from "@/lib/voice/business-hours";
+import { buildStaticSayTwiml, mapVoiceLanguageToTwilioLocale } from "@/lib/voice/twiml";
 import { buildAppUrl } from "@/lib/app-url";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
@@ -556,22 +559,48 @@ export async function getInboundVoiceTwiml(
   businessId: string,
 ): Promise<string> {
   const settings = await getVoiceAgentSettings(businessId);
+  const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
 
   if (!settings.inboundEnabled) {
-    return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna">This line is currently unavailable. Please try again later.</Say></Response>`;
+    return applyCallRecordingToTwiml(
+      businessId,
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna">This line is currently unavailable. Please try again later.</Say></Response>`,
+    );
   }
+
+  if (
+    !isWithinBusinessHours({
+      enabled: settings.businessHoursEnabled,
+      start: settings.businessHoursStart,
+      end: settings.businessHoursEnd,
+      timezone: settings.businessTimezone,
+      days: settings.businessDays,
+    })
+  ) {
+    return applyCallRecordingToTwiml(
+      businessId,
+      buildStaticSayTwiml({
+        speech: settings.afterHoursMessage,
+        speechLocale,
+      }),
+    );
+  }
+
+  let twiml: string;
 
   if (!settings.aiEnabled) {
     const { buildInboundBrowserTwiml } = await import(
       "@/services/voice-client.service"
     );
-    return buildInboundBrowserTwiml(businessId);
+    twiml = await buildInboundBrowserTwiml(businessId);
+  } else {
+    twiml = await buildVoiceConversationTwiml({
+      businessId,
+      direction: "inbound",
+    });
   }
 
-  return buildVoiceConversationTwiml({
-    businessId,
-    direction: "inbound",
-  });
+  return applyCallRecordingToTwiml(businessId, twiml);
 }
 
 export async function getOutboundVoiceTwiml(

@@ -1,7 +1,9 @@
 import "server-only";
 
 import { hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getMessageRepository } from "@/repositories/message.repository";
 import {
   getVoiceRepository,
   type VoiceCallLogInboxRow,
@@ -11,6 +13,7 @@ import type { InboxBusinessContext } from "@/services/chat.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
+import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import {
   getActiveMessagingChannelIds,
 } from "@/features/integrations";
@@ -32,9 +35,13 @@ function mapCallLogRow(row: VoiceCallLogInboxRow): VoiceInboxCallListItem {
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
     aiHandled: row.ai_handled,
+    humanHandled: row.human_handled,
+    handoffAt: row.handoff_at,
     contactId: row.contact_id,
     contactName: row.contacts?.name ?? null,
     externalCallId: row.external_call_id,
+    recordingUrl: row.recording_url,
+    conversationId: row.conversation_id,
   };
 }
 
@@ -140,6 +147,7 @@ export async function getVoiceCallDetail(
     ...mapCallLogRow(row),
     turns,
     turnCount,
+    hasRecording: Boolean(row.recording_url?.trim()),
   };
 }
 
@@ -186,6 +194,16 @@ export async function markVoiceCallCompleted(input: {
     endedAt: endedAt.toISOString(),
     durationSeconds,
     aiHandled: input.aiHandled ?? true,
+  });
+
+  void syncVoiceCallToConversation({
+    businessId: existing.business_id,
+    callSid: input.callSid,
+  }).catch((error) => {
+    console.warn(
+      "[voice-inbox] conversation sync failed",
+      error instanceof Error ? error.message : "unknown",
+    );
   });
 }
 
@@ -250,6 +268,18 @@ export async function handleTwilioCallStatusUpdate(input: {
   }
 
   await repo.updateCallLog(existing.id, patch);
+
+  if (mappedStatus === "completed" || mappedStatus === "missed") {
+    void syncVoiceCallToConversation({
+      businessId: input.businessId,
+      callSid: input.callSid,
+    }).catch((error) => {
+      console.warn(
+        "[voice-inbox] conversation sync failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    });
+  }
 }
 
 export async function recordClientOutboundVoiceCall(input: {
@@ -279,4 +309,91 @@ export async function recordClientOutboundVoiceCall(input: {
     externalCallId: input.callSid,
     triggerReason: "browser_call",
   });
+}
+
+export async function syncVoiceCallToConversation(input: {
+  businessId: string;
+  callSid: string;
+}): Promise<string | null> {
+  if (!hasSupabaseEnv() || !input.callSid.trim()) {
+    return null;
+  }
+
+  const repo = getVoiceRepository();
+  const callLog = await repo.findCallLogByExternalCallId(input.callSid);
+
+  if (!callLog || callLog.conversation_id) {
+    return callLog?.conversation_id ?? null;
+  }
+
+  const session = await repo.findSessionByCallSid(input.callSid);
+  const turns = (session?.turns as VoiceCallSessionTurn[]) ?? [];
+
+  if (turns.length === 0) {
+    return null;
+  }
+
+  let contactId = callLog.contact_id;
+
+  if (!contactId && callLog.phone_number) {
+    contactId = await getConversationRepository().findContactIdByPhone(
+      input.businessId,
+      callLog.phone_number,
+    );
+  }
+
+  if (!contactId) {
+    return null;
+  }
+
+  const conversationId = await getConversationRepository().resolveForInboundContact(
+    input.businessId,
+    contactId,
+    "voice",
+  );
+
+  if (!conversationId) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const messageRepo = getMessageRepository(admin);
+
+  for (const [index, turn] of turns.entries()) {
+    const externalMessageId = `voice:${input.callSid}:${index}`;
+
+    const existing = await messageRepo.findByExternalId(
+      "voice",
+      externalMessageId,
+    );
+
+    if (existing) {
+      continue;
+    }
+
+    const inserted = await messageRepo.insert({
+      conversationId,
+      channel: "voice",
+      senderType: turn.role === "assistant" ? "ai" : "client",
+      content: turn.content,
+      aiGenerated: turn.role === "assistant",
+      externalMessageId,
+    });
+
+    await updateConversationLastMessageFromInsert(admin, {
+      conversationId,
+      content: inserted.content,
+      channel: "voice",
+      senderType: inserted.sender_type,
+      aiGenerated: inserted.ai_generated,
+      createdAt: inserted.sent_at,
+    });
+  }
+
+  await repo.updateCallLog(callLog.id, {
+    conversationId,
+    contactId,
+  });
+
+  return conversationId;
 }

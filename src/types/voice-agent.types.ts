@@ -74,6 +74,14 @@ export type VoiceAgentSettings = {
   aiEnabled: boolean;
   voiceLanguage: string;
   voiceSystemPrompt: string;
+  recordingEnabled: boolean;
+  smsEnabled: boolean;
+  businessHoursEnabled: boolean;
+  businessHoursStart: string;
+  businessHoursEnd: string;
+  businessTimezone: string;
+  businessDays: number[];
+  afterHoursMessage: string;
   providerConfigured: boolean;
   aiConfigured: boolean;
   inboundWebhookUrl: string;

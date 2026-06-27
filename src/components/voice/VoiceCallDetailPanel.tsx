@@ -2,13 +2,20 @@
 
 import Link from "next/link";
 import { useTransition, useState } from "react";
-import { ArrowLeftIcon, Loader2Icon, PhoneIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  Loader2Icon,
+  MessageSquareIcon,
+  PhoneIcon,
+  UserIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
@@ -20,6 +27,7 @@ import {
   formatVoiceCallDuration,
   getVoiceCallStatusClassName,
   getVoiceCallStatusLabel,
+  isActiveVoiceCallStatus,
 } from "@/utils/voice-call-display";
 
 type VoiceCallDetailPanelProps = {
@@ -39,6 +47,9 @@ export function VoiceCallDetailPanel({
 }: VoiceCallDetailPanelProps) {
   const [isCalling, startCalling] = useTransition();
   const [isBrowserCalling, setIsBrowserCalling] = useState(false);
+  const [isHandoffPending, setIsHandoffPending] = useState(false);
+  const [smsBody, setSmsBody] = useState("");
+  const [isSmsSending, setIsSmsSending] = useState(false);
   const softphone = useVoiceSoftphone();
 
   if (!call) {
@@ -51,15 +62,16 @@ export function VoiceCallDetailPanel({
     );
   }
 
-  function handleBrowserCall() {
-    if (!call) {
-      return;
-    }
+  const canHandoff =
+    softphone.enabled &&
+    call.aiHandled &&
+    isActiveVoiceCallStatus(call.status);
 
+  function handleBrowserCall() {
     setIsBrowserCalling(true);
 
     void softphone
-      .placeCall(call.phoneNumber)
+      .placeCall(call!.phoneNumber)
       .then(() => {
         toast.success(VOICE_MESSAGES.callOutboundSuccess);
       })
@@ -89,6 +101,78 @@ export function VoiceCallDetailPanel({
 
       toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
     });
+  }
+
+  function handleHandoff() {
+    setIsHandoffPending(true);
+
+    void fetch("/api/voice/handoff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callLogId: call!.id }),
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as {
+          success?: boolean;
+          message?: string;
+        };
+
+        if (!result.success) {
+          throw new Error(result.message ?? VOICE_MESSAGES.callHandoffFailed);
+        }
+
+        toast.success(VOICE_MESSAGES.callHandoffSuccess);
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : VOICE_MESSAGES.callHandoffFailed,
+        );
+      })
+      .finally(() => {
+        setIsHandoffPending(false);
+      });
+  }
+
+  function handleSendSms() {
+    const message = smsBody.trim();
+
+    if (!message) {
+      return;
+    }
+
+    setIsSmsSending(true);
+
+    void fetch("/api/voice/sms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phoneNumber: call!.phoneNumber,
+        message,
+      }),
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as {
+          success?: boolean;
+          message?: string;
+        };
+
+        if (!result.success) {
+          throw new Error(result.message ?? VOICE_MESSAGES.callSmsFailed);
+        }
+
+        setSmsBody("");
+        toast.success(VOICE_MESSAGES.callSmsSuccess);
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : VOICE_MESSAGES.callSmsFailed,
+        );
+      })
+      .finally(() => {
+        setIsSmsSending(false);
+      });
   }
 
   const displayName =
@@ -131,6 +215,9 @@ export function VoiceCallDetailPanel({
                 {call.aiHandled ? (
                   <Badge variant="secondary">{VOICE_MESSAGES.callAiHandled}</Badge>
                 ) : null}
+                {call.humanHandled ? (
+                  <Badge variant="secondary">{VOICE_MESSAGES.callHumanHandled}</Badge>
+                ) : null}
                 {isLive ? (
                   <Badge variant="destructive">{VOICE_MESSAGES.callLiveBadge}</Badge>
                 ) : null}
@@ -138,7 +225,25 @@ export function VoiceCallDetailPanel({
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            {canHandoff ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="default"
+                disabled={isHandoffPending}
+                onClick={handleHandoff}
+              >
+                {isHandoffPending ? (
+                  <Loader2Icon className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <UserIcon className="mr-2 size-4" />
+                )}
+                {isHandoffPending
+                  ? VOICE_MESSAGES.callHandoffPending
+                  : VOICE_MESSAGES.callHandoff}
+              </Button>
+            ) : null}
             {softphone.enabled ? (
               <Button
                 type="button"
@@ -201,7 +306,64 @@ export function VoiceCallDetailPanel({
               </dd>
             </div>
           ) : null}
+          {call.conversationId ? (
+            <div className="col-span-2">
+              <dt className="text-xs text-muted-foreground">
+                {VOICE_MESSAGES.callConversationLink}
+              </dt>
+              <dd>
+                <Link
+                  href={`${DASHBOARD_ROUTES.chats}?conversation=${call.conversationId}`}
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <MessageSquareIcon className="size-3.5" />
+                  {VOICE_MESSAGES.callConversationLink}
+                </Link>
+              </dd>
+            </div>
+          ) : null}
         </dl>
+
+        {call.hasRecording ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              {VOICE_MESSAGES.callRecordingTitle}
+            </p>
+            <audio
+              controls
+              preload="none"
+              className="h-10 w-full max-w-md"
+              src={`/api/voice/recording?callLogId=${call.id}`}
+            />
+          </div>
+        ) : null}
+
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {VOICE_MESSAGES.callSmsTitle}
+          </p>
+          <Textarea
+            value={smsBody}
+            onChange={(event) => setSmsBody(event.target.value)}
+            placeholder={VOICE_MESSAGES.callSmsPlaceholder}
+            rows={2}
+            className="min-h-0 resize-none text-sm"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isSmsSending || !smsBody.trim()}
+            onClick={handleSendSms}
+          >
+            {isSmsSending ? (
+              <Loader2Icon className="mr-2 size-4 animate-spin" />
+            ) : (
+              <MessageSquareIcon className="mr-2 size-4" />
+            )}
+            {isSmsSending ? VOICE_MESSAGES.callSmsSending : VOICE_MESSAGES.callSmsSend}
+          </Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

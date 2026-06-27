@@ -19,6 +19,16 @@ import { generateText } from "@/services/llm.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
+import { applyCallRecordingToTwiml } from "@/services/voice-recording.service";
+import {
+  buildHandoffAgentTwiml,
+  markVoiceCallHandoffByCallSid,
+} from "@/services/voice-handoff.service";
+import { hasTwilioVoiceClientEnv } from "@/lib/twilio/access-token";
+import {
+  customerConfirmedHumanHandoff,
+  customerExplicitlyRequestedHuman,
+} from "@/utils/human-handoff-policy";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
 
@@ -169,7 +179,10 @@ export async function buildVoiceConversationTwiml(input: {
   const opening = resolveOpeningLine(settings, input.direction);
 
   if (!settings.aiEnabled) {
-    return buildStaticSayTwiml({ speech: opening, speechLocale });
+    return applyCallRecordingToTwiml(
+      input.businessId,
+      buildStaticSayTwiml({ speech: opening, speechLocale }),
+    );
   }
 
   const gatherUrl = buildGatherActionUrl({
@@ -178,7 +191,7 @@ export async function buildVoiceConversationTwiml(input: {
     triggerReason: input.triggerReason,
   });
 
-  return buildSayAndGatherTwiml({
+  const twiml = buildSayAndGatherTwiml({
     speech: opening,
     gatherActionUrl: gatherUrl,
     speechLocale,
@@ -187,6 +200,8 @@ export async function buildVoiceConversationTwiml(input: {
         ? "Please tell me if you have any questions about your request."
         : "How can I help you today?",
   });
+
+  return applyCallRecordingToTwiml(input.businessId, twiml);
 }
 
 export async function handleVoiceGatherInput(input: {
@@ -236,7 +251,21 @@ export async function handleVoiceGatherInput(input: {
 
   if (session.turn_count >= MAX_VOICE_TURNS) {
     void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: true });
-    return buildGoodbyeTwiml(speechLocale);
+    return applyCallRecordingToTwiml(
+      input.businessId,
+      buildGoodbyeTwiml(speechLocale),
+    );
+  }
+
+  const shouldHandoff =
+    hasTwilioVoiceClientEnv() &&
+    (customerExplicitlyRequestedHuman(userSpeech) ||
+      customerConfirmedHumanHandoff(userSpeech, session.turns));
+
+  if (shouldHandoff) {
+    void markVoiceCallHandoffByCallSid(input.callSid);
+    const handoffTwiml = await buildHandoffAgentTwiml(input.businessId);
+    return applyCallRecordingToTwiml(input.businessId, handoffTwiml);
   }
 
   const reply = await generateVoiceAiReply({
@@ -275,10 +304,13 @@ export async function handleVoiceGatherInput(input: {
 
   if (session.turn_count + 1 >= MAX_VOICE_TURNS) {
     void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: true });
-    return buildStaticSayTwiml({
-      speech: `${assistantText} Thank you for calling. Goodbye.`,
-      speechLocale,
-    });
+    return applyCallRecordingToTwiml(
+      input.businessId,
+      buildStaticSayTwiml({
+        speech: `${assistantText} Thank you for calling. Goodbye.`,
+        speechLocale,
+      }),
+    );
   }
 
   const gatherUrl = buildGatherActionUrl({
@@ -287,9 +319,12 @@ export async function handleVoiceGatherInput(input: {
     triggerReason: input.triggerReason,
   });
 
-  return buildSayAndGatherTwiml({
-    speech: assistantText,
-    gatherActionUrl: gatherUrl,
-    speechLocale,
-  });
+  return applyCallRecordingToTwiml(
+    input.businessId,
+    buildSayAndGatherTwiml({
+      speech: assistantText,
+      gatherActionUrl: gatherUrl,
+      speechLocale,
+    }),
+  );
 }

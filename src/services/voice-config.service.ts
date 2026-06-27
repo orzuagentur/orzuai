@@ -32,6 +32,15 @@ const DEFAULT_SETTINGS: Omit<
   aiEnabled: true,
   voiceLanguage: "English",
   voiceSystemPrompt: "",
+  recordingEnabled: true,
+  smsEnabled: true,
+  businessHoursEnabled: false,
+  businessHoursStart: "09:00",
+  businessHoursEnd: "18:00",
+  businessTimezone: "UTC",
+  businessDays: [1, 2, 3, 4, 5],
+  afterHoursMessage:
+    "Thank you for calling. We are currently closed. Please call back during business hours.",
 };
 
 function isVoiceProviderConfigured(
@@ -86,6 +95,16 @@ function mapConfigRowToSettings(
     aiEnabled: data.ai_enabled ?? true,
     voiceLanguage: data.voice_language ?? "English",
     voiceSystemPrompt: data.voice_system_prompt ?? "",
+    recordingEnabled: data.recording_enabled ?? true,
+    smsEnabled: data.sms_enabled ?? true,
+    businessHoursEnabled: data.business_hours_enabled ?? false,
+    businessHoursStart: data.business_hours_start ?? "09:00",
+    businessHoursEnd: data.business_hours_end ?? "18:00",
+    businessTimezone: data.business_timezone ?? "UTC",
+    businessDays: data.business_days ?? [1, 2, 3, 4, 5],
+    afterHoursMessage:
+      data.after_hours_message ??
+      "Thank you for calling. We are currently closed. Please call back during business hours.",
     providerConfigured: isVoiceProviderConfigured(provider, twilioConnected),
     aiConfigured: isVoiceAiConfigured(),
     ...webhooks,

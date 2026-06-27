@@ -195,6 +195,49 @@ export async function createTwilioOutboundCall(input: {
   return response.sid ?? "unknown";
 }
 
+export async function redirectTwilioCall(input: {
+  credentials: TwilioApiCredentials;
+  callSid: string;
+  url: string;
+}): Promise<void> {
+  const body = new URLSearchParams({
+    Url: input.url,
+    Method: "POST",
+  });
+
+  await twilioRequest(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Calls/${input.callSid}.json`,
+    { method: "POST", body },
+  );
+}
+
+export async function sendTwilioSms(input: {
+  credentials: TwilioApiCredentials;
+  from: string;
+  to: string;
+  body: string;
+  statusCallbackUrl?: string;
+}): Promise<string> {
+  const body = new URLSearchParams({
+    From: input.from,
+    To: input.to,
+    Body: input.body,
+  });
+
+  if (input.statusCallbackUrl) {
+    body.set("StatusCallback", input.statusCallbackUrl);
+  }
+
+  const response = await twilioRequest<{ sid?: string }>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Messages.json`,
+    { method: "POST", body },
+  );
+
+  return response.sid ?? "unknown";
+}
+
 type AvailablePhoneNumberResource = {
   phone_number: string;
   friendly_name?: string;

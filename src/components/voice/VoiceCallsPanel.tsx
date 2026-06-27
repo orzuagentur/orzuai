@@ -108,6 +108,9 @@ function VoiceCallsPanelContent({
       ...listItem,
       turns: activeCallDetail?.turns ?? [],
       turnCount: activeCallDetail?.turnCount ?? 0,
+      hasRecording: Boolean(
+        listItem.recordingUrl?.trim() || activeCallDetail?.hasRecording,
+      ),
     };
   }, [activeCallDetail, activeCallId, calls]);
 

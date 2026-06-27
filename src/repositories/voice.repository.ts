@@ -51,6 +51,11 @@ export type VoiceCallLogInboxRow = Pick<
   | "duration_seconds"
   | "ai_handled"
   | "external_call_id"
+  | "recording_url"
+  | "recording_sid"
+  | "conversation_id"
+  | "handoff_at"
+  | "human_handled"
 > & {
   contacts: { id: string; name: string; phone_number: string } | null;
 };
@@ -61,6 +66,11 @@ export type VoiceCallLogUpdate = {
   durationSeconds?: number | null;
   aiHandled?: boolean;
   contactId?: string | null;
+  recordingUrl?: string | null;
+  recordingSid?: string | null;
+  conversationId?: string | null;
+  handoffAt?: string | null;
+  humanHandled?: boolean;
 };
 
 export type VoiceCallSessionTurn = {
@@ -205,6 +215,11 @@ export class VoiceRepository {
         duration_seconds,
         ai_handled,
         external_call_id,
+        recording_url,
+        recording_sid,
+        conversation_id,
+        handoff_at,
+        human_handled,
         contacts (
           id,
           name,
@@ -243,6 +258,11 @@ export class VoiceRepository {
         duration_seconds,
         ai_handled,
         external_call_id,
+        recording_url,
+        recording_sid,
+        conversation_id,
+        handoff_at,
+        human_handled,
         contacts (
           id,
           name,
@@ -266,12 +286,22 @@ export class VoiceRepository {
   ): Promise<
     Pick<
       VoiceCallLogRow,
-      "id" | "created_at" | "status" | "duration_seconds"
+      | "id"
+      | "business_id"
+      | "created_at"
+      | "status"
+      | "duration_seconds"
+      | "contact_id"
+      | "phone_number"
+      | "conversation_id"
+      | "recording_url"
     > | null
   > {
     const { data, error } = await this.db
       .from("voice_call_logs")
-      .select("id, created_at, status, duration_seconds")
+      .select(
+        "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url",
+      )
       .eq("external_call_id", externalCallId)
       .maybeSingle();
 
@@ -307,6 +337,26 @@ export class VoiceRepository {
 
     if (patch.contactId !== undefined) {
       updatePayload.contact_id = patch.contactId;
+    }
+
+    if (patch.recordingUrl !== undefined) {
+      updatePayload.recording_url = patch.recordingUrl;
+    }
+
+    if (patch.recordingSid !== undefined) {
+      updatePayload.recording_sid = patch.recordingSid;
+    }
+
+    if (patch.conversationId !== undefined) {
+      updatePayload.conversation_id = patch.conversationId;
+    }
+
+    if (patch.handoffAt !== undefined) {
+      updatePayload.handoff_at = patch.handoffAt;
+    }
+
+    if (patch.humanHandled !== undefined) {
+      updatePayload.human_handled = patch.humanHandled;
     }
 
     if (Object.keys(updatePayload).length === 0) {
