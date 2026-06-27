@@ -1,12 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getAccessibleBusiness } from "@/services/business-access.service";
-import {
-  countUnreadBusinessNotifications,
-  listBusinessNotifications,
-} from "@/services/business-notifications.service";
+import { fetchBusinessNotificationsForBusiness } from "@/services/business-notifications.service";
 import { requireUser } from "@/services/auth.service";
 
 export async function fetchBusinessNotificationsAction() {
@@ -29,11 +25,9 @@ export async function fetchBusinessNotificationsAction() {
     };
   }
 
-  const admin = createAdminClient();
-  const [data, unreadCount] = await Promise.all([
-    listBusinessNotifications(admin, business.id),
-    countUnreadBusinessNotifications(admin, business.id),
-  ]);
+  const { data, unreadCount } = await fetchBusinessNotificationsForBusiness(
+    business.id,
+  );
 
   return {
     success: true as const,

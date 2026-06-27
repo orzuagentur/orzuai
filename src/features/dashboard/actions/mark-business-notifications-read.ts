@@ -1,9 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getAccessibleBusiness } from "@/services/business-access.service";
-import { markBusinessNotificationsRead } from "@/services/business-notifications.service";
+import { markBusinessNotificationsReadForBusiness } from "@/services/business-notifications.service";
 import { requireUser } from "@/services/auth.service";
 
 export async function markBusinessNotificationsReadAction(
@@ -25,10 +24,7 @@ export async function markBusinessNotificationsReadAction(
     };
   }
 
-  const admin = createAdminClient();
-
-  await markBusinessNotificationsRead({
-    admin,
+  await markBusinessNotificationsReadForBusiness({
     businessId: business.id,
     notificationIds,
   });

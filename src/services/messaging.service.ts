@@ -23,60 +23,39 @@ import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
-import type { Database, MessageSenderType, MessagingChannel } from "@/types/database.types";
+import {
+  getMessageRepository,
+  type ChannelMessageInsert,
+  type ChannelMessageRow,
+} from "@/repositories/message.repository";
+import { getConversationRepository } from "@/repositories/conversation.repository";
+import type { Database, MessagingChannel } from "@/types/database.types";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-const OPEN_CONVERSATION_STATUSES = ["open", "pending", "active"] as const;
-
-export type ChannelMessageInsert = {
-  conversationId: string;
-  channel: MessagingChannel;
-  senderType: MessageSenderType;
-  content: string;
-  emailSubject?: string | null;
-  aiGenerated?: boolean;
-  externalMessageId?: string | null;
-};
-
-export type InsertedChannelMessageRow = {
-  id: string;
-  conversation_id: string;
-  channel: MessagingChannel;
-  sender_type: MessageSenderType;
-  content: string;
-  email_subject?: string | null;
-  ai_generated: boolean;
-  created_at: string;
-  sent_at?: string;
-  external_message_id?: string | null;
-};
+export type { ChannelMessageInsert };
+export type InsertedChannelMessageRow = ChannelMessageRow;
 
 export async function findMessageByExternalId(
   admin: MessagingDbClient,
   channel: MessagingChannel,
   externalMessageId: string,
 ): Promise<InsertedChannelMessageRow | null> {
-  const { data } = await admin
-    .from("messages")
-    .select(
-      "id, conversation_id, channel, sender_type, content, ai_generated, created_at, sent_at, external_message_id",
-    )
-    .eq("channel", channel)
-    .eq("external_message_id", externalMessageId)
-    .maybeSingle();
-
-  return data;
+  return getMessageRepository(admin).findByExternalId(
+    channel,
+    externalMessageId,
+  );
 }
 
 export async function insertChannelMessage(
   admin: MessagingDbClient,
   input: ChannelMessageInsert,
 ): Promise<InsertedChannelMessageRow> {
+  const messageRepo = getMessageRepository(admin);
+
   if (input.externalMessageId) {
-    const existing = await findMessageByExternalId(
-      admin,
+    const existing = await messageRepo.findByExternalId(
       input.channel,
       input.externalMessageId,
     );
@@ -86,26 +65,19 @@ export async function insertChannelMessage(
     }
   }
 
-  const { data: inserted, error } = await admin
-    .from("messages")
-    .insert({
-      conversation_id: input.conversationId,
-      channel: input.channel,
-      sender_type: input.senderType,
-      content: input.content,
-      email_subject: input.emailSubject?.trim() || null,
-      ai_generated: input.aiGenerated ?? false,
-      external_message_id: input.externalMessageId ?? null,
-    })
-    .select(
-      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at, sent_at, external_message_id",
-    )
-    .single();
+  let inserted: ChannelMessageRow;
 
-  if (error) {
-    if (input.externalMessageId && error.code === "23505") {
-      const existing = await findMessageByExternalId(
-        admin,
+  try {
+    inserted = await messageRepo.insert(input);
+  } catch (error) {
+    if (
+      input.externalMessageId &&
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      const existing = await messageRepo.findByExternalId(
         input.channel,
         input.externalMessageId,
       );
@@ -135,10 +107,7 @@ export async function markOutboundMessageFailed(
   admin: MessagingDbClient,
   messageId: string,
 ): Promise<void> {
-  await admin
-    .from("messages")
-    .update({ hidden_for_business: true })
-    .eq("id", messageId);
+  await getMessageRepository(admin).setHiddenForBusiness(messageId);
 
   await admin
     .from("message_deliveries")
@@ -170,12 +139,9 @@ export async function createOutboundMessageDelivery(
   let conversationId = input.conversationId ?? null;
 
   if (!conversationId) {
-    const { data: message } = await admin
-      .from("messages")
-      .select("conversation_id")
-      .eq("id", input.messageId)
-      .maybeSingle();
-    conversationId = message?.conversation_id ?? null;
+    conversationId =
+      (await getMessageRepository(admin).findConversationId(input.messageId)) ??
+      null;
   }
 
   const { error } = await admin.from("message_deliveries").upsert(
@@ -247,10 +213,7 @@ export async function recordMessageDeliveryFailure(
     .eq("message_id", input.messageId);
 
   if (exhausted && input.hideMessageOnExhausted !== false) {
-    await admin
-      .from("messages")
-      .update({ hidden_for_business: true })
-      .eq("id", input.messageId);
+    await getMessageRepository(admin).setHiddenForBusiness(input.messageId);
   }
 }
 
@@ -261,14 +224,10 @@ export async function updateChannelMessageContent(
     content: string;
   },
 ): Promise<void> {
-  const { error } = await admin
-    .from("messages")
-    .update({ content: input.content })
-    .eq("id", input.messageId);
-
-  if (error) {
-    throw error;
-  }
+  await getMessageRepository(admin).updateContent(
+    input.messageId,
+    input.content,
+  );
 }
 
 export async function findContactForChannel(
@@ -291,54 +250,11 @@ export async function resolveInboundConversation(
   contactId: string,
   channel: MessagingChannel,
 ): Promise<string | null> {
-  const now = new Date().toISOString();
-
-  const { data: openConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", channel)
-    .in("status", [...OPEN_CONVERSATION_STATUSES])
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (openConversation?.id) {
-    return openConversation.id;
-  }
-
-  const { data: latestConversation } = await admin
-    .from("conversations")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("contact_id", contactId)
-    .eq("channel", channel)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestConversation?.id) {
-    await admin
-      .from("conversations")
-      .update({ status: "open", updated_at: now })
-      .eq("id", latestConversation.id);
-
-    return latestConversation.id;
-  }
-
-  const { data: createdConversation } = await admin
-    .from("conversations")
-    .insert({
-      business_id: businessId,
-      channel,
-      contact_id: contactId,
-      status: "open",
-    })
-    .select("id")
-    .single();
-
-  return createdConversation?.id ?? null;
+  return getConversationRepository(admin).resolveForInboundContact(
+    businessId,
+    contactId,
+    channel,
+  );
 }
 
 export async function incrementMessagingAnalytics(

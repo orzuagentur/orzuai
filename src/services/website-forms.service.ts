@@ -621,7 +621,6 @@ export async function ingestWebsiteFormSubmission(
       "@/services/voice-agent.service"
     );
     await scheduleOutboundCallAfterOrder({
-      admin,
       businessId,
       contactId,
       phoneNumber,

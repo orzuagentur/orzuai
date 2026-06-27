@@ -59,9 +59,9 @@ import {
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import { isGmailConnected } from "@/services/gmail-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
-
-const CHAT_MESSAGE_SELECT =
-  "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, deleted_for_all_at, hidden_for_business, edited_at, is_edited, created_at, sent_at";
+import { isVoiceInboxVisible } from "@/services/voice-inbox.service";
+import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getMessageRepository } from "@/repositories/message.repository";
 
 export type InboxBusinessContext = {
   userId: string;
@@ -130,14 +130,12 @@ export async function getConversationDetail(
   }
 
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select(
-      "id, channel, status, internal_note, updated_at, last_read_at, total_message_count, contact:contacts(id, name, phone_number, is_favorite, avatar_url)",
-    )
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(supabase);
+  const messageRepo = getMessageRepository(supabase);
+  const conversation = await conversationRepo.findOwnedInboxDetail(
+    conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return null;
@@ -149,17 +147,12 @@ export async function getConversationDetail(
     return null;
   }
 
-  const { data: messages } = await supabase
-    .from("messages")
-    .select(
-      CHAT_MESSAGE_SELECT,
-    )
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .order("sent_at", { ascending: false })
-    .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
-
-  const orderedMessages = (messages ?? []).slice().reverse();
+  const messages = await messageRepo.listChatMessages({
+    conversationId,
+    limit: CONVERSATION_MESSAGES_PAGE_SIZE,
+    order: "desc",
+  });
+  const orderedMessages = messages.slice().reverse();
   const totalCount =
     conversation.total_message_count ?? orderedMessages.length;
 
@@ -207,29 +200,25 @@ export async function getOlderConversationMessages(
   }
 
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(supabase);
+  const messageRepo = getMessageRepository(supabase);
+  const conversation = await conversationRepo.assertOwnedByBusiness(
+    conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return null;
   }
 
-  const { data: messages } = await supabase
-    .from("messages")
-    .select(
-      CHAT_MESSAGE_SELECT,
-    )
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .lt("sent_at", beforeSentAt)
-    .order("sent_at", { ascending: false })
-    .limit(CONVERSATION_MESSAGES_PAGE_SIZE);
+  const messages = await messageRepo.listChatMessages({
+    conversationId,
+    limit: CONVERSATION_MESSAGES_PAGE_SIZE,
+    beforeSentAt,
+    order: "desc",
+  });
 
-  const orderedMessages = (messages ?? []).slice().reverse();
+  const orderedMessages = messages.slice().reverse();
 
   return {
     messages: await enrichChatMessages(
@@ -250,28 +239,24 @@ export async function getConversationMessagesTail(
   }
 
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(supabase);
+  const messageRepo = getMessageRepository(supabase);
+  const conversation = await conversationRepo.assertOwnedByBusiness(
+    conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return null;
   }
 
-  const { data: messages } = await supabase
-    .from("messages")
-    .select(
-      CHAT_MESSAGE_SELECT,
-    )
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .order("sent_at", { ascending: false })
-    .limit(limit);
+  const messages = await messageRepo.listChatMessages({
+    conversationId,
+    limit,
+    order: "desc",
+  });
 
-  const orderedMessages = (messages ?? []).slice().reverse();
+  const orderedMessages = messages.slice().reverse();
 
   return enrichChatMessages(supabase, orderedMessages.map(mapChatMessage));
 }
@@ -287,36 +272,25 @@ export async function getNewConversationMessages(
   }
 
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(supabase);
+  const messageRepo = getMessageRepository(supabase);
+  const conversation = await conversationRepo.assertOwnedByBusiness(
+    conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return null;
   }
 
-  let query = supabase
-    .from("messages")
-    .select(
-      CHAT_MESSAGE_SELECT,
-    )
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false);
+  const messages = await messageRepo.listChatMessages({
+    conversationId,
+    afterSentAt,
+    afterMessageId,
+    order: "asc",
+  });
 
-  if (afterMessageId) {
-    query = query.or(
-      `sent_at.gt.${afterSentAt},and(sent_at.eq.${afterSentAt},id.gt.${afterMessageId})`,
-    );
-  } else {
-    query = query.gt("sent_at", afterSentAt);
-  }
-
-  const { data: messages } = await query.order("sent_at", { ascending: true });
-
-  return enrichChatMessages(supabase, (messages ?? []).map(mapChatMessage));
+  return enrichChatMessages(supabase, messages.map(mapChatMessage));
 }
 
 async function isWhatsAppConnected(businessId: string): Promise<boolean> {
@@ -454,6 +428,7 @@ export async function getChatsMonitorData(
       businessId: null,
       channels: [],
       visibleChannelIds: [],
+      voiceInboxEnabled: false,
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -474,6 +449,7 @@ export async function getChatsMonitorData(
       businessId: null,
       channels: [],
       visibleChannelIds: [],
+      voiceInboxEnabled: false,
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -481,12 +457,16 @@ export async function getChatsMonitorData(
   }
 
   const supabase = await createClient();
-  const channelStatuses = await getChannelConnectionStatuses(resolvedBusinessId);
+  const [channelStatuses, voiceInboxEnabled] = await Promise.all([
+    getChannelConnectionStatuses(resolvedBusinessId),
+    isVoiceInboxVisible(resolvedBusinessId),
+  ]);
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const channels: ChatMonitorChannelStats[] = [];
 
   for (const channel of visibleChannelIds) {
-    const [connected, analyticsResult, conversationsResult, lastConversation] =
+    const conversationRepo = getConversationRepository(supabase);
+    const [connected, analyticsResult, conversationsCount, lastActivityAt] =
       await Promise.all([
         isChatChannelConnected(resolvedBusinessId, channel),
         supabase
@@ -495,28 +475,17 @@ export async function getChatsMonitorData(
           .eq("business_id", resolvedBusinessId)
           .eq("channel", channel)
           .maybeSingle(),
-        supabase
-          .from("conversations")
-          .select("id", { count: "exact", head: true })
-          .eq("business_id", resolvedBusinessId)
-          .eq("channel", channel),
-        supabase
-          .from("conversations")
-          .select("updated_at")
-          .eq("business_id", resolvedBusinessId)
-          .eq("channel", channel)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+        conversationRepo.countByBusinessAndChannel(resolvedBusinessId, channel),
+        conversationRepo.findLatestUpdatedAt(resolvedBusinessId, channel),
       ]);
 
     channels.push({
       channel,
       connected,
-      conversationsCount: conversationsResult.count ?? 0,
+      conversationsCount,
       totalMessages: analyticsResult.data?.total_messages ?? 0,
       aiReplies: analyticsResult.data?.ai_replies ?? 0,
-      lastActivityAt: lastConversation.data?.updated_at ?? null,
+      lastActivityAt,
     });
   }
 
@@ -534,6 +503,7 @@ export async function getChatsMonitorData(
     businessId: resolvedBusinessId,
     channels,
     visibleChannelIds,
+    voiceInboxEnabled,
     totalConversations,
     totalMessages,
     unifiedConversations: [],
@@ -606,13 +576,15 @@ export async function updateConversationStatus(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("conversations")
-    .update({ status: parsed.data.status })
-    .eq("id", parsed.data.conversationId)
-    .eq("business_id", businessId);
+  const conversationRepo = getConversationRepository(supabase);
 
-  if (error) {
+  try {
+    await conversationRepo.updateStatus(
+      parsed.data.conversationId,
+      businessId,
+      parsed.data.status,
+    );
+  } catch {
     return { success: false, message: CHAT_MESSAGES.genericError };
   }
 
@@ -643,14 +615,16 @@ export async function updateConversationInternalNote(
   }
 
   const supabase = await createClient();
+  const conversationRepo = getConversationRepository(supabase);
   const trimmedNote = parsed.data.internalNote.trim();
-  const { error } = await supabase
-    .from("conversations")
-    .update({ internal_note: trimmedNote.length > 0 ? trimmedNote : null })
-    .eq("id", parsed.data.conversationId)
-    .eq("business_id", businessId);
 
-  if (error) {
+  try {
+    await conversationRepo.setInternalNote(
+      parsed.data.conversationId,
+      businessId,
+      trimmedNote.length > 0 ? trimmedNote : null,
+    );
+  } catch {
     return { success: false, message: CHAT_MESSAGES.genericError };
   }
 
@@ -673,6 +647,7 @@ export async function getChatsChannelPageData(
       activeConversation: null,
       cannedResponses: [],
       visibleChannelIds: [],
+      voiceInboxEnabled: false,
     };
   }
 
@@ -689,10 +664,14 @@ export async function getChatsChannelPageData(
       activeConversation: null,
       cannedResponses: [],
       visibleChannelIds: [],
+      voiceInboxEnabled: false,
     };
   }
 
-  const channelStatuses = await getChannelConnectionStatuses(ctx.businessId);
+  const [channelStatuses, voiceInboxEnabled] = await Promise.all([
+    getChannelConnectionStatuses(ctx.businessId),
+    isVoiceInboxVisible(ctx.businessId),
+  ]);
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
 
   const [conversationsPage, channelConnected, cannedResponses, aiEnabled] =
@@ -720,6 +699,7 @@ export async function getChatsChannelPageData(
     activeConversation: null,
     cannedResponses,
     visibleChannelIds,
+    voiceInboxEnabled,
   };
 }
 
@@ -851,12 +831,12 @@ export async function sendChatMessage(
   }
 
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, channel, contact:contacts(id, phone_number)")
-    .eq("id", parsed.data.conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(supabase);
+  const messageRepo = getMessageRepository(supabase);
+  const conversation = await conversationRepo.findOwnedForOutbound(
+    parsed.data.conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return {
@@ -973,10 +953,7 @@ export async function sendChatMessage(
       : [];
 
     await Promise.all([
-      supabase
-        .from("conversations")
-        .update({ updated_at: now })
-        .eq("id", parsed.data.conversationId),
+      conversationRepo.touchUpdatedAt(parsed.data.conversationId, now),
       ...contactUpdates,
     ]);
 
@@ -1037,10 +1014,7 @@ export async function sendChatMessage(
       : [];
 
     await Promise.all([
-      supabase
-        .from("conversations")
-        .update({ updated_at: now })
-        .eq("id", parsed.data.conversationId),
+      conversationRepo.touchUpdatedAt(parsed.data.conversationId, now),
       ...contactUpdates,
     ]);
 
@@ -1065,15 +1039,9 @@ export async function sendChatMessage(
     content: parsed.data.content,
   });
 
-  const { data: insertedMessage } = await supabase
-    .from("messages")
-    .select(
-      "id, conversation_id, channel, sender_type, content, email_subject, ai_generated, created_at",
-    )
-    .eq("conversation_id", parsed.data.conversationId)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const insertedMessage = await messageRepo.findLatestChatMessage(
+    parsed.data.conversationId,
+  );
 
   if (!insertedMessage) {
     return {
@@ -1095,10 +1063,7 @@ export async function sendChatMessage(
     : [];
 
   await Promise.all([
-    supabase
-      .from("conversations")
-      .update({ updated_at: now })
-      .eq("id", parsed.data.conversationId),
+    conversationRepo.touchUpdatedAt(parsed.data.conversationId, now),
     ...contactUpdates,
   ]);
 

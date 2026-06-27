@@ -8,6 +8,7 @@ import type {
   BusinessNotificationKind,
 } from "@/types/business-notification.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -340,4 +341,40 @@ export async function markBusinessNotificationsRead(input: {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function fetchBusinessNotificationsForBusiness(
+  businessId: string,
+): Promise<{ data: BusinessNotification[]; unreadCount: number }> {
+  const admin = createAdminClient();
+  const [data, unreadCount] = await Promise.all([
+    listBusinessNotifications(admin, businessId),
+    countUnreadBusinessNotifications(admin, businessId),
+  ]);
+
+  return { data, unreadCount };
+}
+
+export async function markBusinessNotificationsReadForBusiness(input: {
+  businessId: string;
+  notificationIds?: string[];
+}): Promise<void> {
+  const admin = createAdminClient();
+
+  await markBusinessNotificationsRead({
+    admin,
+    businessId: input.businessId,
+    notificationIds: input.notificationIds,
+  });
+}
+
+export async function markCalendarNotificationsReadForBusiness(
+  businessId: string,
+): Promise<void> {
+  const admin = createAdminClient();
+
+  await markCalendarNotificationsRead({
+    admin,
+    businessId,
+  });
 }

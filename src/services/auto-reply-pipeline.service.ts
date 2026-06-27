@@ -53,6 +53,8 @@ import { isAgentWithinSchedule } from "@/lib/ai/agent-schedule";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 import { agentScheduleSlotsSchema } from "@/types/ai-assistant-schedule.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
+import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getMessageRepository } from "@/repositories/message.repository";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -106,16 +108,10 @@ async function fetchConversationHistory(
   conversationId: string,
   limit: number = AI_CONTEXT_LIMITS.defaultHistoryMessages,
 ): Promise<ConversationTurn[]> {
-  const { data } = await admin
-    .from("messages")
-    .select("id, sender_type, content")
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .is("deleted_for_all_at", null)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  const visibleMessages = [...(data ?? [])].reverse();
+  const messageRepo = getMessageRepository(admin);
+  const visibleMessages = [
+    ...(await messageRepo.listForAiHistory(conversationId, limit)),
+  ].reverse();
   const outboundMessageIds = visibleMessages
     .filter((message) => message.sender_type !== "client")
     .map((message) => message.id);
@@ -154,7 +150,7 @@ function mapKnowledgeForLlm(
   }));
 }
 
-async function resolveAssistantProfile(
+export async function resolveAssistantProfile(
   admin: MessagingDbClient,
   businessId: string,
 ) {
@@ -215,13 +211,7 @@ async function resolveConversationContactId(
   admin: MessagingDbClient,
   conversationId: string,
 ): Promise<string | null> {
-  const { data } = await admin
-    .from("conversations")
-    .select("contact_id")
-    .eq("id", conversationId)
-    .maybeSingle();
-
-  return data?.contact_id ?? null;
+  return getConversationRepository(admin).findContactId(conversationId);
 }
 
 async function fetchBusinessSubscriptionPlan(
@@ -278,7 +268,7 @@ async function fetchCrmReplySnapshot(
   };
 }
 
-function applyAgentPermissionsToPlan(
+export function applyAgentPermissionsToPlan(
   plan: ExecutorPlan,
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>,
 ): ExecutorPlan {
@@ -764,15 +754,9 @@ export async function runAutoReplyBackgroundOrchestration(input: {
 
   const followUpText = buildHumanHandoffFollowUpMessage(input.language);
 
-  const { data: recentAiMessage } = await input.admin
-    .from("messages")
-    .select("content, created_at")
-    .eq("conversation_id", input.conversationId)
-    .eq("sender_type", "ai")
-    .eq("hidden_for_business", false)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const recentAiMessage = await getMessageRepository(
+    input.admin,
+  ).findLatestAiMessage(input.conversationId);
 
   if (
     recentAiMessage?.content &&

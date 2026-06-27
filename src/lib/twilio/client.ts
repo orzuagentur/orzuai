@@ -170,12 +170,21 @@ export async function createTwilioOutboundCall(input: {
   from: string;
   to: string;
   twimlUrl: string;
+  statusCallbackUrl?: string;
 }): Promise<string> {
   const body = new URLSearchParams({
     To: input.to,
     From: input.from,
     Url: input.twimlUrl,
   });
+
+  if (input.statusCallbackUrl) {
+    body.set("StatusCallback", input.statusCallbackUrl);
+    body.set("StatusCallbackMethod", "POST");
+    for (const event of ["initiated", "ringing", "answered", "completed"]) {
+      body.append("StatusCallbackEvent", event);
+    }
+  }
 
   const response = await twilioRequest<{ sid?: string }>(
     input.credentials,

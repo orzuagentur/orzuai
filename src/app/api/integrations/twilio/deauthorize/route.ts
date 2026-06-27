@@ -1,44 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
-import { validateTwilioRequestSignature } from "@/lib/twilio/validate-request";
+import {
+  isTwilioWebhookSignatureValid,
+  readTwilioRequestParams,
+} from "@/lib/twilio/request";
 import { handleTwilioConnectDeauthorization } from "@/services/twilio-integration.service";
 
-async function readTwilioParams(
-  request: NextRequest,
-): Promise<Record<string, string>> {
-  if (request.method === "GET") {
-    return Object.fromEntries(request.nextUrl.searchParams.entries());
-  }
-
-  const formData = await request.formData();
-  const params: Record<string, string> = {};
-
-  for (const [key, value] of formData.entries()) {
-    if (typeof value === "string") {
-      params[key] = value;
-    }
-  }
-
-  return params;
-}
-
 async function handleDeauthorize(request: NextRequest) {
-  const params = await readTwilioParams(request);
+  const params = await readTwilioRequestParams(request);
   const authToken = getTwilioPlatformAuthToken();
-  const signature = request.headers.get("x-twilio-signature");
 
-  if (authToken && signature) {
-    const isValid = validateTwilioRequestSignature({
-      authToken,
-      signature,
-      url: request.url,
+  if (
+    !isTwilioWebhookSignatureValid({
+      request,
       params,
-    });
-
-    if (!isValid) {
-      return new NextResponse("Invalid Twilio signature", { status: 403 });
-    }
+      authToken,
+    })
+  ) {
+    return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
   const accountSid = params.AccountSid;

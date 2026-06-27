@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { placeOutboundVoiceCall } from "@/services/voice-agent.service";
@@ -30,10 +29,7 @@ export async function triggerTestVoiceCallAction(
     return { success: false, message: "Business not found." };
   }
 
-  const admin = createAdminClient();
-
   return placeOutboundVoiceCall({
-    admin,
     businessId: business.id,
     phoneNumber: parsed.data.phoneNumber,
     triggerReason: "test_call",

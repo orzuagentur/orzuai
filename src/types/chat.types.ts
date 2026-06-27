@@ -154,6 +154,7 @@ export type ChatsMonitorData = {
   businessId: string | null;
   channels: ChatMonitorChannelStats[];
   visibleChannelIds: MessagingChannel[];
+  voiceInboxEnabled: boolean;
   totalConversations: number;
   totalMessages: number;
   unifiedConversations: ConversationListItem[];
@@ -180,6 +181,7 @@ export type ChatsChannelPageData = {
   activeConversation: ConversationDetail | null;
   cannedResponses: CannedResponseItem[];
   visibleChannelIds: MessagingChannel[];
+  voiceInboxEnabled: boolean;
 };
 
 export type ChatErrorCode =

@@ -44,7 +44,8 @@ export type MessagingChannel =
   | "telegram"
   | "website_forms"
   | "facebook_messenger"
-  | "email";
+  | "email"
+  | "voice";
 
 export type ConversationStatus =
   | "open"
@@ -2535,6 +2536,9 @@ export type Database = {
           external_call_id: string | null;
           trigger_reason: string | null;
           created_at: string;
+          ended_at: string | null;
+          duration_seconds: number | null;
+          ai_handled: boolean;
         };
         Insert: {
           id?: string;
@@ -2547,6 +2551,9 @@ export type Database = {
           external_call_id?: string | null;
           trigger_reason?: string | null;
           created_at?: string;
+          ended_at?: string | null;
+          duration_seconds?: number | null;
+          ai_handled?: boolean;
         };
         Update: {
           id?: string;
@@ -2559,6 +2566,9 @@ export type Database = {
           external_call_id?: string | null;
           trigger_reason?: string | null;
           created_at?: string;
+          ended_at?: string | null;
+          duration_seconds?: number | null;
+          ai_handled?: boolean;
         };
         Relationships: [
           {

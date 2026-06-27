@@ -116,6 +116,7 @@ export async function insertInboundChannelMessage(
       channel: row.channel,
       sender_type: row.sender_type,
       content: row.content,
+      email_subject: row.email_subject ?? null,
       ai_generated: row.ai_generated,
       created_at: row.created_at,
       sent_at: row.sent_at ?? row.created_at,

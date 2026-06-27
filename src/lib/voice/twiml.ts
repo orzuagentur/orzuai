@@ -91,3 +91,38 @@ export function buildStaticSayTwiml(input: {
 export function buildGoodbyeTwiml(speechLocale: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna" language="${speechLocale}">Thank you for calling. Goodbye.</Say></Response>`;
 }
+
+export function buildDialPhoneNumberTwiml(input: {
+  callerId: string;
+  toNumber: string;
+}): string {
+  const callerId = escapeXml(input.callerId);
+  const toNumber = escapeXml(input.toNumber);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="${callerId}">
+    <Number>${toNumber}</Number>
+  </Dial>
+</Response>`;
+}
+
+export function buildDialClientTwiml(input: {
+  clientIdentity: string;
+  timeoutSeconds?: number;
+  actionUrl?: string;
+  speechLocale: string;
+}): string {
+  const identity = escapeXml(input.clientIdentity);
+  const timeout = input.timeoutSeconds ?? 25;
+  const actionAttr = input.actionUrl
+    ? ` action="${escapeXml(input.actionUrl)}"`
+    : "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeout="${timeout}"${actionAttr}>
+    <Client>${identity}</Client>
+  </Dial>
+</Response>`;
+}

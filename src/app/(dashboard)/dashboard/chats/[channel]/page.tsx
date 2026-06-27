@@ -38,6 +38,7 @@ export default async function ChatsChannelPage({
       hasBusiness={channelData.hasBusiness}
       channel={channelData.channel}
       visibleChannelIds={channelData.visibleChannelIds}
+      voiceInboxEnabled={channelData.voiceInboxEnabled}
       channelConnected={channelData.channelConnected}
       aiEnabled={channelData.aiEnabled}
       conversations={channelData.conversations}

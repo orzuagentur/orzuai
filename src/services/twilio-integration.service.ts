@@ -291,6 +291,7 @@ function buildVoiceWebhookUrls(businessId: string) {
   return {
     inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
     outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
+    statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
   };
 }
 
@@ -457,7 +458,7 @@ export async function selectTwilioPhoneNumber(input: {
       phoneSid: selectedSid,
       voiceUrl: webhooks.inboundWebhookUrl,
       smsUrl: webhooks.inboundWebhookUrl,
-      statusCallbackUrl: webhooks.inboundWebhookUrl,
+      statusCallbackUrl: webhooks.statusCallbackUrl,
     });
   } catch (error) {
     console.error(
@@ -548,7 +549,7 @@ export async function resyncTwilioConnection(
       phoneSid: connection.phoneSid,
       voiceUrl: webhooks.inboundWebhookUrl,
       smsUrl: webhooks.inboundWebhookUrl,
-      statusCallbackUrl: webhooks.inboundWebhookUrl,
+      statusCallbackUrl: webhooks.statusCallbackUrl,
     });
   } catch {
     return { success: false, message: TWILIO_MESSAGES.resyncFailed };
@@ -643,7 +644,7 @@ export async function disconnectTwilioIntegration(
     await admin.from("twilio_connections").delete().eq("business_id", businessId);
   }
 
-  const existingSettings = await import("@/services/voice-agent.service").then(
+  const existingSettings = await import("@/services/voice-config.service").then(
     (module) => module.getVoiceAgentSettings(businessId),
   );
 

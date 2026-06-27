@@ -1,9 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getAccessibleBusiness } from "@/services/business-access.service";
-import { declineAiHumanRequestWithNotice } from "@/services/ai-human-request.service";
+import { declineAiHumanRequestForBusiness } from "@/services/ai-human-request.service";
 import { requireUser } from "@/services/auth.service";
 
 export async function declineAiHumanRequestAction(requestId: string) {
@@ -26,9 +25,7 @@ export async function declineAiHumanRequestAction(requestId: string) {
     };
   }
 
-  const admin = createAdminClient();
-  const result = await declineAiHumanRequestWithNotice({
-    admin,
+  const result = await declineAiHumanRequestForBusiness({
     businessId: business.id,
     requestId,
   });

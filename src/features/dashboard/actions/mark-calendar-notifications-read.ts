@@ -1,9 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getAccessibleBusiness } from "@/services/business-access.service";
-import { markCalendarNotificationsRead } from "@/services/business-notifications.service";
+import { markCalendarNotificationsReadForBusiness } from "@/services/business-notifications.service";
 import { requireUser } from "@/services/auth.service";
 
 export async function markCalendarNotificationsReadAction() {
@@ -18,12 +17,7 @@ export async function markCalendarNotificationsReadAction() {
     return { success: false as const };
   }
 
-  const admin = createAdminClient();
-
-  await markCalendarNotificationsRead({
-    admin,
-    businessId: business.id,
-  });
+  await markCalendarNotificationsReadForBusiness(business.id);
 
   return { success: true as const };
 }

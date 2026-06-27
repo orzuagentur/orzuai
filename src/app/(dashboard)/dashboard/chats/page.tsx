@@ -21,6 +21,7 @@ export default async function ChatsPage({ searchParams }: ChatsPageProps) {
     <ChatsMonitorPanel
       hasBusiness={data.hasBusiness}
       channels={data.channels}
+      voiceInboxEnabled={data.voiceInboxEnabled}
       conversations={data.conversations}
       conversationsTotalCount={data.conversationsTotalCount}
       conversationsHasMore={data.conversationsHasMore}

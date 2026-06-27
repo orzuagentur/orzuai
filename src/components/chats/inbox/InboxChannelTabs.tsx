@@ -5,11 +5,13 @@ import { useEffect } from "react";
 import { LayoutGridIcon, StarIcon } from "lucide-react";
 
 import { ChannelRailItem } from "@/components/navigation/ChannelRailItem";
+import { VoiceIcon } from "@/components/icons/channel-brand-icons";
 import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
 import type { ChatChannelId } from "@/features/chats";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   CHANNEL_RAIL_NAV_CLASS,
   getChannelRailFavoritesShellClassName,
@@ -19,12 +21,13 @@ import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
-export type InboxChannelTabId = ChatChannelId | "all" | "favorites";
+export type InboxChannelTabId = ChatChannelId | "all" | "favorites" | "voice";
 
 type InboxChannelTabsProps = {
   activeChannel: InboxChannelTabId;
   unreadByChannel?: Partial<Record<MessagingChannel, number>>;
   visibleChannelIds?: MessagingChannel[];
+  voiceInboxEnabled?: boolean;
   className?: string;
 };
 
@@ -32,6 +35,7 @@ export function InboxChannelTabs({
   activeChannel,
   unreadByChannel: localUnreadByChannel = {},
   visibleChannelIds = [],
+  voiceInboxEnabled = false,
   className,
 }: InboxChannelTabsProps) {
   const router = useRouter();
@@ -47,10 +51,14 @@ export function InboxChannelTabs({
     router.prefetch(DASHBOARD_ROUTES.chats);
     router.prefetch(DASHBOARD_ROUTES.chatsFavorites);
 
+    if (voiceInboxEnabled) {
+      router.prefetch(DASHBOARD_ROUTES.chatsVoice);
+    }
+
     for (const channel of visibleChannels) {
       router.prefetch(`${DASHBOARD_ROUTES.chats}/${channel.id}`);
     }
-  }, [router, visibleChannels]);
+  }, [router, visibleChannels, voiceInboxEnabled]);
 
   return (
     <nav
@@ -118,6 +126,25 @@ export function InboxChannelTabs({
           />
         );
       })}
+
+      {voiceInboxEnabled ? (
+        <ChannelRailItem
+          href={DASHBOARD_ROUTES.chatsVoice}
+          isActive={activeChannel === "voice"}
+          label={VOICE_MESSAGES.inboxTabLabel}
+          ariaLabel={VOICE_MESSAGES.inboxTabLabel}
+          iconShell={
+            <div
+              className={getChannelRailIconShellClassName(
+                activeChannel === "voice",
+                getChannelIconContainerClassName("voice"),
+              )}
+            >
+              <VoiceIcon className="size-5" />
+            </div>
+          }
+        />
+      ) : null}
     </nav>
   );
 }

@@ -31,6 +31,7 @@ import {
 } from "@/utils/contact-additional-contacts";
 import { createGoogleCalendarEventForBusinessWithAdmin } from "@/services/google-calendar.service";
 import { createAiCalendarEventNotification } from "@/services/business-notifications.service";
+import { getConversationRepository } from "@/repositories/conversation.repository";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -677,27 +678,11 @@ async function applyAddInternalNote(
     return null;
   }
 
-  const { data } = await admin
-    .from("conversations")
-    .select("internal_note")
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const line = `[${timestamp}] ${noteLine}`;
-  const existing = data?.internal_note?.trim() ?? "";
-  const nextNote = existing ? `${existing}\n\n${line}` : line;
-
-  const { error } = await admin
-    .from("conversations")
-    .update({ internal_note: nextNote.slice(0, 8000) })
-    .eq("id", conversationId)
-    .eq("business_id", businessId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await getConversationRepository(admin).appendInternalNote({
+    conversationId,
+    businessId,
+    noteLine,
+  });
 
   await recordCrmIdempotencyKey(admin, {
     businessId,

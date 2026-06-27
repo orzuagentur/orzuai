@@ -22,6 +22,7 @@ export default async function ChatsFavoritesPage({
       favoritesOnly
       hasBusiness={data.hasBusiness}
       channels={data.channels}
+      voiceInboxEnabled={data.voiceInboxEnabled}
       conversations={data.conversations}
       conversationsTotalCount={data.conversationsTotalCount}
       conversationsHasMore={data.conversationsHasMore}

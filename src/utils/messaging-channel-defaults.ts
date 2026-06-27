@@ -8,6 +8,7 @@ export function createEmptyUnreadByChannel(): Record<MessagingChannel, number> {
     website_forms: 0,
     email: 0,
     facebook_messenger: 0,
+    voice: 0,
   };
 }
 
@@ -19,5 +20,6 @@ export function createEmptyChannelConnectionMap(): Record<MessagingChannel, bool
     website_forms: false,
     email: false,
     facebook_messenger: false,
+    voice: false,
   };
 }

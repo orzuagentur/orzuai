@@ -1,9 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getAccessibleBusiness } from "@/services/business-access.service";
-import { dismissAiHumanRequest } from "@/services/ai-human-request.service";
+import { dismissAiHumanRequestForBusiness } from "@/services/ai-human-request.service";
 import { requireUser } from "@/services/auth.service";
 
 export async function dismissAiHumanRequestAction(requestId: string) {
@@ -24,9 +23,7 @@ export async function dismissAiHumanRequestAction(requestId: string) {
     };
   }
 
-  const admin = createAdminClient();
-  const removed = await dismissAiHumanRequest({
-    admin,
+  const removed = await dismissAiHumanRequestForBusiness({
     businessId: business.id,
     requestId,
   });

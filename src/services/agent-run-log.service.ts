@@ -9,7 +9,7 @@ export async function logOrchestratorAgentRun(
   admin: MessagingDbClient,
   input: {
     businessId: string;
-    conversationId: string;
+    conversationId: string | null;
     contactId: string | null;
     channel: string;
     clientMessage: string;

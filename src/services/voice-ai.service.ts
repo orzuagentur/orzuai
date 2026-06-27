@@ -1,9 +1,5 @@
 import "server-only";
 
-import {
-  DEFAULT_AI_LANGUAGE,
-  DEFAULT_AI_SYSTEM_PROMPT,
-} from "@/features/business/constants";
 import { buildVoiceSystemPrompt } from "@/lib/voice/prompts";
 import {
   buildGatherActionUrl,
@@ -13,114 +9,45 @@ import {
   mapVoiceLanguageToTwilioLocale,
   sanitizeForSpeech,
 } from "@/lib/voice/twiml";
-import { getDefaultGeminiModel, hasSupabaseEnv } from "@/lib/env";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { generateText, getProviderAvailability } from "@/services/llm.service";
+import { hasSupabaseEnv } from "@/lib/env";
+import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
+import {
+  getVoiceRepository,
+  type VoiceCallSessionTurn,
+} from "@/repositories/voice.repository";
+import { generateText } from "@/services/llm.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
+import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
+import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
+import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
 
 const MAX_VOICE_TURNS = 8;
 
-type VoiceTurn = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type VoiceSessionRow = {
+type VoiceSessionState = {
   id: string;
   business_id: string;
   call_sid: string;
   direction: string;
-  turns: VoiceTurn[];
+  turns: VoiceCallSessionTurn[];
   turn_count: number;
 };
 
-async function loadVoiceAgentConfig(
-  businessId: string,
-): Promise<VoiceAgentSettings> {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("voice_agent_config")
-    .select("*")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  if (!data) {
-    return {
-      enabled: false,
-      provider: "twilio",
-      phoneNumber: "",
-      outboundEnabled: true,
-      inboundEnabled: true,
-      callbackAfterOrder: true,
-      callbackDelayMinutes: 5,
-      outboundScript:
-        "Hello! This is your AI assistant calling to confirm your order and see if you have any questions.",
-      inboundGreeting: "Thank you for calling. How can we help you today?",
-      retellAgentId: "",
-      vapiAssistantId: "",
-      twilioPhoneSid: "",
-      aiEnabled: true,
-      voiceLanguage: "English",
-      voiceSystemPrompt: "",
-      providerConfigured: false,
-      aiConfigured: isVoiceAiConfigured(),
-      inboundWebhookUrl: "",
-      outboundWebhookUrl: "",
-    };
-  }
-
-  return {
-    enabled: data.enabled,
-    provider: data.provider as VoiceAgentSettings["provider"],
-    phoneNumber: data.phone_number ?? "",
-    outboundEnabled: data.outbound_enabled,
-    inboundEnabled: data.inbound_enabled,
-    callbackAfterOrder: data.callback_after_order,
-    callbackDelayMinutes: data.callback_delay_minutes,
-    outboundScript: data.outbound_script,
-    inboundGreeting: data.inbound_greeting,
-    retellAgentId: data.retell_agent_id ?? "",
-    vapiAssistantId: data.vapi_assistant_id ?? "",
-    twilioPhoneSid: data.twilio_phone_sid ?? "",
-    aiEnabled: data.ai_enabled ?? true,
-    voiceLanguage: data.voice_language ?? "English",
-    voiceSystemPrompt: data.voice_system_prompt ?? "",
-    providerConfigured: true,
-    aiConfigured: isVoiceAiConfigured(),
-    inboundWebhookUrl: "",
-    outboundWebhookUrl: "",
-  };
-}
-
 async function loadBusinessContext(businessId: string) {
-  const admin = createAdminClient();
-
-  const [businessResult, aiSettingsResult, knowledgeEntries] =
-    await Promise.all([
-      admin
-        .from("businesses")
-        .select("business_name")
-        .eq("id", businessId)
-        .maybeSingle(),
-      admin
-        .from("ai_settings")
-        .select("provider, model, language, system_prompt, channel")
-        .eq("business_id", businessId)
-        .in("channel", ["website_forms", "whatsapp", "telegram"])
-        .order("channel", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      listKnowledgeEntriesForBusiness(admin, businessId),
-    ]);
+  const [context, knowledgeEntries] = await Promise.all([
+    getVoiceAiBusinessContext(businessId),
+    listKnowledgeEntriesForBusiness(
+      getVoiceRepository().client,
+      businessId,
+    ),
+  ]);
 
   return {
-    businessName: businessResult.data?.business_name ?? "the business",
-    provider: aiSettingsResult.data?.provider ?? "gemini",
-    model: aiSettingsResult.data?.model ?? getDefaultGeminiModel(),
-    language: aiSettingsResult.data?.language ?? DEFAULT_AI_LANGUAGE,
-    systemPrompt:
-      aiSettingsResult.data?.system_prompt ?? DEFAULT_AI_SYSTEM_PROMPT,
+    businessName: context.businessName,
+    provider: context.provider,
+    model: context.model,
+    language: context.language,
+    systemPrompt: context.systemPrompt,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       category: entry.category ?? "",
       title: entry.title,
@@ -133,38 +60,28 @@ async function getOrCreateSession(input: {
   businessId: string;
   callSid: string;
   direction: "inbound" | "outbound";
-}): Promise<VoiceSessionRow | null> {
+}): Promise<VoiceSessionState | null> {
   if (!hasSupabaseEnv()) {
     return null;
   }
 
-  const admin = createAdminClient();
-  const { data: existing } = await admin
-    .from("voice_call_sessions")
-    .select("id, business_id, call_sid, direction, turns, turn_count")
-    .eq("call_sid", input.callSid)
-    .maybeSingle();
+  const repo = getVoiceRepository();
+  const existing = await repo.findSessionByCallSid(input.callSid);
 
   if (existing) {
     return {
       ...existing,
-      turns: (existing.turns as VoiceTurn[]) ?? [],
+      turns: (existing.turns as VoiceCallSessionTurn[]) ?? [],
     };
   }
 
-  const { data: created, error } = await admin
-    .from("voice_call_sessions")
-    .insert({
-      business_id: input.businessId,
-      call_sid: input.callSid,
-      direction: input.direction,
-      turns: [],
-      turn_count: 0,
-    })
-    .select("id, business_id, call_sid, direction, turns, turn_count")
-    .single();
+  const created = await repo.createSession({
+    businessId: input.businessId,
+    callSid: input.callSid,
+    direction: input.direction,
+  });
 
-  if (error || !created) {
+  if (!created) {
     return null;
   }
 
@@ -176,24 +93,20 @@ async function getOrCreateSession(input: {
 
 async function appendSessionTurn(input: {
   sessionId: string;
-  turns: VoiceTurn[];
+  turns: VoiceCallSessionTurn[];
   turnCount: number;
 }) {
-  const admin = createAdminClient();
-
-  await admin
-    .from("voice_call_sessions")
-    .update({
-      turns: input.turns,
-      turn_count: input.turnCount,
-    })
-    .eq("id", input.sessionId);
+  await getVoiceRepository().updateSessionTurns({
+    sessionId: input.sessionId,
+    turns: input.turns,
+    turnCount: input.turnCount,
+  });
 }
 
 export async function generateVoiceAiReply(input: {
   businessId: string;
   userMessage: string;
-  conversationHistory: VoiceTurn[];
+  conversationHistory: VoiceCallSessionTurn[];
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
   settings: VoiceAgentSettings;
@@ -251,7 +164,7 @@ export async function buildVoiceConversationTwiml(input: {
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
 }): Promise<string> {
-  const settings = await loadVoiceAgentConfig(input.businessId);
+  const settings = await getVoiceAgentSettings(input.businessId);
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
   const opening = resolveOpeningLine(settings, input.direction);
 
@@ -276,22 +189,19 @@ export async function buildVoiceConversationTwiml(input: {
   });
 }
 
-export function isVoiceAiConfigured(): boolean {
-  const availability = getProviderAvailability();
-  return availability.gemini || availability.openai || availability.claude;
-}
-
 export async function handleVoiceGatherInput(input: {
   businessId: string;
   callSid: string;
   direction: "inbound" | "outbound";
   speechResult: string;
   triggerReason?: string | null;
+  callerPhone?: string | null;
 }): Promise<string> {
-  const settings = await loadVoiceAgentConfig(input.businessId);
+  const settings = await getVoiceAgentSettings(input.businessId);
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
 
   if (!settings.aiEnabled) {
+    void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: false });
     return buildGoodbyeTwiml(speechLocale);
   }
 
@@ -325,6 +235,7 @@ export async function handleVoiceGatherInput(input: {
   }
 
   if (session.turn_count >= MAX_VOICE_TURNS) {
+    void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: true });
     return buildGoodbyeTwiml(speechLocale);
   }
 
@@ -341,7 +252,7 @@ export async function handleVoiceGatherInput(input: {
     ? reply.text
     : "Sorry, I could not process that right now. A team member will follow up with you soon.";
 
-  const updatedTurns: VoiceTurn[] = [
+  const updatedTurns: VoiceCallSessionTurn[] = [
     ...session.turns,
     { role: "user", content: userSpeech },
     { role: "assistant", content: assistantText },
@@ -353,7 +264,17 @@ export async function handleVoiceGatherInput(input: {
     turnCount: session.turn_count + 1,
   });
 
+  if (input.callerPhone?.trim()) {
+    void scheduleVoiceTurnOrchestration({
+      businessId: input.businessId,
+      callerPhone: input.callerPhone.trim(),
+      clientMessage: userSpeech,
+      conversationHistory: updatedTurns,
+    });
+  }
+
   if (session.turn_count + 1 >= MAX_VOICE_TURNS) {
+    void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: true });
     return buildStaticSayTwiml({
       speech: `${assistantText} Thank you for calling. Goodbye.`,
       speechLocale,

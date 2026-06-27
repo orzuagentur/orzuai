@@ -15,6 +15,7 @@ import {
 } from "@/services/messaging.service";
 import type { AiHumanRequest } from "@/types/ai-human-request.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMessagePreviewText } from "@/utils/chat-media";
 import { customerExplicitlyRequestedHuman } from "@/utils/human-handoff-policy";
 
@@ -403,4 +404,37 @@ export function buildHumanHandoffFollowUpMessage(language: string): string {
   }
 
   return "I've notified our team — a manager will join this chat as soon as they're available.";
+}
+
+export async function listAiHumanRequestsForBusiness(
+  businessId: string,
+): Promise<AiHumanRequest[]> {
+  const admin = createAdminClient();
+  return listAiHumanRequests(admin, businessId);
+}
+
+export async function dismissAiHumanRequestForBusiness(input: {
+  businessId: string;
+  requestId: string;
+}): Promise<boolean> {
+  const admin = createAdminClient();
+
+  return dismissAiHumanRequest({
+    admin,
+    businessId: input.businessId,
+    requestId: input.requestId,
+  });
+}
+
+export async function declineAiHumanRequestForBusiness(input: {
+  businessId: string;
+  requestId: string;
+}): Promise<{ success: boolean; customerNotified: boolean }> {
+  const admin = createAdminClient();
+
+  return declineAiHumanRequestWithNotice({
+    admin,
+    businessId: input.businessId,
+    requestId: input.requestId,
+  });
 }

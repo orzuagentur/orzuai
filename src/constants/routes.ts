@@ -31,6 +31,7 @@ export const DASHBOARD_ROUTES = {
   chats: "/dashboard/chats",
   chatsMonitor: "/dashboard/chats",
   chatsFavorites: "/dashboard/chats/favorites",
+  chatsVoice: "/dashboard/chats/voice",
   contacts: "/dashboard/contacts",
   knowledgeBase: "/dashboard/knowledge-base",
   integrations: "/dashboard/integrations",

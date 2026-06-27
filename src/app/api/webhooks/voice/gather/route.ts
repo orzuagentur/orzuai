@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const speechResult = String(formData.get("SpeechResult") ?? "");
   const callSid = String(formData.get("CallSid") ?? "unknown");
+  const callerPhone = String(formData.get("From") ?? formData.get("To") ?? "");
 
   const twiml = await handleVoiceGatherInput({
     businessId,
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
     direction,
     speechResult,
     triggerReason,
+    callerPhone: callerPhone || null,
   });
 
   return new NextResponse(twiml, {

@@ -3,60 +3,44 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getMessageRepository } from "@/repositories/message.repository";
 import type { Database } from "@/types/database.types";
 import { buildConversationLastMessageUpdate } from "@/utils/conversation-last-message";
+
 type DbClient = SupabaseClient<Database>;
 
 export async function recomputeConversationLastMessage(
   client: DbClient,
   conversationId: string,
 ): Promise<void> {
-  const { data: latest } = await client
-    .from("messages")
-    .select("content, sent_at, sender_type, ai_generated")
-    .eq("conversation_id", conversationId)
-    .eq("hidden_for_business", false)
-    .is("deleted_for_all_at", null)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const messageRepo = getMessageRepository(client);
+  const conversationRepo = getConversationRepository(client);
+  const latest = await messageRepo.findLatestVisibleMessage(conversationId);
 
   if (!latest) {
-    await client
-      .from("conversations")
-      .update({
-        last_message_preview: null,
-        last_message_at: null,
-        last_message_sender_type: null,
-        last_message_ai_generated: false,
-      })
-      .eq("id", conversationId);
+    await conversationRepo.updateLastMessageFields(conversationId, {
+      last_message_preview: null,
+      last_message_at: null,
+      last_message_sender_type: null,
+      last_message_ai_generated: false,
+    });
     return;
   }
 
-  const { data: latestClient } = await client
-    .from("messages")
-    .select("sent_at")
-    .eq("conversation_id", conversationId)
-    .eq("sender_type", "client")
-    .eq("hidden_for_business", false)
-    .is("deleted_for_all_at", null)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const latestClientSentAt =
+    await messageRepo.findLatestClientMessageSentAt(conversationId);
 
-  await client
-    .from("conversations")
-    .update(
-      buildConversationLastMessageUpdate({
-        content: latest.content,
-        senderType: latest.sender_type,
-        aiGenerated: latest.ai_generated,
-        createdAt: latest.sent_at,
-        previousLastClientMessageAt: latestClient?.sent_at ?? null,
-      }),
-    )
-    .eq("id", conversationId);
+  await conversationRepo.updateLastMessageFields(
+    conversationId,
+    buildConversationLastMessageUpdate({
+      content: latest.content,
+      senderType: latest.sender_type,
+      aiGenerated: latest.ai_generated,
+      createdAt: latest.sent_at,
+      previousLastClientMessageAt: latestClientSentAt,
+    }),
+  );
 }
 
 export async function updateConversationLastMessageFromInsert(
@@ -71,26 +55,22 @@ export async function updateConversationLastMessageFromInsert(
     createdAt: string;
   },
 ): Promise<void> {
-  const { data: conversation } = await client
-    .from("conversations")
-    .select("last_client_message_at")
-    .eq("id", input.conversationId)
-    .maybeSingle();
+  const conversationRepo = getConversationRepository(client);
+  const previousLastClientMessageAt =
+    await conversationRepo.findLastClientMessageAt(input.conversationId);
 
-  await client
-    .from("conversations")
-    .update(
-      buildConversationLastMessageUpdate({
-        content: input.content,
-        channel: input.channel,
-        emailSubject: input.emailSubject,
-        senderType: input.senderType,
-        aiGenerated: input.aiGenerated,
-        createdAt: input.createdAt,
-        previousLastClientMessageAt: conversation?.last_client_message_at ?? null,
-      }),
-    )
-    .eq("id", input.conversationId);
+  await conversationRepo.updateLastMessageFields(
+    input.conversationId,
+    buildConversationLastMessageUpdate({
+      content: input.content,
+      channel: input.channel,
+      emailSubject: input.emailSubject,
+      senderType: input.senderType,
+      aiGenerated: input.aiGenerated,
+      createdAt: input.createdAt,
+      previousLastClientMessageAt,
+    }),
+  );
 }
 
 export async function recomputeConversationLastMessageForBusiness(
@@ -98,12 +78,10 @@ export async function recomputeConversationLastMessageForBusiness(
   businessId: string,
 ): Promise<void> {
   const supabase = await createClient();
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("id", conversationId)
-    .eq("business_id", businessId)
-    .maybeSingle();
+  const conversation = await getConversationRepository(supabase).assertOwnedByBusiness(
+    conversationId,
+    businessId,
+  );
 
   if (!conversation) {
     return;

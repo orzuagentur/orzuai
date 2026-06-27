@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Loader2Icon,
   PencilIcon,
+  PhoneIcon,
   StarIcon,
   Trash2Icon,
   XIcon,
@@ -30,6 +31,8 @@ import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-con
 import { deleteContactAction } from "@/features/contacts/actions/delete-contact";
 import { updateContactAction } from "@/features/contacts/actions/update-contact";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
@@ -73,6 +76,7 @@ export function ContactFullProfilePanel({
     () => contactToFormValues(profile.contact),
   );
   const [isFavoriteBusy, setIsFavoriteBusy] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
   const [editAdditionalContacts, setEditAdditionalContacts] = useState<
     AdditionalContactEntry[]
   >([]);
@@ -126,6 +130,32 @@ export function ContactFullProfilePanel({
       await onRefresh();
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleCallContact() {
+    const phoneNumber = contact.identifier?.trim();
+
+    if (!phoneNumber) {
+      return;
+    }
+
+    setIsCalling(true);
+
+    try {
+      const result = await triggerContactVoiceCallAction({
+        phoneNumber,
+        contactId: contact.id,
+      });
+
+      if (!result.success) {
+        toast.error(result.message ?? VOICE_MESSAGES.callOutboundFailed);
+        return;
+      }
+
+      toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
+    } finally {
+      setIsCalling(false);
     }
   }
 
@@ -204,6 +234,24 @@ export function ContactFullProfilePanel({
               </div>
             </div>
             <div className="flex shrink-0 gap-1">
+              {contact.identifier?.trim() ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={isCalling}
+                  onClick={() => {
+                    void handleCallContact();
+                  }}
+                  aria-label={VOICE_MESSAGES.callOutbound}
+                >
+                  {isCalling ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <PhoneIcon className="size-4" />
+                  )}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"

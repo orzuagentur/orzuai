@@ -2,6 +2,8 @@ import "server-only";
 
 import { AI_CONTEXT_LIMITS } from "@/lib/ai/context-window";
 import { generateTextWithFallback } from "@/services/llm.service";
+import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getMessageRepository } from "@/repositories/message.repository";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -26,24 +28,7 @@ export async function loadConversationMemory(
   admin: MessagingDbClient,
   conversationId: string,
 ): Promise<ConversationMemorySnapshot | null> {
-  const { data } = await admin
-    .from("conversations")
-    .select(
-      "ai_summary, ai_summary_updated_at, ai_summary_message_count, total_message_count",
-    )
-    .eq("id", conversationId)
-    .maybeSingle();
-
-  if (!data) {
-    return null;
-  }
-
-  return {
-    aiSummary: data.ai_summary,
-    aiSummaryUpdatedAt: data.ai_summary_updated_at,
-    aiSummaryMessageCount: data.ai_summary_message_count ?? 0,
-    totalMessageCount: data.total_message_count ?? 0,
-  };
+  return getConversationRepository(admin).loadMemory(conversationId);
 }
 
 function shouldRefreshConversationSummary(
@@ -68,14 +53,12 @@ async function fetchRecentMessagesForSummary(
   conversationId: string,
   limit = 30,
 ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
-  const { data } = await admin
-    .from("messages")
-    .select("sender_type, content")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const messages = await getMessageRepository(admin).listMessagesForSummary(
+    conversationId,
+    limit,
+  );
 
-  return [...(data ?? [])]
+  return [...messages]
     .reverse()
     .map((message) => ({
       role:
@@ -118,7 +101,8 @@ export async function refreshConversationSummaryIfNeeded(input: {
   businessId: string;
   conversationId: string;
 }): Promise<string | null> {
-  const memory = await loadConversationMemory(input.admin, input.conversationId);
+  const conversationRepo = getConversationRepository(input.admin);
+  const memory = await conversationRepo.loadMemory(input.conversationId);
 
   if (!memory || !shouldRefreshConversationSummary(memory)) {
     return memory?.aiSummary ?? null;
@@ -152,14 +136,11 @@ export async function refreshConversationSummaryIfNeeded(input: {
   const summary = result.data.text.trim().slice(0, AI_CONTEXT_LIMITS.maxSummaryChars);
   const now = new Date().toISOString();
 
-  await input.admin
-    .from("conversations")
-    .update({
-      ai_summary: summary,
-      ai_summary_updated_at: now,
-      ai_summary_message_count: memory.totalMessageCount,
-    })
-    .eq("id", input.conversationId);
+  await conversationRepo.updateMemorySummary(input.conversationId, {
+    aiSummary: summary,
+    aiSummaryUpdatedAt: now,
+    aiSummaryMessageCount: memory.totalMessageCount,
+  });
 
   return summary;
 }
