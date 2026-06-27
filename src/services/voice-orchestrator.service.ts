@@ -6,6 +6,7 @@ import {
   getBusinessBookingSetup,
   listBusinessCalendarResources,
 } from "@/services/business-calendar-setup.service";
+import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
   applyPreparedExecutorPlan,
@@ -79,6 +80,9 @@ async function runVoiceTurnOrchestration(input: {
     calendarResources,
     bookingSetup,
   );
+  const availabilityText = calendarConnected
+    ? await formatAvailabilityForAiPrompt(input.businessId)
+    : "";
 
   const conversationHistory = input.conversationHistory.map((turn) => ({
     role: turn.role,
@@ -92,6 +96,7 @@ async function runVoiceTurnOrchestration(input: {
     contact,
     calendarConnected,
     bookableResourcesText,
+    availabilityText,
   });
 
   if (!orchestrationResult.success) {

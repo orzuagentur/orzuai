@@ -23,6 +23,7 @@ import {
   getBusinessBookingSetup,
   listBusinessCalendarResources,
 } from "@/services/business-calendar-setup.service";
+import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
 import {
   buildHumanHandoffFollowUpMessage,
   createAiHumanRequest,
@@ -633,6 +634,9 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     calendarResources,
     bookingSetup,
   );
+  const availabilityText = calendarConnected
+    ? await formatAvailabilityForAiPrompt(input.businessId)
+    : "";
 
   const orchestrationResult = await runAutoReplyOrchestrator({
     businessId: input.businessId,
@@ -641,6 +645,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     contact,
     calendarConnected,
     bookableResourcesText,
+    availabilityText,
   });
 
   if (!orchestrationResult.success) {

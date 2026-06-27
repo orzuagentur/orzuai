@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { TimeInterval } from "@/lib/calendar/slot-engine";
 import type { GoogleCalendarEvent } from "@/types/google-calendar.types";
 
 type GoogleCalendarListItem = {
@@ -171,4 +172,73 @@ export async function createGoogleCalendarEvent(
   }
 
   return { success: true, event };
+}
+
+type FreeBusyCalendarBlock = {
+  start?: string;
+  end?: string;
+};
+
+type FreeBusyResponse = {
+  calendars?: Record<string, { busy?: FreeBusyCalendarBlock[] }>;
+  error?: { message?: string };
+};
+
+export async function queryGoogleCalendarFreeBusy(
+  accessToken: string,
+  calendarIds: string[],
+  timeMin: string,
+  timeMax: string,
+): Promise<{ busy: TimeInterval[]; error?: string }> {
+  if (calendarIds.length === 0) {
+    return { busy: [] };
+  }
+
+  const response = await fetch(
+    "https://www.googleapis.com/calendar/v3/freeBusy",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        timeMin,
+        timeMax,
+        items: calendarIds.map((id) => ({ id })),
+      }),
+    },
+  );
+
+  const data = (await response.json()) as FreeBusyResponse;
+
+  if (!response.ok) {
+    return {
+      busy: [],
+      error: data.error?.message ?? `FreeBusy API error (${response.status})`,
+    };
+  }
+
+  const busy: TimeInterval[] = [];
+
+  for (const calendarId of calendarIds) {
+    const blocks = data.calendars?.[calendarId]?.busy ?? [];
+
+    for (const block of blocks) {
+      if (!block.start || !block.end) {
+        continue;
+      }
+
+      const start = new Date(block.start);
+      const end = new Date(block.end);
+
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        busy.push({ start, end });
+      }
+    }
+  }
+
+  busy.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  return { busy };
 }

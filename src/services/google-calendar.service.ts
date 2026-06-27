@@ -201,6 +201,12 @@ async function getValidAccessToken(
   return refreshed.accessToken;
 }
 
+export async function getGoogleCalendarAccessToken(
+  connection: GoogleCalendarConnection,
+): Promise<string | null> {
+  return getValidAccessToken(connection);
+}
+
 export async function completeGoogleCalendarOAuth(
   businessId: string,
   code: string,

@@ -2,59 +2,51 @@ import Link from "next/link";
 import { CalendarIcon, ExternalLinkIcon, MapPinIcon } from "lucide-react";
 
 import { GoogleCalendarToolbar } from "@/components/google-calendar/GoogleCalendarToolbar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { GOOGLE_CALENDAR_INTEGRATION_HREF } from "@/features/google-calendar/constants";
+import { GOOGLE_CALENDAR_INTEGRATION_HREF, GOOGLE_CALENDAR_MESSAGES } from "@/features/google-calendar/constants";
 import type { GoogleCalendarEvent } from "@/types/google-calendar.types";
 
 type GoogleCalendarViewProps = {
   events: GoogleCalendarEvent[];
-  calendarSummary: string | null;
-  googleAccountEmail: string | null;
   syncError?: string | null;
 };
 
-function formatEventTime(event: GoogleCalendarEvent): string {
+function formatEventTimeRange(event: GoogleCalendarEvent): string {
   if (event.isAllDay) {
-    return "All day";
+    return GOOGLE_CALENDAR_MESSAGES.allDayLabel;
   }
 
   const start = new Date(event.start);
   const end = new Date(event.end);
-
-  const dateFormatter = new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-
   const timeFormatter = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
   });
 
-  const sameDay = start.toDateString() === end.toDateString();
-
-  if (sameDay) {
-    return `${dateFormatter.format(start)} · ${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;
+  if (start.toDateString() === end.toDateString()) {
+    return `${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;
   }
 
-  return `${dateFormatter.format(start)} ${timeFormatter.format(start)} – ${dateFormatter.format(end)} ${timeFormatter.format(end)}`;
+  return `${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;
 }
 
 function groupEventsByDay(events: GoogleCalendarEvent[]): Map<string, GoogleCalendarEvent[]> {
   const groups = new Map<string, GoogleCalendarEvent[]>();
+  const today = new Date().toDateString();
 
-  for (const event of events) {
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+  );
+
+  for (const event of sorted) {
     const dayKey = event.isAllDay
       ? event.start
       : new Date(event.start).toDateString();
+
+    if (!event.isAllDay && dayKey < today) {
+      continue;
+    }
 
     const existing = groups.get(dayKey) ?? [];
     existing.push(event);
@@ -64,116 +56,120 @@ function groupEventsByDay(events: GoogleCalendarEvent[]): Map<string, GoogleCale
   return groups;
 }
 
+function formatDayLabel(dayKey: string, isAllDayAnchor: boolean): string {
+  const date = isAllDayAnchor
+    ? new Date(dayKey + "T12:00:00")
+    : new Date(dayKey);
+
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return GOOGLE_CALENDAR_MESSAGES.todayLabel;
+  }
+
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return GOOGLE_CALENDAR_MESSAGES.tomorrowLabel;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function GoogleCalendarView({
   events,
-  calendarSummary,
-  googleAccountEmail,
   syncError,
 }: GoogleCalendarViewProps) {
   const grouped = groupEventsByDay(events);
+  const dayEntries = [...grouped.entries()];
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-6 bg-background p-4 text-foreground md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">Google Calendar</p>
-          {calendarSummary ? (
-            <p className="text-sm text-muted-foreground">
-              {calendarSummary}
-              {googleAccountEmail ? ` · ${googleAccountEmail}` : ""}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <GoogleCalendarToolbar />
-          <Button variant="outline" size="sm" asChild>
-            <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF}>Settings</Link>
-          </Button>
-        </div>
+    <section className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          {GOOGLE_CALENDAR_MESSAGES.scheduleTitle}
+        </h2>
+        <GoogleCalendarToolbar />
       </div>
 
       {syncError ? (
-        <Card className="border-destructive/30 bg-destructive/5 shadow-none">
-          <CardContent className="p-4 text-sm text-destructive">
-            {syncError}. Reconnect in{" "}
-            <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF} className="underline">
-              Calendar settings
-            </Link>
-            .
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {syncError}.{" "}
+          <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF} className="underline">
+            {GOOGLE_CALENDAR_MESSAGES.reconnectButton}
+          </Link>
+        </div>
       ) : null}
 
-      {events.length === 0 ? (
-        <Card className="max-w-2xl border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-foreground">
-              <CalendarIcon className="size-4" />
-              No events
-            </CardTitle>
-            <CardDescription>
-              No events in the next 60 days (or past week). Use Create event above,
-              or add events in Google Calendar and click Refresh.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {dayEntries.length === 0 ? (
+        <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center">
+          <CalendarIcon className="mx-auto mb-3 size-8 text-muted-foreground/60" />
+          <p className="font-medium">{GOOGLE_CALENDAR_MESSAGES.emptyEvents}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {GOOGLE_CALENDAR_MESSAGES.emptyEventsHint}
+          </p>
+        </div>
       ) : (
         <div className="space-y-6">
-          {[...grouped.entries()].map(([dayKey, dayEvents]) => {
-            const dayLabel = dayEvents[0]?.isAllDay
-              ? new Date(dayKey + "T12:00:00").toLocaleDateString(undefined, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })
-              : new Date(dayKey).toLocaleDateString(undefined, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                });
+          {dayEntries.map(([dayKey, dayEvents]) => {
+            const isToday =
+              formatDayLabel(dayKey, Boolean(dayEvents[0]?.isAllDay)) ===
+              GOOGLE_CALENDAR_MESSAGES.todayLabel;
 
             return (
-              <section key={dayKey} className="space-y-3">
-                <h2 className="text-sm font-medium text-muted-foreground">
-                  {dayLabel}
-                </h2>
-                <div className="space-y-2">
-                  {dayEvents.map((event) => (
-                    <Card key={event.id} className="border bg-card shadow-none">
-                      <CardContent className="flex items-start justify-between gap-4 p-4">
-                        <div className="min-w-0 space-y-1">
-                          <p className="font-medium text-foreground">{event.summary}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatEventTime(event)}
-                          </p>
-                          {event.location ? (
-                            <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <MapPinIcon className="size-3.5 shrink-0" />
-                              <span className="truncate">{event.location}</span>
-                            </p>
-                          ) : null}
-                        </div>
-                        {event.htmlLink ? (
-                          <Button variant="ghost" size="icon" asChild>
-                            <a
-                              href={event.htmlLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label="Open in Google Calendar"
-                            >
-                              <ExternalLinkIcon className="size-4" />
-                            </a>
-                          </Button>
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  ))}
+              <div key={dayKey}>
+                <div className="mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">
+                    {formatDayLabel(dayKey, Boolean(dayEvents[0]?.isAllDay))}
+                  </h3>
+                  {isToday ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {GOOGLE_CALENDAR_MESSAGES.todayBadge}
+                    </Badge>
+                  ) : null}
                 </div>
-              </section>
+                <ul className="divide-y rounded-xl border bg-card">
+                  {dayEvents.map((event) => (
+                    <li
+                      key={event.id}
+                      className="flex items-start gap-4 px-4 py-3 first:rounded-t-xl last:rounded-b-xl"
+                    >
+                      <div className="w-28 shrink-0 pt-0.5 text-sm tabular-nums text-muted-foreground">
+                        {formatEventTimeRange(event)}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="font-medium leading-snug">{event.summary}</p>
+                        {event.location ? (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPinIcon className="size-3 shrink-0" />
+                            <span className="truncate">{event.location}</span>
+                          </p>
+                        ) : null}
+                      </div>
+                      {event.htmlLink ? (
+                        <Button variant="ghost" size="icon" className="shrink-0" asChild>
+                          <a
+                            href={event.htmlLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={GOOGLE_CALENDAR_MESSAGES.openGoogleCalendar}
+                          >
+                            <ExternalLinkIcon className="size-4" />
+                          </a>
+                        </Button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             );
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }

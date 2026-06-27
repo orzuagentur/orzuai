@@ -47,6 +47,7 @@ export const executorCreateCalendarEventActionSchema = z.object({
   endDateTime: z.string().trim().min(1).max(80),
   timeZone: z.string().trim().min(1).max(80).default("UTC"),
   description: z.string().trim().max(2000).optional(),
+  resourceName: z.string().trim().max(120).optional(),
 });
 
 export const executorActionSchema = z.discriminatedUnion("type", [

@@ -131,7 +131,7 @@ export async function getBusinessBookingSetup(
   const { data } = await admin
     .from("business_booking_setup")
     .select(
-      "business_id, business_type, business_type_label, operating_hours_note, generated_from_knowledge_at",
+      "business_id, business_type, business_type_label, operating_hours_note, generated_from_knowledge_at, booking_timezone, slot_buffer_minutes, advance_booking_days, business_hours_enabled, business_hours_start, business_hours_end, business_days",
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -146,7 +146,60 @@ export async function getBusinessBookingSetup(
     businessTypeLabel: data.business_type_label,
     operatingHoursNote: data.operating_hours_note,
     generatedFromKnowledgeAt: data.generated_from_knowledge_at,
+    bookingTimezone: data.booking_timezone ?? "UTC",
+    slotBufferMinutes: data.slot_buffer_minutes ?? 15,
+    advanceBookingDays: data.advance_booking_days ?? 14,
+    businessHoursEnabled: data.business_hours_enabled ?? false,
+    businessHoursStart: data.business_hours_start ?? "09:00",
+    businessHoursEnd: data.business_hours_end ?? "18:00",
+    businessDays: data.business_days ?? [1, 2, 3, 4, 5],
   };
+}
+
+export async function saveBusinessBookingSettings(
+  businessId: string,
+  input: {
+    bookingTimezone?: string;
+    slotBufferMinutes?: number;
+    advanceBookingDays?: number;
+    businessHoursEnabled?: boolean;
+    businessHoursStart?: string;
+    businessHoursEnd?: string;
+    businessDays?: number[];
+  },
+): Promise<{ success: boolean; message?: string }> {
+  const admin = createAdminClient();
+  const existing = await getBusinessBookingSetup(businessId);
+
+  const { error } = await admin.from("business_booking_setup").upsert(
+    {
+      business_id: businessId,
+      business_type: existing?.businessType ?? "generic",
+      business_type_label: existing?.businessTypeLabel ?? "Business",
+      operating_hours_note: existing?.operatingHoursNote ?? "",
+      generated_from_knowledge_at: existing?.generatedFromKnowledgeAt,
+      booking_timezone: input.bookingTimezone ?? existing?.bookingTimezone ?? "UTC",
+      slot_buffer_minutes:
+        input.slotBufferMinutes ?? existing?.slotBufferMinutes ?? 15,
+      advance_booking_days:
+        input.advanceBookingDays ?? existing?.advanceBookingDays ?? 14,
+      business_hours_enabled:
+        input.businessHoursEnabled ?? existing?.businessHoursEnabled ?? false,
+      business_hours_start:
+        input.businessHoursStart ?? existing?.businessHoursStart ?? "09:00",
+      business_hours_end:
+        input.businessHoursEnd ?? existing?.businessHoursEnd ?? "18:00",
+      business_days: input.businessDays ?? existing?.businessDays ?? [1, 2, 3, 4, 5],
+    },
+    { onConflict: "business_id" },
+  );
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateCalendarPaths();
+  return { success: true };
 }
 
 export function formatCalendarResourcesForAiPrompt(
@@ -194,7 +247,7 @@ async function extractCalendarResourcesFromKnowledge(input: {
       "Read the business knowledge base and propose bookable calendar resources.",
       "",
       "Rules:",
-      "- Detect business type: hotel → rooms; restaurant → tables; barbershop/salon → staff/chairs; clinic → rooms/staff.",
+      "- Detect business type: hotel → rooms; restaurant → tables; barbershop/salon → staff/chairs; clinic → rooms/staff; auto_service → lifts/bays/services.",
       "- Extract every distinct bookable unit mentioned (room numbers, tables, masters, services with duration).",
       "- If exact names are missing, infer sensible defaults (Table 1..N, Room 101.., Master Anna).",
       "- durationMinutes: typical appointment length (hotel room = 1440, table = 120, haircut = 45).",
@@ -202,7 +255,7 @@ async function extractCalendarResourcesFromKnowledge(input: {
       "- operatingHoursNote: short summary from Business Hours category if present.",
       "",
       "Return JSON:",
-      '{"businessType":"hotel|restaurant|barbershop|salon|clinic|generic","businessTypeLabel":"Hotel","operatingHoursNote":"","resources":[{"resourceType":"room|table|staff|chair|service|other","name":"Room 101","description":"","capacity":2,"durationMinutes":1440}]}',
+      '{"businessType":"hotel|restaurant|barbershop|salon|clinic|auto_service|generic","businessTypeLabel":"Hotel","operatingHoursNote":"","resources":[{"resourceType":"room|table|staff|chair|service|other","name":"Room 101","description":"","capacity":2,"durationMinutes":1440}]}',
       "",
       "Knowledge base:",
       input.knowledgeContext,

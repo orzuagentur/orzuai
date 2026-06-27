@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { GoogleCalendarView } from "@/components/google-calendar/GoogleCalendarView";
-import { BusinessCalendarResourcesPanel } from "@/components/google-calendar/BusinessCalendarResourcesPanel";
+import { CalendarAvailabilityPanel } from "@/components/google-calendar/CalendarAvailabilityPanel";
+import { CalendarBookingSettingsPanel } from "@/components/google-calendar/CalendarBookingSettingsPanel";
 import { CalendarNotificationsMarkRead } from "@/components/google-calendar/CalendarNotificationsMarkRead";
+import { GoogleCalendarView } from "@/components/google-calendar/GoogleCalendarView";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,17 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { GOOGLE_CALENDAR_INTEGRATION_HREF } from "@/features/google-calendar/constants";
+import { GOOGLE_CALENDAR_INTEGRATION_HREF, GOOGLE_CALENDAR_MESSAGES } from "@/features/google-calendar/constants";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
+import { getCalendarAvailabilityPageData } from "@/services/calendar-availability.service";
 import {
   getGoogleCalendarConnection,
   getGoogleCalendarEventsForBusiness,
 } from "@/services/google-calendar.service";
-import {
-  getBusinessBookingSetup,
-  listBusinessCalendarResources,
-} from "@/services/business-calendar-setup.service";
 
 export default function CalendarPage() {
   return (
@@ -43,29 +42,28 @@ async function CalendarPageContent() {
   }
 
   const connection = await getGoogleCalendarConnection(business.id);
-  const [bookingSetup, calendarResources] = await Promise.all([
-    getBusinessBookingSetup(business.id),
-    listBusinessCalendarResources(business.id),
-  ]);
+  const bookingSetup = await getBusinessBookingSetup(business.id);
 
   if (connection?.status !== "connected") {
     return (
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <BusinessCalendarResourcesPanel
-          setup={bookingSetup}
-          resources={calendarResources}
-        />
-        <Card className="max-w-2xl shadow-none">
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
+        <div className="mx-auto w-full max-w-lg space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {GOOGLE_CALENDAR_MESSAGES.pageTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {GOOGLE_CALENDAR_MESSAGES.pageDescription}
+          </p>
+        </div>
+        <Card className="mx-auto w-full max-w-lg shadow-none">
           <CardHeader>
-            <CardTitle>Connect Google Calendar</CardTitle>
-            <CardDescription>
-              Connect your Google account to view events and enable AI booking.
-            </CardDescription>
+            <CardTitle>{GOOGLE_CALENDAR_MESSAGES.connectTitle}</CardTitle>
+            <CardDescription>{GOOGLE_CALENDAR_MESSAGES.connectDescription}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF}>
-                Connect Google Calendar
+                {GOOGLE_CALENDAR_MESSAGES.connectButton}
               </Link>
             </Button>
           </CardContent>
@@ -74,24 +72,42 @@ async function CalendarPageContent() {
     );
   }
 
-  const eventsResult = await getGoogleCalendarEventsForBusiness(business.id);
+  const [eventsResult, availability] = await Promise.all([
+    getGoogleCalendarEventsForBusiness(business.id),
+    getCalendarAvailabilityPageData(business.id),
+  ]);
 
   return (
     <>
       <CalendarNotificationsMarkRead />
-      <div className="flex flex-col gap-6">
-        <div className="px-4 pt-4 md:px-6 md:pt-6">
-          <BusinessCalendarResourcesPanel
-            setup={bookingSetup}
-            resources={calendarResources}
-          />
+      <div className="flex min-h-full flex-col">
+        <div className="border-b bg-muted/30 px-4 py-6 md:px-8">
+          <div className="mx-auto max-w-6xl space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {GOOGLE_CALENDAR_MESSAGES.pageTitle}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {connection.calendarSummary ?? GOOGLE_CALENDAR_MESSAGES.calendarLabel}
+              {connection.googleAccountEmail
+                ? ` · ${connection.googleAccountEmail}`
+                : ""}
+            </p>
+          </div>
         </div>
-        <GoogleCalendarView
-          events={eventsResult?.events ?? []}
-          calendarSummary={connection.calendarSummary}
-          googleAccountEmail={connection.googleAccountEmail}
-          syncError={eventsResult?.syncError}
-        />
+
+        <div className="mx-auto grid w-full max-w-6xl flex-1 gap-6 p-4 md:grid-cols-[minmax(0,1fr)_320px] md:p-8">
+          <GoogleCalendarView
+            events={eventsResult?.events ?? []}
+            syncError={eventsResult?.syncError}
+          />
+          <aside className="space-y-4 md:sticky md:top-6 md:self-start">
+            <CalendarAvailabilityPanel
+              slots={availability.slots}
+              timeZone={availability.timeZone}
+            />
+            <CalendarBookingSettingsPanel setup={bookingSetup} />
+          </aside>
+        </div>
       </div>
     </>
   );

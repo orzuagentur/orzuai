@@ -2,14 +2,20 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 export const GOOGLE_CALENDAR_MESSAGES = {
   pageTitle: "Calendar",
-  pageDescription: "View and manage events from your connected Google Calendar.",
-  connectTitle: "Google Calendar",
+  pageDescription:
+    "Your Google Calendar schedule and open appointment times in one place.",
+  connectTitle: "Connect Google Calendar",
   connectDescription:
-    "Connect your Google account so AI can check availability and book appointments from chat.",
+    "Link the calendar you already use. OrzuAI reads your real availability and can book appointments from customer chats.",
   connectButton: "Connect Google Calendar",
   reconnectButton: "Reconnect",
   connectedAs: "Connected as",
-  calendarLabel: "Calendar",
+  calendarLabel: "Primary calendar",
+  scheduleTitle: "Upcoming",
+  todayLabel: "Today",
+  tomorrowLabel: "Tomorrow",
+  todayBadge: "Today",
+  allDayLabel: "All day",
   notConfiguredTitle: "Google OAuth not configured",
   notConfiguredDescription:
     "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment. In Google Cloud Console, add the redirect URI shown below.",
@@ -20,9 +26,9 @@ export const GOOGLE_CALENDAR_MESSAGES = {
   disconnectSuccess: "Google Calendar disconnected.",
   oauthError: "Could not connect Google Calendar. Please try again.",
   oauthSuccess: "Google Calendar connected successfully.",
-  emptyEvents: "No upcoming events in the next 60 days.",
+  emptyEvents: "Nothing scheduled ahead",
   emptyEventsHint:
-    "Create an event here or in Google Calendar — then click Refresh.",
+    "Add events in Google Calendar or use New event above.",
   createEvent: "Create event",
   refresh: "Refresh",
   openGoogleCalendar: "Open Google Calendar",
@@ -35,6 +41,24 @@ export const GOOGLE_CALENDAR_MESSAGES = {
   eventStartLabel: "Start",
   eventEndLabel: "End",
   backToIntegrations: "My integrations",
+  availabilityTitle: "Open times",
+  availabilityDescription:
+    "Free slots from your Google Calendar. The AI assistant can offer these when customers ask to book.",
+  availabilityEmpty:
+    "No free slots in the next two weeks. Check business hours below or free up time in Google Calendar.",
+  settingsTitle: "Booking hours",
+  settingsDescription:
+    "Timezone and working hours used when checking availability.",
+  settingsSave: "Save booking rules",
+  settingsSaved: "Booking rules saved.",
+  settingsSaveFailed: "Could not save booking rules.",
+  timezoneLabel: "Timezone",
+  bufferLabel: "Buffer between bookings (minutes)",
+  advanceDaysLabel: "Book up to (days ahead)",
+  hoursEnabledLabel: "Only book during business hours",
+  hoursEnabledHint: "When on, AI only books inside the hours below.",
+  hoursStartLabel: "Opens at",
+  hoursEndLabel: "Closes at",
 } as const;
 
 export const GOOGLE_CALENDAR_INTEGRATION_HREF =

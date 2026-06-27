@@ -29,6 +29,14 @@ function detectBusinessType(text: string): {
     return { type: "clinic", label: "Клиника" };
   }
 
+  if (
+    /автосервис|сто\b|auto\s*service|car\s*service|ремонт\s*авто|шиномонтаж|техобслуживан|car\s*repair/i.test(
+      text,
+    )
+  ) {
+    return { type: "auto_service", label: "Автосервис" };
+  }
+
   return { type: "generic", label: "Бизнес" };
 }
 
@@ -97,6 +105,33 @@ function buildDefaultResources(
           name: "Кабинет 1",
           capacity: 1,
           durationMinutes: 30,
+        },
+      ];
+    case "auto_service":
+      return [
+        {
+          resourceType: "service" as CalendarResourceType,
+          name: "ТО / техобслуживание",
+          capacity: 1,
+          durationMinutes: 60,
+        },
+        {
+          resourceType: "service" as CalendarResourceType,
+          name: "Диагностика",
+          capacity: 1,
+          durationMinutes: 45,
+        },
+        {
+          resourceType: "chair" as CalendarResourceType,
+          name: "Пост 1",
+          capacity: 1,
+          durationMinutes: 90,
+        },
+        {
+          resourceType: "chair" as CalendarResourceType,
+          name: "Пост 2",
+          capacity: 1,
+          durationMinutes: 90,
         },
       ];
     default:

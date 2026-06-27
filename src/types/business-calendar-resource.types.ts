@@ -17,6 +17,7 @@ export const BUSINESS_TYPES = [
   "barbershop",
   "salon",
   "clinic",
+  "auto_service",
   "generic",
 ] as const;
 
@@ -64,4 +65,11 @@ export type BusinessBookingSetup = {
   businessTypeLabel: string;
   operatingHoursNote: string;
   generatedFromKnowledgeAt: string | null;
+  bookingTimezone: string;
+  slotBufferMinutes: number;
+  advanceBookingDays: number;
+  businessHoursEnabled: boolean;
+  businessHoursStart: string;
+  businessHoursEnd: string;
+  businessDays: number[];
 };

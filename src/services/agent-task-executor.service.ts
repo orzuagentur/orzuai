@@ -716,12 +716,80 @@ async function applyCreateCalendarEvent(
     return null;
   }
 
-  const result = await createGoogleCalendarEventForBusinessWithAdmin({
-    admin,
+  const { resolveBookingSlot } = await import(
+    "@/services/calendar-availability.service"
+  );
+
+  const slotResolution = await resolveBookingSlot({
     businessId,
     summary: action.summary,
     startDateTime: action.startDateTime,
     endDateTime: action.endDateTime,
+    timeZone: action.timeZone,
+    resourceName: action.resourceName,
+    preferNearestSlot: true,
+  });
+
+  if (slotResolution.status === "unavailable") {
+    if (!idempotencyContext.contactId) {
+      return null;
+    }
+
+    const altText =
+      slotResolution.alternatives.length > 0
+        ? ` Suggested: ${slotResolution.alternatives.join(", ")}`
+        : "";
+
+    const fallbackTask = await applyCreateTask(
+      admin,
+      businessId,
+      idempotencyContext.contactId,
+      {
+        type: "create_task",
+        title: `Booking request: ${action.summary.trim() || "Appointment"}`,
+        dueAt: action.startDateTime,
+      },
+      idempotencyContext,
+    );
+
+    if (fallbackTask) {
+      await recordCrmIdempotencyKey(admin, {
+        businessId,
+        idempotencyKey,
+        actionType: "create_calendar_event",
+      });
+      return `Booking queued — requested time not available.${altText}`;
+    }
+
+    return null;
+  }
+
+  const resolvedStart =
+    slotResolution.status === "available" ||
+    slotResolution.status === "rescheduled"
+      ? slotResolution.startDateTime
+      : action.startDateTime;
+  const resolvedEnd =
+    slotResolution.status === "available" ||
+    slotResolution.status === "rescheduled"
+      ? slotResolution.endDateTime
+      : action.endDateTime;
+
+  const summary =
+    slotResolution.status === "available" ||
+    slotResolution.status === "rescheduled"
+      ? slotResolution.resourceName &&
+        !action.summary.includes(slotResolution.resourceName)
+        ? `${slotResolution.resourceName} — ${action.summary}`
+        : action.summary
+      : action.summary;
+
+  const result = await createGoogleCalendarEventForBusinessWithAdmin({
+    admin,
+    businessId,
+    summary,
+    startDateTime: resolvedStart,
+    endDateTime: resolvedEnd,
     timeZone: action.timeZone,
     description: action.description,
   });
@@ -773,12 +841,14 @@ async function applyCreateCalendarEvent(
       channel: idempotencyContext.channel,
       contactId: idempotencyContext.contactId ?? null,
       contactName: idempotencyContext.contactName ?? null,
-      summary: action.summary,
-      startDateTime: action.startDateTime,
+      summary,
+      startDateTime: resolvedStart,
     });
   }
 
-  return `Calendar event created: ${action.summary}`;
+  return slotResolution.status === "rescheduled"
+    ? `Calendar event created (nearest free slot): ${summary}`
+    : `Calendar event created: ${summary}`;
 }
 
 async function applyExecutorPlan(
