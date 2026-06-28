@@ -3,7 +3,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 export const GOOGLE_CALENDAR_MESSAGES = {
   pageTitle: "Calendar",
   pageDescription:
-    "Your Google Calendar schedule and open appointment times in one place.",
+    "Your OrzuX schedule for bookings, events, and tasks. Connect Google Calendar optionally to sync external events.",
   connectTitle: "Connect Google Calendar",
   connectDescription:
     "Link the calendar you already use. OrzuAI reads your real availability and can book appointments from customer chats.",

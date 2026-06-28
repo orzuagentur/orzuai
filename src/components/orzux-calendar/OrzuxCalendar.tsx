@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -50,6 +50,7 @@ type OrzuxCalendarProps = {
   calendarLabel?: string | null;
   accountEmail?: string | null;
   googleConnected?: boolean;
+  lastSyncedAt?: string | null;
 };
 
 export function OrzuxCalendar({
@@ -63,6 +64,7 @@ export function OrzuxCalendar({
   calendarLabel,
   accountEmail,
   googleConnected = false,
+  lastSyncedAt = null,
 }: OrzuxCalendarProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -71,7 +73,6 @@ export function OrzuxCalendar({
   const [visibleMonth, setVisibleMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<OrzuxCalendarEvent | null>(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -81,7 +82,7 @@ export function OrzuxCalendar({
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskInitialStart, setTaskInitialStart] = useState<Date | null>(null);
-  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   const openTaskDialog = useCallback((open: boolean) => {
     setTaskDialogOpen(open);
@@ -90,17 +91,19 @@ export function OrzuxCalendar({
     }
   }, []);
 
-  const handleTaskComplete = useCallback(
-    async (event: OrzuxCalendarEvent) => {
-      if (!event.isTask || completingTaskId) {
+  const handleTaskStatusChange = useCallback(
+    async (event: OrzuxCalendarEvent, status: "open" | "done") => {
+      if (!event.isTask || updatingTaskId) {
         return;
       }
 
-      setCompletingTaskId(event.recordId);
+      setUpdatingTaskId(event.recordId);
 
       try {
         const response = await fetch(`/api/calendar/tasks/${event.recordId}`, {
           method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
         });
         const result = (await response.json()) as { success: boolean; message?: string };
 
@@ -109,19 +112,53 @@ export function OrzuxCalendar({
           return;
         }
 
-        toast.success(ORZUX_CALENDAR_MESSAGES.taskCompleted);
+        toast.success(
+          status === "done"
+            ? ORZUX_CALENDAR_MESSAGES.taskCompleted
+            : ORZUX_CALENDAR_MESSAGES.taskReopened,
+        );
+        router.refresh();
+      } catch {
+        toast.error(ORZUX_CALENDAR_MESSAGES.taskCompleteFailed);
+      } finally {
+        setUpdatingTaskId(null);
+      }
+    },
+    [updatingTaskId, router],
+  );
+
+  const handleTaskDelete = useCallback(
+    async (event: OrzuxCalendarEvent) => {
+      if (!event.isTask || updatingTaskId) {
+        return;
+      }
+
+      setUpdatingTaskId(event.recordId);
+
+      try {
+        const response = await fetch(`/api/calendar/tasks/${event.recordId}`, {
+          method: "DELETE",
+        });
+        const result = (await response.json()) as { success: boolean; message?: string };
+
+        if (!response.ok || !result.success) {
+          toast.error(result.message ?? ORZUX_CALENDAR_MESSAGES.taskDeleteFailed);
+          return;
+        }
+
+        toast.success(ORZUX_CALENDAR_MESSAGES.taskDeleted);
         if (selectedEvent?.recordId === event.recordId) {
           setEventSheetOpen(false);
           setSelectedEvent(null);
         }
         router.refresh();
       } catch {
-        toast.error(ORZUX_CALENDAR_MESSAGES.taskCompleteFailed);
+        toast.error(ORZUX_CALENDAR_MESSAGES.taskDeleteFailed);
       } finally {
-        setCompletingTaskId(null);
+        setUpdatingTaskId(null);
       }
     },
-    [completingTaskId, router, selectedEvent?.recordId],
+    [updatingTaskId, router, selectedEvent?.recordId],
   );
 
   const daysWithEvents = useMemo(() => {
@@ -167,14 +204,38 @@ export function OrzuxCalendar({
     });
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    router.refresh();
-    setTimeout(() => setIsRefreshing(false), 600);
-  }, [router]);
-
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  useEffect(() => {
+    if (!googleConnected) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncGoogleCalendar() {
+      try {
+        const response = await fetch("/api/calendar/google/sync", { method: "POST" });
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        router.refresh();
+      } catch {
+        // Background sync — no toast noise.
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void syncGoogleCalendar();
+    }, 120_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [googleConnected, router]);
 
   const headerDateLabel = formatHeaderDate(selectedDate);
 
@@ -189,9 +250,8 @@ export function OrzuxCalendar({
       googleConnected,
       calendarLabel,
       accountEmail,
+      lastSyncedAt,
       syncError,
-      isRefreshing,
-      onRefresh: () => void handleRefresh(),
       sidebarOpen,
       onOpenSidebar: openSidebar,
     }),
@@ -203,9 +263,8 @@ export function OrzuxCalendar({
       googleConnected,
       calendarLabel,
       accountEmail,
+      lastSyncedAt,
       syncError,
-      isRefreshing,
-      handleRefresh,
       sidebarOpen,
       openSidebar,
     ],
@@ -238,8 +297,8 @@ export function OrzuxCalendar({
               setSlotTime(time);
               setSlotSheetOpen(true);
             }}
-            onTaskComplete={(event) => void handleTaskComplete(event)}
-            completingTaskId={completingTaskId}
+            onTaskStatusChange={(event, status) => void handleTaskStatusChange(event, status)}
+            updatingTaskId={updatingTaskId}
           />
 
           <div className="pointer-events-none absolute bottom-6 right-6 z-30">
@@ -350,8 +409,9 @@ export function OrzuxCalendar({
         onOpenChange={setEventSheetOpen}
         resources={resources}
         timeZone={timeZone}
-        onTaskComplete={(event) => void handleTaskComplete(event)}
-        completingTaskId={completingTaskId}
+        onTaskStatusChange={(event, status) => void handleTaskStatusChange(event, status)}
+        onTaskDelete={(event) => void handleTaskDelete(event)}
+        updatingTaskId={updatingTaskId}
       />
 
       <OrzuxCalendarBookingDialog

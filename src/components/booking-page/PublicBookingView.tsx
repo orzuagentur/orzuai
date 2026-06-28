@@ -37,6 +37,7 @@ type PublicBookingViewProps = {
 function getInputType(field: BookingFormField): string {
   if (field.type === "email") return "email";
   if (field.type === "phone") return "tel";
+  if (field.type === "number") return "number";
   return "text";
 }
 

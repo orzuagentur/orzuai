@@ -6,20 +6,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
+import { getBusinessTypePreset } from "@/lib/calendar/business-type-presets";
 import {
   createCustomBookingFormField,
   type BookingFormField,
 } from "@/lib/calendar/booking-form-fields";
+import type { BusinessBookingType } from "@/types/business-calendar-resource.types";
 
 type BookingFormFieldsEditorProps = {
   fields: BookingFormField[];
   onChange: (fields: BookingFormField[]) => void;
+  businessType: BusinessBookingType;
 };
+
+const CUSTOM_FIELD_TYPES: Array<{
+  value: BookingFormField["type"];
+  label: string;
+}> = [
+  { value: "text", label: ORZUX_CALENDAR_MESSAGES.formFieldTypeText },
+  { value: "textarea", label: ORZUX_CALENDAR_MESSAGES.formFieldTypeTextarea },
+  { value: "phone", label: ORZUX_CALENDAR_MESSAGES.formFieldTypePhone },
+  { value: "number", label: ORZUX_CALENDAR_MESSAGES.formFieldTypeNumber },
+];
 
 export function BookingFormFieldsEditor({
   fields,
   onChange,
+  businessType,
 }: BookingFormFieldsEditorProps) {
+  const preset = getBusinessTypePreset(businessType);
+
   function updateField(id: string, patch: Partial<BookingFormField>) {
     onChange(
       fields.map((field) => (field.id === id ? { ...field, ...patch } : field)),
@@ -39,7 +55,7 @@ export function BookingFormFieldsEditor({
       <div>
         <p className="text-sm font-medium">{ORZUX_CALENDAR_MESSAGES.bookingFormTitle}</p>
         <p className="text-xs text-muted-foreground">
-          {ORZUX_CALENDAR_MESSAGES.bookingFormSubtitle}
+          {ORZUX_CALENDAR_MESSAGES.bookingFormSubtitleForType(preset.label)}
         </p>
       </div>
 
@@ -76,9 +92,11 @@ export function BookingFormFieldsEditor({
                       }
                       className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
                     >
-                      <option value="text">{ORZUX_CALENDAR_MESSAGES.formFieldTypeText}</option>
-                      <option value="textarea">{ORZUX_CALENDAR_MESSAGES.formFieldTypeTextarea}</option>
-                      <option value="phone">{ORZUX_CALENDAR_MESSAGES.formFieldTypePhone}</option>
+                      {CUSTOM_FIELD_TYPES.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}

@@ -46,6 +46,12 @@ export const DASHBOARD_NAV_ITEMS = [
     icon: Users,
   },
   {
+    id: "calendar",
+    label: "Calendar",
+    href: DASHBOARD_ROUTES.calendar,
+    icon: Calendar,
+  },
+  {
     id: "ai-assistant",
     label: "AI Agent",
     href: DASHBOARD_ROUTES.aiAssistant,
@@ -97,29 +103,11 @@ export type DashboardNavOptions = {
   googleCalendarConnected?: boolean;
 };
 
-/** Base nav plus integration-driven items (e.g. Calendar when Google is connected). */
+/** Base dashboard navigation (Calendar is always available; Google sync is optional). */
 export function buildDashboardNavItems(
-  options: DashboardNavOptions = {},
+  _options: DashboardNavOptions = {},
 ): DashboardNavItem[] {
-  const items: DashboardNavItem[] = [...DASHBOARD_NAV_ITEMS];
-
-  if (options.googleCalendarConnected) {
-    const crmIndex = items.findIndex((item) => item.id === "contacts");
-    const calendarItem: DashboardNavItem = {
-      id: "calendar",
-      label: "Calendar",
-      href: DASHBOARD_ROUTES.calendar,
-      icon: Calendar,
-    };
-
-    if (crmIndex >= 0) {
-      items.splice(crmIndex + 1, 0, calendarItem);
-    } else {
-      items.push(calendarItem);
-    }
-  }
-
-  return items;
+  return [...DASHBOARD_NAV_ITEMS];
 }
 
 export const SETTINGS_MESSAGES = {

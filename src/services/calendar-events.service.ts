@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createGoogleCalendarEvent } from "@/lib/google-calendar/client";
+import {
+  createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+} from "@/lib/google-calendar/client";
 import {
   getGoogleCalendarAccessToken,
   getGoogleCalendarEventsForBusiness,
@@ -135,6 +139,7 @@ export function taskToOrzuxCalendarEvent(task: CalendarTaskRecord): OrzuxCalenda
     htmlLink: null,
     source: "local",
     isTask: true,
+    taskStatus: task.status,
     dueAt: task.dueAt,
   };
 }
@@ -317,8 +322,9 @@ export async function listCalendarTasksForBusiness(
     .from("calendar_tasks")
     .select("*")
     .eq("business_id", businessId)
-    .eq("status", "open")
-    .or(`start_at.gte.${timeMin.toISOString()},due_at.gte.${timeMin.toISOString()}`)
+    .or(
+      `start_at.gte.${timeMin.toISOString()},due_at.gte.${timeMin.toISOString()},status.eq.done`,
+    )
     .order("start_at", { ascending: true, nullsFirst: false });
 
   if (error) {
@@ -326,6 +332,33 @@ export async function listCalendarTasksForBusiness(
   }
 
   return (data ?? []).map(mapTaskRow);
+}
+
+async function getGoogleConnectionForBusiness(businessId: string) {
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("google_calendar_connections")
+    .select("*")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (
+    !connection ||
+    connection.google_calendar_status !== "connected" ||
+    !connection.calendar_id
+  ) {
+    return null;
+  }
+
+  const accessToken = await getGoogleCalendarAccessToken(connection);
+
+  if (!accessToken) {
+    return null;
+  }
+
+  return { connection, accessToken };
 }
 
 async function syncEventToGoogle(input: {
@@ -336,32 +369,15 @@ async function syncEventToGoogle(input: {
   endDateTime: string;
   timeZone: string;
 }): Promise<{ googleEventId: string | null; htmlLink: string | null }> {
-  const admin = createAdminClient();
-  const { data: connection } = await admin
-    .from("google_calendar_connections")
-    .select("*")
-    .eq("business_id", input.businessId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const google = await getGoogleConnectionForBusiness(input.businessId);
 
-  if (
-    !connection ||
-    connection.google_calendar_status !== "connected" ||
-    !connection.calendar_id
-  ) {
-    return { googleEventId: null, htmlLink: null };
-  }
-
-  const accessToken = await getGoogleCalendarAccessToken(connection);
-
-  if (!accessToken) {
+  if (!google) {
     return { googleEventId: null, htmlLink: null };
   }
 
   const created = await createGoogleCalendarEvent(
-    accessToken,
-    connection.calendar_id,
+    google.accessToken,
+    google.connection.calendar_id!,
     {
       summary: input.title,
       description: input.description || undefined,
@@ -464,13 +480,45 @@ export async function updateCalendarEventForBusiness(input: {
     return { success: false, message: "Event not found." };
   }
 
+  const nextTitle = input.title ?? existing.title;
+  const nextDescription = input.description ?? existing.description;
+  const nextStart = input.startDateTime ?? existing.start_at;
+  const nextEnd = input.endDateTime ?? existing.end_at;
+  const nextTimeZone = input.timeZone ?? existing.timezone;
+
+  if (existing.google_event_id) {
+    const google = await getGoogleConnectionForBusiness(input.businessId);
+
+    if (google) {
+      const updated = await updateGoogleCalendarEvent(
+        google.accessToken,
+        google.connection.calendar_id!,
+        existing.google_event_id,
+        {
+          summary: nextTitle,
+          description: nextDescription,
+          startDateTime: nextStart,
+          endDateTime: nextEnd,
+          timeZone: nextTimeZone,
+        },
+      );
+
+      if (!updated.success) {
+        return {
+          success: false,
+          message: updated.error ?? "Could not update Google Calendar event.",
+        };
+      }
+    }
+  }
+
   const payload = {
-    title: input.title ?? existing.title,
-    description: input.description ?? existing.description,
+    title: nextTitle,
+    description: nextDescription,
     location: input.location ?? existing.location,
-    start_at: input.startDateTime ?? existing.start_at,
-    end_at: input.endDateTime ?? existing.end_at,
-    timezone: input.timeZone ?? existing.timezone,
+    start_at: nextStart,
+    end_at: nextEnd,
+    timezone: nextTimeZone,
     resource_id: input.resourceId === undefined ? existing.resource_id : input.resourceId,
     updated_at: new Date().toISOString(),
   };
@@ -505,6 +553,25 @@ export async function deleteCalendarEventForBusiness(input: {
 
   if (!existing) {
     return { success: false, message: "Event not found." };
+  }
+
+  if (existing.google_event_id) {
+    const google = await getGoogleConnectionForBusiness(input.businessId);
+
+    if (google) {
+      const deleted = await deleteGoogleCalendarEvent(
+        google.accessToken,
+        google.connection.calendar_id!,
+        existing.google_event_id,
+      );
+
+      if (!deleted.success) {
+        return {
+          success: false,
+          message: deleted.error ?? "Could not delete Google Calendar event.",
+        };
+      }
+    }
   }
 
   const { error } = await admin
@@ -590,17 +657,17 @@ export async function createCalendarTaskForBusiness(input: {
   return { success: true };
 }
 
-export async function completeCalendarTaskForBusiness(input: {
+export async function updateCalendarTaskStatusForBusiness(input: {
   businessId: string;
   taskId: string;
+  status: "open" | "done";
 }): Promise<{ success: boolean; message?: string }> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("calendar_tasks")
-    .update({ status: "done" })
+    .update({ status: input.status })
     .eq("business_id", input.businessId)
     .eq("id", input.taskId)
-    .eq("status", "open")
     .select("id")
     .maybeSingle();
 
@@ -609,7 +676,43 @@ export async function completeCalendarTaskForBusiness(input: {
   }
 
   if (!data) {
-    return { success: false, message: "Task not found or already completed." };
+    return { success: false, message: "Task not found." };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.calendar);
+  return { success: true };
+}
+
+export async function completeCalendarTaskForBusiness(input: {
+  businessId: string;
+  taskId: string;
+}): Promise<{ success: boolean; message?: string }> {
+  return updateCalendarTaskStatusForBusiness({
+    businessId: input.businessId,
+    taskId: input.taskId,
+    status: "done",
+  });
+}
+
+export async function deleteCalendarTaskForBusiness(input: {
+  businessId: string;
+  taskId: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("calendar_tasks")
+    .delete()
+    .eq("business_id", input.businessId)
+    .eq("id", input.taskId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  if (!data) {
+    return { success: false, message: "Task not found." };
   }
 
   revalidatePath(DASHBOARD_ROUTES.calendar);

@@ -21,9 +21,8 @@ export type CalendarDayChrome = {
   googleConnected: boolean;
   calendarLabel?: string | null;
   accountEmail?: string | null;
+  lastSyncedAt?: string | null;
   syncError?: string | null;
-  isRefreshing: boolean;
-  onRefresh: () => void;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
 };

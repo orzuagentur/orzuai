@@ -97,7 +97,7 @@ export async function listGoogleCalendarEvents(
     timeMax,
     singleEvents: "true",
     orderBy: "startTime",
-    maxResults: "100",
+    maxResults: "250",
   });
 
   const response = await fetch(
@@ -172,6 +172,87 @@ export async function createGoogleCalendarEvent(
   }
 
   return { success: true, event };
+}
+
+export async function updateGoogleCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+  input: {
+    summary?: string;
+    description?: string;
+    startDateTime?: string;
+    endDateTime?: string;
+    timeZone?: string;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const body: Record<string, unknown> = {};
+
+  if (input.summary !== undefined) {
+    body.summary = input.summary;
+  }
+
+  if (input.description !== undefined) {
+    body.description = input.description;
+  }
+
+  if (input.startDateTime && input.timeZone) {
+    body.start = { dateTime: input.startDateTime, timeZone: input.timeZone };
+  }
+
+  if (input.endDateTime && input.timeZone) {
+    body.end = { dateTime: input.endDateTime, timeZone: input.timeZone };
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    return {
+      success: false,
+      error: data?.error?.message ?? "Failed to update Google Calendar event.",
+    };
+  }
+
+  return { success: true };
+}
+
+export async function deleteGoogleCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+
+  if (!response.ok && response.status !== 404) {
+    const data = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    return {
+      success: false,
+      error: data?.error?.message ?? "Failed to delete Google Calendar event.",
+    };
+  }
+
+  return { success: true };
 }
 
 type FreeBusyCalendarBlock = {

@@ -4,7 +4,8 @@ export type BookingFormFieldType =
   | "email"
   | "phone"
   | "text"
-  | "textarea";
+  | "textarea"
+  | "number";
 
 export type BookingFormField = {
   id: string;
@@ -73,6 +74,10 @@ export function parseBookingFormFields(raw: unknown): BookingFormField[] {
   return parsed.length > 0 ? parsed : DEFAULT_BOOKING_FORM_FIELDS;
 }
 
+export function cloneBookingFormFields(fields: BookingFormField[]): BookingFormField[] {
+  return fields.map((field) => ({ ...field }));
+}
+
 export function createCustomBookingFormField(label: string): BookingFormField {
   const id = crypto.randomUUID();
 
@@ -99,6 +104,10 @@ export function validateBookingFormAnswers(
 
     if (field.type === "email" && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       return { valid: false, message: "Enter a valid email address." };
+    }
+
+    if (field.type === "number" && value && !/^\d+$/.test(value)) {
+      return { valid: false, message: `${field.label} must be a number.` };
     }
   }
 

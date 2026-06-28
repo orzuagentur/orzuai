@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CalendarNotificationsMarkRead } from "@/components/google-calendar/CalendarNotificationsMarkRead";
 import { OrzuxCalendar } from "@/components/orzux-calendar/OrzuxCalendar";
-import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { GOOGLE_CALENDAR_INTEGRATION_HREF } from "@/features/google-calendar/constants";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
@@ -14,6 +14,7 @@ import {
   listCalendarEventsForBusiness,
   listCalendarTasksForBusiness,
   mergeCalendarEvents,
+  syncGoogleCalendarEventsForBusiness,
 } from "@/services/calendar-events.service";
 import { getCalendarAvailabilityPageData } from "@/services/calendar-availability.service";
 import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
@@ -32,12 +33,23 @@ async function CalendarPageContent() {
   const business = user ? await getPrimaryBusiness(user.id) : null;
 
   if (!business) {
-    redirect(GOOGLE_CALENDAR_INTEGRATION_HREF);
+    redirect(DASHBOARD_ROUTES.onboarding);
   }
 
   const connection = await getGoogleCalendarConnection(business.id);
   const googleConnected = connection?.status === "connected";
   const bookingSetup = await getBusinessBookingSetup(business.id);
+
+  let syncError: string | null = null;
+
+  if (googleConnected) {
+    const syncResult = await syncGoogleCalendarEventsForBusiness(business.id);
+    syncError = syncResult.syncError ?? null;
+  }
+
+  const refreshedConnection = googleConnected
+    ? await getGoogleCalendarConnection(business.id)
+    : connection;
 
   const [bookings, localEvents, localTasks, availability, bookingPages, resources] =
     await Promise.all([
@@ -94,9 +106,11 @@ async function CalendarPageContent() {
           resourceType: resource.resourceType,
           durationMinutes: resource.durationMinutes,
         }))}
-        calendarLabel={connection?.calendarSummary}
-        accountEmail={connection?.googleAccountEmail}
+        calendarLabel={refreshedConnection?.calendarSummary}
+        accountEmail={refreshedConnection?.googleAccountEmail}
         googleConnected={googleConnected}
+        lastSyncedAt={refreshedConnection?.lastSyncedAt}
+        syncError={syncError}
       />
     </>
   );

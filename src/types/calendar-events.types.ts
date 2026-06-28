@@ -47,6 +47,7 @@ export type OrzuxCalendarEvent = {
   htmlLink: string | null;
   source: "local" | "google";
   isTask?: boolean;
+  taskStatus?: "open" | "done";
   isBooking?: boolean;
   resourceId?: string | null;
   resourceName?: string | null;

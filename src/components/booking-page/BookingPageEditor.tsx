@@ -34,7 +34,6 @@ import { getPublicAppOrigin } from "@/constants/public-app-url";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import { slugifyBookingPageTitle } from "@/lib/calendar/booking-page-slug";
 import {
-  DEFAULT_BOOKING_FORM_FIELDS,
   parseBookingFormFields,
   type BookingFormField,
 } from "@/lib/calendar/booking-form-fields";
@@ -49,6 +48,7 @@ import {
 import {
   getBusinessTypePreset,
   getDurationOptionsForType,
+  getPresetFormFields,
 } from "@/lib/calendar/business-type-presets";
 import type { BookingPageRecord } from "@/types/booking-page.types";
 
@@ -147,13 +147,17 @@ export function BookingPageEditor({
   );
   const [resources, setResources] = useState<EditableBookingResource[]>(() =>
     initialResources.length > 0
-      ? mapResourcesToEditable(initialResources)
+      ? mapResourcesToEditable(
+          initialResources,
+          initialPreset.resourceEditor,
+          initialPreset.slotDurationMinutes,
+        )
       : createResourcesFromPreset(initialPreset.resources),
   );
   const [formFields, setFormFields] = useState<BookingFormField[]>(() =>
     page?.formFields?.length
       ? parseBookingFormFields(page.formFields)
-      : DEFAULT_BOOKING_FORM_FIELDS,
+      : getPresetFormFields(initialType),
   );
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [fieldErrors, setFieldErrors] = useState<
@@ -163,6 +167,11 @@ export function BookingPageEditor({
 
   const durationOptions = useMemo(
     () => getDurationOptionsForType(businessType),
+    [businessType],
+  );
+
+  const resourceEditorConfig = useMemo(
+    () => getBusinessTypePreset(businessType).resourceEditor,
     [businessType],
   );
 
@@ -207,6 +216,7 @@ export function BookingPageEditor({
     setAdvanceDays(preset.advanceBookingDays);
     setSchedule(preset.weeklySchedule);
     setResources(createResourcesFromPreset(preset.resources));
+    setFormFields(getPresetFormFields(type));
     setFieldErrors({});
     if (!silent) {
       toast.success(ORZUX_CALENDAR_MESSAGES.presetApplied);
@@ -404,7 +414,12 @@ export function BookingPageEditor({
                       </select>
                     </div>
 
-                    <BookingResourcesEditor resources={resources} onChange={setResources} />
+                    <BookingResourcesEditor
+                      resources={resources}
+                      onChange={setResources}
+                      editorConfig={resourceEditorConfig}
+                      defaultDurationMinutes={duration}
+                    />
 
                     <div className="space-y-3">
                       <div>
@@ -594,7 +609,11 @@ export function BookingPageEditor({
 
                 {editorStep === 3 ? (
                   <>
-                    <BookingFormFieldsEditor fields={formFields} onChange={setFormFields} />
+                    <BookingFormFieldsEditor
+                      fields={formFields}
+                      onChange={setFormFields}
+                      businessType={businessType}
+                    />
 
                     <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
                       <p className="font-medium text-foreground">{ORZUX_CALENDAR_MESSAGES.publicBookingUrl}</p>

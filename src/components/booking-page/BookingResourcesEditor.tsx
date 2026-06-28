@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
-import { CALENDAR_RESOURCE_TYPES } from "@/types/business-calendar-resource.types";
+import type { BookingResourceEditorConfig } from "@/lib/calendar/business-type-presets";
 import type { CalendarResourceType } from "@/types/business-calendar-resource.types";
 
 export type EditableBookingResource = {
@@ -22,23 +22,32 @@ export type EditableBookingResource = {
 type BookingResourcesEditorProps = {
   resources: EditableBookingResource[];
   onChange: (resources: EditableBookingResource[]) => void;
+  editorConfig: BookingResourceEditorConfig;
+  defaultDurationMinutes?: number;
 };
 
-function createEmptyResource(): EditableBookingResource {
+function createEmptyResource(
+  config: BookingResourceEditorConfig,
+  defaultDurationMinutes = 60,
+): EditableBookingResource {
   return {
     clientId: crypto.randomUUID(),
-    resourceType: "service",
+    resourceType: config.defaultResourceType,
     name: "",
     description: "",
-    capacity: 1,
-    durationMinutes: 60,
+    capacity: config.showCapacity ? 2 : 1,
+    durationMinutes: defaultDurationMinutes,
   };
 }
 
 export function BookingResourcesEditor({
   resources,
   onChange,
+  editorConfig,
+  defaultDurationMinutes = 60,
 }: BookingResourcesEditorProps) {
+  const showTypePicker = editorConfig.allowedResourceTypes.length > 1;
+
   function updateResource(
     clientId: string,
     patch: Partial<EditableBookingResource>,
@@ -59,15 +68,18 @@ export function BookingResourcesEditor({
   }
 
   function addResource() {
-    onChange([...resources, createEmptyResource()]);
+    onChange([
+      ...resources,
+      createEmptyResource(editorConfig, defaultDurationMinutes),
+    ]);
   }
 
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-sm font-medium">{ORZUX_CALENDAR_MESSAGES.resourcesTitle}</p>
+        <p className="text-sm font-medium">{editorConfig.resourcesTitle}</p>
         <p className="text-xs text-muted-foreground">
-          {ORZUX_CALENDAR_MESSAGES.resourcesSubtitle}
+          {editorConfig.resourcesSubtitle}
         </p>
       </div>
 
@@ -95,69 +107,81 @@ export function BookingResourcesEditor({
             </div>
 
             <div className="grid gap-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="col-span-2 space-y-1">
+              <div
+                className={
+                  showTypePicker || editorConfig.showDuration || editorConfig.showCapacity
+                    ? "grid grid-cols-2 gap-2"
+                    : "grid gap-2"
+                }
+              >
+                <div className={showTypePicker ? "col-span-2 space-y-1" : "space-y-1"}>
                   <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceName}</Label>
                   <Input
                     value={resource.name}
                     onChange={(event) =>
                       updateResource(resource.clientId, { name: event.target.value })
                     }
-                    placeholder="Stylist Anna"
+                    placeholder={editorConfig.namePlaceholder}
                     className="h-8 text-sm"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceType}</Label>
-                  <select
-                    value={resource.resourceType}
-                    onChange={(event) =>
-                      updateResource(resource.clientId, {
-                        resourceType: event.target.value as CalendarResourceType,
-                      })
-                    }
-                    className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                  >
-                    {CALENDAR_RESOURCE_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {ORZUX_CALENDAR_MESSAGES.resourceTypes[type]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {showTypePicker ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceType}</Label>
+                    <select
+                      value={resource.resourceType}
+                      onChange={(event) =>
+                        updateResource(resource.clientId, {
+                          resourceType: event.target.value as CalendarResourceType,
+                        })
+                      }
+                      className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    >
+                      {editorConfig.allowedResourceTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {ORZUX_CALENDAR_MESSAGES.resourceTypes[type]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
 
-                <div className="space-y-1">
-                  <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceDuration}</Label>
-                  <Input
-                    type="number"
-                    min={5}
-                    max={480}
-                    value={resource.durationMinutes}
-                    onChange={(event) =>
-                      updateResource(resource.clientId, {
-                        durationMinutes: Number(event.target.value),
-                      })
-                    }
-                    className="h-8 text-sm"
-                  />
-                </div>
+                {editorConfig.showDuration ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceDuration}</Label>
+                    <Input
+                      type="number"
+                      min={5}
+                      max={480}
+                      value={resource.durationMinutes}
+                      onChange={(event) =>
+                        updateResource(resource.clientId, {
+                          durationMinutes: Number(event.target.value),
+                        })
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                ) : null}
 
-                <div className="space-y-1">
-                  <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceCapacity}</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={resource.capacity}
-                    onChange={(event) =>
-                      updateResource(resource.clientId, {
-                        capacity: Number(event.target.value),
-                      })
-                    }
-                    className="h-8 text-sm"
-                  />
-                </div>
+                {editorConfig.showCapacity ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">{ORZUX_CALENDAR_MESSAGES.resourceCapacity}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={resource.capacity}
+                      onChange={(event) =>
+                        updateResource(resource.clientId, {
+                          capacity: Number(event.target.value),
+                        })
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -187,15 +211,19 @@ export function mapResourcesToEditable(
     capacity: number;
     durationMinutes: number;
   }>,
+  config: BookingResourceEditorConfig,
+  defaultDurationMinutes = 60,
 ): EditableBookingResource[] {
   if (resources.length === 0) {
-    return [createEmptyResource()];
+    return [createEmptyResource(config, defaultDurationMinutes)];
   }
 
   return resources.map((resource) => ({
     clientId: resource.id,
     id: resource.id,
-    resourceType: resource.resourceType,
+    resourceType: config.allowedResourceTypes.includes(resource.resourceType)
+      ? resource.resourceType
+      : config.defaultResourceType,
     name: resource.name,
     description: resource.description,
     capacity: resource.capacity,

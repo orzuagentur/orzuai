@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import { extractBookingGuests } from "@/lib/calendar/booking-guests";
+import { cn } from "@/lib/utils";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
 
 import { formatEventDateTimeRange, formatDueDate, formatSingleDateTime, toLocalDateTimeValue } from "./utils";
@@ -33,8 +34,9 @@ type OrzuxCalendarEventSheetProps = {
   onOpenChange: (open: boolean) => void;
   resources?: CalendarResourceOption[];
   timeZone: string;
-  onTaskComplete?: (event: OrzuxCalendarEvent) => void;
-  completingTaskId?: string | null;
+  onTaskStatusChange?: (event: OrzuxCalendarEvent, status: "open" | "done") => void;
+  onTaskDelete?: (event: OrzuxCalendarEvent) => void;
+  updatingTaskId?: string | null;
 };
 
 export function OrzuxCalendarEventSheet({
@@ -43,8 +45,9 @@ export function OrzuxCalendarEventSheet({
   onOpenChange,
   resources = [],
   timeZone,
-  onTaskComplete,
-  completingTaskId = null,
+  onTaskStatusChange,
+  onTaskDelete,
+  updatingTaskId = null,
 }: OrzuxCalendarEventSheetProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -66,8 +69,8 @@ export function OrzuxCalendarEventSheet({
     setEditing(false);
   }, [event, open]);
 
-  const isLocal = event?.source === "local" && !event.id.startsWith("google-");
-  const canEdit = isLocal && event?.kind !== "task";
+  const isStoredEvent = event?.id.startsWith("local-event-") ?? false;
+  const canEdit = isStoredEvent && event?.kind !== "task";
   const guests = event
     ? extractBookingGuests({
         description: event.description,
@@ -155,6 +158,8 @@ export function OrzuxCalendarEventSheet({
     ? ORZUX_CALENDAR_MESSAGES.editBooking
     : ORZUX_CALENDAR_MESSAGES.editEvent;
 
+  const isDoneTask = event.kind === "task" && event.taskStatus === "done";
+
   return (
     <Dialog
       open={open}
@@ -171,7 +176,9 @@ export function OrzuxCalendarEventSheet({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
               <DialogTitle className="text-left text-lg leading-snug">
-                {editing ? editLabel : event.summary}
+                <span className={cn(isDoneTask && "line-through decoration-amber-700/60")}>
+                  {editing ? editLabel : event.summary}
+                </span>
               </DialogTitle>
               {!editing ? (
                 <p className="text-sm text-muted-foreground">
@@ -262,8 +269,17 @@ export function OrzuxCalendarEventSheet({
           ) : (
             <div className="space-y-4 text-sm">
               {event.kind === "task" ? (
-                <div className="rounded-lg border bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-200">
-                  {ORZUX_CALENDAR_MESSAGES.createTask}
+                <div
+                  className={cn(
+                    "rounded-lg border px-3 py-2",
+                    isDoneTask
+                      ? "border-amber-500/25 bg-amber-500/5 text-amber-800/70 line-through dark:text-amber-200/70"
+                      : "border-amber-500/40 bg-amber-500/5 text-amber-800 dark:text-amber-200",
+                  )}
+                >
+                  {isDoneTask
+                    ? ORZUX_CALENDAR_MESSAGES.taskCompletedLabel
+                    : ORZUX_CALENDAR_MESSAGES.createTask}
                 </div>
               ) : null}
               {event.isBooking ? (
@@ -384,16 +400,35 @@ export function OrzuxCalendarEventSheet({
               {ORZUX_CALENDAR_MESSAGES.deleteEvent}
             </Button>
           ) : event.kind === "task" ? (
-            <Button
-              className="w-full"
-              disabled={completingTaskId === event.recordId}
-              onClick={() => onTaskComplete?.(event)}
-            >
-              {completingTaskId === event.recordId ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : null}
-              {ORZUX_CALENDAR_MESSAGES.taskMarkDone}
-            </Button>
+            <div className="flex w-full flex-col gap-2">
+              <Button
+                className="w-full"
+                variant={isDoneTask ? "outline" : "default"}
+                disabled={updatingTaskId === event.recordId}
+                onClick={() =>
+                  onTaskStatusChange?.(event, isDoneTask ? "open" : "done")
+                }
+              >
+                {updatingTaskId === event.recordId ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : null}
+                {isDoneTask
+                  ? ORZUX_CALENDAR_MESSAGES.taskMarkUndone
+                  : ORZUX_CALENDAR_MESSAGES.taskMarkDone}
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full"
+                disabled={updatingTaskId === event.recordId}
+                onClick={() => onTaskDelete?.(event)}
+              >
+                {updatingTaskId === event.recordId ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : null}
+                <Trash2Icon className="size-4" />
+                {ORZUX_CALENDAR_MESSAGES.deleteTask}
+              </Button>
+            </div>
           ) : null}
         </DialogFooter>
       </DialogContent>

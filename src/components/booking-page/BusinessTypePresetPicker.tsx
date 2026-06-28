@@ -1,11 +1,11 @@
 "use client";
 
 import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
-  BUSINESS_TYPE_PRESET_LIST,
   getBusinessTypePreset,
+  getPresetsByCategory,
 } from "@/lib/calendar/business-type-presets";
 import { BUSINESS_TYPE_ICONS } from "@/lib/calendar/business-type-icons";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
@@ -30,6 +30,7 @@ export function BusinessTypePresetPicker({
   const [expanded, setExpanded] = useState(false);
   const selected = getBusinessTypePreset(value);
   const SelectedIcon = BUSINESS_TYPE_ICONS[value];
+  const groupedPresets = useMemo(() => getPresetsByCategory(), []);
 
   function selectType(type: BusinessBookingType) {
     onChange(type);
@@ -70,36 +71,45 @@ export function BusinessTypePresetPicker({
       </button>
 
       {expanded ? (
-        <div className="max-h-56 overflow-y-auto overscroll-contain rounded-lg border bg-card p-2">
-          <div className="grid gap-1.5">
-            {BUSINESS_TYPE_PRESET_LIST.map((preset) => {
-              const Icon = BUSINESS_TYPE_ICONS[preset.type];
-              const isActive = preset.type === value;
+        <div className="max-h-72 overflow-y-auto overscroll-contain rounded-lg border bg-card p-2">
+          <div className="space-y-3">
+            {groupedPresets.map((group) => (
+              <div key={group.category}>
+                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.category}
+                </p>
+                <div className="grid gap-1">
+                  {group.presets.map((preset) => {
+                    const Icon = BUSINESS_TYPE_ICONS[preset.type];
+                    const isActive = preset.type === value;
 
-              return (
-                <button
-                  key={preset.type}
-                  type="button"
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
-                    isActive
-                      ? "bg-primary/10 ring-1 ring-primary/20"
-                      : "hover:bg-muted/60",
-                  )}
-                  onClick={() => selectType(preset.type)}
-                >
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <Icon className="size-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">{preset.label}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      {preset.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+                    return (
+                      <button
+                        key={preset.type}
+                        type="button"
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
+                          isActive
+                            ? "bg-primary/10 ring-1 ring-primary/20"
+                            : "hover:bg-muted/60",
+                        )}
+                        onClick={() => selectType(preset.type)}
+                      >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <Icon className="size-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">{preset.label}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {preset.description}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}

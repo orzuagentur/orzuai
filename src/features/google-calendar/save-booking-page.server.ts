@@ -38,7 +38,7 @@ const formFieldSchema = z.object({
   id: z.string().min(1),
   key: z.string().min(1).max(80),
   label: z.string().trim().min(1).max(120),
-  type: z.enum(["first_name", "last_name", "email", "phone", "text", "textarea"]),
+  type: z.enum(["first_name", "last_name", "email", "phone", "text", "textarea", "number"]),
   required: z.boolean(),
   system: z.boolean().optional(),
 });
