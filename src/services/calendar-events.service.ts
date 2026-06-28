@@ -180,6 +180,7 @@ function parseGoogleEventDateTimes(event: GoogleCalendarEvent): {
 
 export async function syncGoogleCalendarEventsForBusiness(
   businessId: string,
+  options?: { revalidate?: boolean },
 ): Promise<{ synced: number; syncError?: string }> {
   const result = await getGoogleCalendarEventsForBusiness(businessId);
 
@@ -240,7 +241,10 @@ export async function syncGoogleCalendarEventsForBusiness(
     }
   }
 
-  revalidatePath(DASHBOARD_ROUTES.calendar);
+  if (options?.revalidate) {
+    revalidatePath(DASHBOARD_ROUTES.calendar);
+  }
+
   return { synced, syncError: result.syncError };
 }
 

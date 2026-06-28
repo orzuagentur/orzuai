@@ -27,7 +27,9 @@ export async function POST() {
       );
     }
 
-    const result = await syncGoogleCalendarEventsForBusiness(business.id);
+    const result = await syncGoogleCalendarEventsForBusiness(business.id, {
+      revalidate: true,
+    });
 
     if (result.syncError) {
       return NextResponse.json(
