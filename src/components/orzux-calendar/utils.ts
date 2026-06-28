@@ -115,6 +115,43 @@ export function formatTimeRange(
   return `${formatter.format(new Date(startIso))} – ${formatter.format(new Date(endIso))}`;
 }
 
+export function formatEventDateTimeRange(
+  startIso: string,
+  endIso: string,
+  locale?: string,
+): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+
+  if (isSameDay(start, end)) {
+    return formatTimeRange(startIso, endIso, locale);
+  }
+
+  const formatter = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: start.getFullYear() !== end.getFullYear() ? "numeric" : undefined,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
+export function formatSingleDateTime(iso: string, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+export function isSameCalendarDay(startIso: string, endIso: string): boolean {
+  return isSameDay(new Date(startIso), new Date(endIso));
+}
+
 export function dateTimeFromGridClick(
   day: Date,
   offsetY: number,
@@ -145,6 +182,7 @@ export function eventsOverlap(
 export type TimedEventColumnLayout<T extends { start: string; end: string }> = {
   item: T;
   top: number;
+  height: number;
   column: number;
   columnCount: number;
 };
@@ -152,33 +190,41 @@ export type TimedEventColumnLayout<T extends { start: string; end: string }> = {
 export function layoutTimedEventsInColumns<T extends { start: string; end: string }>(
   items: T[],
   day: Date,
+  minHeight = 44,
 ): TimedEventColumnLayout<T>[] {
   const positioned = items
     .map((item) => {
-      const top = getEventStartTop(item, day);
-      if (top === null) return null;
-      return { item, top };
+      const layout = getTimedEventLayout(item, day);
+      if (!layout) return null;
+      return {
+        item,
+        top: layout.top,
+        height: Math.max(layout.height, minHeight),
+      };
     })
-    .filter((entry): entry is { item: T; top: number } => entry !== null)
+    .filter(
+      (entry): entry is { item: T; top: number; height: number } => entry !== null,
+    )
     .sort(
       (a, b) =>
         a.top - b.top ||
-        new Date(a.item.start).getTime() - new Date(b.item.start).getTime(),
+        new Date(a.item.start).getTime() - new Date(b.item.start).getTime() ||
+        new Date(b.item.end).getTime() - new Date(a.item.end).getTime(),
     );
 
   const columns: T[][] = [];
-  const result: TimedEventColumnLayout<T>[] = [];
+  const preliminary: Array<{ item: T; top: number; height: number; column: number }> = [];
 
-  for (const { item, top } of positioned) {
+  for (const entry of positioned) {
     let placedColumn = -1;
 
     for (let column = 0; column < columns.length; column += 1) {
       const columnItems = columns[column];
       if (!columnItems) continue;
 
-      const overlapsColumn = columnItems.some((existing) => eventsOverlap(existing, item));
+      const overlapsColumn = columnItems.some((existing) => eventsOverlap(existing, entry.item));
       if (!overlapsColumn) {
-        columnItems.push(item);
+        columnItems.push(entry.item);
         placedColumn = column;
         break;
       }
@@ -186,21 +232,42 @@ export function layoutTimedEventsInColumns<T extends { start: string; end: strin
 
     if (placedColumn === -1) {
       placedColumn = columns.length;
-      columns.push([item]);
+      columns.push([entry.item]);
     }
 
-    result.push({
-      item,
-      top,
+    preliminary.push({
+      item: entry.item,
+      top: entry.top,
+      height: entry.height,
       column: placedColumn,
-      columnCount: columns.length,
     });
   }
 
-  return result.map((entry) => ({
-    ...entry,
-    columnCount: columns.length,
-  }));
+  return preliminary.map((entry) => {
+    const overlapping = preliminary.filter(
+      (other) => other.item !== entry.item && eventsOverlap(other.item, entry.item),
+    );
+    const columnCount =
+      Math.max(entry.column, ...overlapping.map((other) => other.column), 0) + 1;
+
+    return {
+      ...entry,
+      columnCount,
+    };
+  });
+}
+
+export function getColumnEventStyle(column: number, columnCount: number): {
+  left: string;
+  width: string;
+} {
+  const gapPx = 4;
+  const widthPercent = 100 / columnCount;
+
+  return {
+    left: `calc(${column * widthPercent}% + ${gapPx / 2}px)`,
+    width: `calc(${widthPercent}% - ${gapPx}px)`,
+  };
 }
 
 const BOOKING_CHIP_COLORS = [

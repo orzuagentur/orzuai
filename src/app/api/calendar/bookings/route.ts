@@ -9,13 +9,17 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { formatSlotForDisplay } from "@/lib/calendar/slot-engine";
 
+const guestSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email(),
+});
+
 const schema = z.object({
   resourceId: z.string().uuid(),
   startDateTime: z.string().min(1),
-  endDateTime: z.string().min(1).optional(),
+  endDateTime: z.string().min(1),
   timeZone: z.string().min(1),
-  customerName: z.string().trim().min(1).max(120),
-  customerEmail: z.string().trim().email(),
+  guests: z.array(guestSchema).min(1).max(20),
   customerPhone: z.string().trim().max(40).optional(),
   notes: z.string().trim().max(2000).optional(),
   bookingPageId: z.string().uuid().optional(),
@@ -39,11 +43,18 @@ export async function POST(request: Request) {
     }
 
     const start = new Date(body.startDateTime);
-    const end = body.endDateTime
-      ? new Date(body.endDateTime)
-      : new Date(start.getTime() + resource.durationMinutes * 60 * 1000);
+    const end = new Date(body.endDateTime);
 
-    const summary = [resource.name, body.customerName].filter(Boolean).join(" · ");
+    if (end.getTime() <= start.getTime()) {
+      return NextResponse.json(
+        { success: false, message: "End time must be after start time." },
+        { status: 400 },
+      );
+    }
+
+    const primaryGuest = body.guests[0]!;
+    const guestSummary = body.guests.map((guest) => guest.name).join(", ");
+    const summary = [resource.name, guestSummary].filter(Boolean).join(" · ");
 
     const slotResolution = await resolveBookingSlot({
       businessId: business.id,
@@ -64,10 +75,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const guestLines = body.guests.map(
+      (guest, index) => `Guest ${index + 1}: ${guest.name} <${guest.email}>`,
+    );
+
     const description = [
       body.notes?.trim() ? `Notes: ${body.notes.trim()}` : null,
       body.customerPhone?.trim() ? `Phone: ${body.customerPhone.trim()}` : null,
-      `Email: ${body.customerEmail.trim()}`,
+      ...guestLines,
       `Resource: ${resource.name}`,
       "Source: Dashboard booking",
     ]
@@ -83,8 +98,8 @@ export async function POST(request: Request) {
       timeZone: body.timeZone,
       resourceId: resource.id,
       bookingPageId: body.bookingPageId ?? null,
-      customerName: body.customerName,
-      customerEmail: body.customerEmail,
+      customerName: guestSummary,
+      customerEmail: primaryGuest.email,
       isBooking: true,
     });
 
@@ -92,31 +107,35 @@ export async function POST(request: Request) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    const emailResult = await sendBookingConfirmationEmail({
-      businessId: business.id,
-      businessName: business.business_name,
-      pageTitle: resource.name,
-      customerEmail: body.customerEmail,
-      customerName: body.customerName,
-      slotLabel: formatSlotForDisplay(
-        {
-          start: new Date(slotResolution.startDateTime),
-          end: new Date(slotResolution.endDateTime),
-        },
-        body.timeZone,
-      ),
-      resourceName: resource.name,
-      timeZone: body.timeZone,
-    });
+    const slotLabel = formatSlotForDisplay(
+      {
+        start: new Date(slotResolution.startDateTime),
+        end: new Date(slotResolution.endDateTime),
+      },
+      body.timeZone,
+    );
 
-    if (!emailResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: emailResult.error ?? "Booking saved but confirmation email could not be sent.",
-        },
-        { status: 502 },
-      );
+    for (const guest of body.guests) {
+      const emailResult = await sendBookingConfirmationEmail({
+        businessId: business.id,
+        businessName: business.business_name,
+        pageTitle: resource.name,
+        customerEmail: guest.email,
+        customerName: guest.name,
+        slotLabel,
+        resourceName: resource.name,
+        timeZone: body.timeZone,
+      });
+
+      if (!emailResult.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: emailResult.error ?? "Booking saved but confirmation email could not be sent.",
+          },
+          { status: 502 },
+        );
+      }
     }
 
     return NextResponse.json({ success: true, eventId: result.eventId });

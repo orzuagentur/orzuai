@@ -16,9 +16,11 @@ import {
   dateTimeFromGridClick,
   eventOccursOnDay,
   formatDayColumnHeader,
+  formatEventDateTimeRange,
   formatTimeRange,
   getBookingChipColor,
-  getTimedEventLayout,
+  getColumnEventStyle,
+  isSameCalendarDay,
   isSameDay,
   layoutTimedEventsInColumns,
 } from "./utils";
@@ -46,7 +48,7 @@ function getCurrentTimeLineTop(now: Date): number {
 function getBookingTooltip(event: OrzuxCalendarEvent): string {
   const parts = [event.summary || ORZUX_CALENDAR_MESSAGES.bookingBadge];
   if (event.resourceName) parts.push(event.resourceName);
-  parts.push(formatTimeRange(event.start, event.end));
+  parts.push(formatEventDateTimeRange(event.start, event.end));
   return parts.join(" · ");
 }
 
@@ -74,9 +76,28 @@ export function OrzuxCalendarDayGrid({
   const bookingEvents = timedEvents.filter((event) => event.isBooking);
   const regularTimedEvents = timedEvents.filter((event) => !event.isBooking);
 
-  const bookingLayouts = useMemo(
-    () => layoutTimedEventsInColumns(bookingEvents, selectedDate),
-    [bookingEvents, selectedDate],
+  const sameDayBookings = useMemo(
+    () => bookingEvents.filter((event) => isSameCalendarDay(event.start, event.end)),
+    [bookingEvents],
+  );
+  const multiDayBookings = useMemo(
+    () => bookingEvents.filter((event) => !isSameCalendarDay(event.start, event.end)),
+    [bookingEvents],
+  );
+
+  const eventLayouts = useMemo(
+    () => layoutTimedEventsInColumns(regularTimedEvents, selectedDate),
+    [regularTimedEvents, selectedDate],
+  );
+
+  const bookingChipLayouts = useMemo(
+    () => layoutTimedEventsInColumns(sameDayBookings, selectedDate, BOOKING_CHIP_SIZE_PX),
+    [sameDayBookings, selectedDate],
+  );
+
+  const multiDayBookingLayouts = useMemo(
+    () => layoutTimedEventsInColumns(multiDayBookings, selectedDate),
+    [multiDayBookings, selectedDate],
   );
 
   useEffect(() => {
@@ -167,18 +188,15 @@ export function OrzuxCalendarDayGrid({
               />
             ))}
 
-            {regularTimedEvents.map((event) => {
-              const layout = getTimedEventLayout(event, selectedDate);
-              if (!layout) return null;
-
-              const minHeight = Math.max(layout.height, 44);
+            {eventLayouts.map(({ item: event, top, height, column, columnCount }) => {
+              const position = getColumnEventStyle(column, columnCount);
 
               return (
                 <button
                   key={event.id}
                   type="button"
                   className={cn(
-                    "absolute inset-x-1.5 overflow-hidden rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition hover:brightness-95",
+                    "absolute overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm transition hover:brightness-95",
                     event.isTask
                       ? "border-amber-500/40 bg-amber-500/15"
                       : event.source === "local"
@@ -186,8 +204,10 @@ export function OrzuxCalendarDayGrid({
                         : "border-blue-500/40 bg-blue-500/15",
                   )}
                   style={{
-                    top: layout.top,
-                    height: minHeight,
+                    top,
+                    height,
+                    left: position.left,
+                    width: position.width,
                     zIndex: 2,
                   }}
                   onClick={(clickEvent) => {
@@ -195,8 +215,8 @@ export function OrzuxCalendarDayGrid({
                     onEventClick?.(event);
                   }}
                 >
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug">{event.summary}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="truncate text-xs font-semibold leading-snug">{event.summary}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
                     {formatTimeRange(event.start, event.end)}
                   </p>
                   {event.htmlLink ? (
@@ -204,18 +224,49 @@ export function OrzuxCalendarDayGrid({
                       href={event.htmlLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="absolute right-1.5 top-1.5 rounded p-0.5 hover:bg-background/60"
+                      className="absolute right-1 top-1 rounded p-0.5 hover:bg-background/60"
                       aria-label={ORZUX_CALENDAR_MESSAGES.openInGoogle}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <ExternalLinkIcon className="size-3.5" />
+                      <ExternalLinkIcon className="size-3" />
                     </a>
                   ) : null}
                 </button>
               );
             })}
 
-            {bookingLayouts.map(({ item: event, top, column }) => {
+            {multiDayBookingLayouts.map(({ item: event, top, height, column, columnCount }) => {
+              const position = getColumnEventStyle(column, columnCount);
+              const color = getBookingChipColor(event.resourceId ?? event.recordId);
+
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  className="absolute overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm transition hover:brightness-95"
+                  style={{
+                    top,
+                    height,
+                    left: position.left,
+                    width: position.width,
+                    borderColor: `${color}66`,
+                    backgroundColor: `${color}22`,
+                    zIndex: 3,
+                  }}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation();
+                    onEventClick?.(event);
+                  }}
+                >
+                  <p className="truncate text-xs font-semibold leading-snug">{event.summary}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {formatEventDateTimeRange(event.start, event.end)}
+                  </p>
+                </button>
+              );
+            })}
+
+            {bookingChipLayouts.map(({ item: event, top, column }) => {
               const color = getBookingChipColor(event.resourceId ?? event.recordId);
               const left = 6 + column * (BOOKING_CHIP_SIZE_PX + BOOKING_CHIP_GAP_PX);
 
@@ -232,7 +283,7 @@ export function OrzuxCalendarDayGrid({
                     width: BOOKING_CHIP_SIZE_PX,
                     height: BOOKING_CHIP_SIZE_PX,
                     backgroundColor: color,
-                    zIndex: 3,
+                    zIndex: 4,
                   }}
                   onClick={(clickEvent) => {
                     clickEvent.stopPropagation();

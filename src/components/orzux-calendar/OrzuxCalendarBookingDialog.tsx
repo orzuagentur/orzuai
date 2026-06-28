@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2Icon } from "lucide-react";
+import { Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -26,6 +26,12 @@ export type CalendarResourceOption = {
   durationMinutes: number;
 };
 
+type GuestEntry = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 type OrzuxCalendarBookingDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +39,20 @@ type OrzuxCalendarBookingDialogProps = {
   timeZone: string;
   initialStart?: Date | null;
 };
+
+function createGuest(): GuestEntry {
+  return {
+    id: crypto.randomUUID(),
+    name: "",
+    email: "",
+  };
+}
+
+function defaultEndFromStart(startValue: string, durationMinutes: number): string {
+  const startDate = new Date(startValue);
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+  return toLocalDateTimeValue(endDate);
+}
 
 export function OrzuxCalendarBookingDialog({
   open,
@@ -44,13 +64,14 @@ export function OrzuxCalendarBookingDialog({
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
+  const [guests, setGuests] = useState<GuestEntry[]>([createGuest()]);
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
 
   const selectedResource = resources.find((resource) => resource.id === resourceId);
+  const durationMinutes = selectedResource?.durationMinutes ?? 60;
 
   useEffect(() => {
     if (!open) return;
@@ -62,28 +83,79 @@ export function OrzuxCalendarBookingDialog({
       base.setHours(9, 0, 0, 0);
     }
 
-    setStart(toLocalDateTimeValue(base));
+    const startValue = toLocalDateTimeValue(base);
+    setStart(startValue);
+    setEnd(defaultEndFromStart(startValue, resources[0]?.durationMinutes ?? 60));
     setResourceId(resources[0]?.id ?? "");
-    setCustomerName("");
-    setCustomerEmail("");
+    setGuests([createGuest()]);
     setCustomerPhone("");
     setNotes("");
   }, [open, initialStart, resources]);
 
+  function handleStartChange(value: string) {
+    setStart(value);
+    setEnd(defaultEndFromStart(value, durationMinutes));
+  }
+
+  function handleResourceChange(value: string) {
+    setResourceId(value);
+    const resource = resources.find((item) => item.id === value);
+    if (start) {
+      setEnd(defaultEndFromStart(start, resource?.durationMinutes ?? 60));
+    }
+  }
+
+  function updateGuest(id: string, patch: Partial<Pick<GuestEntry, "name" | "email">>) {
+    setGuests((current) =>
+      current.map((guest) => (guest.id === id ? { ...guest, ...patch } : guest)),
+    );
+  }
+
+  function addGuest() {
+    setGuests((current) => [...current, createGuest()]);
+  }
+
+  function removeGuest(id: string) {
+    setGuests((current) => (current.length <= 1 ? current : current.filter((guest) => guest.id !== id)));
+  }
+
   async function handleSubmit() {
-    if (!resourceId || !customerName.trim()) {
+    if (!resourceId) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.bookingResourcesRequired);
+      return;
+    }
+
+    const normalizedGuests = guests
+      .map((guest) => ({
+        name: guest.name.trim(),
+        email: guest.email.trim().toLowerCase(),
+      }))
+      .filter((guest) => guest.name || guest.email);
+
+    if (normalizedGuests.length === 0 || !normalizedGuests[0]?.name) {
       toast.error(ORZUX_CALENDAR_MESSAGES.bookingGuestRequired);
       return;
     }
 
-    if (!customerEmail.trim() || !customerEmail.includes("@")) {
-      toast.error(ORZUX_CALENDAR_MESSAGES.bookingEmailRequired);
-      return;
+    for (const guest of normalizedGuests) {
+      if (!guest.name || !guest.email.includes("@")) {
+        toast.error(ORZUX_CALENDAR_MESSAGES.bookingGuestEmailRequired);
+        return;
+      }
     }
 
     const startDate = new Date(start);
-    const endDate = new Date(startDate);
-    endDate.setMinutes(endDate.getMinutes() + (selectedResource?.durationMinutes ?? 60));
+    const endDate = new Date(end);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.bookingInvalidDates);
+      return;
+    }
+
+    if (endDate.getTime() <= startDate.getTime()) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.endBeforeStart);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -95,8 +167,7 @@ export function OrzuxCalendarBookingDialog({
           startDateTime: startDate.toISOString(),
           endDateTime: endDate.toISOString(),
           timeZone,
-          customerName: customerName.trim(),
-          customerEmail: customerEmail.trim(),
+          guests: normalizedGuests,
           customerPhone: customerPhone.trim() || undefined,
           notes: notes.trim() || undefined,
         }),
@@ -136,7 +207,7 @@ export function OrzuxCalendarBookingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{ORZUX_CALENDAR_MESSAGES.createBooking}</DialogTitle>
         </DialogHeader>
@@ -147,7 +218,7 @@ export function OrzuxCalendarBookingDialog({
             <select
               id="booking-resource"
               value={resourceId}
-              onChange={(e) => setResourceId(e.target.value)}
+              onChange={(e) => handleResourceChange(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               {resources.map((resource) => (
@@ -159,35 +230,71 @@ export function OrzuxCalendarBookingDialog({
             </select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="booking-start">{ORZUX_CALENDAR_MESSAGES.eventStart}</Label>
-            <Input
-              id="booking-start"
-              type="datetime-local"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          </div>
-
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="booking-guest">{ORZUX_CALENDAR_MESSAGES.guestLabel} *</Label>
+              <Label htmlFor="booking-start">{ORZUX_CALENDAR_MESSAGES.eventStart}</Label>
               <Input
-                id="booking-guest"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder={ORZUX_CALENDAR_MESSAGES.publicBookFirstName}
+                id="booking-start"
+                type="datetime-local"
+                value={start}
+                onChange={(e) => handleStartChange(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="booking-email">{ORZUX_CALENDAR_MESSAGES.publicBookEmail} *</Label>
+              <Label htmlFor="booking-end">{ORZUX_CALENDAR_MESSAGES.eventEnd}</Label>
               <Input
-                id="booking-email"
-                type="email"
-                required
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
+                id="booking-end"
+                type="datetime-local"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
               />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label>{ORZUX_CALENDAR_MESSAGES.guestsLabel}</Label>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1" onClick={addGuest}>
+                <PlusIcon className="size-3.5" />
+                {ORZUX_CALENDAR_MESSAGES.addGuest}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {guests.map((guest, index) => (
+                <div key={guest.id} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {ORZUX_CALENDAR_MESSAGES.guestLabel} {index + 1}
+                    </p>
+                    {guests.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        aria-label={ORZUX_CALENDAR_MESSAGES.removeGuest}
+                        onClick={() => removeGuest(guest.id)}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      value={guest.name}
+                      onChange={(e) => updateGuest(guest.id, { name: e.target.value })}
+                      placeholder={ORZUX_CALENDAR_MESSAGES.publicBookFirstName}
+                    />
+                    <Input
+                      type="email"
+                      value={guest.email}
+                      onChange={(e) => updateGuest(guest.id, { email: e.target.value })}
+                      placeholder={ORZUX_CALENDAR_MESSAGES.publicBookEmail}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

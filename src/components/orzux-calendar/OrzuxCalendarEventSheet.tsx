@@ -18,7 +18,32 @@ import {
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
 
-import { formatTimeRange, toLocalDateTimeValue } from "./utils";
+import { formatEventDateTimeRange, formatSingleDateTime, toLocalDateTimeValue } from "./utils";
+
+function parseBookingGuests(event: OrzuxCalendarEvent): Array<{ name: string; email?: string }> {
+  const fromDescription = (event.description ?? "")
+    .split("\n")
+    .map((line) => line.match(/^Guest \d+: (.+?) <([^>]+)>$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({
+      name: match[1]?.trim() ?? "",
+      email: match[2]?.trim(),
+    }))
+    .filter((guest) => guest.name);
+
+  if (fromDescription.length > 0) {
+    return fromDescription;
+  }
+
+  return (event.customerName ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name, index) => ({
+      name,
+      email: index === 0 ? event.customerEmail ?? undefined : undefined,
+    }));
+}
 
 type CalendarResourceOption = {
   id: string;
@@ -161,7 +186,7 @@ export function OrzuxCalendarEventSheet({
           </div>
           {!editing ? (
             <p className="text-sm text-muted-foreground">
-              {formatTimeRange(event.start, event.end)}
+              {formatEventDateTimeRange(event.start, event.end)}
             </p>
           ) : null}
         </SheetHeader>
@@ -231,6 +256,20 @@ export function OrzuxCalendarEventSheet({
                   {ORZUX_CALENDAR_MESSAGES.bookingBadge}
                 </div>
               ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    {ORZUX_CALENDAR_MESSAGES.eventStart}
+                  </p>
+                  <p className="mt-1">{formatSingleDateTime(event.start)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    {ORZUX_CALENDAR_MESSAGES.eventEnd}
+                  </p>
+                  <p className="mt-1">{formatSingleDateTime(event.end)}</p>
+                </div>
+              </div>
               {event.resourceName ? (
                 <div>
                   <p className="text-xs font-medium uppercase text-muted-foreground">
@@ -242,12 +281,18 @@ export function OrzuxCalendarEventSheet({
               {event.customerName ? (
                 <div>
                   <p className="text-xs font-medium uppercase text-muted-foreground">
-                    {ORZUX_CALENDAR_MESSAGES.guestLabel}
+                    {ORZUX_CALENDAR_MESSAGES.guestsLabel}
                   </p>
-                  <p className="mt-1">{event.customerName}</p>
-                  {event.customerEmail ? (
-                    <p className="text-muted-foreground">{event.customerEmail}</p>
-                  ) : null}
+                  <ul className="mt-1 space-y-1">
+                    {parseBookingGuests(event).map((guest) => (
+                      <li key={`${guest.name}-${guest.email ?? ""}`}>
+                        <span>{guest.name}</span>
+                        {guest.email ? (
+                          <span className="text-muted-foreground"> · {guest.email}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
               {event.description ? (
