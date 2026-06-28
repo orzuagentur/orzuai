@@ -23,6 +23,7 @@ import { OrzuxCalendarCreateMenu } from "./OrzuxCalendarCreateMenu";
 import { OrzuxCalendarDayGrid } from "./OrzuxCalendarDayGrid";
 import { OrzuxCalendarEventSheet } from "./OrzuxCalendarEventSheet";
 import { OrzuxCalendarMiniMonth } from "./OrzuxCalendarMiniMonth";
+import { OrzuxCalendarSlotSheet } from "./OrzuxCalendarSlotSheet";
 import {
   addDays,
   formatHeaderDate,
@@ -73,13 +74,19 @@ export function OrzuxCalendar({
   const [selectedEvent, setSelectedEvent] = useState<OrzuxCalendarEvent | null>(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [slotSheetOpen, setSlotSheetOpen] = useState(false);
+  const [slotTime, setSlotTime] = useState<Date | null>(null);
   const [bookingInitialStart, setBookingInitialStart] = useState<Date | null>(null);
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
-  const daysWithBookings = useMemo(() => {
+  const daysWithEvents = useMemo(() => {
     const set = new Set<string>();
     for (const event of events) {
-      if (!event.isBooking) continue;
-      set.add(startOfDay(new Date(event.start)).toDateString());
+      const start = event.isAllDay
+        ? new Date(`${event.start}T12:00:00`)
+        : new Date(event.start);
+      set.add(startOfDay(start).toDateString());
     }
     return set;
   }, [events]);
@@ -183,12 +190,24 @@ export function OrzuxCalendar({
               setSelectedEvent(event);
               setEventSheetOpen(true);
             }}
-            onSlotClick={(time) => openBooking(time)}
+            onSlotClick={(time) => {
+              setSlotTime(time);
+              setSlotSheetOpen(true);
+            }}
           />
 
           <div className="pointer-events-none absolute bottom-6 right-6 z-30">
             <div className="pointer-events-auto">
-              <OrzuxCalendarCreateMenu variant="fab" onOpenBooking={() => openBooking()} />
+              <OrzuxCalendarCreateMenu
+                selectedDate={selectedDate}
+                variant="fab"
+                bookingPageCount={bookingPages.length}
+                onOpenBooking={() => openBooking()}
+                eventOpen={eventDialogOpen}
+                onEventOpenChange={setEventDialogOpen}
+                taskOpen={taskDialogOpen}
+                onTaskOpenChange={setTaskDialogOpen}
+              />
             </div>
           </div>
         </div>
@@ -204,7 +223,16 @@ export function OrzuxCalendar({
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <OrzuxCalendarCreateMenu variant="sidebar" onOpenBooking={() => openBooking()} />
+                    <OrzuxCalendarCreateMenu
+                      selectedDate={selectedDate}
+                      variant="sidebar"
+                      bookingPageCount={bookingPages.length}
+                      onOpenBooking={() => openBooking()}
+                      eventOpen={eventDialogOpen}
+                      onEventOpenChange={setEventDialogOpen}
+                      taskOpen={taskDialogOpen}
+                      onTaskOpenChange={setTaskDialogOpen}
+                    />
                   </div>
                   <Button
                     type="button"
@@ -225,7 +253,7 @@ export function OrzuxCalendar({
                   visibleMonth={visibleMonth}
                   onSelectDate={setSelectedDate}
                   onVisibleMonthChange={setVisibleMonth}
-                  daysWithEvents={daysWithBookings}
+                  daysWithEvents={daysWithEvents}
                 />
 
                 <details
@@ -280,6 +308,18 @@ export function OrzuxCalendar({
         resources={resources}
         timeZone={timeZone}
         initialStart={bookingInitialStart}
+      />
+
+      <OrzuxCalendarSlotSheet
+        open={slotSheetOpen}
+        onOpenChange={setSlotSheetOpen}
+        slotTime={slotTime}
+        onCreateBooking={() => {
+          setBookingInitialStart(slotTime);
+          setBookingOpen(true);
+        }}
+        onCreateEvent={() => setEventDialogOpen(true)}
+        onCreateTask={() => setTaskDialogOpen(true)}
       />
     </div>
   );

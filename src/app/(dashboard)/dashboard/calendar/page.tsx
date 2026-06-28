@@ -11,7 +11,9 @@ import { getBusinessBookingSetup } from "@/services/business-calendar-setup.serv
 import { listBookingPagesForBusiness } from "@/services/booking-pages.service";
 import {
   listCalendarBookingsForBusiness,
-  toOrzuxCalendarEvent,
+  listCalendarEventsForBusiness,
+  listCalendarTasksForBusiness,
+  mergeCalendarEvents,
 } from "@/services/calendar-events.service";
 import { getCalendarAvailabilityPageData } from "@/services/calendar-availability.service";
 import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
@@ -37,22 +39,45 @@ async function CalendarPageContent() {
   const googleConnected = connection?.status === "connected";
   const bookingSetup = await getBusinessBookingSetup(business.id);
 
-  const [bookings, availability, bookingPages, resources] = await Promise.all([
-    listCalendarBookingsForBusiness(business.id).catch(() => []),
-    getCalendarAvailabilityPageData(business.id).catch(() => ({
-      slots: [],
-      timeZone: bookingSetup?.bookingTimezone ?? "UTC",
-    })),
-    listBookingPagesForBusiness(business.id).catch(() => []),
-    listAllBusinessCalendarResources(business.id).catch(() => []),
-  ]);
+  const [bookings, localEvents, localTasks, availability, bookingPages, resources] =
+    await Promise.all([
+      listCalendarBookingsForBusiness(business.id).catch(() => []),
+      listCalendarEventsForBusiness(business.id).catch(() => []),
+      listCalendarTasksForBusiness(business.id).catch(() => []),
+      getCalendarAvailabilityPageData(business.id).catch(() => ({
+        slots: [],
+        timeZone: bookingSetup?.bookingTimezone ?? "UTC",
+      })),
+      listBookingPagesForBusiness(business.id).catch(() => []),
+      listAllBusinessCalendarResources(business.id).catch(() => []),
+    ]);
 
   const resourceNameMap = Object.fromEntries(resources.map((resource) => [resource.id, resource.name]));
 
-  const events = bookings.map((record) => {
-    const event = toOrzuxCalendarEvent(record, resourceNameMap[record.resourceId ?? ""] ?? null);
-    return event;
+  const nonBookingEvents = localEvents.filter((record) => !record.isBooking);
+  const bookingEvents = mergeCalendarEvents({
+    localEvents: bookings,
+    localTasks: [],
+    googleEvents: [],
   });
+  const otherEvents = mergeCalendarEvents({
+    localEvents: nonBookingEvents,
+    localTasks,
+    googleEvents: [],
+  });
+
+  const events = [...bookingEvents, ...otherEvents]
+    .map((event) => {
+      if (!event.resourceId || event.resourceName) {
+        return event;
+      }
+
+      return {
+        ...event,
+        resourceName: resourceNameMap[event.resourceId] ?? null,
+      };
+    })
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
   return (
     <>

@@ -79,6 +79,7 @@ export async function submitPublicBooking(
     startDateTime: start.toISOString(),
     endDateTime: end.toISOString(),
     timeZone: page.bookingTimezone,
+    resourceId: resource?.id ?? null,
     resourceName: resource?.name ?? null,
     preferNearestSlot: false,
   });

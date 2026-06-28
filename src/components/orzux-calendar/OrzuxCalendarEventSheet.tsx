@@ -62,7 +62,7 @@ export function OrzuxCalendarEventSheet({
   }, [event, open]);
 
   const isLocal = event?.source === "local" && !event.id.startsWith("google-");
-  const canEdit = isLocal && Boolean(event?.isBooking);
+  const canEdit = isLocal && event?.kind !== "task";
 
   async function handleSave() {
     if (!event || !canEdit) return;

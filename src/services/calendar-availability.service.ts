@@ -150,6 +150,7 @@ async function getLocalBusyIntervals(input: {
     .from("calendar_events")
     .select("start_at, end_at, is_all_day, resource_id")
     .eq("business_id", input.businessId)
+    .eq("is_booking", true)
     .gte("start_at", input.timeMin.toISOString())
     .lte("start_at", input.timeMax.toISOString());
 
@@ -163,7 +164,7 @@ async function getLocalBusyIntervals(input: {
         return true;
       }
 
-      return !row.resource_id || row.resource_id === input.resourceId;
+      return row.resource_id === input.resourceId;
     })
     .map((row) => {
       const start = new Date(row.start_at);
@@ -188,11 +189,13 @@ export async function getCalendarBusyIntervals(input: {
   timeMax: Date;
   resourceId?: string | null;
 }): Promise<TimeInterval[]> {
-  const [localBusy, googleBusy] = await Promise.all([
-    getLocalBusyIntervals(input),
-    getGoogleCalendarBusyIntervals(input),
-  ]);
+  const localBusy = await getLocalBusyIntervals(input);
 
+  if (input.resourceId) {
+    return mergeBusyIntervals(localBusy);
+  }
+
+  const googleBusy = await getGoogleCalendarBusyIntervals(input);
   return mergeBusyIntervals([...localBusy, ...googleBusy]);
 }
 
@@ -515,6 +518,7 @@ export async function resolveBookingSlot(input: {
   startDateTime: string;
   endDateTime: string;
   timeZone: string;
+  resourceId?: string | null;
   resourceName?: string | null;
   preferNearestSlot?: boolean;
 }): Promise<BookingSlotResolution> {
@@ -541,6 +545,9 @@ export async function resolveBookingSlot(input: {
   }
 
   const resource =
+    (input.resourceId
+      ? resources.find((item) => item.id === input.resourceId) ?? null
+      : null) ??
     matchResourceByName(resources, input.resourceName) ??
     matchResourceFromSummary(resources, input.summary);
 
@@ -576,15 +583,16 @@ export async function resolveBookingSlot(input: {
   const timeZone =
     input.timeZone || bookingPage?.bookingTimezone || setup?.bookingTimezone || "UTC";
 
-  if (
-    isIntervalFree(candidate, busy, bufferMinutes) &&
-    (!operatingHours.enabled ||
-      (isWithinOperatingHours(candidate.start, operatingHours) &&
-        isWithinOperatingHours(
-          new Date(candidate.end.getTime() - 60_000),
-          operatingHours,
-        )))
-  ) {
+  const withinHours =
+    !operatingHours.enabled ||
+    (isWithinOperatingHours(candidate.start, operatingHours) &&
+      isWithinOperatingHours(
+        new Date(candidate.end.getTime() - 60_000),
+        operatingHours,
+      ));
+  const isFree = isIntervalFree(candidate, busy, bufferMinutes);
+
+  if (isFree && withinHours) {
     return {
       status: "available",
       startDateTime: candidate.start.toISOString(),
@@ -627,7 +635,11 @@ export async function resolveBookingSlot(input: {
 
   return {
     status: "unavailable",
-    reason: "Requested time overlaps an existing booking or is outside business hours.",
+    reason: !isFree
+      ? resource?.name
+        ? `${resource.name} is already booked at this time.`
+        : "Requested time overlaps an existing booking."
+      : "Requested time is outside business hours.",
     alternatives,
   };
 }

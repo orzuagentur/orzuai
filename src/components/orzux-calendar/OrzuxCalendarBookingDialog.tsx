@@ -76,6 +76,11 @@ export function OrzuxCalendarBookingDialog({
       return;
     }
 
+    if (!customerEmail.trim() || !customerEmail.includes("@")) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.bookingEmailRequired);
+      return;
+    }
+
     const startDate = new Date(start);
     const endDate = new Date(startDate);
     endDate.setMinutes(endDate.getMinutes() + (selectedResource?.durationMinutes ?? 60));
@@ -91,7 +96,7 @@ export function OrzuxCalendarBookingDialog({
           endDateTime: endDate.toISOString(),
           timeZone,
           customerName: customerName.trim(),
-          customerEmail: customerEmail.trim() || undefined,
+          customerEmail: customerEmail.trim(),
           customerPhone: customerPhone.trim() || undefined,
           notes: notes.trim() || undefined,
         }),
@@ -175,10 +180,11 @@ export function OrzuxCalendarBookingDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="booking-email">{ORZUX_CALENDAR_MESSAGES.publicBookEmail}</Label>
+              <Label htmlFor="booking-email">{ORZUX_CALENDAR_MESSAGES.publicBookEmail} *</Label>
               <Input
                 id="booking-email"
                 type="email"
+                required
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
               />

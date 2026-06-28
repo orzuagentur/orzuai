@@ -166,7 +166,11 @@ export const ORZUX_CALENDAR_MESSAGES = {
   bookingCreated: "Booking created",
   bookingCreateFailed: "Could not create booking",
   bookingGuestRequired: "Enter guest name",
+  bookingEmailRequired: "Enter guest email",
   bookingResourcesRequired: "Create a booking page with resources first.",
+  sendPage: "Send page",
+  sendPageMessage: "Book an appointment using this link:",
+  copyLinkFailed: "Could not copy link",
   publicBookChooseResource: "Choose a table, room, or service",
   publicBookResourceSlots: "Available times",
 } as const;
