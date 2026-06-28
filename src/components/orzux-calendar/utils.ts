@@ -173,9 +173,12 @@ export function layoutTimedEventsInColumns<T extends { start: string; end: strin
     let placedColumn = -1;
 
     for (let column = 0; column < columns.length; column += 1) {
-      const overlapsColumn = columns[column].some((existing) => eventsOverlap(existing, item));
+      const columnItems = columns[column];
+      if (!columnItems) continue;
+
+      const overlapsColumn = columnItems.some((existing) => eventsOverlap(existing, item));
       if (!overlapsColumn) {
-        columns[column].push(item);
+        columnItems.push(item);
         placedColumn = column;
         break;
       }
@@ -222,7 +225,10 @@ function hashString(value: string): number {
 }
 
 export function getBookingChipColor(seed: string): string {
-  return BOOKING_CHIP_COLORS[hashString(seed) % BOOKING_CHIP_COLORS.length];
+  return (
+    BOOKING_CHIP_COLORS[hashString(seed) % BOOKING_CHIP_COLORS.length] ??
+    BOOKING_CHIP_COLORS[0]
+  );
 }
 
 export const BOOKING_CHIP_SIZE_PX = 22;
