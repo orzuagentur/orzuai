@@ -1844,6 +1844,9 @@ export type Database = {
           id: string;
           business_id: string;
           title: string;
+          description: string;
+          start_at: string | null;
+          end_at: string | null;
           due_at: string | null;
           status: string;
           google_event_id: string | null;
@@ -1854,6 +1857,9 @@ export type Database = {
           id?: string;
           business_id: string;
           title: string;
+          description?: string;
+          start_at?: string | null;
+          end_at?: string | null;
           due_at?: string | null;
           status?: string;
           google_event_id?: string | null;
@@ -1864,6 +1870,9 @@ export type Database = {
           id?: string;
           business_id?: string;
           title?: string;
+          description?: string;
+          start_at?: string | null;
+          end_at?: string | null;
           due_at?: string | null;
           status?: string;
           google_event_id?: string | null;

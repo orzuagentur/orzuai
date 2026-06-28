@@ -7,6 +7,9 @@ import { requireUser } from "@/services/auth.service";
 
 const schema = z.object({
   title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(4000).optional(),
+  startDateTime: z.string().min(1),
+  endDateTime: z.string().min(1),
   dueAt: z.string().min(1),
 });
 
@@ -26,6 +29,9 @@ export async function POST(request: Request) {
     const result = await createCalendarTaskForBusiness({
       businessId: business.id,
       title: body.title,
+      description: body.description,
+      startDateTime: body.startDateTime,
+      endDateTime: body.endDateTime,
       dueAt: body.dueAt,
     });
 

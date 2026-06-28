@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { GOOGLE_CALENDAR_INTEGRATION_HREF, GOOGLE_CALENDAR_MESSAGES } from "@/features/google-calendar/constants";
@@ -79,6 +80,49 @@ export function OrzuxCalendar({
   const [bookingInitialStart, setBookingInitialStart] = useState<Date | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskInitialStart, setTaskInitialStart] = useState<Date | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+
+  const openTaskDialog = useCallback((open: boolean) => {
+    setTaskDialogOpen(open);
+    if (!open) {
+      setTaskInitialStart(null);
+    }
+  }, []);
+
+  const handleTaskComplete = useCallback(
+    async (event: OrzuxCalendarEvent) => {
+      if (!event.isTask || completingTaskId) {
+        return;
+      }
+
+      setCompletingTaskId(event.recordId);
+
+      try {
+        const response = await fetch(`/api/calendar/tasks/${event.recordId}`, {
+          method: "PATCH",
+        });
+        const result = (await response.json()) as { success: boolean; message?: string };
+
+        if (!response.ok || !result.success) {
+          toast.error(result.message ?? ORZUX_CALENDAR_MESSAGES.taskCompleteFailed);
+          return;
+        }
+
+        toast.success(ORZUX_CALENDAR_MESSAGES.taskCompleted);
+        if (selectedEvent?.recordId === event.recordId) {
+          setEventSheetOpen(false);
+          setSelectedEvent(null);
+        }
+        router.refresh();
+      } catch {
+        toast.error(ORZUX_CALENDAR_MESSAGES.taskCompleteFailed);
+      } finally {
+        setCompletingTaskId(null);
+      }
+    },
+    [completingTaskId, router, selectedEvent?.recordId],
+  );
 
   const daysWithEvents = useMemo(() => {
     const set = new Set<string>();
@@ -194,6 +238,8 @@ export function OrzuxCalendar({
               setSlotTime(time);
               setSlotSheetOpen(true);
             }}
+            onTaskComplete={(event) => void handleTaskComplete(event)}
+            completingTaskId={completingTaskId}
           />
 
           <div className="pointer-events-none absolute bottom-6 right-6 z-30">
@@ -206,7 +252,9 @@ export function OrzuxCalendar({
                 eventOpen={eventDialogOpen}
                 onEventOpenChange={setEventDialogOpen}
                 taskOpen={taskDialogOpen}
-                onTaskOpenChange={setTaskDialogOpen}
+                onTaskOpenChange={openTaskDialog}
+                taskInitialStart={taskInitialStart}
+                onPrepareTaskOpen={() => setTaskInitialStart(null)}
               />
             </div>
           </div>
@@ -231,7 +279,9 @@ export function OrzuxCalendar({
                       eventOpen={eventDialogOpen}
                       onEventOpenChange={setEventDialogOpen}
                       taskOpen={taskDialogOpen}
-                      onTaskOpenChange={setTaskDialogOpen}
+                      onTaskOpenChange={openTaskDialog}
+                      taskInitialStart={taskInitialStart}
+                      onPrepareTaskOpen={() => setTaskInitialStart(null)}
                     />
                   </div>
                   <Button
@@ -300,6 +350,8 @@ export function OrzuxCalendar({
         onOpenChange={setEventSheetOpen}
         resources={resources}
         timeZone={timeZone}
+        onTaskComplete={(event) => void handleTaskComplete(event)}
+        completingTaskId={completingTaskId}
       />
 
       <OrzuxCalendarBookingDialog
@@ -318,8 +370,13 @@ export function OrzuxCalendar({
           setBookingInitialStart(slotTime);
           setBookingOpen(true);
         }}
-        onCreateEvent={() => setEventDialogOpen(true)}
-        onCreateTask={() => setTaskDialogOpen(true)}
+        onCreateEvent={() => {
+          setEventDialogOpen(true);
+        }}
+        onCreateTask={() => {
+          setTaskInitialStart(slotTime);
+          setTaskDialogOpen(true);
+        }}
       />
     </div>
   );

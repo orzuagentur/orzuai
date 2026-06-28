@@ -1,11 +1,15 @@
 "use client";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
-import { cn } from "@/lib/utils";
+import {
+  formatDateKeyInTimezone,
+  getTimezoneDayBounds,
+} from "@/lib/calendar/slot-engine";
 import type { WeeklySchedule } from "@/lib/calendar/weekly-schedule";
+import { cn } from "@/lib/utils";
 
 type PublicBookingCalendarProps = {
   timeZone: string;
@@ -17,20 +21,11 @@ type PublicBookingCalendarProps = {
 
 const WEEKDAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function formatDateKey(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function getZonedDayOfWeek(date: Date, timeZone: string): number {
+function getZonedDayOfWeek(instant: Date, timeZone: string): number {
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
-  }).format(date);
+  }).format(instant);
   const map: Record<string, number> = {
     Sun: 0,
     Mon: 1,
@@ -43,29 +38,54 @@ function getZonedDayOfWeek(date: Date, timeZone: string): number {
   return map[weekday] ?? 0;
 }
 
-function parseDateKey(dateKey: string): Date {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year!, month! - 1, day!);
+function addDaysToDateKey(dateKey: string, days: number, timeZone: string): string {
+  let current = dateKey;
+  const step = days >= 0 ? 1 : -1;
+
+  for (let index = 0; index < Math.abs(days); index += 1) {
+    const bounds = getTimezoneDayBounds(current, timeZone);
+    const nextInstant = new Date(
+      (step > 0 ? bounds.end.getTime() : bounds.start.getTime()) + step,
+    );
+    current = formatDateKeyInTimezone(nextInstant, timeZone);
+  }
+
+  return current;
 }
 
-function startOfMonth(dateKey: string, timeZone: string): string {
-  const [year, month] = dateKey.split("-").map(Number);
-  return formatDateKey(new Date(year!, month! - 1, 1), timeZone);
+function monthStartFromDateKey(dateKey: string): string {
+  return `${dateKey.slice(0, 7)}-01`;
+}
+
+function shiftMonthStart(monthStartKey: string, deltaMonths: number): string {
+  const year = Number.parseInt(monthStartKey.slice(0, 4), 10);
+  const month = Number.parseInt(monthStartKey.slice(5, 7), 10);
+  const shifted = new Date(Date.UTC(year, month - 1 + deltaMonths, 1));
+
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-01`;
 }
 
 function buildMonthGrid(monthStartKey: string, timeZone: string): string[] {
-  const monthStart = parseDateKey(monthStartKey);
-  const gridStart = new Date(monthStart);
-  gridStart.setDate(gridStart.getDate() - getZonedDayOfWeek(monthStart, timeZone));
+  const firstDayOffset = getZonedDayOfWeek(
+    getTimezoneDayBounds(monthStartKey, timeZone).start,
+    timeZone,
+  );
+  const gridStart = addDaysToDateKey(monthStartKey, -firstDayOffset, timeZone);
 
   const cells: string[] = [];
+  let current = gridStart;
+
   for (let index = 0; index < 42; index += 1) {
-    const cell = new Date(gridStart);
-    cell.setDate(cell.getDate() + index);
-    cells.push(formatDateKey(cell, timeZone));
+    cells.push(current);
+    current = addDaysToDateKey(current, 1, timeZone);
   }
 
   return cells;
+}
+
+function getMaxBookableDateKey(timeZone: string, advanceBookingDays: number): string {
+  const todayKey = formatDateKeyInTimezone(new Date(), timeZone);
+  return addDaysToDateKey(todayKey, advanceBookingDays, timeZone);
 }
 
 function isDateBookable(
@@ -74,22 +94,36 @@ function isDateBookable(
   weeklySchedule: WeeklySchedule,
   advanceBookingDays: number,
 ): boolean {
-  const todayKey = formatDateKey(new Date(), timeZone);
+  const todayKey = formatDateKeyInTimezone(new Date(), timeZone);
+  const maxKey = getMaxBookableDateKey(timeZone, advanceBookingDays);
 
-  if (dateKey < todayKey) {
+  if (dateKey < todayKey || dateKey > maxKey) {
     return false;
   }
 
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + advanceBookingDays);
-  const maxKey = formatDateKey(maxDate, timeZone);
-
-  if (dateKey > maxKey) {
-    return false;
-  }
-
-  const dayOfWeek = getZonedDayOfWeek(parseDateKey(dateKey), timeZone);
+  const dayOfWeek = getZonedDayOfWeek(getTimezoneDayBounds(dateKey, timeZone).start, timeZone);
   return weeklySchedule[dayOfWeek]?.enabled ?? false;
+}
+
+function firstBookableDateInMonth(
+  monthStartKey: string,
+  timeZone: string,
+  weeklySchedule: WeeklySchedule,
+  advanceBookingDays: number,
+): string | null {
+  const grid = buildMonthGrid(monthStartKey, timeZone);
+
+  for (const dateKey of grid) {
+    if (!dateKey.startsWith(monthStartKey.slice(0, 7))) {
+      continue;
+    }
+
+    if (isDateBookable(dateKey, timeZone, weeklySchedule, advanceBookingDays)) {
+      return dateKey;
+    }
+  }
+
+  return null;
 }
 
 export function PublicBookingCalendar({
@@ -100,13 +134,26 @@ export function PublicBookingCalendar({
   onSelectDate,
 }: PublicBookingCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState(() =>
-    startOfMonth(selectedDate, timeZone),
+    monthStartFromDateKey(selectedDate),
   );
 
+  const maxBookableKey = useMemo(
+    () => getMaxBookableDateKey(timeZone, advanceBookingDays),
+    [timeZone, advanceBookingDays],
+  );
+
+  useEffect(() => {
+    setVisibleMonth(monthStartFromDateKey(selectedDate));
+  }, [selectedDate]);
+
   const monthLabel = useMemo(() => {
-    const date = parseDateKey(visibleMonth);
-    return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  }, [visibleMonth]);
+    const { start } = getTimezoneDayBounds(visibleMonth, timeZone);
+    return start.toLocaleDateString(undefined, {
+      timeZone,
+      month: "long",
+      year: "numeric",
+    });
+  }, [visibleMonth, timeZone]);
 
   const grid = useMemo(
     () => buildMonthGrid(visibleMonth, timeZone),
@@ -114,28 +161,55 @@ export function PublicBookingCalendar({
   );
 
   const visibleMonthPrefix = visibleMonth.slice(0, 7);
+  const canGoPrev = visibleMonth > monthStartFromDateKey(formatDateKeyInTimezone(new Date(), timeZone));
+  const canGoNext = visibleMonth < monthStartFromDateKey(maxBookableKey);
 
   function goPrevMonth() {
-    const [year, month] = visibleMonth.split("-").map(Number);
-    const prev = new Date(year!, month! - 2, 1);
-    setVisibleMonth(formatDateKey(prev, timeZone));
+    if (!canGoPrev) return;
+
+    const prevMonth = shiftMonthStart(visibleMonth, -1);
+    setVisibleMonth(prevMonth);
+
+    const firstBookable = firstBookableDateInMonth(
+      prevMonth,
+      timeZone,
+      weeklySchedule,
+      advanceBookingDays,
+    );
+
+    if (firstBookable) {
+      onSelectDate(firstBookable);
+    }
   }
 
   function goNextMonth() {
-    const [year, month] = visibleMonth.split("-").map(Number);
-    const next = new Date(year!, month!, 1);
-    setVisibleMonth(formatDateKey(next, timeZone));
+    if (!canGoNext) return;
+
+    const nextMonth = shiftMonthStart(visibleMonth, 1);
+    setVisibleMonth(nextMonth);
+
+    const firstBookable = firstBookableDateInMonth(
+      nextMonth,
+      timeZone,
+      weeklySchedule,
+      advanceBookingDays,
+    );
+
+    if (firstBookable) {
+      onSelectDate(firstBookable);
+    }
   }
 
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-medium">{ORZUX_CALENDAR_MESSAGES.publicBookSelectDate}</h2>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="inline-flex size-8 items-center justify-center rounded-md border bg-background hover:bg-muted"
+            className="inline-flex size-8 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             onClick={goPrevMonth}
+            disabled={!canGoPrev}
             aria-label={ORZUX_CALENDAR_MESSAGES.prevMonth}
           >
             <ChevronLeftIcon className="size-4" />
@@ -143,14 +217,22 @@ export function PublicBookingCalendar({
           <span className="min-w-[120px] text-center text-sm font-medium">{monthLabel}</span>
           <button
             type="button"
-            className="inline-flex size-8 items-center justify-center rounded-md border bg-background hover:bg-muted"
+            className="inline-flex size-8 items-center justify-center rounded-md border bg-background hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             onClick={goNextMonth}
+            disabled={!canGoNext}
             aria-label={ORZUX_CALENDAR_MESSAGES.nextMonth}
           >
             <ChevronRightIcon className="size-4" />
           </button>
         </div>
       </div>
+
+      <p className="mb-3 text-xs text-muted-foreground">
+        {ORZUX_CALENDAR_MESSAGES.publicBookAdvanceWindow.replace(
+          "{days}",
+          String(advanceBookingDays),
+        )}
+      </p>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-muted-foreground">
         {WEEKDAY_HEADERS.map((label) => (
@@ -171,7 +253,7 @@ export function PublicBookingCalendar({
             advanceBookingDays,
           );
           const isSelected = dateKey === selectedDate;
-          const todayKey = formatDateKey(new Date(), timeZone);
+          const todayKey = formatDateKeyInTimezone(new Date(), timeZone);
           const isToday = dateKey === todayKey;
 
           return (
@@ -183,7 +265,9 @@ export function PublicBookingCalendar({
                 !bookable
                   ? dateKey < todayKey
                     ? ORZUX_CALENDAR_MESSAGES.publicBookPastDate
-                    : ORZUX_CALENDAR_MESSAGES.publicBookClosedDay
+                    : dateKey > maxBookableKey
+                      ? ORZUX_CALENDAR_MESSAGES.publicBookTooFarAhead
+                      : ORZUX_CALENDAR_MESSAGES.publicBookClosedDay
                   : undefined
               }
               className={cn(

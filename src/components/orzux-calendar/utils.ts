@@ -148,6 +148,14 @@ export function formatSingleDateTime(iso: string, locale?: string): string {
   }).format(new Date(iso));
 }
 
+export function formatDueDate(iso: string, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function isSameCalendarDay(startIso: string, endIso: string): boolean {
   return isSameDay(new Date(startIso), new Date(endIso));
 }

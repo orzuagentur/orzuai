@@ -10,6 +10,10 @@ import { sendBookingActionEmail } from "@/services/booking-confirmation-email.se
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { formatSlotForDisplay } from "@/lib/calendar/slot-engine";
+import {
+  extractBookingGuests,
+  notifyBookingGuests,
+} from "@/lib/calendar/booking-guests";
 import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
 
 type RouteContext = {
@@ -24,6 +28,10 @@ const updateSchema = z.object({
   endDateTime: z.string().min(1).optional(),
   timeZone: z.string().min(1).optional(),
   resourceId: z.string().uuid().nullable().optional(),
+});
+
+const deleteSchema = z.object({
+  notifyGuests: z.boolean().optional(),
 });
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -53,23 +61,38 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    if (result.event.isBooking && result.event.customerEmail.includes("@")) {
+    if (result.event.isBooking) {
       const resources = await listAllBusinessCalendarResources(business.id);
       const resource = resources.find((item) => item.id === result.event!.resourceId);
+      const slotLabel = formatSlotForDisplay(
+        { start: new Date(result.event.startAt), end: new Date(result.event.endAt) },
+        result.event.timezone,
+      );
+      const guests = extractBookingGuests(result.event);
 
-      await sendBookingActionEmail({
-        businessId: business.id,
-        businessName: business.business_name,
-        customerEmail: result.event.customerEmail,
-        customerName: result.event.customerName || "Customer",
-        action: "updated",
-        slotLabel: formatSlotForDisplay(
-          { start: new Date(result.event.startAt), end: new Date(result.event.endAt) },
-          result.event.timezone,
-        ),
-        resourceName: resource?.name,
-        pageTitle: result.event.title,
-      });
+      if (guests.length > 0) {
+        const emailResult = await notifyBookingGuests({
+          guests,
+          send: (guest) =>
+            sendBookingActionEmail({
+              businessId: business.id,
+              businessName: business.business_name,
+              customerEmail: guest.email,
+              customerName: guest.name,
+              action: "updated",
+              slotLabel,
+              resourceName: resource?.name,
+              pageTitle: result.event!.title,
+            }),
+        });
+
+        if (!emailResult.success) {
+          return NextResponse.json(
+            { success: false, message: emailResult.error ?? "Could not notify guests." },
+            { status: 502 },
+          );
+        }
+      }
     }
 
     return NextResponse.json({ success: true });
@@ -82,7 +105,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
     const business = await getPrimaryBusiness(user.id);
@@ -92,6 +115,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
+    let notifyGuests = true;
+
+    try {
+      const rawBody = await request.text();
+      if (rawBody.trim()) {
+        const body = deleteSchema.parse(JSON.parse(rawBody));
+        if (body.notifyGuests !== undefined) {
+          notifyGuests = body.notifyGuests;
+        }
+      }
+    } catch {
+      return NextResponse.json({ success: false, message: "Invalid delete request." }, { status: 400 });
+    }
+
     const existing = await getCalendarEventForBusiness(business.id, id);
 
     if (!existing) {
@@ -107,23 +144,38 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    if (existing.isBooking && existing.customerEmail.includes("@")) {
+    if (existing.isBooking && notifyGuests) {
       const resources = await listAllBusinessCalendarResources(business.id);
       const resource = resources.find((item) => item.id === existing.resourceId);
+      const slotLabel = formatSlotForDisplay(
+        { start: new Date(existing.startAt), end: new Date(existing.endAt) },
+        existing.timezone,
+      );
+      const guests = extractBookingGuests(existing);
 
-      await sendBookingActionEmail({
-        businessId: business.id,
-        businessName: business.business_name,
-        customerEmail: existing.customerEmail,
-        customerName: existing.customerName || "Customer",
-        action: "cancelled",
-        slotLabel: formatSlotForDisplay(
-          { start: new Date(existing.startAt), end: new Date(existing.endAt) },
-          existing.timezone,
-        ),
-        resourceName: resource?.name,
-        pageTitle: existing.title,
-      });
+      if (guests.length > 0) {
+        const emailResult = await notifyBookingGuests({
+          guests,
+          send: (guest) =>
+            sendBookingActionEmail({
+              businessId: business.id,
+              businessName: business.business_name,
+              customerEmail: guest.email,
+              customerName: guest.name,
+              action: "cancelled",
+              slotLabel,
+              resourceName: resource?.name,
+              pageTitle: existing.title,
+            }),
+        });
+
+        if (!emailResult.success) {
+          return NextResponse.json(
+            { success: false, message: emailResult.error ?? "Could not notify guests." },
+            { status: 502 },
+          );
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

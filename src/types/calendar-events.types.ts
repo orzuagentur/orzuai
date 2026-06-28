@@ -23,6 +23,9 @@ export type CalendarTaskRecord = {
   id: string;
   businessId: string;
   title: string;
+  description: string;
+  startAt: string | null;
+  endAt: string | null;
   dueAt: string | null;
   status: "open" | "done";
   googleEventId: string | null;
@@ -50,4 +53,5 @@ export type OrzuxCalendarEvent = {
   customerName?: string | null;
   customerEmail?: string | null;
   timezone?: string;
+  dueAt?: string | null;
 };

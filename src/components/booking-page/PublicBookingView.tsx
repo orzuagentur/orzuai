@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CalendarIcon, CheckCircle2Icon, ClockIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +40,16 @@ function getInputType(field: BookingFormField): string {
   return "text";
 }
 
+function InlineBookingError({ message }: { message?: string | null }) {
+  if (!message) return null;
+
+  return (
+    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
+
 function formatSelectedDayLabel(dateKey: string, timeZone: string): string {
   const [year, month, day] = dateKey.split("-").map(Number);
   const date = new Date(year!, month! - 1, day!, 12, 0, 0);
@@ -67,6 +77,11 @@ export function PublicBookingView({
   const [completed, setCompleted] = useState(false);
   const [isLoadingSlots, startLoadingSlots] = useTransition();
   const [isSubmitting, startSubmitting] = useTransition();
+  const [slotResourceError, setSlotResourceError] = useState<string | null>(null);
+  const [slotTimeError, setSlotTimeError] = useState<string | null>(null);
+  const [isCheckingSlot, setIsCheckingSlot] = useState(false);
+
+  const hasSlotError = Boolean(slotResourceError || slotTimeError);
 
   const selectedDayLabel = useMemo(
     () => formatSelectedDayLabel(selectedDate, page.bookingTimezone),
@@ -92,6 +107,8 @@ export function PublicBookingView({
 
           setResourceSlots(result.resourceSlots ?? []);
           setSelectedSlot(null);
+          setSlotResourceError(null);
+          setSlotTimeError(null);
         } catch {
           toast.error(ORZUX_CALENDAR_MESSAGES.publicBookFailed);
         }
@@ -100,15 +117,89 @@ export function PublicBookingView({
     [page.slug],
   );
 
+  const skipInitialSlotFetch = useRef(true);
+
   useEffect(() => {
-    if (selectedDate !== initialDate) {
-      loadSlotsForDate(selectedDate);
+    if (skipInitialSlotFetch.current && selectedDate === initialDate) {
+      skipInitialSlotFetch.current = false;
+      return;
     }
+
+    loadSlotsForDate(selectedDate);
   }, [selectedDate, initialDate, loadSlotsForDate]);
 
   function handleDateSelect(dateKey: string) {
     setSelectedDate(dateKey);
+    setSlotResourceError(null);
+    setSlotTimeError(null);
   }
+
+  useEffect(() => {
+    if (!selectedSlot || !selectedResourceId) {
+      setSlotResourceError(null);
+      setSlotTimeError(null);
+      setIsCheckingSlot(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setIsCheckingSlot(true);
+      setSlotResourceError(null);
+      setSlotTimeError(null);
+
+      void fetch(`/api/public/book/${page.slug}/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDateTime: selectedSlot.start,
+          endDateTime: selectedSlot.end,
+          resourceId: selectedResourceId,
+        }),
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          const result = (await response.json()) as {
+            success: boolean;
+            available?: boolean;
+            message?: string;
+            field?: "resource" | "time";
+          };
+
+          if (!response.ok || !result.success) {
+            setSlotTimeError(result.message ?? ORZUX_CALENDAR_MESSAGES.publicBookFailed);
+            return;
+          }
+
+          if (result.available) {
+            setSlotResourceError(null);
+            setSlotTimeError(null);
+            return;
+          }
+
+          if (result.field === "resource") {
+            setSlotResourceError(result.message ?? ORZUX_CALENDAR_MESSAGES.bookingSlotUnavailable);
+          } else {
+            setSlotTimeError(result.message ?? ORZUX_CALENDAR_MESSAGES.bookingSlotUnavailable);
+          }
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+
+          setSlotTimeError(ORZUX_CALENDAR_MESSAGES.publicBookFailed);
+        })
+        .finally(() => {
+          setIsCheckingSlot(false);
+        });
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [page.slug, selectedResourceId, selectedSlot]);
 
   function updateAnswer(key: string, value: string) {
     setFormAnswers((current) => ({ ...current, [key]: value }));
@@ -117,6 +208,10 @@ export function PublicBookingView({
   function handleSubmit() {
     if (!selectedSlot) {
       toast.error(ORZUX_CALENDAR_MESSAGES.publicBookSelectSlot);
+      return;
+    }
+
+    if (isCheckingSlot || hasSlotError) {
       return;
     }
 
@@ -143,7 +238,14 @@ export function PublicBookingView({
         const result = (await response.json()) as { success: boolean; message?: string };
 
         if (!response.ok || !result.success) {
-          toast.error(result.message ?? ORZUX_CALENDAR_MESSAGES.publicBookFailed);
+          const message = result.message ?? ORZUX_CALENDAR_MESSAGES.publicBookFailed;
+          if (message.includes("already booked") || message.includes("no longer available")) {
+            setSlotResourceError(message);
+            setSlotTimeError(null);
+          } else {
+            setSlotTimeError(message);
+            setSlotResourceError(null);
+          }
           return;
         }
 
@@ -249,6 +351,8 @@ export function PublicBookingView({
                                 onClick={() => {
                                   setSelectedResourceId(group.resourceId);
                                   setSelectedSlot(slot);
+                                  setSlotResourceError(null);
+                                  setSlotTimeError(null);
                                 }}
                               >
                                 {new Date(slot.start).toLocaleTimeString(undefined, {
@@ -261,6 +365,18 @@ export function PublicBookingView({
                           })}
                         </div>
                       )}
+                      {selectedResourceId === group.resourceId && selectedSlot ? (
+                        <div className="mt-3 space-y-2">
+                          {isCheckingSlot ? (
+                            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2Icon className="size-3 animate-spin" />
+                              {ORZUX_CALENDAR_MESSAGES.bookingCheckingAvailability}
+                            </p>
+                          ) : null}
+                          <InlineBookingError message={slotResourceError} />
+                          <InlineBookingError message={slotTimeError} />
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -306,9 +422,19 @@ export function PublicBookingView({
               ))}
 
               {selectedSlot ? (
-                <p className="rounded-md bg-primary/5 px-3 py-2 text-sm text-foreground">
-                  {selectedSlot.label}
-                </p>
+                <div className="space-y-2">
+                  <p className="rounded-md bg-primary/5 px-3 py-2 text-sm text-foreground">
+                    {selectedSlot.label}
+                  </p>
+                  {isCheckingSlot ? (
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2Icon className="size-3 animate-spin" />
+                      {ORZUX_CALENDAR_MESSAGES.bookingCheckingAvailability}
+                    </p>
+                  ) : null}
+                  <InlineBookingError message={slotResourceError} />
+                  <InlineBookingError message={slotTimeError} />
+                </div>
               ) : (
                 <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                   {ORZUX_CALENDAR_MESSAGES.publicBookSelectSlot}
@@ -318,7 +444,13 @@ export function PublicBookingView({
               <Button
                 className="w-full"
                 size="lg"
-                disabled={isSubmitting || isLoadingSlots || !selectedSlot}
+                disabled={
+                  isSubmitting ||
+                  isLoadingSlots ||
+                  isCheckingSlot ||
+                  hasSlotError ||
+                  !selectedSlot
+                }
                 onClick={handleSubmit}
               >
                 {isSubmitting ? <Loader2Icon className="size-4 animate-spin" /> : null}

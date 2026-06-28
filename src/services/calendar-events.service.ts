@@ -62,6 +62,9 @@ function mapTaskRow(row: {
   id: string;
   business_id: string;
   title: string;
+  description?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
   due_at: string | null;
   status: string;
   google_event_id: string | null;
@@ -71,6 +74,9 @@ function mapTaskRow(row: {
     id: row.id,
     businessId: row.business_id,
     title: row.title,
+    description: row.description ?? "",
+    startAt: row.start_at ?? null,
+    endAt: row.end_at ?? null,
     dueAt: row.due_at,
     status: row.status as CalendarTaskRecord["status"],
     googleEventId: row.google_event_id,
@@ -106,18 +112,22 @@ export function toOrzuxCalendarEvent(
 }
 
 export function taskToOrzuxCalendarEvent(task: CalendarTaskRecord): OrzuxCalendarEvent {
-  const due = task.dueAt ? new Date(task.dueAt) : new Date();
-  const start = new Date(due);
-  start.setHours(9, 0, 0, 0);
-  const end = new Date(start);
-  end.setMinutes(30);
+  const fallbackDue = task.dueAt ? new Date(task.dueAt) : new Date();
+  const start = task.startAt ? new Date(task.startAt) : new Date(fallbackDue);
+  if (!task.startAt) {
+    start.setHours(9, 0, 0, 0);
+  }
+
+  const end = task.endAt
+    ? new Date(task.endAt)
+    : new Date(start.getTime() + 30 * 60 * 1000);
 
   return {
     id: `local-task-${task.id}`,
     recordId: task.id,
     kind: "task",
     summary: task.title,
-    description: null,
+    description: task.description || null,
     location: null,
     start: start.toISOString(),
     end: end.toISOString(),
@@ -125,6 +135,7 @@ export function taskToOrzuxCalendarEvent(task: CalendarTaskRecord): OrzuxCalenda
     htmlLink: null,
     source: "local",
     isTask: true,
+    dueAt: task.dueAt,
   };
 }
 
@@ -307,8 +318,8 @@ export async function listCalendarTasksForBusiness(
     .select("*")
     .eq("business_id", businessId)
     .eq("status", "open")
-    .gte("due_at", timeMin.toISOString())
-    .order("due_at", { ascending: true });
+    .or(`start_at.gte.${timeMin.toISOString()},due_at.gte.${timeMin.toISOString()}`)
+    .order("start_at", { ascending: true, nullsFirst: false });
 
   if (error) {
     throw new Error(error.message);
@@ -528,14 +539,23 @@ export async function getCalendarEventForBusiness(
 export async function createCalendarTaskForBusiness(input: {
   businessId: string;
   title: string;
+  description?: string;
+  startDateTime: string;
+  endDateTime: string;
   dueAt: string;
   syncToGoogle?: boolean;
 }): Promise<{ success: boolean; message?: string }> {
   const admin = createAdminClient();
+  const start = new Date(input.startDateTime);
+  const end = new Date(input.endDateTime);
   const due = new Date(input.dueAt);
-  const end = new Date(due);
-  end.setMinutes(end.getMinutes() + 30);
+
+  if (end.getTime() <= start.getTime()) {
+    return { success: false, message: "End time must be after start time." };
+  }
+
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const description = input.description?.trim() ?? "";
 
   let googleEventId: string | null = null;
 
@@ -543,8 +563,8 @@ export async function createCalendarTaskForBusiness(input: {
     const synced = await syncEventToGoogle({
       businessId: input.businessId,
       title: `✓ ${input.title}`,
-      description: "",
-      startDateTime: due.toISOString(),
+      description,
+      startDateTime: start.toISOString(),
       endDateTime: end.toISOString(),
       timeZone,
     });
@@ -554,6 +574,9 @@ export async function createCalendarTaskForBusiness(input: {
   const { error } = await admin.from("calendar_tasks").insert({
     business_id: input.businessId,
     title: input.title,
+    description,
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
     due_at: due.toISOString(),
     status: "open",
     google_event_id: googleEventId,
@@ -561,6 +584,32 @@ export async function createCalendarTaskForBusiness(input: {
 
   if (error) {
     return { success: false, message: error.message };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.calendar);
+  return { success: true };
+}
+
+export async function completeCalendarTaskForBusiness(input: {
+  businessId: string;
+  taskId: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("calendar_tasks")
+    .update({ status: "done" })
+    .eq("business_id", input.businessId)
+    .eq("id", input.taskId)
+    .eq("status", "open")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  if (!data) {
+    return { success: false, message: "Task not found or already completed." };
   }
 
   revalidatePath(DASHBOARD_ROUTES.calendar);

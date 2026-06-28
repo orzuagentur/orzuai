@@ -45,7 +45,23 @@ type OrzuxCalendarCreateMenuProps = {
   onEventOpenChange: (open: boolean) => void;
   taskOpen: boolean;
   onTaskOpenChange: (open: boolean) => void;
+  taskInitialStart?: Date | null;
+  onPrepareTaskOpen?: () => void;
 };
+
+function defaultEndFromStart(startValue: string): string {
+  const start = new Date(startValue);
+  start.setHours(start.getHours() + 1);
+  return toLocalDateTimeValue(start);
+}
+
+function dateKeyFromDateTimeValue(value: string): string {
+  return value.slice(0, 10);
+}
+
+function endOfDayIsoFromDateKey(dateKey: string): string {
+  return new Date(`${dateKey}T23:59:59`).toISOString();
+}
 
 function defaultStartForDay(day: Date): string {
   const next = startOfDay(day);
@@ -83,6 +99,8 @@ export function OrzuxCalendarCreateMenu({
   onEventOpenChange,
   taskOpen,
   onTaskOpenChange,
+  taskInitialStart = null,
+  onPrepareTaskOpen,
 }: OrzuxCalendarCreateMenuProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -91,10 +109,12 @@ export function OrzuxCalendarCreateMenu({
   const [start, setStart] = useState(() => defaultStartForDay(selectedDate));
   const [end, setEnd] = useState(() => defaultEndForDay(selectedDate));
   const [taskTitle, setTaskTitle] = useState("");
-  const [taskDue, setTaskDue] = useState(() => {
-    const d = startOfDay(selectedDate);
-    return toLocalDateTimeValue(d).slice(0, 10);
-  });
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskStart, setTaskStart] = useState(() => defaultStartForDay(selectedDate));
+  const [taskEnd, setTaskEnd] = useState(() => defaultEndForDay(selectedDate));
+  const [taskDue, setTaskDue] = useState(() =>
+    dateKeyFromDateTimeValue(defaultStartForDay(selectedDate)),
+  );
 
   useEffect(() => {
     if (eventOpen) {
@@ -108,9 +128,21 @@ export function OrzuxCalendarCreateMenu({
   useEffect(() => {
     if (taskOpen) {
       setTaskTitle("");
-      setTaskDue(toLocalDateTimeValue(startOfDay(selectedDate)).slice(0, 10));
+      setTaskDescription("");
+
+      if (taskInitialStart) {
+        const startValue = toLocalDateTimeValue(taskInitialStart);
+        setTaskStart(startValue);
+        setTaskEnd(defaultEndFromStart(startValue));
+        setTaskDue(dateKeyFromDateTimeValue(startValue));
+      } else {
+        const startValue = defaultStartForDay(selectedDate);
+        setTaskStart(startValue);
+        setTaskEnd(defaultEndForDay(selectedDate));
+        setTaskDue(dateKeyFromDateTimeValue(startValue));
+      }
     }
-  }, [taskOpen, selectedDate]);
+  }, [taskOpen, selectedDate, taskInitialStart]);
 
   async function handleCreateEvent() {
     if (!title.trim()) {
@@ -157,6 +189,14 @@ export function OrzuxCalendarCreateMenu({
       return;
     }
 
+    const start = new Date(taskStart);
+    const end = new Date(taskEnd);
+
+    if (end.getTime() <= start.getTime()) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.taskInvalidTime);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -165,7 +205,10 @@ export function OrzuxCalendarCreateMenu({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: taskTitle.trim(),
-          dueAt: new Date(`${taskDue}T09:00:00`).toISOString(),
+          description: taskDescription.trim(),
+          startDateTime: start.toISOString(),
+          endDateTime: end.toISOString(),
+          dueAt: endOfDayIsoFromDateKey(taskDue),
         }),
       });
 
@@ -225,7 +268,12 @@ export function OrzuxCalendarCreateMenu({
             <CalendarIcon className="size-4" />
             {ORZUX_CALENDAR_MESSAGES.createEvent}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onTaskOpenChange(true)}>
+          <DropdownMenuItem
+            onClick={() => {
+              onPrepareTaskOpen?.();
+              onTaskOpenChange(true);
+            }}
+          >
             <CheckSquareIcon className="size-4" />
             {ORZUX_CALENDAR_MESSAGES.createTask}
           </DropdownMenuItem>
@@ -308,12 +356,44 @@ export function OrzuxCalendarCreateMenu({
                 placeholder={ORZUX_CALENDAR_MESSAGES.taskTitlePlaceholder}
               />
             </div>
+            <AutoGrowDescriptionField
+              id="orzux-task-description"
+              label={ORZUX_CALENDAR_MESSAGES.taskDescription}
+              value={taskDescription}
+              onChange={setTaskDescription}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="orzux-task-start">{ORZUX_CALENDAR_MESSAGES.taskStart}</Label>
+                <Input
+                  id="orzux-task-start"
+                  type="datetime-local"
+                  value={taskStart}
+                  onChange={(e) => {
+                    setTaskStart(e.target.value);
+                    if (dateKeyFromDateTimeValue(e.target.value) > taskDue) {
+                      setTaskDue(dateKeyFromDateTimeValue(e.target.value));
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="orzux-task-end">{ORZUX_CALENDAR_MESSAGES.taskEnd}</Label>
+                <Input
+                  id="orzux-task-end"
+                  type="datetime-local"
+                  value={taskEnd}
+                  onChange={(e) => setTaskEnd(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="orzux-task-due">{ORZUX_CALENDAR_MESSAGES.taskDueDate}</Label>
               <Input
                 id="orzux-task-due"
                 type="date"
                 value={taskDue}
+                min={dateKeyFromDateTimeValue(taskStart)}
                 onChange={(e) => setTaskDue(e.target.value)}
               />
             </div>

@@ -151,8 +151,8 @@ async function getLocalBusyIntervals(input: {
     .select("start_at, end_at, is_all_day, resource_id")
     .eq("business_id", input.businessId)
     .eq("is_booking", true)
-    .gte("start_at", input.timeMin.toISOString())
-    .lte("start_at", input.timeMax.toISOString());
+    .lt("start_at", input.timeMax.toISOString())
+    .gt("end_at", input.timeMin.toISOString());
 
   if (error || !data) {
     return [];
@@ -366,7 +366,24 @@ export async function getPublicBookingPageSlots(
 
   const resources = await listPublicBookingPageResources(page.id);
   const todayKey = formatDateKeyInTimezone(new Date(), page.bookingTimezone);
-  const date = options?.date ?? todayKey;
+  const maxBookableKey = formatDateKeyInTimezone(
+    (() => {
+      const maxDate = new Date();
+      maxDate.setDate(maxDate.getDate() + page.advanceBookingDays);
+      return maxDate;
+    })(),
+    page.bookingTimezone,
+  );
+
+  let date = options?.date ?? todayKey;
+
+  if (date < todayKey) {
+    date = todayKey;
+  }
+
+  if (date > maxBookableKey) {
+    date = maxBookableKey;
+  }
 
   const resourceSlots = await Promise.all(
     resources.map(async (resource) => {
@@ -568,18 +585,19 @@ export async function resolveBookingSlot(input: {
   windowEnd.setDate(windowEnd.getDate() + daysAhead);
   windowEnd.setHours(23, 59, 59, 999);
 
+  const bufferMinutes =
+    bookingPage?.slotBufferMinutes ?? setup?.slotBufferMinutes ?? 15;
+  const bufferMs = bufferMinutes * 60 * 1000;
   const busy = await getCalendarBusyIntervals({
     businessId: input.businessId,
-    timeMin: new Date(),
-    timeMax: windowEnd,
+    timeMin: new Date(candidate.start.getTime() - bufferMs),
+    timeMax: new Date(Math.max(candidate.end.getTime() + bufferMs, windowEnd.getTime())),
     resourceId: resource?.id ?? null,
   });
 
   const operatingHours = bookingPage
     ? buildOperatingHoursFromBookingPage(bookingPage)
     : buildOperatingHoursFromSetup(setup);
-  const bufferMinutes =
-    bookingPage?.slotBufferMinutes ?? setup?.slotBufferMinutes ?? 15;
   const timeZone =
     input.timeZone || bookingPage?.bookingTimezone || setup?.bookingTimezone || "UTC";
 
@@ -640,6 +658,60 @@ export async function resolveBookingSlot(input: {
         ? `${resource.name} is already booked at this time.`
         : "Requested time overlaps an existing booking."
       : "Requested time is outside business hours.",
+    alternatives,
+  };
+}
+
+export type BookingSlotCheckResult = {
+  available: boolean;
+  message?: string;
+  field?: "resource" | "time";
+  alternatives?: string[];
+};
+
+export async function checkBookingSlotAvailability(input: {
+  businessId: string;
+  bookingPageId?: string;
+  startDateTime: string;
+  endDateTime: string;
+  timeZone: string;
+  resourceId?: string | null;
+  resourceName?: string | null;
+}): Promise<BookingSlotCheckResult> {
+  const resolution = await resolveBookingSlot({
+    businessId: input.businessId,
+    bookingPageId: input.bookingPageId,
+    summary: "availability-check",
+    startDateTime: input.startDateTime,
+    endDateTime: input.endDateTime,
+    timeZone: input.timeZone,
+    resourceId: input.resourceId ?? null,
+    resourceName: input.resourceName ?? null,
+    preferNearestSlot: false,
+  });
+
+  if (resolution.status === "available") {
+    return { available: true };
+  }
+
+  const alternatives =
+    resolution.status === "unavailable" ? resolution.alternatives : [];
+  const reason =
+    resolution.status === "unavailable"
+      ? resolution.reason
+      : "This time is no longer available.";
+  const isResourceConflict =
+    reason.includes("already booked") || reason.includes("overlaps an existing booking");
+  const field: "resource" | "time" = isResourceConflict ? "resource" : "time";
+  const message =
+    alternatives.length > 0
+      ? `${reason} Try: ${alternatives.slice(0, 3).join(", ")}`
+      : reason;
+
+  return {
+    available: false,
+    message,
+    field,
     alternatives,
   };
 }
