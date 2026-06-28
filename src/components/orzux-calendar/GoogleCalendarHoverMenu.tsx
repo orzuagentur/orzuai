@@ -11,7 +11,6 @@ import { GOOGLE_CALENDAR_INTEGRATION_HREF } from "@/features/google-calendar/con
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import { cn } from "@/lib/utils";
 
-import { GoogleBrandIcon } from "./GoogleBrandIcon";
 import { GoogleCalendarIcon } from "./GoogleCalendarIcon";
 
 type GoogleCalendarHoverMenuProps = {
@@ -116,7 +115,7 @@ export function GoogleCalendarHoverMenu({
     return (
       <Button size="sm" variant="outline" className="hidden gap-2 sm:inline-flex" asChild>
         <Link href={GOOGLE_CALENDAR_INTEGRATION_HREF}>
-          <GoogleBrandIcon className="size-4" />
+          <GoogleCalendarIcon size={18} className="object-contain" />
           {ORZUX_CALENDAR_MESSAGES.connectGoogleShort}
         </Link>
       </Button>
@@ -140,14 +139,11 @@ export function GoogleCalendarHoverMenu({
         type="button"
         variant="outline"
         size="icon"
-        className="relative size-11 overflow-visible p-1.5"
+        className="size-11 overflow-hidden p-1.5"
         aria-label={ORZUX_CALENDAR_MESSAGES.openGoogleCalendar}
         aria-expanded={open}
       >
-        <GoogleCalendarIcon className="size-7" />
-        <span className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-border">
-          <GoogleBrandIcon className="size-3" />
-        </span>
+        <GoogleCalendarIcon size={32} className="size-8 object-contain" />
       </Button>
 
       <div
@@ -162,7 +158,7 @@ export function GoogleCalendarHoverMenu({
       >
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <GoogleCalendarIcon className="size-6" />
+            <GoogleCalendarIcon size={28} className="object-contain" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{ORZUX_CALENDAR_MESSAGES.googleCalendarConnected}</p>

@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
 
 import {
-  BOOKING_CHIP_GAP_PX,
   BOOKING_CHIP_SIZE_PX,
   DAY_END_HOUR,
   DAY_START_HOUR,
@@ -76,17 +75,10 @@ export function OrzuxCalendarDayGrid({
   );
   const allDayEvents = dayEvents.filter((event) => event.isAllDay);
   const timedEvents = dayEvents.filter((event) => !event.isAllDay);
-  const bookingEvents = timedEvents.filter((event) => event.isBooking);
-  const regularTimedEvents = timedEvents.filter((event) => !event.isBooking);
 
   const eventLayouts = useMemo(
-    () => layoutTimedEventsInColumns(regularTimedEvents, selectedDate),
-    [regularTimedEvents, selectedDate],
-  );
-
-  const bookingChipLayouts = useMemo(
-    () => layoutTimedEventsInColumns(bookingEvents, selectedDate),
-    [bookingEvents, selectedDate],
+    () => layoutTimedEventsInColumns(timedEvents, selectedDate),
+    [timedEvents, selectedDate],
   );
 
   useEffect(() => {
@@ -179,6 +171,38 @@ export function OrzuxCalendarDayGrid({
 
             {eventLayouts.map(({ item: event, top, height, column, columnCount }) => {
               const position = getColumnEventStyle(column, columnCount);
+
+              if (event.isBooking) {
+                const color = getBookingChipColor(event.resourceId ?? event.recordId);
+
+                return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    title={getBookingTooltip(event)}
+                    aria-label={getBookingTooltip(event)}
+                    className="absolute flex flex-col items-center rounded-md shadow-sm ring-1 ring-black/10 transition hover:brightness-110"
+                    style={{
+                      top,
+                      height: Math.max(height, BOOKING_CHIP_SIZE_PX),
+                      left: position.left,
+                      width: BOOKING_CHIP_SIZE_PX,
+                      backgroundColor: color,
+                      zIndex: 2,
+                    }}
+                    onClick={(clickEvent) => {
+                      clickEvent.stopPropagation();
+                      onEventClick?.(event);
+                    }}
+                  >
+                    <CalendarClockIcon
+                      className="mt-1 size-3 shrink-0 text-white"
+                      strokeWidth={2.5}
+                    />
+                  </button>
+                );
+              }
+
               const isDoneTask = event.isTask && event.taskStatus === "done";
 
               return (
@@ -266,38 +290,6 @@ export function OrzuxCalendarDayGrid({
                       <ExternalLinkIcon className="size-3" />
                     </a>
                   ) : null}
-                </button>
-              );
-            })}
-
-            {bookingChipLayouts.map(({ item: event, top, height, column }) => {
-              const color = getBookingChipColor(event.resourceId ?? event.recordId);
-              const left = 6 + column * (BOOKING_CHIP_SIZE_PX + BOOKING_CHIP_GAP_PX);
-
-              return (
-                <button
-                  key={event.id}
-                  type="button"
-                  title={getBookingTooltip(event)}
-                  aria-label={getBookingTooltip(event)}
-                  className="absolute flex flex-col items-center rounded-md shadow-sm ring-1 ring-black/10 transition hover:brightness-110"
-                  style={{
-                    top,
-                    height: Math.max(height, BOOKING_CHIP_SIZE_PX),
-                    left,
-                    width: BOOKING_CHIP_SIZE_PX,
-                    backgroundColor: color,
-                    zIndex: 5,
-                  }}
-                  onClick={(clickEvent) => {
-                    clickEvent.stopPropagation();
-                    onEventClick?.(event);
-                  }}
-                >
-                  <CalendarClockIcon
-                    className="mt-1 size-3 shrink-0 text-white"
-                    strokeWidth={2.5}
-                  />
                 </button>
               );
             })}

@@ -85,7 +85,7 @@ function mapProfileRow(row: {
     canUpdateContact: row.can_update_contact ?? true,
     canAddNote: row.can_add_note ?? true,
     canAddInternalNote: row.can_add_internal_note ?? true,
-    canCreateCalendarEvent: row.can_create_calendar_event ?? false,
+    canCreateCalendarEvent: row.can_create_calendar_event ?? true,
     canRequestHuman: row.can_request_human ?? true,
     canNotifyOwner: row.can_notify_owner ?? true,
     canNotifyOnActions: row.can_notify_on_actions ?? true,

@@ -29,8 +29,8 @@ import {
   parseAdditionalContacts,
   type AdditionalContactEntry,
 } from "@/utils/contact-additional-contacts";
-import { createGoogleCalendarEventForBusinessWithAdmin } from "@/services/google-calendar.service";
 import { createAiCalendarEventNotification } from "@/services/business-notifications.service";
+import { createAiCalendarBooking } from "@/services/ai-calendar-booking.service";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
@@ -248,8 +248,9 @@ function buildExecutorPrompt(input: {
     "- create_deal: for sales interest, quotes, orders (sales goal).",
     "- add_note: short CRM note on the contact profile summarizing new facts.",
     "- add_internal_note: short team-only note for managers in the chat sidebar (not visible to customer). Put owner requests, impatience, or internal observations here — never in clientSummary.",
-    "- create_calendar_event: when booking intent and clear date/time.",
-    "- clientSummary: optional one short sentence spoken DIRECTLY to the customer (use I/we). Never mention CRM, internal notes, managers, or describe the customer in third person. Leave empty when there is nothing new to tell the customer.",
+    "- create_calendar_event: when booking intent and clear date/time — book instantly in OrzuX calendar (never defer to a manager).",
+    "- For hotel stays: startDateTime = check-in, endDateTime = check-out. Fill guestCount and all booking form fields from contact + message.",
+    "- clientSummary: confirm the booking to the customer with exact date/time/resource. Never say a manager will contact them or that booking is queued.",
     "",
     "Return JSON only:",
     '{"contactUpdates":{"name":"...","email":"...","phone":"...","company":"..."},"actions":[{"type":"create_task","title":"...","dueAt":"2025-06-03T10:00:00Z"}],"clientSummary":"..."}',
@@ -696,6 +697,7 @@ async function applyAddInternalNote(
 async function applyCreateCalendarEvent(
   admin: MessagingDbClient,
   businessId: string,
+  contact: ContactSnapshot | null,
   action: Extract<ExecutorAction, { type: "create_calendar_event" }>,
   idempotencyContext: {
     conversationId?: string | null;
@@ -716,112 +718,29 @@ async function applyCreateCalendarEvent(
     return null;
   }
 
-  const { resolveBookingSlot } = await import(
-    "@/services/calendar-availability.service"
-  );
-
-  const slotResolution = await resolveBookingSlot({
+  const bookingResult = await createAiCalendarBooking({
     businessId,
+    contact,
     summary: action.summary,
     startDateTime: action.startDateTime,
     endDateTime: action.endDateTime,
     timeZone: action.timeZone,
+    description: action.description,
     resourceName: action.resourceName,
+    resourceId: action.resourceId,
+    bookingPageId: action.bookingPageId,
+    formAnswers: action.formAnswers,
+    clientMessage: idempotencyContext.clientMessage,
     preferNearestSlot: true,
   });
 
-  if (slotResolution.status === "unavailable") {
-    if (!idempotencyContext.contactId) {
-      return null;
-    }
-
-    const altText =
-      slotResolution.alternatives.length > 0
-        ? ` Suggested: ${slotResolution.alternatives.join(", ")}`
-        : "";
-
-    const fallbackTask = await applyCreateTask(
-      admin,
+  if (!bookingResult.success) {
+    await recordCrmIdempotencyKey(admin, {
       businessId,
-      idempotencyContext.contactId,
-      {
-        type: "create_task",
-        title: `Booking request: ${action.summary.trim() || "Appointment"}`,
-        dueAt: action.startDateTime,
-      },
-      idempotencyContext,
-    );
-
-    if (fallbackTask) {
-      await recordCrmIdempotencyKey(admin, {
-        businessId,
-        idempotencyKey,
-        actionType: "create_calendar_event",
-      });
-      return `Booking queued — requested time not available.${altText}`;
-    }
-
-    return null;
-  }
-
-  const resolvedStart =
-    slotResolution.status === "available" ||
-    slotResolution.status === "rescheduled"
-      ? slotResolution.startDateTime
-      : action.startDateTime;
-  const resolvedEnd =
-    slotResolution.status === "available" ||
-    slotResolution.status === "rescheduled"
-      ? slotResolution.endDateTime
-      : action.endDateTime;
-
-  const summary =
-    slotResolution.status === "available" ||
-    slotResolution.status === "rescheduled"
-      ? slotResolution.resourceName &&
-        !action.summary.includes(slotResolution.resourceName)
-        ? `${slotResolution.resourceName} — ${action.summary}`
-        : action.summary
-      : action.summary;
-
-  const result = await createGoogleCalendarEventForBusinessWithAdmin({
-    admin,
-    businessId,
-    summary,
-    startDateTime: resolvedStart,
-    endDateTime: resolvedEnd,
-    timeZone: action.timeZone,
-    description: action.description,
-  });
-
-  if (!result.success) {
-    if (!idempotencyContext.contactId) {
-      return null;
-    }
-
-    const fallbackTitle = `Booking request: ${action.summary.trim() || "Appointment"}`;
-    const fallbackTask = await applyCreateTask(
-      admin,
-      businessId,
-      idempotencyContext.contactId,
-      {
-        type: "create_task",
-        title: fallbackTitle,
-        dueAt: action.startDateTime,
-      },
-      idempotencyContext,
-    );
-
-    if (fallbackTask) {
-      await recordCrmIdempotencyKey(admin, {
-        businessId,
-        idempotencyKey,
-        actionType: "create_calendar_event",
-      });
-      return "Booking request saved — manager will confirm the appointment";
-    }
-
-    return null;
+      idempotencyKey,
+      actionType: "create_calendar_event",
+    });
+    return `Booking not confirmed: ${bookingResult.message}`;
   }
 
   await recordCrmIdempotencyKey(admin, {
@@ -841,14 +760,22 @@ async function applyCreateCalendarEvent(
       channel: idempotencyContext.channel,
       contactId: idempotencyContext.contactId ?? null,
       contactName: idempotencyContext.contactName ?? null,
-      summary,
-      startDateTime: resolvedStart,
+      summary: bookingResult.summary,
+      startDateTime: action.startDateTime,
     });
   }
 
-  return slotResolution.status === "rescheduled"
-    ? `Calendar event created (nearest free slot): ${summary}`
-    : `Calendar event created: ${summary}`;
+  const emailNote = bookingResult.customerEmail?.includes("@")
+    ? " Confirmation email sent."
+    : "";
+
+  const resourceNote = bookingResult.resourceName
+    ? ` (${bookingResult.resourceName})`
+    : "";
+
+  return bookingResult.rescheduled
+    ? `Booking confirmed${resourceNote} — ${bookingResult.slotLabel} (nearest available slot).${emailNote}`
+    : `Booking confirmed${resourceNote} — ${bookingResult.slotLabel}.${emailNote}`;
 }
 
 async function applyExecutorPlan(
@@ -922,6 +849,7 @@ async function applyExecutorPlan(
       result = await applyCreateCalendarEvent(
         admin,
         businessId,
+        contact,
         action,
         idempotencyContext,
       );

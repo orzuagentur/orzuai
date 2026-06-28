@@ -142,30 +142,15 @@ export function GmailIcon({ className, ...props }: IconProps) {
 }
 
 /** Official Google Calendar mark. */
-export function GoogleCalendarIcon({ className, ...props }: IconProps) {
+export function GoogleCalendarIcon({ className }: IconProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/icons/google-calendar-icon.png"
+      alt=""
+      className={className ? `${className} object-contain` : "size-6 object-contain"}
       aria-hidden="true"
-      {...props}
-    >
-      <path
-        fill="#FFFFFF"
-        d="M18.316 5.684H5.684A2.684 2.684 0 0 0 3 8.368v10.316A2.684 2.684 0 0 0 5.684 21.368h12.632A2.684 2.684 0 0 0 21 18.684V8.368a2.684 2.684 0 0 0-2.684-2.684z"
-      />
-      <path fill="#1A73E8" d="M21 8.368V8H3v.368A2.684 2.684 0 0 0 5.684 11h12.632A2.684 2.684 0 0 0 21 8.368z" />
-      <path fill="#EA4335" d="M7.5 3h1.5v3H7.5V3zM15 3h1.5v3H15V3z" />
-      <path
-        fill="#34A853"
-        d="M7.5 3V5.25H6A1.5 1.5 0 0 0 4.5 6.75V8h15V6.75A1.5 1.5 0 0 0 18 5.25h-1.5V3H15v2.25H9V3H7.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M8 12h2.25v2.25H8V12zm3.375 0H13.5v2.25h-2.125V12zm3.375 0H16.875v2.25H14.75V12zM8 15.375h2.25V17.5H8v-2.125zm3.375 0H13.5V17.5h-2.125v-2.125zm3.375 0H16.875V17.5H14.75v-2.125z"
-      />
-      <path fill="#FBBC04" d="M3 8h18v1H3V8z" />
-    </svg>
+    />
   );
 }
 

@@ -195,11 +195,9 @@ export type TimedEventColumnLayout<T extends { start: string; end: string }> = {
   columnCount: number;
 };
 
-export function layoutTimedEventsInColumns<T extends { start: string; end: string }>(
-  items: T[],
-  day: Date,
-  minHeight = 44,
-): TimedEventColumnLayout<T>[] {
+export function layoutTimedEventsInColumns<
+  T extends { start: string; end: string; isBooking?: boolean },
+>(items: T[], day: Date, minHeight = 44): TimedEventColumnLayout<T>[] {
   const positioned = items
     .map((item) => {
       const layout = getTimedEventLayout(item, day);
@@ -213,12 +211,22 @@ export function layoutTimedEventsInColumns<T extends { start: string; end: strin
     .filter(
       (entry): entry is { item: T; top: number; height: number } => entry !== null,
     )
-    .sort(
-      (a, b) =>
-        a.top - b.top ||
-        new Date(a.item.start).getTime() - new Date(b.item.start).getTime() ||
-        new Date(b.item.end).getTime() - new Date(a.item.end).getTime(),
-    );
+    .sort((a, b) => {
+      if (a.top !== b.top) return a.top - b.top;
+
+      const aStart = new Date(a.item.start).getTime();
+      const bStart = new Date(b.item.start).getTime();
+      if (aStart !== bStart) return aStart - bStart;
+
+      const aEnd = new Date(a.item.end).getTime();
+      const bEnd = new Date(b.item.end).getTime();
+      if (aEnd !== bEnd) return aEnd - bEnd;
+
+      if (a.item.isBooking && !b.item.isBooking) return -1;
+      if (!a.item.isBooking && b.item.isBooking) return 1;
+
+      return 0;
+    });
 
   const columns: T[][] = [];
   const preliminary: Array<{ item: T; top: number; height: number; column: number }> = [];

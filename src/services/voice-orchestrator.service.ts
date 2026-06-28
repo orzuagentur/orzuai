@@ -6,7 +6,12 @@ import {
   getBusinessBookingSetup,
   listBusinessCalendarResources,
 } from "@/services/business-calendar-setup.service";
+import {
+  formatBookingPagesForAiPrompt,
+  isCalendarBookingEnabled,
+} from "@/services/ai-calendar-booking.service";
 import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
+import { listPublishedBookingPagesForBusinessAdmin } from "@/services/booking-pages.service";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
   applyPreparedExecutorPlan,
@@ -72,15 +77,19 @@ async function runVoiceTurnOrchestration(input: {
   const calendarConnected =
     calendarConnection.data?.google_calendar_status === "connected";
 
-  const [bookingSetup, calendarResources] = await Promise.all([
-    getBusinessBookingSetup(input.businessId),
-    listBusinessCalendarResources(input.businessId),
-  ]);
+  const [bookingSetup, calendarResources, bookingPages, calendarBookingEnabled] =
+    await Promise.all([
+      getBusinessBookingSetup(input.businessId),
+      listBusinessCalendarResources(input.businessId),
+      listPublishedBookingPagesForBusinessAdmin(input.businessId),
+      isCalendarBookingEnabled(input.businessId),
+    ]);
   const bookableResourcesText = formatCalendarResourcesForAiPrompt(
     calendarResources,
     bookingSetup,
   );
-  const availabilityText = calendarConnected
+  const bookingPagesText = formatBookingPagesForAiPrompt(bookingPages);
+  const availabilityText = calendarBookingEnabled
     ? await formatAvailabilityForAiPrompt(input.businessId)
     : "";
 
@@ -94,8 +103,10 @@ async function runVoiceTurnOrchestration(input: {
     message: input.clientMessage,
     conversationHistory,
     contact,
-    calendarConnected,
+    calendarBookingEnabled,
+    googleCalendarConnected: calendarConnected,
     bookableResourcesText,
+    bookingPagesText,
     availabilityText,
   });
 

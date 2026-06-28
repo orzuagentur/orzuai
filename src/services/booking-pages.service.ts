@@ -151,6 +151,25 @@ export async function getBookingPageByIdAdmin(
   return data ? mapBookingPageRow(data) : null;
 }
 
+export async function listPublishedBookingPagesForBusinessAdmin(
+  businessId: string,
+): Promise<BookingPageRecord[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("booking_pages")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("published", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map(mapBookingPageRow);
+}
+
 export async function getPublishedBookingPageBySlug(
   slug: string,
 ): Promise<PublicBookingPageView | null> {

@@ -23,7 +23,12 @@ import {
   getBusinessBookingSetup,
   listBusinessCalendarResources,
 } from "@/services/business-calendar-setup.service";
+import {
+  formatBookingPagesForAiPrompt,
+  isCalendarBookingEnabled,
+} from "@/services/ai-calendar-booking.service";
 import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
+import { listPublishedBookingPagesForBusinessAdmin } from "@/services/booking-pages.service";
 import {
   buildHumanHandoffFollowUpMessage,
   createAiHumanRequest,
@@ -177,7 +182,7 @@ export async function resolveAssistantProfile(
       canUpdateContact: data.can_update_contact ?? true,
       canAddNote: data.can_add_note ?? true,
       canAddInternalNote: data.can_add_internal_note ?? true,
-      canCreateCalendarEvent: data.can_create_calendar_event ?? false,
+      canCreateCalendarEvent: data.can_create_calendar_event ?? true,
       canRequestHuman: data.can_request_human ?? true,
       canNotifyOwner: data.can_notify_owner ?? true,
       canNotifyOnActions: data.can_notify_on_actions ?? true,
@@ -626,15 +631,19 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   const calendarConnected =
     calendarConnection.data?.google_calendar_status === "connected";
 
-  const [bookingSetup, calendarResources] = await Promise.all([
-    getBusinessBookingSetup(input.businessId),
-    listBusinessCalendarResources(input.businessId),
-  ]);
+  const [bookingSetup, calendarResources, bookingPages, calendarBookingEnabled] =
+    await Promise.all([
+      getBusinessBookingSetup(input.businessId),
+      listBusinessCalendarResources(input.businessId),
+      listPublishedBookingPagesForBusinessAdmin(input.businessId),
+      isCalendarBookingEnabled(input.businessId),
+    ]);
   const bookableResourcesText = formatCalendarResourcesForAiPrompt(
     calendarResources,
     bookingSetup,
   );
-  const availabilityText = calendarConnected
+  const bookingPagesText = formatBookingPagesForAiPrompt(bookingPages);
+  const availabilityText = calendarBookingEnabled
     ? await formatAvailabilityForAiPrompt(input.businessId)
     : "";
 
@@ -643,8 +652,10 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     message: input.clientMessage,
     conversationHistory,
     contact,
-    calendarConnected,
+    calendarBookingEnabled,
+    googleCalendarConnected: calendarConnected,
     bookableResourcesText,
+    bookingPagesText,
     availabilityText,
   });
 

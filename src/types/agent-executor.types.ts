@@ -48,6 +48,9 @@ export const executorCreateCalendarEventActionSchema = z.object({
   timeZone: z.string().trim().min(1).max(80).default("UTC"),
   description: z.string().trim().max(2000).optional(),
   resourceName: z.string().trim().max(120).optional(),
+  resourceId: z.string().uuid().optional(),
+  bookingPageId: z.string().uuid().optional(),
+  formAnswers: z.record(z.string(), z.string()).optional(),
 });
 
 export const executorActionSchema = z.discriminatedUnion("type", [
