@@ -1,6 +1,7 @@
 import { SUPPORT_EMAIL } from "@/constants/app-origin";
 import { ENV_KEYS } from "@/constants/env-keys";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
+import { formatResendFromAddress } from "@/lib/resend/from-address";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
 
 function readEnv(name: string): string | undefined {
@@ -52,7 +53,7 @@ export function getResendApiKey(): string {
 }
 
 export function getResendFromEmail(): string {
-  return getRequiredEnv(ENV_KEYS.RESEND_FROM_EMAIL);
+  return formatResendFromAddress(getRequiredEnv(ENV_KEYS.RESEND_FROM_EMAIL));
 }
 
 export function hasResendEnv(): boolean {

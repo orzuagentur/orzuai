@@ -1,9 +1,8 @@
 import "server-only";
 
-import { NOREPLY_EMAIL } from "@/constants/app-origin";
 import { sendGmailMessage } from "@/lib/gmail/client";
 import { getResendClient } from "@/lib/resend/client";
-import { hasResendEnv } from "@/lib/env";
+import { getResendFromEmail, hasResendEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getGmailAccessTokenForBusiness } from "@/services/gmail-integration.service";
 
@@ -97,7 +96,7 @@ export async function sendBusinessOutboundEmail(
   try {
     const resend = getResendClient();
     const { error } = await resend.emails.send({
-      from: `${sender.businessName} <${NOREPLY_EMAIL}>`,
+      from: getResendFromEmail(),
       replyTo: [replyTo],
       to: recipient,
       subject: input.subject,

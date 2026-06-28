@@ -1,3 +1,5 @@
+import { formatResendFromAddress } from "@/lib/resend-from";
+
 export function getAdminAppUrl(): string {
   const fromEnv =
     process.env.NEXT_PUBLIC_ADMIN_APP_URL?.trim() ||
@@ -38,5 +40,5 @@ export function getResendFromEmail(): string {
     throw new Error("Missing RESEND_FROM_EMAIL");
   }
 
-  return value;
+  return formatResendFromAddress(value);
 }

@@ -1,6 +1,6 @@
 const SECRET_KEY_PLACEHOLDERS: Record<string, string> = {
   RESEND_API_KEY: "your-resend-api-key",
-  RESEND_FROM_EMAIL: "OrzuX <noreply@yourdomain.com>",
+  RESEND_FROM_EMAIL: "OrzuX <support@orzux.com>",
   GEMINI_API_KEY: "your-gemini-api-key",
   GEMINI_DEFAULT_MODEL: "gemini-2.5-flash",
   OPENAI_API_KEY: "your-openai-api-key",
