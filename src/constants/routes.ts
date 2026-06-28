@@ -45,7 +45,13 @@ export const DASHBOARD_ROUTES = {
   automations: "/dashboard/automations",
   marketplace: "/dashboard/integrations/marketplace",
   calendar: "/dashboard/calendar",
+  calendarBooking: "/dashboard/calendar/booking",
+  calendarBookingNew: "/dashboard/calendar/booking/new",
   googleCalendarIntegration: "/dashboard/integrations/google_calendar",
+} as const;
+
+export const PUBLIC_ROUTES = {
+  book: (slug: string) => `/book/${slug}`,
 } as const;
 
 export const PROTECTED_ROUTE_PREFIXES = ["/dashboard"] as const;

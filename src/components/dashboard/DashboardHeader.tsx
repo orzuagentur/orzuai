@@ -6,11 +6,12 @@ import { AnalyticsTabBar } from "@/components/analytics/AnalyticsTabBar";
 import { useOptionalAnalyticsChrome } from "@/components/analytics/analytics-chrome-context";
 import { InboxToolbar } from "@/components/chats/inbox/InboxToolbar";
 import { AiAssistantToolbar } from "@/components/ai-assistant/AiAssistantToolbar";
-import {
-  AutomationsHeaderActions,
+import { AutomationsHeaderActions,
   AutomationsTabBar,
 } from "@/components/automations/AutomationsTabBar";
 import { useOptionalAutomationsChrome } from "@/components/automations/automations-chrome-context";
+import { CalendarToolbar } from "@/components/orzux-calendar/CalendarToolbar";
+import { useOptionalCalendarChrome } from "@/components/orzux-calendar/calendar-chrome-context";
 import { ContactsToolbar } from "@/components/contacts/ContactsToolbar";
 import { CrmEntityTabs } from "@/components/contacts/CrmEntityTabs";
 import { useOptionalAiAssistantChrome } from "@/components/ai-assistant/ai-assistant-chrome-context";
@@ -44,6 +45,13 @@ function isAutomationsPath(pathname: string): boolean {
   return pathname === DASHBOARD_ROUTES.automations;
 }
 
+function isCalendarPath(pathname: string): boolean {
+  return (
+    pathname === DASHBOARD_ROUTES.calendar ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.calendar}/`)
+  );
+}
+
 export function DashboardHeader() {
   const pathname = usePathname();
   const pageMeta = getDashboardPageHeaderMeta(pathname);
@@ -52,6 +60,7 @@ export function DashboardHeader() {
   const aiAssistantChrome = useOptionalAiAssistantChrome();
   const analyticsChrome = useOptionalAnalyticsChrome();
   const automationsChrome = useOptionalAutomationsChrome();
+  const calendarChrome = useOptionalCalendarChrome();
   const showInboxToolbar = isInboxPath(pathname) && inboxChrome !== null;
   const showContactsToolbar =
     isContactsPath(pathname) && contactsChrome !== null;
@@ -61,18 +70,23 @@ export function DashboardHeader() {
     isAnalyticsPath(pathname) && analyticsChrome !== null;
   const showAutomationsTabs =
     isAutomationsPath(pathname) && automationsChrome !== null;
+  const showCalendarToolbar =
+    isCalendarPath(pathname) && calendarChrome !== null;
   const compactHeading =
     showInboxToolbar ||
     showContactsToolbar ||
     showAiAssistantToolbar ||
     showAnalyticsTabs ||
-    showAutomationsTabs;
+    showAutomationsTabs ||
+    showCalendarToolbar;
 
   return (
     <header className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b px-3 sm:gap-3 sm:px-4">
       <SidebarTrigger className="-ml-1 shrink-0 md:hidden" />
 
-      {pageMeta ? (
+      {showCalendarToolbar && calendarChrome ? (
+        <CalendarToolbar chrome={calendarChrome} />
+      ) : pageMeta ? (
         <>
           <DashboardPageHeading title={pageMeta.title} compact={compactHeading} />
 

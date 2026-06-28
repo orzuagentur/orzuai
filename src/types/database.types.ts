@@ -1773,6 +1773,90 @@ export type Database = {
         };
         Relationships: [];
       };
+      calendar_events: {
+        Row: {
+          id: string;
+          business_id: string;
+          title: string;
+          description: string;
+          location: string;
+          start_at: string;
+          end_at: string;
+          timezone: string;
+          is_all_day: boolean;
+          google_event_id: string | null;
+          google_html_link: string | null;
+          source: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          title: string;
+          description?: string;
+          location?: string;
+          start_at: string;
+          end_at: string;
+          timezone?: string;
+          is_all_day?: boolean;
+          google_event_id?: string | null;
+          google_html_link?: string | null;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          title?: string;
+          description?: string;
+          location?: string;
+          start_at?: string;
+          end_at?: string;
+          timezone?: string;
+          is_all_day?: boolean;
+          google_event_id?: string | null;
+          google_html_link?: string | null;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      calendar_tasks: {
+        Row: {
+          id: string;
+          business_id: string;
+          title: string;
+          due_at: string | null;
+          status: string;
+          google_event_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          title: string;
+          due_at?: string | null;
+          status?: string;
+          google_event_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          title?: string;
+          due_at?: string | null;
+          status?: string;
+          google_event_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       business_booking_setup: {
         Row: {
           business_id: string;
@@ -1787,6 +1871,10 @@ export type Database = {
           business_hours_start: string;
           business_hours_end: string;
           business_days: number[];
+          booking_page_title: string;
+          slot_duration_minutes: number;
+          booking_page_published: boolean;
+          weekly_schedule: unknown;
           created_at: string;
           updated_at: string;
         };
@@ -1803,6 +1891,10 @@ export type Database = {
           business_hours_start?: string;
           business_hours_end?: string;
           business_days?: number[];
+          booking_page_title?: string;
+          slot_duration_minutes?: number;
+          booking_page_published?: boolean;
+          weekly_schedule?: unknown;
           created_at?: string;
           updated_at?: string;
         };
@@ -1819,6 +1911,10 @@ export type Database = {
           business_hours_start?: string;
           business_hours_end?: string;
           business_days?: number[];
+          booking_page_title?: string;
+          slot_duration_minutes?: number;
+          booking_page_published?: boolean;
+          weekly_schedule?: unknown;
           created_at?: string;
           updated_at?: string;
         };
@@ -1832,10 +1928,76 @@ export type Database = {
           },
         ];
       };
+      booking_pages: {
+        Row: {
+          id: string;
+          business_id: string;
+          slug: string;
+          title: string;
+          business_type: string;
+          business_type_label: string;
+          slot_duration_minutes: number;
+          slot_buffer_minutes: number;
+          advance_booking_days: number;
+          booking_timezone: string;
+          weekly_schedule: unknown;
+          form_fields: unknown;
+          published: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          slug: string;
+          title: string;
+          business_type?: string;
+          business_type_label?: string;
+          slot_duration_minutes?: number;
+          slot_buffer_minutes?: number;
+          advance_booking_days?: number;
+          booking_timezone?: string;
+          weekly_schedule?: unknown;
+          form_fields?: unknown;
+          published?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          slug?: string;
+          title?: string;
+          business_type?: string;
+          business_type_label?: string;
+          slot_duration_minutes?: number;
+          slot_buffer_minutes?: number;
+          advance_booking_days?: number;
+          booking_timezone?: string;
+          weekly_schedule?: unknown;
+          form_fields?: unknown;
+          published?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_pages_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       business_calendar_resources: {
         Row: {
           id: string;
           business_id: string;
+          booking_page_id: string | null;
           resource_type: string;
           name: string;
           description: string;
@@ -1850,6 +2012,7 @@ export type Database = {
         Insert: {
           id?: string;
           business_id: string;
+          booking_page_id?: string | null;
           resource_type: string;
           name: string;
           description?: string;
@@ -1864,6 +2027,7 @@ export type Database = {
         Update: {
           id?: string;
           business_id?: string;
+          booking_page_id?: string | null;
           resource_type?: string;
           name?: string;
           description?: string;
@@ -1881,6 +2045,13 @@ export type Database = {
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_calendar_resources_booking_page_id_fkey";
+            columns: ["booking_page_id"];
+            isOneToOne: false;
+            referencedRelation: "booking_pages";
             referencedColumns: ["id"];
           },
         ];

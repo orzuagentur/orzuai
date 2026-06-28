@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getPrimaryHoursFromSchedule,
+  parseWeeklySchedule,
+  weeklyScheduleToBusinessDays,
+  type WeeklySchedule,
+} from "@/lib/calendar/weekly-schedule";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { mapKnowledgeEntry } from "@/utils/knowledge";
@@ -100,6 +106,7 @@ function mapResourceRow(row: {
 
 function revalidateCalendarPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.calendar);
+  revalidatePath(DASHBOARD_ROUTES.calendarBooking);
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
 }
 
@@ -131,7 +138,7 @@ export async function getBusinessBookingSetup(
   const { data } = await admin
     .from("business_booking_setup")
     .select(
-      "business_id, business_type, business_type_label, operating_hours_note, generated_from_knowledge_at, booking_timezone, slot_buffer_minutes, advance_booking_days, business_hours_enabled, business_hours_start, business_hours_end, business_days",
+      "business_id, business_type, business_type_label, operating_hours_note, generated_from_knowledge_at, booking_timezone, slot_buffer_minutes, advance_booking_days, business_hours_enabled, business_hours_start, business_hours_end, business_days, booking_page_title, slot_duration_minutes, booking_page_published, weekly_schedule",
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -153,6 +160,10 @@ export async function getBusinessBookingSetup(
     businessHoursStart: data.business_hours_start ?? "09:00",
     businessHoursEnd: data.business_hours_end ?? "18:00",
     businessDays: data.business_days ?? [1, 2, 3, 4, 5],
+    bookingPageTitle: data.booking_page_title ?? "",
+    slotDurationMinutes: data.slot_duration_minutes ?? 60,
+    bookingPagePublished: data.booking_page_published ?? false,
+    weeklySchedule: parseWeeklySchedule(data.weekly_schedule),
   };
 }
 
@@ -190,6 +201,58 @@ export async function saveBusinessBookingSettings(
       business_hours_end:
         input.businessHoursEnd ?? existing?.businessHoursEnd ?? "18:00",
       business_days: input.businessDays ?? existing?.businessDays ?? [1, 2, 3, 4, 5],
+    },
+    { onConflict: "business_id" },
+  );
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateCalendarPaths();
+  return { success: true };
+}
+
+export async function saveBusinessBookingPage(
+  businessId: string,
+  input: {
+    bookingPageTitle: string;
+    slotDurationMinutes: number;
+    bookingTimezone: string;
+    weeklySchedule: WeeklySchedule;
+    bookingPagePublished: boolean;
+    slotBufferMinutes?: number;
+    advanceBookingDays?: number;
+    businessType?: BusinessBookingSetup["businessType"];
+    businessTypeLabel?: string;
+  },
+): Promise<{ success: boolean; message?: string }> {
+  const admin = createAdminClient();
+  const existing = await getBusinessBookingSetup(businessId);
+  const businessDays = weeklyScheduleToBusinessDays(input.weeklySchedule);
+  const primaryHours = getPrimaryHoursFromSchedule(input.weeklySchedule);
+
+  const { error } = await admin.from("business_booking_setup").upsert(
+    {
+      business_id: businessId,
+      business_type: input.businessType ?? existing?.businessType ?? "generic",
+      business_type_label:
+        input.businessTypeLabel ?? existing?.businessTypeLabel ?? "Business",
+      operating_hours_note: existing?.operatingHoursNote ?? "",
+      generated_from_knowledge_at: existing?.generatedFromKnowledgeAt,
+      booking_page_title: input.bookingPageTitle.trim(),
+      slot_duration_minutes: input.slotDurationMinutes,
+      booking_page_published: input.bookingPagePublished,
+      weekly_schedule: input.weeklySchedule,
+      booking_timezone: input.bookingTimezone,
+      slot_buffer_minutes:
+        input.slotBufferMinutes ?? existing?.slotBufferMinutes ?? 15,
+      advance_booking_days:
+        input.advanceBookingDays ?? existing?.advanceBookingDays ?? 14,
+      business_hours_enabled: businessDays.length > 0,
+      business_hours_start: primaryHours.start,
+      business_hours_end: primaryHours.end,
+      business_days: businessDays.length > 0 ? businessDays : [1, 2, 3, 4, 5],
     },
     { onConflict: "business_id" },
   );

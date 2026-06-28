@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev",
     "dev:admin": "npm run dev --workspace=@orzu/admin",
     "build": "next build",
     "build:admin": "npm run build --workspace=@orzu/admin",

@@ -7,6 +7,7 @@ import { AnalyticsChromeProvider } from "@/components/analytics/analytics-chrome
 import { AutomationsChromeProvider } from "@/components/automations/automations-chrome-context";
 import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-context";
 import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistant-chrome-context";
+import { CalendarChromeProvider } from "@/components/orzux-calendar/calendar-chrome-context";
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -72,6 +73,7 @@ export function DashboardShell({
         <InboxChromeProvider>
           <ContactsChromeProvider>
             <AiAssistantChromeProvider>
+            <CalendarChromeProvider>
             <AnalyticsChromeProvider>
             <AutomationsChromeProvider>
             <DashboardProfileProvider userProfile={userProfile}>
@@ -94,6 +96,7 @@ export function DashboardShell({
             </DashboardProfileProvider>
             </AutomationsChromeProvider>
             </AnalyticsChromeProvider>
+            </CalendarChromeProvider>
             </AiAssistantChromeProvider>
           </ContactsChromeProvider>
         </InboxChromeProvider>

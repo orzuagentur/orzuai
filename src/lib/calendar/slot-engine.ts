@@ -9,6 +9,7 @@ export type OperatingHoursConfig = {
   end: string;
   timezone: string;
   days: number[];
+  daySchedules?: Record<number, { start: string; end: string }>;
 };
 
 function parseTimeToMinutes(value: string): number | null {
@@ -79,17 +80,18 @@ export function isWithinOperatingHours(
     return true;
   }
 
-  const startMinutes = parseTimeToMinutes(config.start);
-  const endMinutes = parseTimeToMinutes(config.end);
-
-  if (startMinutes == null || endMinutes == null) {
-    return true;
-  }
-
   const parts = getZonedParts(date, config.timezone || "UTC");
 
   if (!config.days.includes(parts.dayOfWeek)) {
     return false;
+  }
+
+  const daySchedule = config.daySchedules?.[parts.dayOfWeek];
+  const startMinutes = parseTimeToMinutes(daySchedule?.start ?? config.start);
+  const endMinutes = parseTimeToMinutes(daySchedule?.end ?? config.end);
+
+  if (startMinutes == null || endMinutes == null) {
+    return true;
   }
 
   const currentMinutes = parts.hour * 60 + parts.minute;
@@ -112,6 +114,34 @@ export function intervalsOverlap(
     a.start.getTime() - bufferMs < b.end.getTime() &&
     a.end.getTime() + bufferMs > b.start.getTime()
   );
+}
+
+export function mergeBusyIntervals(intervals: TimeInterval[]): TimeInterval[] {
+  const valid = intervals
+    .filter(
+      (interval) =>
+        !Number.isNaN(interval.start.getTime()) &&
+        !Number.isNaN(interval.end.getTime()) &&
+        interval.end.getTime() > interval.start.getTime(),
+    )
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const merged: TimeInterval[] = [];
+
+  for (const interval of valid) {
+    const last = merged[merged.length - 1];
+
+    if (!last || interval.start.getTime() > last.end.getTime()) {
+      merged.push({ start: interval.start, end: interval.end });
+      continue;
+    }
+
+    if (interval.end.getTime() > last.end.getTime()) {
+      last.end = interval.end;
+    }
+  }
+
+  return merged;
 }
 
 export function isIntervalFree(
@@ -239,4 +269,71 @@ export function formatSlotForDisplay(
   });
 
   return formatter.format(slot.start);
+}
+
+function findUtcForLocalDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  const targetDay = year * 10_000 + month * 100 + day;
+  const targetMinutes = hour * 60 + minute;
+
+  let low = Date.UTC(year, month - 1, day - 1);
+  let high = Date.UTC(year, month - 1, day + 2);
+
+  for (let attempt = 0; attempt < 48; attempt += 1) {
+    const mid = Math.floor((low + high) / 2);
+    const parts = getZonedParts(new Date(mid), timeZone);
+    const currentDay = parts.year * 10_000 + parts.month * 100 + parts.day;
+    const currentMinutes = parts.hour * 60 + parts.minute;
+
+    if (
+      currentDay < targetDay ||
+      (currentDay === targetDay && currentMinutes < targetMinutes)
+    ) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  return new Date(high);
+}
+
+/** UTC bounds for a calendar day (YYYY-MM-DD) in the given IANA timezone. */
+export function getTimezoneDayBounds(
+  dateStr: string,
+  timeZone: string,
+): TimeInterval {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (!match) {
+    const fallback = new Date();
+    return { start: fallback, end: fallback };
+  }
+
+  const year = Number.parseInt(match[1] ?? "0", 10);
+  const month = Number.parseInt(match[2] ?? "0", 10);
+  const day = Number.parseInt(match[3] ?? "0", 10);
+
+  const start = findUtcForLocalDateTime(year, month, day, 0, 0, timeZone);
+  const end = findUtcForLocalDateTime(year, month, day, 23, 59, timeZone);
+  end.setSeconds(59, 999);
+
+  return { start, end };
+}
+
+export function formatDateKeyInTimezone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { WeeklySchedule } from "@/lib/calendar/weekly-schedule";
+
 export const CALENDAR_RESOURCE_TYPES = [
   "room",
   "table",
@@ -12,13 +14,26 @@ export const CALENDAR_RESOURCE_TYPES = [
 export type CalendarResourceType = (typeof CALENDAR_RESOURCE_TYPES)[number];
 
 export const BUSINESS_TYPES = [
-  "hotel",
-  "restaurant",
-  "barbershop",
-  "salon",
-  "clinic",
-  "auto_service",
   "generic",
+  "salon",
+  "barbershop",
+  "clinic",
+  "dentist",
+  "restaurant",
+  "hotel",
+  "auto_service",
+  "spa",
+  "gym",
+  "veterinary",
+  "photography",
+  "tutoring",
+  "legal",
+  "real_estate",
+  "coworking",
+  "pet_grooming",
+  "yoga_studio",
+  "cleaning",
+  "event_venue",
 ] as const;
 
 export type BusinessBookingType = (typeof BUSINESS_TYPES)[number];
@@ -72,4 +87,8 @@ export type BusinessBookingSetup = {
   businessHoursStart: string;
   businessHoursEnd: string;
   businessDays: number[];
+  bookingPageTitle: string;
+  slotDurationMinutes: number;
+  bookingPagePublished: boolean;
+  weeklySchedule: WeeklySchedule;
 };

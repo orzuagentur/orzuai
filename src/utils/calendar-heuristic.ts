@@ -4,6 +4,7 @@ import type {
   CalendarResourceType,
 } from "@/types/business-calendar-resource.types";
 import type { KnowledgeEntryData } from "@/types/knowledge.types";
+import { getBusinessTypePreset } from "@/lib/calendar/business-type-presets";
 
 function detectBusinessType(text: string): {
   type: BusinessBookingType;
@@ -69,87 +70,13 @@ function extractStaffNames(text: string): string[] {
 function buildDefaultResources(
   businessType: BusinessBookingType,
 ): CalendarResourceExtraction["resources"] {
-  switch (businessType) {
-    case "hotel":
-      return Array.from({ length: 5 }, (_, index) => ({
-        resourceType: "room" as CalendarResourceType,
-        name: `Номер ${101 + index}`,
-        capacity: 2,
-        durationMinutes: 1440,
-      }));
-    case "restaurant":
-      return Array.from({ length: 6 }, (_, index) => ({
-        resourceType: "table" as CalendarResourceType,
-        name: `Столик ${index + 1}`,
-        capacity: 4,
-        durationMinutes: 120,
-      }));
-    case "barbershop":
-    case "salon":
-      return ["Анна", "Дмитрий", "Сергей"].map((name) => ({
-        resourceType: "staff" as CalendarResourceType,
-        name: `Мастер ${name}`,
-        capacity: 1,
-        durationMinutes: 45,
-      }));
-    case "clinic":
-      return [
-        {
-          resourceType: "staff" as CalendarResourceType,
-          name: "Врач 1",
-          capacity: 1,
-          durationMinutes: 30,
-        },
-        {
-          resourceType: "room" as CalendarResourceType,
-          name: "Кабинет 1",
-          capacity: 1,
-          durationMinutes: 30,
-        },
-      ];
-    case "auto_service":
-      return [
-        {
-          resourceType: "service" as CalendarResourceType,
-          name: "ТО / техобслуживание",
-          capacity: 1,
-          durationMinutes: 60,
-        },
-        {
-          resourceType: "service" as CalendarResourceType,
-          name: "Диагностика",
-          capacity: 1,
-          durationMinutes: 45,
-        },
-        {
-          resourceType: "chair" as CalendarResourceType,
-          name: "Пост 1",
-          capacity: 1,
-          durationMinutes: 90,
-        },
-        {
-          resourceType: "chair" as CalendarResourceType,
-          name: "Пост 2",
-          capacity: 1,
-          durationMinutes: 90,
-        },
-      ];
-    default:
-      return [
-        {
-          resourceType: "service" as CalendarResourceType,
-          name: "Запись 1",
-          capacity: 1,
-          durationMinutes: 60,
-        },
-        {
-          resourceType: "service" as CalendarResourceType,
-          name: "Запись 2",
-          capacity: 1,
-          durationMinutes: 60,
-        },
-      ];
-  }
+  return getBusinessTypePreset(businessType).resources.map((resource) => ({
+    resourceType: resource.resourceType,
+    name: resource.name,
+    description: resource.description,
+    capacity: resource.capacity,
+    durationMinutes: resource.durationMinutes,
+  }));
 }
 
 export function buildHeuristicCalendarExtraction(
