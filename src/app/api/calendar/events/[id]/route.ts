@@ -1,0 +1,133 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  deleteCalendarEventForBusiness,
+  getCalendarEventForBusiness,
+  updateCalendarEventForBusiness,
+} from "@/services/calendar-events.service";
+import { sendBookingActionEmail } from "@/services/booking-confirmation-email.service";
+import { getPrimaryBusiness } from "@/services/business.service";
+import { requireUser } from "@/services/auth.service";
+import { formatSlotForDisplay } from "@/lib/calendar/slot-engine";
+import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+const updateSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().max(10000).optional(),
+  location: z.string().max(500).optional(),
+  startDateTime: z.string().min(1).optional(),
+  endDateTime: z.string().min(1).optional(),
+  timeZone: z.string().min(1).optional(),
+  resourceId: z.string().uuid().nullable().optional(),
+});
+
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const user = await requireUser();
+    const business = await getPrimaryBusiness(user.id);
+
+    if (!business) {
+      return NextResponse.json({ success: false, message: "Business not found." }, { status: 400 });
+    }
+
+    const { id } = await context.params;
+    const body = updateSchema.parse(await request.json());
+    const existing = await getCalendarEventForBusiness(business.id, id);
+
+    if (!existing) {
+      return NextResponse.json({ success: false, message: "Event not found." }, { status: 404 });
+    }
+
+    const result = await updateCalendarEventForBusiness({
+      businessId: business.id,
+      eventId: id,
+      ...body,
+    });
+
+    if (!result.success || !result.event) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    if (result.event.isBooking && result.event.customerEmail.includes("@")) {
+      const resources = await listAllBusinessCalendarResources(business.id);
+      const resource = resources.find((item) => item.id === result.event!.resourceId);
+
+      await sendBookingActionEmail({
+        businessId: business.id,
+        businessName: business.business_name,
+        customerEmail: result.event.customerEmail,
+        customerName: result.event.customerName || "Customer",
+        action: "updated",
+        slotLabel: formatSlotForDisplay(
+          { start: new Date(result.event.startAt), end: new Date(result.event.endAt) },
+          result.event.timezone,
+        ),
+        resourceName: resource?.name,
+        pageTitle: result.event.title,
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const message = error instanceof z.ZodError
+      ? error.issues[0]?.message ?? "Invalid event data."
+      : "Could not update event.";
+
+    return NextResponse.json({ success: false, message }, { status: 400 });
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const user = await requireUser();
+    const business = await getPrimaryBusiness(user.id);
+
+    if (!business) {
+      return NextResponse.json({ success: false, message: "Business not found." }, { status: 400 });
+    }
+
+    const { id } = await context.params;
+    const existing = await getCalendarEventForBusiness(business.id, id);
+
+    if (!existing) {
+      return NextResponse.json({ success: false, message: "Event not found." }, { status: 404 });
+    }
+
+    const result = await deleteCalendarEventForBusiness({
+      businessId: business.id,
+      eventId: id,
+    });
+
+    if (!result.success) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    if (existing.isBooking && existing.customerEmail.includes("@")) {
+      const resources = await listAllBusinessCalendarResources(business.id);
+      const resource = resources.find((item) => item.id === existing.resourceId);
+
+      await sendBookingActionEmail({
+        businessId: business.id,
+        businessName: business.business_name,
+        customerEmail: existing.customerEmail,
+        customerName: existing.customerName || "Customer",
+        action: "cancelled",
+        slotLabel: formatSlotForDisplay(
+          { start: new Date(existing.startAt), end: new Date(existing.endAt) },
+          existing.timezone,
+        ),
+        resourceName: resource?.name,
+        pageTitle: existing.title,
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ success: false, message: "Could not delete event." }, { status: 500 });
+  }
+}

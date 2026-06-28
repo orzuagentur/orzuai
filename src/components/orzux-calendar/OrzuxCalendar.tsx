@@ -17,9 +17,11 @@ import {
   useCalendarChromeRegistration,
   type CalendarDayChrome,
 } from "./calendar-chrome-context";
+import { OrzuxCalendarBookingDialog, type CalendarResourceOption } from "./OrzuxCalendarBookingDialog";
 import { OrzuxCalendarBookingPages } from "./OrzuxCalendarBookingPages";
 import { OrzuxCalendarCreateMenu } from "./OrzuxCalendarCreateMenu";
 import { OrzuxCalendarDayGrid } from "./OrzuxCalendarDayGrid";
+import { OrzuxCalendarEventSheet } from "./OrzuxCalendarEventSheet";
 import { OrzuxCalendarMiniMonth } from "./OrzuxCalendarMiniMonth";
 import {
   addDays,
@@ -41,6 +43,7 @@ type OrzuxCalendarProps = {
   timeZone: string;
   bookingSetup: BusinessBookingSetup | null;
   bookingPages?: BookingPageRecord[];
+  resources?: CalendarResourceOption[];
   syncError?: string | null;
   calendarLabel?: string | null;
   accountEmail?: string | null;
@@ -53,6 +56,7 @@ export function OrzuxCalendar({
   timeZone,
   bookingSetup: _bookingSetup,
   bookingPages = [],
+  resources = [],
   syncError,
   calendarLabel,
   accountEmail,
@@ -66,14 +70,16 @@ export function OrzuxCalendar({
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<OrzuxCalendarEvent | null>(null);
+  const [eventSheetOpen, setEventSheetOpen] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingInitialStart, setBookingInitialStart] = useState<Date | null>(null);
 
-  const daysWithEvents = useMemo(() => {
+  const daysWithBookings = useMemo(() => {
     const set = new Set<string>();
     for (const event of events) {
-      const start = event.isAllDay
-        ? new Date(`${event.start}T12:00:00`)
-        : new Date(event.start);
-      set.add(startOfDay(start).toDateString());
+      if (!event.isBooking) continue;
+      set.add(startOfDay(new Date(event.start)).toDateString());
     }
     return set;
   }, [events]);
@@ -82,6 +88,11 @@ export function OrzuxCalendar({
     () => slots.filter((slot) => isSameDay(new Date(slot.start), selectedDate)),
     [slots, selectedDate],
   );
+
+  const openBooking = useCallback((start: Date | null = null) => {
+    setBookingInitialStart(start);
+    setBookingOpen(true);
+  }, []);
 
   const goToday = useCallback(() => {
     const today = startOfDay(new Date());
@@ -167,13 +178,17 @@ export function OrzuxCalendar({
           <OrzuxCalendarDayGrid
             selectedDate={selectedDate}
             events={events}
-            slots={slots}
             timeZone={timeZone}
+            onEventClick={(event) => {
+              setSelectedEvent(event);
+              setEventSheetOpen(true);
+            }}
+            onSlotClick={(time) => openBooking(time)}
           />
 
           <div className="pointer-events-none absolute bottom-6 right-6 z-30">
             <div className="pointer-events-auto">
-              <OrzuxCalendarCreateMenu selectedDate={selectedDate} variant="fab" />
+              <OrzuxCalendarCreateMenu variant="fab" onOpenBooking={() => openBooking()} />
             </div>
           </div>
         </div>
@@ -189,7 +204,7 @@ export function OrzuxCalendar({
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <OrzuxCalendarCreateMenu selectedDate={selectedDate} variant="sidebar" />
+                    <OrzuxCalendarCreateMenu variant="sidebar" onOpenBooking={() => openBooking()} />
                   </div>
                   <Button
                     type="button"
@@ -210,7 +225,7 @@ export function OrzuxCalendar({
                   visibleMonth={visibleMonth}
                   onSelectDate={setSelectedDate}
                   onVisibleMonthChange={setVisibleMonth}
-                  daysWithEvents={daysWithEvents}
+                  daysWithEvents={daysWithBookings}
                 />
 
                 <details
@@ -250,6 +265,22 @@ export function OrzuxCalendar({
           </div>
         </aside>
       </div>
+
+      <OrzuxCalendarEventSheet
+        event={selectedEvent}
+        open={eventSheetOpen}
+        onOpenChange={setEventSheetOpen}
+        resources={resources}
+        timeZone={timeZone}
+      />
+
+      <OrzuxCalendarBookingDialog
+        open={bookingOpen}
+        onOpenChange={setBookingOpen}
+        resources={resources}
+        timeZone={timeZone}
+        initialStart={bookingInitialStart}
+      />
     </div>
   );
 }

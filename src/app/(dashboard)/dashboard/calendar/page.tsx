@@ -10,15 +10,12 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
 import { listBookingPagesForBusiness } from "@/services/booking-pages.service";
 import {
-  listCalendarEventsForBusiness,
-  listCalendarTasksForBusiness,
-  mergeCalendarEvents,
-  syncGoogleCalendarEventsForBusiness,
+  listCalendarBookingsForBusiness,
+  toOrzuxCalendarEvent,
 } from "@/services/calendar-events.service";
 import { getCalendarAvailabilityPageData } from "@/services/calendar-availability.service";
-import {
-  getGoogleCalendarConnection,
-} from "@/services/google-calendar.service";
+import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
+import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 
 export default function CalendarPage() {
   return (
@@ -40,26 +37,21 @@ async function CalendarPageContent() {
   const googleConnected = connection?.status === "connected";
   const bookingSetup = await getBusinessBookingSetup(business.id);
 
-  const [localTasks, availability, googleSync, bookingPages] = await Promise.all([
-    listCalendarTasksForBusiness(business.id).catch(() => []),
+  const [bookings, availability, bookingPages, resources] = await Promise.all([
+    listCalendarBookingsForBusiness(business.id).catch(() => []),
     getCalendarAvailabilityPageData(business.id).catch(() => ({
       slots: [],
       timeZone: bookingSetup?.bookingTimezone ?? "UTC",
     })),
-    googleConnected
-      ? syncGoogleCalendarEventsForBusiness(business.id).catch(() => ({
-          synced: 0,
-        }))
-      : Promise.resolve({ synced: 0 }),
     listBookingPagesForBusiness(business.id).catch(() => []),
+    listAllBusinessCalendarResources(business.id).catch(() => []),
   ]);
 
-  const localEvents = await listCalendarEventsForBusiness(business.id).catch(() => []);
+  const resourceNameMap = Object.fromEntries(resources.map((resource) => [resource.id, resource.name]));
 
-  const events = mergeCalendarEvents({
-    localEvents,
-    localTasks,
-    googleEvents: [],
+  const events = bookings.map((record) => {
+    const event = toOrzuxCalendarEvent(record, resourceNameMap[record.resourceId ?? ""] ?? null);
+    return event;
   });
 
   return (
@@ -71,7 +63,12 @@ async function CalendarPageContent() {
         timeZone={availability.timeZone}
         bookingSetup={bookingSetup}
         bookingPages={bookingPages}
-        syncError={"syncError" in googleSync ? googleSync.syncError : undefined}
+        resources={resources.map((resource) => ({
+          id: resource.id,
+          name: resource.name,
+          resourceType: resource.resourceType,
+          durationMinutes: resource.durationMinutes,
+        }))}
         calendarLabel={connection?.calendarSummary}
         accountEmail={connection?.googleAccountEmail}
         googleConnected={googleConnected}

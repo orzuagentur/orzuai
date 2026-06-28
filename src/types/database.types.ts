@@ -1789,6 +1789,11 @@ export type Database = {
           source: string;
           created_at: string;
           updated_at: string;
+          resource_id: string | null;
+          booking_page_id: string | null;
+          customer_name: string;
+          customer_email: string;
+          is_booking: boolean;
         };
         Insert: {
           id?: string;
@@ -1805,6 +1810,11 @@ export type Database = {
           source?: string;
           created_at?: string;
           updated_at?: string;
+          resource_id?: string | null;
+          booking_page_id?: string | null;
+          customer_name?: string;
+          customer_email?: string;
+          is_booking?: boolean;
         };
         Update: {
           id?: string;
@@ -1821,6 +1831,11 @@ export type Database = {
           source?: string;
           created_at?: string;
           updated_at?: string;
+          resource_id?: string | null;
+          booking_page_id?: string | null;
+          customer_name?: string;
+          customer_email?: string;
+          is_booking?: boolean;
         };
         Relationships: [];
       };

@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClockIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import {
+  CalendarClockIcon,
+  ExternalLinkIcon,
+  Loader2Icon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "@/constants/routes";
@@ -14,6 +23,30 @@ type OrzuxCalendarBookingPagesProps = {
 };
 
 export function OrzuxCalendarBookingPages({ pages }: OrzuxCalendarBookingPagesProps) {
+  const router = useRouter();
+  const [isDeleting, startDeleting] = useTransition();
+
+  function handleDelete(pageId: string) {
+    startDeleting(async () => {
+      try {
+        const response = await fetch(`/api/calendar/booking-page?pageId=${pageId}`, {
+          method: "DELETE",
+        });
+        const result = (await response.json()) as { success: boolean; message?: string };
+
+        if (!response.ok || !result.success) {
+          toast.error(result.message ?? ORZUX_CALENDAR_MESSAGES.bookingPageSaveFailed);
+          return;
+        }
+
+        toast.success(ORZUX_CALENDAR_MESSAGES.pageDeleted);
+        router.refresh();
+      } catch {
+        toast.error(ORZUX_CALENDAR_MESSAGES.bookingPageSaveFailed);
+      }
+    });
+  }
+
   return (
     <section className="space-y-2 rounded-xl border bg-card p-3">
       <div className="flex items-center justify-between gap-2">
@@ -33,58 +66,65 @@ export function OrzuxCalendarBookingPages({ pages }: OrzuxCalendarBookingPagesPr
           </Link>
         </Button>
       ) : (
-        <div className="space-y-2">
-          {pages.slice(0, 4).map((page) => {
+        <div className="max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+          {pages.map((page) => {
             const typeLabel = getBusinessTypePreset(page.businessType).label;
 
             return (
-              <Link
+              <div
                 key={page.id}
-                href={`${DASHBOARD_ROUTES.calendarBooking}/${page.id}`}
-                className="flex items-start gap-2 rounded-md border bg-background px-3 py-2 transition-colors hover:bg-muted/50"
+                className="flex items-start gap-1 rounded-md border bg-background px-2 py-2"
               >
-                <CalendarClockIcon className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {page.title || ORZUX_CALENDAR_MESSAGES.defaultBookingPageName}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {page.published
-                      ? ORZUX_CALENDAR_MESSAGES.bookingPageActive
-                      : ORZUX_CALENDAR_MESSAGES.bookingPageDraft}
-                    {" · "}
-                    {typeLabel}
-                  </p>
-                </div>
-                {page.published ? (
-                  <a
-                    href={PUBLIC_ROUTES.book(page.slug)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label={ORZUX_CALENDAR_MESSAGES.openPublicPage}
-                    onClick={(event) => event.stopPropagation()}
+                <Link
+                  href={`${DASHBOARD_ROUTES.calendarBooking}/${page.id}`}
+                  className="flex min-w-0 flex-1 items-start gap-2 transition-colors hover:opacity-80"
+                >
+                  <CalendarClockIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {page.title || ORZUX_CALENDAR_MESSAGES.defaultBookingPageName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {page.published
+                        ? ORZUX_CALENDAR_MESSAGES.bookingPageActive
+                        : ORZUX_CALENDAR_MESSAGES.bookingPageDraft}
+                      {" · "}
+                      {typeLabel}
+                    </p>
+                  </div>
+                </Link>
+
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {page.published ? (
+                    <a
+                      href={PUBLIC_ROUTES.book(page.slug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label={ORZUX_CALENDAR_MESSAGES.openPublicPage}
+                    >
+                      <ExternalLinkIcon className="size-3.5" />
+                    </a>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    disabled={isDeleting}
+                    aria-label={ORZUX_CALENDAR_MESSAGES.deletePage}
+                    onClick={() => handleDelete(page.id)}
                   >
-                    <ExternalLinkIcon className="size-3.5" />
-                  </a>
-                ) : null}
-              </Link>
+                    {isDeleting ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      <Trash2Icon className="size-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
             );
           })}
-
-          {pages.length > 4 ? (
-            <Button variant="ghost" size="sm" className="w-full" asChild>
-              <Link href={DASHBOARD_ROUTES.calendarBooking}>
-                View all ({pages.length})
-              </Link>
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
-              <Link href={DASHBOARD_ROUTES.calendarBooking}>
-                {ORZUX_CALENDAR_MESSAGES.manageBookingPages}
-              </Link>
-            </Button>
-          )}
         </div>
       )}
     </section>

@@ -20,6 +20,7 @@ import { formatSlotForDisplay } from "@/lib/calendar/slot-engine";
 const publicBookingSchema = z.object({
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1).optional(),
+  resourceId: z.string().uuid().optional(),
   resourceName: z.string().trim().max(120).optional(),
   formAnswers: z.record(z.string(), z.string()),
 });
@@ -50,12 +51,14 @@ export async function submitPublicBooking(
   }
 
   const resources = await listPublicBookingPageResources(page.id);
-  const resource = parsed.data.resourceName
-    ? resources.find(
-        (item) =>
-          item.name.toLowerCase() === parsed.data.resourceName!.toLowerCase(),
-      ) ?? resources[0]
-    : resources[0];
+  const resource = parsed.data.resourceId
+    ? resources.find((item) => item.id === parsed.data.resourceId) ?? resources[0]
+    : parsed.data.resourceName
+      ? resources.find(
+          (item) =>
+            item.name.toLowerCase() === parsed.data.resourceName!.toLowerCase(),
+        ) ?? resources[0]
+      : resources[0];
 
   const durationMinutes = resource?.durationMinutes ?? page.slotDurationMinutes;
   const start = new Date(parsed.data.startDateTime);
@@ -99,6 +102,12 @@ export async function submitPublicBooking(
     `Source: Public booking page (${page.slug})`,
   ].filter(Boolean);
 
+  const customerEmail =
+    parsed.data.formAnswers.email?.trim() ||
+    Object.entries(parsed.data.formAnswers).find(([key]) =>
+      key.toLowerCase().includes("email"),
+    )?.[1]?.trim();
+
   const result = await createCalendarEventForBusiness({
     businessId: page.businessId,
     title: summary,
@@ -106,17 +115,16 @@ export async function submitPublicBooking(
     startDateTime: resolvedStart,
     endDateTime: resolvedEnd,
     timeZone: page.bookingTimezone,
+    resourceId: resource?.id ?? null,
+    bookingPageId: page.id,
+    customerName: customerLabel,
+    customerEmail: customerEmail ?? "",
+    isBooking: true,
   });
 
   if (!result.success) {
     return result;
   }
-
-  const customerEmail =
-    parsed.data.formAnswers.email?.trim() ||
-    Object.entries(parsed.data.formAnswers).find(([key]) =>
-      key.toLowerCase().includes("email"),
-    )?.[1]?.trim();
 
   if (customerEmail?.includes("@")) {
     const slotLabel = formatSlotForDisplay(

@@ -1,9 +1,8 @@
 import "server-only";
 
 import { renderBookingConfirmationEmail } from "@/lib/email/templates/booking-confirmation-email";
-import { sendGmailMessage } from "@/lib/gmail/client";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getGmailAccessTokenForBusiness } from "@/services/gmail-integration.service";
+import { renderBookingActionEmail } from "@/lib/email/templates/booking-action-email";
+import { sendBusinessOutboundEmail } from "@/services/business-outbound-email.service";
 
 export async function sendBookingConfirmationEmail(input: {
   businessId: string;
@@ -30,44 +29,45 @@ export async function sendBookingConfirmationEmail(input: {
     timeZone: input.timeZone,
   });
 
-  const gmail = await getGmailAccessTokenForBusiness(input.businessId);
+  return sendBusinessOutboundEmail({
+    businessId: input.businessId,
+    to: recipient,
+    subject,
+    text,
+  });
+}
 
-  if (gmail) {
-    const result = await sendGmailMessage({
-      accessToken: gmail.accessToken,
-      fromEmail: gmail.fromEmail,
-      toEmail: recipient,
-      subject,
-      body: text,
-    });
+export async function sendBookingActionEmail(input: {
+  businessId: string;
+  businessName: string;
+  customerEmail: string;
+  customerName: string;
+  action: "updated" | "cancelled" | "confirmed";
+  slotLabel: string;
+  resourceName?: string;
+  pageTitle?: string;
+  note?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const recipient = input.customerEmail.trim().toLowerCase();
 
-    if (result.success) {
-      return { success: true };
-    }
-
-    return { success: false, error: result.error ?? "Gmail send failed." };
+  if (!recipient.includes("@")) {
+    return { success: false, error: "Customer email is invalid." };
   }
 
-  const admin = createAdminClient();
-  const { data: business } = await admin
-    .from("businesses")
-    .select("email, business_name")
-    .eq("id", input.businessId)
-    .maybeSingle();
+  const { subject, text } = renderBookingActionEmail({
+    businessName: input.businessName,
+    action: input.action,
+    customerName: input.customerName,
+    slotLabel: input.slotLabel,
+    resourceName: input.resourceName,
+    pageTitle: input.pageTitle,
+    note: input.note,
+  });
 
-  const ownerEmail = business?.email?.trim();
-
-  if (!ownerEmail?.includes("@")) {
-    return {
-      success: false,
-      error:
-        "Connect Gmail in Integrations or add a business email to send confirmations from your account.",
-    };
-  }
-
-  return {
-    success: false,
-    error:
-      "Connect Gmail in Integrations to send booking confirmations from your email address.",
-  };
+  return sendBusinessOutboundEmail({
+    businessId: input.businessId,
+    to: recipient,
+    subject,
+    text,
+  });
 }

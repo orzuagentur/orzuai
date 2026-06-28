@@ -328,7 +328,7 @@ export function BookingPageEditor({
         router.push(
           nextPageId
             ? `${DASHBOARD_ROUTES.calendarBooking}/${nextPageId}`
-            : DASHBOARD_ROUTES.calendarBooking,
+            : DASHBOARD_ROUTES.calendar,
         );
         router.refresh();
       } catch {
@@ -369,7 +369,7 @@ export function BookingPageEditor({
             <div className="flex shrink-0 items-center justify-end border-b px-4 py-3">
               <Button variant="ghost" size="icon" className="size-8 shrink-0" asChild>
                 <Link
-                  href={DASHBOARD_ROUTES.calendarBooking}
+                  href={DASHBOARD_ROUTES.calendar}
                   aria-label={ORZUX_CALENDAR_MESSAGES.backToCalendar}
                 >
                   <XIcon className="size-4" />

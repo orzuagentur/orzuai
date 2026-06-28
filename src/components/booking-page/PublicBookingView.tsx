@@ -13,15 +13,24 @@ import type { BookingFormField } from "@/lib/calendar/booking-form-fields";
 import { cn } from "@/lib/utils";
 import type { PublicBookingPageView, PublicBookingSlot } from "@/types/booking-page.types";
 
+type ResourceSlotGroup = {
+  resourceId: string;
+  resourceName: string;
+  resourceType: string;
+  durationMinutes: number;
+  slots: PublicBookingSlot[];
+};
+
 type PublicBookingViewProps = {
   page: PublicBookingPageView;
   formFields: BookingFormField[];
   resources: Array<{
+    id: string;
     name: string;
     resourceType: string;
     durationMinutes: number;
   }>;
-  initialSlots: PublicBookingSlot[];
+  initialResourceSlots: ResourceSlotGroup[];
   initialDate: string;
 };
 
@@ -47,13 +56,13 @@ export function PublicBookingView({
   page,
   formFields,
   resources,
-  initialSlots,
+  initialResourceSlots,
   initialDate,
 }: PublicBookingViewProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [slots, setSlots] = useState(initialSlots);
+  const [resourceSlots, setResourceSlots] = useState(initialResourceSlots);
   const [selectedSlot, setSelectedSlot] = useState<PublicBookingSlot | null>(null);
-  const [selectedResource, setSelectedResource] = useState(resources[0]?.name ?? "");
+  const [selectedResourceId, setSelectedResourceId] = useState(resources[0]?.id ?? "");
   const [formAnswers, setFormAnswers] = useState<Record<string, string>>({});
   const [completed, setCompleted] = useState(false);
   const [isLoadingSlots, startLoadingSlots] = useTransition();
@@ -73,7 +82,7 @@ export function PublicBookingView({
           );
           const result = (await response.json()) as {
             success: boolean;
-            slots?: PublicBookingSlot[];
+            resourceSlots?: ResourceSlotGroup[];
           };
 
           if (!response.ok || !result.success) {
@@ -81,7 +90,7 @@ export function PublicBookingView({
             return;
           }
 
-          setSlots(result.slots ?? []);
+          setResourceSlots(result.resourceSlots ?? []);
           setSelectedSlot(null);
         } catch {
           toast.error(ORZUX_CALENDAR_MESSAGES.publicBookFailed);
@@ -126,7 +135,7 @@ export function PublicBookingView({
           body: JSON.stringify({
             startDateTime: selectedSlot.start,
             endDateTime: selectedSlot.end,
-            resourceName: selectedResource || undefined,
+            resourceId: selectedResourceId || undefined,
             formAnswers,
           }),
         });
@@ -189,6 +198,9 @@ export function PublicBookingView({
                   {ORZUX_CALENDAR_MESSAGES.publicBookAvailableTimes}
                 </h2>
               </div>
+              <p className="mb-1 text-sm font-medium">
+                {ORZUX_CALENDAR_MESSAGES.publicBookChooseResource}
+              </p>
               <p className="mb-4 text-sm capitalize text-muted-foreground">{selectedDayLabel}</p>
 
               {isLoadingSlots ? (
@@ -196,36 +208,61 @@ export function PublicBookingView({
                   <Loader2Icon className="size-4 animate-spin" />
                   {ORZUX_CALENDAR_MESSAGES.publicBookLoadingTimes}
                 </div>
-              ) : slots.length === 0 ? (
+              ) : resourceSlots.length === 0 ? (
                 <p className="py-4 text-sm text-muted-foreground">
                   {ORZUX_CALENDAR_MESSAGES.publicBookNoTimesForDay}
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {slots.map((slot) => {
-                    const active =
-                      selectedSlot?.start === slot.start && selectedSlot?.end === slot.end;
+                <div className="space-y-4">
+                  {resourceSlots.map((group) => (
+                    <div key={group.resourceId} className="rounded-xl border bg-background p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{group.resourceName}</p>
+                          <p className="text-xs capitalize text-muted-foreground">
+                            {group.resourceType.replace("_", " ")} · {group.durationMinutes} min
+                          </p>
+                        </div>
+                      </div>
+                      {group.slots.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          {ORZUX_CALENDAR_MESSAGES.publicBookNoTimesForDay}
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {group.slots.map((slot) => {
+                            const active =
+                              selectedSlot?.start === slot.start &&
+                              selectedSlot?.end === slot.end &&
+                              selectedResourceId === group.resourceId;
 
-                    return (
-                      <button
-                        key={slot.start}
-                        type="button"
-                        className={cn(
-                          "min-w-[5.5rem] rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "bg-background hover:border-primary/40 hover:bg-muted",
-                        )}
-                        onClick={() => setSelectedSlot(slot)}
-                      >
-                        {new Date(slot.start).toLocaleTimeString(undefined, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                          timeZone: page.bookingTimezone,
-                        })}
-                      </button>
-                    );
-                  })}
+                            return (
+                              <button
+                                key={`${group.resourceId}-${slot.start}`}
+                                type="button"
+                                className={cn(
+                                  "min-w-[5.5rem] rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                                  active
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "bg-background hover:border-primary/40 hover:bg-muted",
+                                )}
+                                onClick={() => {
+                                  setSelectedResourceId(group.resourceId);
+                                  setSelectedSlot(slot);
+                                }}
+                              >
+                                {new Date(slot.start).toLocaleTimeString(undefined, {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  timeZone: page.bookingTimezone,
+                                })}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -238,22 +275,10 @@ export function PublicBookingView({
             </div>
 
             <div className="space-y-3">
-              {resources.length > 1 ? (
-                <div className="space-y-1">
-                  <Label htmlFor="public-resource">{ORZUX_CALENDAR_MESSAGES.resourceType}</Label>
-                  <select
-                    id="public-resource"
-                    value={selectedResource}
-                    onChange={(event) => setSelectedResource(event.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {resources.map((resource) => (
-                      <option key={resource.name} value={resource.name}>
-                        {resource.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {selectedSlot && selectedResourceId ? (
+                <p className="rounded-md bg-muted/40 px-3 py-2 text-sm">
+                  {resourceSlots.find((group) => group.resourceId === selectedResourceId)?.resourceName}
+                </p>
               ) : null}
 
               {formFields.map((field) => (

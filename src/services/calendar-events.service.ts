@@ -30,6 +30,11 @@ function mapEventRow(row: {
   google_html_link: string | null;
   source: string;
   created_at: string;
+  resource_id?: string | null;
+  booking_page_id?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  is_booking?: boolean | null;
 }): CalendarEventRecord {
   return {
     id: row.id,
@@ -45,6 +50,11 @@ function mapEventRow(row: {
     googleHtmlLink: row.google_html_link,
     source: row.source,
     createdAt: row.created_at,
+    resourceId: row.resource_id ?? null,
+    bookingPageId: row.booking_page_id ?? null,
+    customerName: row.customer_name ?? "",
+    customerEmail: row.customer_email ?? "",
+    isBooking: row.is_booking ?? false,
   };
 }
 
@@ -68,11 +78,16 @@ function mapTaskRow(row: {
   };
 }
 
-export function toOrzuxCalendarEvent(record: CalendarEventRecord): OrzuxCalendarEvent {
+export function toOrzuxCalendarEvent(
+  record: CalendarEventRecord,
+  resourceName?: string | null,
+): OrzuxCalendarEvent {
   const fromGoogle = Boolean(record.googleEventId) || record.source === "google_sync";
 
   return {
     id: `local-event-${record.id}`,
+    recordId: record.id,
+    kind: record.isBooking ? "booking" : "event",
     summary: record.title,
     description: record.description || null,
     location: record.location || null,
@@ -81,6 +96,12 @@ export function toOrzuxCalendarEvent(record: CalendarEventRecord): OrzuxCalendar
     isAllDay: record.isAllDay,
     htmlLink: record.googleHtmlLink,
     source: fromGoogle ? "google" : "local",
+    isBooking: record.isBooking,
+    resourceId: record.resourceId,
+    resourceName: resourceName ?? null,
+    customerName: record.customerName || null,
+    customerEmail: record.customerEmail || null,
+    timezone: record.timezone,
   };
 }
 
@@ -93,6 +114,8 @@ export function taskToOrzuxCalendarEvent(task: CalendarTaskRecord): OrzuxCalenda
 
   return {
     id: `local-task-${task.id}`,
+    recordId: task.id,
+    kind: "task",
     summary: task.title,
     description: null,
     location: null,
@@ -108,6 +131,8 @@ export function taskToOrzuxCalendarEvent(task: CalendarTaskRecord): OrzuxCalenda
 export function googleEventToOrzux(event: GoogleCalendarEvent): OrzuxCalendarEvent {
   return {
     id: `google-${event.id}`,
+    recordId: event.id,
+    kind: "event",
     summary: event.summary,
     description: event.description,
     location: event.location,
@@ -215,7 +240,7 @@ export function mergeCalendarEvents(input: {
   );
 
   const merged: OrzuxCalendarEvent[] = [
-    ...input.localEvents.map(toOrzuxCalendarEvent),
+    ...input.localEvents.map((record) => toOrzuxCalendarEvent(record)),
     ...input.localTasks.map(taskToOrzuxCalendarEvent),
     ...input.googleEvents
       .filter((event) => !linkedGoogleIds.has(event.id))
@@ -238,6 +263,28 @@ export async function listCalendarEventsForBusiness(
     .from("calendar_events")
     .select("*")
     .eq("business_id", businessId)
+    .gte("start_at", timeMin.toISOString())
+    .order("start_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map(mapEventRow);
+}
+
+export async function listCalendarBookingsForBusiness(
+  businessId: string,
+): Promise<CalendarEventRecord[]> {
+  const admin = createAdminClient();
+  const timeMin = new Date();
+  timeMin.setDate(timeMin.getDate() - 7);
+
+  const { data, error } = await admin
+    .from("calendar_events")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("is_booking", true)
     .gte("start_at", timeMin.toISOString())
     .order("start_at", { ascending: true });
 
@@ -332,7 +379,12 @@ export async function createCalendarEventForBusiness(input: {
   endDateTime: string;
   timeZone: string;
   syncToGoogle?: boolean;
-}): Promise<{ success: boolean; message?: string }> {
+  resourceId?: string | null;
+  bookingPageId?: string | null;
+  customerName?: string;
+  customerEmail?: string;
+  isBooking?: boolean;
+}): Promise<{ success: boolean; message?: string; eventId?: string }> {
   const admin = createAdminClient();
 
   let googleEventId: string | null = null;
@@ -351,7 +403,7 @@ export async function createCalendarEventForBusiness(input: {
     googleHtmlLink = synced.htmlLink;
   }
 
-  const { error } = await admin.from("calendar_events").insert({
+  const { data, error } = await admin.from("calendar_events").insert({
     business_id: input.businessId,
     title: input.title,
     description: input.description ?? "",
@@ -362,15 +414,115 @@ export async function createCalendarEventForBusiness(input: {
     is_all_day: false,
     google_event_id: googleEventId,
     google_html_link: googleHtmlLink,
-    source: googleEventId ? "manual_google" : "manual",
-  });
+    source: googleEventId ? "manual_google" : input.isBooking ? "booking" : "manual",
+    resource_id: input.resourceId ?? null,
+    booking_page_id: input.bookingPageId ?? null,
+    customer_name: input.customerName ?? "",
+    customer_email: input.customerEmail ?? "",
+    is_booking: input.isBooking ?? false,
+  }).select("id").single();
 
   if (error) {
     return { success: false, message: error.message };
   }
 
   revalidatePath(DASHBOARD_ROUTES.calendar);
-  return { success: true };
+  return { success: true, eventId: data?.id };
+}
+
+export async function updateCalendarEventForBusiness(input: {
+  businessId: string;
+  eventId: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  timeZone?: string;
+  resourceId?: string | null;
+}): Promise<{ success: boolean; message?: string; event?: CalendarEventRecord }> {
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("calendar_events")
+    .select("*")
+    .eq("business_id", input.businessId)
+    .eq("id", input.eventId)
+    .maybeSingle();
+
+  if (!existing) {
+    return { success: false, message: "Event not found." };
+  }
+
+  const payload = {
+    title: input.title ?? existing.title,
+    description: input.description ?? existing.description,
+    location: input.location ?? existing.location,
+    start_at: input.startDateTime ?? existing.start_at,
+    end_at: input.endDateTime ?? existing.end_at,
+    timezone: input.timeZone ?? existing.timezone,
+    resource_id: input.resourceId === undefined ? existing.resource_id : input.resourceId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await admin
+    .from("calendar_events")
+    .update(payload)
+    .eq("business_id", input.businessId)
+    .eq("id", input.eventId)
+    .select("*")
+    .single();
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.calendar);
+  return { success: true, event: mapEventRow(data) };
+}
+
+export async function deleteCalendarEventForBusiness(input: {
+  businessId: string;
+  eventId: string;
+}): Promise<{ success: boolean; message?: string; event?: CalendarEventRecord }> {
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("calendar_events")
+    .select("*")
+    .eq("business_id", input.businessId)
+    .eq("id", input.eventId)
+    .maybeSingle();
+
+  if (!existing) {
+    return { success: false, message: "Event not found." };
+  }
+
+  const { error } = await admin
+    .from("calendar_events")
+    .delete()
+    .eq("business_id", input.businessId)
+    .eq("id", input.eventId);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.calendar);
+  return { success: true, event: mapEventRow(existing) };
+}
+
+export async function getCalendarEventForBusiness(
+  businessId: string,
+  eventId: string,
+): Promise<CalendarEventRecord | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("calendar_events")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("id", eventId)
+    .maybeSingle();
+
+  return data ? mapEventRow(data) : null;
 }
 
 export async function createCalendarTaskForBusiness(input: {

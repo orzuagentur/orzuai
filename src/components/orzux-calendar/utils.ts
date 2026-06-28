@@ -1,4 +1,4 @@
-export const HOUR_HEIGHT_PX = 56;
+export const HOUR_HEIGHT_PX = 72;
 export const DAY_START_HOUR = 0;
 export const DAY_END_HOUR = 24;
 
@@ -114,3 +114,116 @@ export function formatTimeRange(
 
   return `${formatter.format(new Date(startIso))} – ${formatter.format(new Date(endIso))}`;
 }
+
+export function dateTimeFromGridClick(
+  day: Date,
+  offsetY: number,
+  hourHeight = HOUR_HEIGHT_PX,
+): Date {
+  const minutes = Math.floor((offsetY / hourHeight) * 60);
+  const snapped = Math.round(minutes / 15) * 15;
+  const result = startOfDay(day);
+  result.setMinutes(snapped);
+  return result;
+}
+
+export function getEventStartTop(
+  event: { start: string; end: string },
+  day: Date,
+): number | null {
+  const layout = getTimedEventLayout(event, day);
+  return layout?.top ?? null;
+}
+
+export function eventsOverlap(
+  a: { start: string; end: string },
+  b: { start: string; end: string },
+): boolean {
+  return new Date(a.start) < new Date(b.end) && new Date(b.start) < new Date(a.end);
+}
+
+export type TimedEventColumnLayout<T extends { start: string; end: string }> = {
+  item: T;
+  top: number;
+  column: number;
+  columnCount: number;
+};
+
+export function layoutTimedEventsInColumns<T extends { start: string; end: string }>(
+  items: T[],
+  day: Date,
+): TimedEventColumnLayout<T>[] {
+  const positioned = items
+    .map((item) => {
+      const top = getEventStartTop(item, day);
+      if (top === null) return null;
+      return { item, top };
+    })
+    .filter((entry): entry is { item: T; top: number } => entry !== null)
+    .sort(
+      (a, b) =>
+        a.top - b.top ||
+        new Date(a.item.start).getTime() - new Date(b.item.start).getTime(),
+    );
+
+  const columns: T[][] = [];
+  const result: TimedEventColumnLayout<T>[] = [];
+
+  for (const { item, top } of positioned) {
+    let placedColumn = -1;
+
+    for (let column = 0; column < columns.length; column += 1) {
+      const overlapsColumn = columns[column].some((existing) => eventsOverlap(existing, item));
+      if (!overlapsColumn) {
+        columns[column].push(item);
+        placedColumn = column;
+        break;
+      }
+    }
+
+    if (placedColumn === -1) {
+      placedColumn = columns.length;
+      columns.push([item]);
+    }
+
+    result.push({
+      item,
+      top,
+      column: placedColumn,
+      columnCount: columns.length,
+    });
+  }
+
+  return result.map((entry) => ({
+    ...entry,
+    columnCount: columns.length,
+  }));
+}
+
+const BOOKING_CHIP_COLORS = [
+  "#1a73e8",
+  "#33b679",
+  "#e67c73",
+  "#f4511e",
+  "#8e24aa",
+  "#039be5",
+  "#616161",
+  "#3f51b5",
+  "#0b8043",
+  "#d50000",
+] as const;
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+export function getBookingChipColor(seed: string): string {
+  return BOOKING_CHIP_COLORS[hashString(seed) % BOOKING_CHIP_COLORS.length];
+}
+
+export const BOOKING_CHIP_SIZE_PX = 22;
+export const BOOKING_CHIP_GAP_PX = 3;

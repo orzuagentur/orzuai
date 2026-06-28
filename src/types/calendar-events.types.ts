@@ -12,6 +12,11 @@ export type CalendarEventRecord = {
   googleHtmlLink: string | null;
   source: string;
   createdAt: string;
+  resourceId: string | null;
+  bookingPageId: string | null;
+  customerName: string;
+  customerEmail: string;
+  isBooking: boolean;
 };
 
 export type CalendarTaskRecord = {
@@ -24,8 +29,12 @@ export type CalendarTaskRecord = {
   createdAt: string;
 };
 
+export type OrzuxCalendarEventKind = "event" | "task" | "booking";
+
 export type OrzuxCalendarEvent = {
   id: string;
+  recordId: string;
+  kind: OrzuxCalendarEventKind;
   summary: string;
   description: string | null;
   location: string | null;
@@ -35,4 +44,10 @@ export type OrzuxCalendarEvent = {
   htmlLink: string | null;
   source: "local" | "google";
   isTask?: boolean;
+  isBooking?: boolean;
+  resourceId?: string | null;
+  resourceName?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  timezone?: string;
 };

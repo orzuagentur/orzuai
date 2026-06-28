@@ -1,34 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { CalendarClockIcon } from "lucide-react";
 
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import { cn } from "@/lib/utils";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
 
 import {
+  BOOKING_CHIP_GAP_PX,
+  BOOKING_CHIP_SIZE_PX,
   DAY_END_HOUR,
   DAY_START_HOUR,
   HOUR_HEIGHT_PX,
+  dateTimeFromGridClick,
   eventOccursOnDay,
   formatDayColumnHeader,
   formatTimeRange,
-  getTimedEventLayout,
+  getBookingChipColor,
   isSameDay,
+  layoutTimedEventsInColumns,
 } from "./utils";
-
-type AvailabilitySlot = {
-  label: string;
-  start: string;
-  end: string;
-};
 
 type OrzuxCalendarDayGridProps = {
   selectedDate: Date;
   events: OrzuxCalendarEvent[];
-  slots: AvailabilitySlot[];
   timeZone: string;
+  onEventClick?: (event: OrzuxCalendarEvent) => void;
+  onSlotClick?: (time: Date) => void;
 };
 
 function formatHourLabel(hour: number): string {
@@ -43,33 +42,39 @@ function getCurrentTimeLineTop(now: Date): number {
   return (minutes / 60) * HOUR_HEIGHT_PX;
 }
 
+function getBookingTooltip(event: OrzuxCalendarEvent): string {
+  const parts = [event.summary || ORZUX_CALENDAR_MESSAGES.bookingBadge];
+  if (event.resourceName) parts.push(event.resourceName);
+  parts.push(formatTimeRange(event.start, event.end));
+  return parts.join(" · ");
+}
+
 export function OrzuxCalendarDayGrid({
   selectedDate,
   events,
-  slots,
   timeZone,
+  onEventClick,
+  onSlotClick,
 }: OrzuxCalendarDayGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const isToday = isSameDay(selectedDate, new Date());
-  const hours = useMemo(
-    () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i),
-    [],
+  const hours = Array.from(
+    { length: DAY_END_HOUR - DAY_START_HOUR },
+    (_, i) => DAY_START_HOUR + i,
   );
 
-  const dayEvents = useMemo(
-    () => events.filter((event) => eventOccursOnDay(event, selectedDate)),
+  const bookingEvents = useMemo(
+    () =>
+      events.filter(
+        (event) => event.isBooking && eventOccursOnDay(event, selectedDate) && !event.isAllDay,
+      ),
     [events, selectedDate],
   );
 
-  const allDayEvents = dayEvents.filter((event) => event.isAllDay);
-  const timedEvents = dayEvents.filter((event) => !event.isAllDay);
-
-  const daySlots = useMemo(
-    () =>
-      slots.filter((slot) =>
-        isSameDay(new Date(slot.start), selectedDate),
-      ),
-    [slots, selectedDate],
+  const bookingLayouts = useMemo(
+    () => layoutTimedEventsInColumns(bookingEvents, selectedDate),
+    [bookingEvents, selectedDate],
   );
 
   useEffect(() => {
@@ -82,8 +87,16 @@ export function OrzuxCalendarDayGrid({
 
   const gridHeight = hours.length * HOUR_HEIGHT_PX;
 
+  function handleGridClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (!onSlotClick || !gridRef.current) return;
+
+    const rect = gridRef.current.getBoundingClientRect();
+    const offsetY = event.clientY - rect.top + (scrollRef.current?.scrollTop ?? 0);
+    onSlotClick(dateTimeFromGridClick(selectedDate, offsetY));
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex border-b bg-muted/30">
         <div className="w-16 shrink-0 border-r px-2 py-3 text-[10px] text-muted-foreground">
           {timeZone}
@@ -103,26 +116,13 @@ export function OrzuxCalendarDayGrid({
         </div>
       </div>
 
-      {allDayEvents.length > 0 ? (
-        <div className="flex border-b bg-muted/20">
-          <div className="w-16 shrink-0 border-r px-2 py-2 text-[10px] text-muted-foreground">
-            {ORZUX_CALENDAR_MESSAGES.allDay}
-          </div>
-          <div className="flex flex-1 flex-wrap gap-1 p-2">
-            {allDayEvents.map((event) => (
-              <EventChip key={event.id} event={event} compact />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative flex" style={{ minHeight: gridHeight }}>
           <div className="w-16 shrink-0 border-r">
             {hours.map((hour) => (
               <div
                 key={hour}
-                className="relative border-b text-right text-[11px] text-muted-foreground"
+                className="relative border-b text-right text-xs text-muted-foreground"
                 style={{ height: HOUR_HEIGHT_PX }}
               >
                 {hour > 0 ? (
@@ -132,7 +132,11 @@ export function OrzuxCalendarDayGrid({
             ))}
           </div>
 
-          <div className="relative min-w-0 flex-1">
+          <div
+            ref={gridRef}
+            className="relative min-w-0 flex-1 cursor-pointer"
+            onClick={handleGridClick}
+          >
             {hours.map((hour) => (
               <div
                 key={hour}
@@ -141,62 +145,32 @@ export function OrzuxCalendarDayGrid({
               />
             ))}
 
-            {daySlots.map((slot) => {
-              const layout = getTimedEventLayout(slot, selectedDate);
-              if (!layout) return null;
+            {bookingLayouts.map(({ item: event, top, column }) => {
+              const color = getBookingChipColor(event.resourceId ?? event.recordId);
+              const left = 6 + column * (BOOKING_CHIP_SIZE_PX + BOOKING_CHIP_GAP_PX);
 
               return (
-                <div
-                  key={slot.start}
-                  className="pointer-events-none absolute inset-x-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-300"
-                  style={{
-                    top: layout.top,
-                    height: layout.height,
-                    zIndex: 1,
-                  }}
-                >
-                  {ORZUX_CALENDAR_MESSAGES.openSlot}
-                </div>
-              );
-            })}
-
-            {timedEvents.map((event) => {
-              const layout = getTimedEventLayout(event, selectedDate);
-              if (!layout) return null;
-
-              return (
-                <div
+                <button
                   key={event.id}
-                  className={cn(
-                    "absolute inset-x-1 overflow-hidden rounded-md border px-2 py-1 text-[11px] shadow-sm",
-                    event.isTask
-                      ? "border-amber-500/40 bg-amber-500/15"
-                      : event.source === "local"
-                        ? "border-violet-500/40 bg-violet-500/15"
-                        : "border-blue-500/40 bg-blue-500/15",
-                  )}
+                  type="button"
+                  title={getBookingTooltip(event)}
+                  aria-label={getBookingTooltip(event)}
+                  className="absolute flex items-center justify-center rounded-md shadow-sm ring-1 ring-black/10 transition hover:scale-110 hover:brightness-110"
                   style={{
-                    top: layout.top,
-                    height: layout.height,
-                    zIndex: 2,
+                    top: top - BOOKING_CHIP_SIZE_PX / 2,
+                    left,
+                    width: BOOKING_CHIP_SIZE_PX,
+                    height: BOOKING_CHIP_SIZE_PX,
+                    backgroundColor: color,
+                    zIndex: 3,
+                  }}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation();
+                    onEventClick?.(event);
                   }}
                 >
-                  <p className="truncate font-medium leading-tight">{event.summary}</p>
-                  <p className="truncate text-muted-foreground">
-                    {formatTimeRange(event.start, event.end)}
-                  </p>
-                  {event.htmlLink ? (
-                    <a
-                      href={event.htmlLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute right-1 top-1 rounded p-0.5 hover:bg-background/60"
-                      aria-label={ORZUX_CALENDAR_MESSAGES.openInGoogle}
-                    >
-                      <ExternalLinkIcon className="size-3" />
-                    </a>
-                  ) : null}
-                </div>
+                  <CalendarClockIcon className="size-3 text-white" strokeWidth={2.5} />
+                </button>
               );
             })}
 
@@ -213,30 +187,11 @@ export function OrzuxCalendarDayGrid({
         </div>
       </div>
 
-      {dayEvents.length === 0 && daySlots.length === 0 ? (
+      {bookingEvents.length === 0 ? (
         <div className="border-t px-4 py-3 text-center text-sm text-muted-foreground">
           {ORZUX_CALENDAR_MESSAGES.emptyDay}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function EventChip({
-  event,
-  compact = false,
-}: {
-  event: OrzuxCalendarEvent;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-md border border-blue-500/40 bg-blue-500/15 px-2 py-1 text-xs font-medium",
-        compact && "max-w-full truncate",
-      )}
-    >
-      {event.summary}
     </div>
   );
 }

@@ -40,11 +40,12 @@ export default async function PublicBookPage({ params }: PublicBookPageProps) {
         page={data.page}
         formFields={data.page.formFields}
         resources={data.resources.map((resource) => ({
+          id: resource.id,
           name: resource.name,
           resourceType: resource.resourceType,
           durationMinutes: resource.durationMinutes,
         }))}
-        initialSlots={data.slots}
+        initialResourceSlots={data.resourceSlots}
         initialDate={data.selectedDate}
       />
     </main>

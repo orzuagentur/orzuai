@@ -139,6 +139,7 @@ async function getLocalBusyIntervals(input: {
   businessId: string;
   timeMin: Date;
   timeMax: Date;
+  resourceId?: string | null;
 }): Promise<TimeInterval[]> {
   if (!hasSupabaseEnv()) {
     return [];
@@ -147,7 +148,7 @@ async function getLocalBusyIntervals(input: {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("calendar_events")
-    .select("start_at, end_at, is_all_day")
+    .select("start_at, end_at, is_all_day, resource_id")
     .eq("business_id", input.businessId)
     .gte("start_at", input.timeMin.toISOString())
     .lte("start_at", input.timeMax.toISOString());
@@ -157,6 +158,13 @@ async function getLocalBusyIntervals(input: {
   }
 
   return data
+    .filter((row) => {
+      if (!input.resourceId) {
+        return true;
+      }
+
+      return !row.resource_id || row.resource_id === input.resourceId;
+    })
     .map((row) => {
       const start = new Date(row.start_at);
       const end = new Date(row.end_at);
@@ -174,25 +182,11 @@ async function getLocalBusyIntervals(input: {
     );
 }
 
-function matchResourceFromSummary(
-  resources: BusinessCalendarResource[],
-  summary: string,
-): BusinessCalendarResource | null {
-  const normalizedSummary = summary.toLowerCase();
-
-  for (const resource of resources) {
-    if (normalizedSummary.includes(resource.name.toLowerCase())) {
-      return resource;
-    }
-  }
-
-  return resources[0] ?? null;
-}
-
 export async function getCalendarBusyIntervals(input: {
   businessId: string;
   timeMin: Date;
   timeMax: Date;
+  resourceId?: string | null;
 }): Promise<TimeInterval[]> {
   const [localBusy, googleBusy] = await Promise.all([
     getLocalBusyIntervals(input),
@@ -253,6 +247,65 @@ async function getGoogleCalendarBusyIntervals(input: {
     );
 }
 
+function matchResourceFromSummary(
+  resources: BusinessCalendarResource[],
+  summary: string,
+): BusinessCalendarResource | null {
+  const normalizedSummary = summary.toLowerCase();
+
+  for (const resource of resources) {
+    if (normalizedSummary.includes(resource.name.toLowerCase())) {
+      return resource;
+    }
+  }
+
+  return resources[0] ?? null;
+}
+
+export async function findBookingPageSlotsForResource(input: {
+  page: BookingPageRecord;
+  resource: BusinessCalendarResource;
+  date?: string;
+  maxSlots?: number;
+}): Promise<TimeInterval[]> {
+  const daysAhead = input.page.advanceBookingDays;
+  const operatingHours = buildOperatingHoursFromBookingPage(input.page);
+  const durationMinutes = input.resource.durationMinutes ?? input.page.slotDurationMinutes;
+
+  let windowStart = new Date();
+  let windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + daysAhead);
+  windowEnd.setHours(23, 59, 59, 999);
+
+  if (input.date) {
+    const dayBounds = getTimezoneDayBounds(input.date, input.page.bookingTimezone);
+    windowStart = dayBounds.start;
+    windowEnd = dayBounds.end;
+
+    if (windowStart.getTime() < Date.now()) {
+      windowStart = new Date();
+    }
+  }
+
+  const busy = await getCalendarBusyIntervals({
+    businessId: input.page.businessId,
+    timeMin: windowStart,
+    timeMax: windowEnd,
+    resourceId: input.resource.id,
+  });
+
+  return findAvailableSlots({
+    busy,
+    windowStart,
+    windowEnd,
+    durationMinutes,
+    stepMinutes: durationMinutes >= 120 ? 30 : 15,
+    bufferMinutes: input.page.slotBufferMinutes,
+    maxSlots: input.maxSlots ?? 24,
+    operatingHours,
+  });
+}
+
 export async function findBookingPageAvailableSlots(input: {
   page: BookingPageRecord;
   resources: BusinessCalendarResource[];
@@ -300,7 +353,7 @@ export async function findBookingPageAvailableSlots(input: {
 
 export async function getPublicBookingPageSlots(
   slug: string,
-  options?: { date?: string },
+  options?: { date?: string; resourceId?: string },
 ) {
   const page = await getPublishedBookingPageBySlug(slug);
 
@@ -312,22 +365,43 @@ export async function getPublicBookingPageSlots(
   const todayKey = formatDateKeyInTimezone(new Date(), page.bookingTimezone);
   const date = options?.date ?? todayKey;
 
-  const slots = await findBookingPageAvailableSlots({
-    page,
-    resources,
-    maxSlots: options?.date ? 48 : 32,
-    date,
-  });
+  const resourceSlots = await Promise.all(
+    resources.map(async (resource) => {
+      const intervals = await findBookingPageSlotsForResource({
+        page,
+        resource,
+        date,
+        maxSlots: 24,
+      });
+
+      return {
+        resourceId: resource.id,
+        resourceName: resource.name,
+        resourceType: resource.resourceType,
+        durationMinutes: resource.durationMinutes,
+        slots: intervals.map((slot) => ({
+          start: slot.start.toISOString(),
+          end: slot.end.toISOString(),
+          label: formatSlotForDisplay(slot, page.bookingTimezone),
+        })),
+      };
+    }),
+  );
+
+  const selectedResource = options?.resourceId
+    ? resources.find((resource) => resource.id === options.resourceId)
+    : null;
+
+  const slots = selectedResource
+    ? (resourceSlots.find((entry) => entry.resourceId === selectedResource.id)?.slots ?? [])
+    : resourceSlots.flatMap((entry) => entry.slots);
 
   return {
     page,
     resources,
     selectedDate: date,
-    slots: slots.map((slot) => ({
-      start: slot.start.toISOString(),
-      end: slot.end.toISOString(),
-      label: formatSlotForDisplay(slot, page.bookingTimezone),
-    })),
+    resourceSlots,
+    slots,
   };
 }
 
@@ -491,6 +565,7 @@ export async function resolveBookingSlot(input: {
     businessId: input.businessId,
     timeMin: new Date(),
     timeMax: windowEnd,
+    resourceId: resource?.id ?? null,
   });
 
   const operatingHours = bookingPage

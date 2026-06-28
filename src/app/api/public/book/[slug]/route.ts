@@ -38,6 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
       resourceType: resource.resourceType,
       durationMinutes: resource.durationMinutes,
     })),
+    resourceSlots: data.resourceSlots,
     slots: data.slots,
   });
 }
