@@ -13,6 +13,7 @@ import type { InboxBusinessContext } from "@/services/chat.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
+import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import {
   getActiveMessagingChannelIds,
@@ -59,6 +60,19 @@ async function resolveVisibleChannelIds(businessId: string) {
   return getActiveMessagingChannelIds(channelStatuses);
 }
 
+export async function isSmsInboxVisible(businessId: string): Promise<boolean> {
+  if (!hasSupabaseEnv()) {
+    return false;
+  }
+
+  const [voiceVisible, settings] = await Promise.all([
+    isVoiceInboxVisible(businessId),
+    getVoiceAgentSettings(businessId),
+  ]);
+
+  return voiceVisible && settings.smsEnabled;
+}
+
 export async function getVoiceInboxPageData(
   inboxContext?: InboxBusinessContext | null,
   activeCallId?: string | null,
@@ -68,6 +82,7 @@ export async function getVoiceInboxPageData(
       hasBusiness: false,
       businessId: null,
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
       softphoneEnabled: false,
       businessPhoneNumber: null,
       visibleChannelIds: [],
@@ -81,6 +96,7 @@ export async function getVoiceInboxPageData(
       hasBusiness: false,
       businessId: null,
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
       softphoneEnabled: false,
       businessPhoneNumber: null,
       visibleChannelIds: [],
@@ -90,9 +106,10 @@ export async function getVoiceInboxPageData(
   }
 
   const { businessId } = inboxContext;
-  const [voiceInboxEnabled, visibleChannelIds, calls, clientConfig] =
+  const [voiceInboxEnabled, smsInboxEnabled, visibleChannelIds, calls, clientConfig] =
     await Promise.all([
       isVoiceInboxVisible(businessId),
+      isSmsInboxVisible(businessId),
       resolveVisibleChannelIds(businessId),
       getVoiceRepository().listCallLogsForInbox(businessId),
       getVoiceClientConfig(businessId),
@@ -108,6 +125,7 @@ export async function getVoiceInboxPageData(
     hasBusiness: true,
     businessId,
     voiceInboxEnabled,
+    smsInboxEnabled,
     softphoneEnabled: clientConfig.enabled,
     businessPhoneNumber: clientConfig.phoneNumber,
     visibleChannelIds,

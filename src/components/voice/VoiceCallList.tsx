@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PhoneIncomingIcon, PhoneOutgoingIcon } from "lucide-react";
 
+import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -10,11 +11,9 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import type { VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import {
-  getVoiceCallStatusClassName,
-  getVoiceCallStatusLabel,
-  isActiveVoiceCallStatus,
+  formatVoiceCallDuration,
+  isMissedVoiceCallStatus,
 } from "@/utils/voice-call-display";
-import { RelativeTime } from "@/components/ui/relative-time";
 
 type VoiceCallListProps = {
   calls: VoiceInboxCallListItem[];
@@ -41,7 +40,7 @@ export function VoiceCallList({
 
   return (
     <div className={cn("min-h-0 flex-1 overflow-y-auto", className)}>
-      <ul className="divide-y">
+      <ul>
         {calls.map((call) => {
           const isActive = call.id === activeCallId;
           const DirectionIcon =
@@ -49,37 +48,34 @@ export function VoiceCallList({
           const displayName =
             call.contactName ?? formatContactIdentifier(call.phoneNumber);
           const href = `${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`;
+          const directionLabel =
+            call.direction === "inbound"
+              ? VOICE_MESSAGES.callDirectionInbound
+              : VOICE_MESSAGES.callDirectionOutbound;
+
+          const rowClassName = cn(
+            "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+            isActive && "bg-muted/70",
+          );
+
+          const content = (
+            <CallListRowContent
+              call={call}
+              displayName={displayName}
+              DirectionIcon={DirectionIcon}
+              directionLabel={directionLabel}
+            />
+          );
 
           return (
             <li key={call.id}>
               {onCallSelect ? (
-                <button
-                  type="button"
-                  onClick={() => onCallSelect(call.id)}
-                  className={cn(
-                    "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                    isActive && "bg-muted",
-                  )}
-                >
-                  <CallListRowContent
-                    call={call}
-                    displayName={displayName}
-                    DirectionIcon={DirectionIcon}
-                  />
+                <button type="button" onClick={() => onCallSelect(call.id)} className={rowClassName}>
+                  {content}
                 </button>
               ) : (
-                <Link
-                  href={href}
-                  className={cn(
-                    "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-                    isActive && "bg-muted",
-                  )}
-                >
-                  <CallListRowContent
-                    call={call}
-                    displayName={displayName}
-                    DirectionIcon={DirectionIcon}
-                  />
+                <Link href={href} className={rowClassName}>
+                  {content}
                 </Link>
               )}
             </li>
@@ -94,49 +90,44 @@ function CallListRowContent({
   call,
   displayName,
   DirectionIcon,
+  directionLabel,
 }: {
   call: VoiceInboxCallListItem;
   displayName: string;
   DirectionIcon: typeof PhoneIncomingIcon;
+  directionLabel: string;
 }) {
+  const createdAt = new Date(call.createdAt);
+  const dateLabel = createdAt.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const timeLabel = createdAt.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const subtitle = isMissedVoiceCallStatus(call.status)
+    ? VOICE_MESSAGES.callHistoryMissedLabel
+    : call.status === "completed" && call.durationSeconds
+      ? formatVoiceCallDuration(call.durationSeconds)
+      : null;
+
   return (
     <>
-      <div
-        className={cn(
-          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full",
-          call.direction === "inbound"
-            ? "bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400"
-            : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400",
-        )}
-      >
-        <DirectionIcon className="size-4" />
-      </div>
+      <ContactAvatar name={displayName} className="size-11 shrink-0 text-sm" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-medium">{displayName}</p>
-          <RelativeTime
-            value={call.createdAt}
-            className="shrink-0 text-xs text-muted-foreground"
-          />
-        </div>
-        <p className="truncate text-sm text-muted-foreground">
-          {formatContactIdentifier(call.phoneNumber)}
+        <p className="truncate font-medium">{displayName}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+          <DirectionIcon className="size-3.5 shrink-0" />
+          <span>{directionLabel}</span>
+          {subtitle ? <span>· {subtitle}</span> : null}
         </p>
-        <p
-          className={cn(
-            "mt-1 flex items-center gap-1.5 text-xs",
-            getVoiceCallStatusClassName(call.status),
-          )}
-        >
-          {isActiveVoiceCallStatus(call.status) ? (
-            <span className="relative flex size-2 shrink-0">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-sky-500 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-sky-600" />
-            </span>
-          ) : null}
-          {getVoiceCallStatusLabel(call.status)}
-          {call.aiHandled ? ` · ${VOICE_MESSAGES.callAiHandled}` : ""}
-        </p>
+      </div>
+      <div className="shrink-0 text-right text-xs text-muted-foreground">
+        <p>{dateLabel}</p>
+        <p className="mt-0.5">{timeLabel}</p>
       </div>
     </>
   );

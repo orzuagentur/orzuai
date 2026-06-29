@@ -22,6 +22,7 @@ export default async function ChatsPage({ searchParams }: ChatsPageProps) {
       hasBusiness={data.hasBusiness}
       channels={data.channels}
       voiceInboxEnabled={data.voiceInboxEnabled}
+      smsInboxEnabled={data.smsInboxEnabled}
       conversations={data.conversations}
       conversationsTotalCount={data.conversationsTotalCount}
       conversationsHasMore={data.conversationsHasMore}

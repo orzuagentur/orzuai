@@ -59,7 +59,7 @@ import {
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import { isGmailConnected } from "@/services/gmail-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
-import { isVoiceInboxVisible } from "@/services/voice-inbox.service";
+import { isSmsInboxVisible, isVoiceInboxVisible } from "@/services/voice-inbox.service";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { getMessageRepository } from "@/repositories/message.repository";
 
@@ -429,6 +429,7 @@ export async function getChatsMonitorData(
       channels: [],
       visibleChannelIds: [],
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -450,6 +451,7 @@ export async function getChatsMonitorData(
       channels: [],
       visibleChannelIds: [],
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
       totalConversations: 0,
       totalMessages: 0,
       unifiedConversations: [],
@@ -457,9 +459,10 @@ export async function getChatsMonitorData(
   }
 
   const supabase = await createClient();
-  const [channelStatuses, voiceInboxEnabled] = await Promise.all([
+  const [channelStatuses, voiceInboxEnabled, smsInboxEnabled] = await Promise.all([
     getChannelConnectionStatuses(resolvedBusinessId),
     isVoiceInboxVisible(resolvedBusinessId),
+    isSmsInboxVisible(resolvedBusinessId),
   ]);
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
   const channels: ChatMonitorChannelStats[] = [];
@@ -504,6 +507,7 @@ export async function getChatsMonitorData(
     channels,
     visibleChannelIds,
     voiceInboxEnabled,
+    smsInboxEnabled,
     totalConversations,
     totalMessages,
     unifiedConversations: [],
@@ -648,6 +652,7 @@ export async function getChatsChannelPageData(
       cannedResponses: [],
       visibleChannelIds: [],
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
     };
   }
 
@@ -665,12 +670,14 @@ export async function getChatsChannelPageData(
       cannedResponses: [],
       visibleChannelIds: [],
       voiceInboxEnabled: false,
+      smsInboxEnabled: false,
     };
   }
 
-  const [channelStatuses, voiceInboxEnabled] = await Promise.all([
+  const [channelStatuses, voiceInboxEnabled, smsInboxEnabled] = await Promise.all([
     getChannelConnectionStatuses(ctx.businessId),
     isVoiceInboxVisible(ctx.businessId),
+    isSmsInboxVisible(ctx.businessId),
   ]);
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
 
@@ -700,6 +707,7 @@ export async function getChatsChannelPageData(
     cannedResponses,
     visibleChannelIds,
     voiceInboxEnabled,
+    smsInboxEnabled,
   };
 }
 

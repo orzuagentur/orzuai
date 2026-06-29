@@ -13,15 +13,15 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import { hasSupabaseEnv } from "@/lib/env";
 
+const inboxChannelEnum = z.enum([
+  ...MESSAGING_INTEGRATION_CHANNELS,
+  "voice",
+] as const);
+
 const fetchMonitorConversationsSchema = z.object({
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(50),
-  channel: z
-    .enum([
-      MESSAGING_INTEGRATION_CHANNELS[0],
-      ...MESSAGING_INTEGRATION_CHANNELS.slice(1),
-    ])
-    .optional(),
+  channel: inboxChannelEnum.optional(),
   search: z.string().max(200).optional(),
   view: z
     .enum(["all", "needs_reply", "high_intent", "favorites"])

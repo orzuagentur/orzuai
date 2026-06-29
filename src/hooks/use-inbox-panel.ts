@@ -9,7 +9,6 @@ import {
 import { useInboxListRealtime } from "@/hooks/use-inbox-list-realtime";
 import { useInboxActiveConversation } from "@/hooks/use-inbox-active-conversation";
 import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
-import type { ChatChannelId } from "@/features/chats";
 import type {
   ConversationDetail,
   ConversationListItem,
@@ -33,7 +32,7 @@ type UseInboxPanelOptions = {
   hasBusiness: boolean;
   businessId: string | null;
   isInitialLoading: boolean;
-  channelFilter?: ChatChannelId;
+  channelFilter?: MessagingChannel;
   hasActiveListFilters: boolean;
   onConversationsChange: React.Dispatch<
     React.SetStateAction<ConversationListItem[]>

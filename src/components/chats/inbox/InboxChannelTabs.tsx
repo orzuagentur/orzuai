@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { LayoutGridIcon, StarIcon } from "lucide-react";
+import { LayoutGridIcon, MessageSquareIcon, StarIcon } from "lucide-react";
 
 import { ChannelRailItem } from "@/components/navigation/ChannelRailItem";
 import { VoiceIcon } from "@/components/icons/channel-brand-icons";
@@ -12,6 +12,7 @@ import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
 import type { ChatChannelId } from "@/features/chats";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { SMS_MESSAGES } from "@/features/sms/constants";
 import {
   CHANNEL_RAIL_NAV_CLASS,
   getChannelRailFavoritesShellClassName,
@@ -21,13 +22,14 @@ import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
-export type InboxChannelTabId = ChatChannelId | "all" | "favorites" | "voice";
+export type InboxChannelTabId = ChatChannelId | "all" | "favorites" | "voice" | "sms";
 
 type InboxChannelTabsProps = {
   activeChannel: InboxChannelTabId;
   unreadByChannel?: Partial<Record<MessagingChannel, number>>;
   visibleChannelIds?: MessagingChannel[];
   voiceInboxEnabled?: boolean;
+  smsInboxEnabled?: boolean;
   className?: string;
 };
 
@@ -36,6 +38,7 @@ export function InboxChannelTabs({
   unreadByChannel: localUnreadByChannel = {},
   visibleChannelIds = [],
   voiceInboxEnabled = false,
+  smsInboxEnabled = false,
   className,
 }: InboxChannelTabsProps) {
   const router = useRouter();
@@ -55,10 +58,14 @@ export function InboxChannelTabs({
       router.prefetch(DASHBOARD_ROUTES.chatsVoice);
     }
 
+    if (smsInboxEnabled) {
+      router.prefetch(DASHBOARD_ROUTES.chatsSms);
+    }
+
     for (const channel of visibleChannels) {
       router.prefetch(`${DASHBOARD_ROUTES.chats}/${channel.id}`);
     }
-  }, [router, visibleChannels, voiceInboxEnabled]);
+  }, [router, visibleChannels, voiceInboxEnabled, smsInboxEnabled]);
 
   return (
     <nav
@@ -141,6 +148,25 @@ export function InboxChannelTabs({
               )}
             >
               <VoiceIcon className="size-5" />
+            </div>
+          }
+        />
+      ) : null}
+
+      {smsInboxEnabled ? (
+        <ChannelRailItem
+          href={DASHBOARD_ROUTES.chatsSms}
+          isActive={activeChannel === "sms"}
+          label={SMS_MESSAGES.inboxTabLabel}
+          ariaLabel={SMS_MESSAGES.inboxTabLabel}
+          iconShell={
+            <div
+              className={getChannelRailIconShellClassName(
+                activeChannel === "sms",
+                getChannelIconContainerClassName("voice"),
+              )}
+            >
+              <MessageSquareIcon className="size-5" />
             </div>
           }
         />

@@ -29,12 +29,16 @@ type VoiceSoftphoneContextValue = {
   status: SoftphoneStatus;
   error: string | null;
   isMuted: boolean;
+  isSpeakerMuted: boolean;
   isOnline: boolean;
+  activePhoneNumber: string | null;
   goOnline: () => Promise<void>;
   goOffline: () => void;
   placeCall: (phoneNumber: string) => Promise<void>;
+  sendDigits: (digits: string) => void;
   hangUp: () => void;
   toggleMute: () => void;
+  toggleSpeaker: () => void;
   acceptIncoming: () => void;
   rejectIncoming: () => void;
 };
@@ -72,12 +76,16 @@ export function useVoiceSoftphone(): VoiceSoftphoneContextValue {
       status: "offline",
       error: null,
       isMuted: false,
+      isSpeakerMuted: false,
       isOnline: false,
+      activePhoneNumber: null,
       goOnline: async () => {},
       goOffline: () => {},
       placeCall: async () => {},
+      sendDigits: () => {},
       hangUp: () => {},
       toggleMute: () => {},
+      toggleSpeaker: () => {},
       acceptIncoming: () => {},
       rejectIncoming: () => {},
     };
@@ -93,9 +101,12 @@ function useVoiceSoftphoneState(input: {
   const [status, setStatus] = useState<SoftphoneStatus>("offline");
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+  const [activePhoneNumber, setActivePhoneNumber] = useState<string | null>(null);
   const deviceRef = useRef<DeviceInstance | null>(null);
   const activeCallRef = useRef<CallInstance | null>(null);
   const incomingCallRef = useRef<CallInstance | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const isRegisteredRef = useRef(false);
 
   const cleanupCall = useCallback((call: CallInstance | null) => {
@@ -127,6 +138,9 @@ function useVoiceSoftphoneState(input: {
     isRegisteredRef.current = false;
 
     setIsMuted(false);
+    setIsSpeakerMuted(false);
+    setActivePhoneNumber(null);
+    remoteAudioRef.current = null;
     setError(null);
     setStatus("offline");
   }, [cleanupCall]);
@@ -145,6 +159,10 @@ function useVoiceSoftphoneState(input: {
 
   const attachCallListeners = useCallback(
     (call: CallInstance, mode: "outbound" | "incoming") => {
+      call.on("audio", (remoteAudio: HTMLAudioElement) => {
+        remoteAudioRef.current = remoteAudio;
+      });
+
       call.on("accept", () => {
         setStatus("on-call");
         setError(null);
@@ -160,6 +178,9 @@ function useVoiceSoftphoneState(input: {
         }
 
         setIsMuted(false);
+        setIsSpeakerMuted(false);
+        setActivePhoneNumber(null);
+        remoteAudioRef.current = null;
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
 
@@ -244,6 +265,13 @@ function useVoiceSoftphoneState(input: {
       });
 
       device.on("incoming", (call) => {
+        const from =
+          call.parameters?.From?.trim() ||
+          call.customParameters?.get?.("From")?.trim() ||
+          null;
+        if (from) {
+          setActivePhoneNumber(from);
+        }
         attachCallListeners(call, "incoming");
       });
 
@@ -286,6 +314,7 @@ function useVoiceSoftphoneState(input: {
 
       setStatus("connecting");
       setError(null);
+      setActivePhoneNumber(normalized);
 
       try {
         const call = await device.connect({
@@ -314,6 +343,9 @@ function useVoiceSoftphoneState(input: {
     activeCallRef.current = null;
     incomingCallRef.current = null;
     setIsMuted(false);
+    setIsSpeakerMuted(false);
+    setActivePhoneNumber(null);
+    remoteAudioRef.current = null;
     setStatus(isRegisteredRef.current ? "ready" : "offline");
   }, [cleanupCall]);
 
@@ -327,6 +359,45 @@ function useVoiceSoftphoneState(input: {
     const nextMuted = !call.isMuted();
     call.mute(nextMuted);
     setIsMuted(nextMuted);
+  }, []);
+
+  const toggleSpeaker = useCallback(() => {
+    const call = activeCallRef.current ?? incomingCallRef.current;
+
+    if (!call) {
+      return;
+    }
+
+    const nextSpeakerMuted = !isSpeakerMuted;
+    const remoteAudio = remoteAudioRef.current;
+
+    if (remoteAudio) {
+      remoteAudio.muted = nextSpeakerMuted;
+    }
+
+    const remoteStream = call.getRemoteStream();
+
+    if (remoteStream) {
+      for (const track of remoteStream.getAudioTracks()) {
+        track.enabled = !nextSpeakerMuted;
+      }
+    }
+
+    setIsSpeakerMuted(nextSpeakerMuted);
+  }, [isSpeakerMuted]);
+
+  const sendDigits = useCallback((digits: string) => {
+    const call = activeCallRef.current;
+
+    if (!call || !digits.trim()) {
+      return;
+    }
+
+    try {
+      call.sendDigits(digits);
+    } catch {
+      // ignore DTMF errors when call is not ready
+    }
   }, []);
 
   const acceptIncoming = useCallback(() => {
@@ -359,12 +430,16 @@ function useVoiceSoftphoneState(input: {
     status,
     error,
     isMuted,
+    isSpeakerMuted,
     isOnline: status !== "offline" && status !== "error",
+    activePhoneNumber,
     goOnline,
     goOffline,
     placeCall,
+    sendDigits,
     hangUp,
     toggleMute,
+    toggleSpeaker,
     acceptIncoming,
     rejectIncoming,
   };

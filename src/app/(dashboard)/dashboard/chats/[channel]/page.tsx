@@ -39,6 +39,7 @@ export default async function ChatsChannelPage({
       channel={channelData.channel}
       visibleChannelIds={channelData.visibleChannelIds}
       voiceInboxEnabled={channelData.voiceInboxEnabled}
+      smsInboxEnabled={channelData.smsInboxEnabled}
       channelConnected={channelData.channelConnected}
       aiEnabled={channelData.aiEnabled}
       conversations={channelData.conversations}

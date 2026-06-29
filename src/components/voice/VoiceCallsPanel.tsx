@@ -3,17 +3,23 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+  UserIcon,
+} from "lucide-react";
 
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
-import { InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import {
-  findFirstActiveVoiceCall,
-  VoiceActiveCallBanner,
-} from "@/components/voice/VoiceActiveCallBanner";
-import { VoiceCallDetailPanel } from "@/components/voice/VoiceCallDetailPanel";
-import { VoiceSoftphoneBar } from "@/components/voice/VoiceSoftphoneBar";
+  InboxLayoutProvider,
+  useInboxLayout,
+} from "@/components/chats/inbox/inbox-layout-context";
+import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog";
+import { VoiceContactsDialog } from "@/components/voice/VoiceContactsDialog";
+import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPanel";
+import { VoiceInboxDialerPanel } from "@/components/voice/VoiceInboxDialerPanel";
 import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
 import { VoiceCallFilters } from "@/components/voice/VoiceCallFilters";
 import { VoiceCallList } from "@/components/voice/VoiceCallList";
@@ -31,9 +37,9 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
+import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
   filterVoiceCalls,
-  isActiveVoiceCallStatus,
   type VoiceCallFilter,
 } from "@/utils/voice-call-display";
 
@@ -51,6 +57,7 @@ function VoiceCallsPanelContent({
   hasBusiness = true,
   businessId = null,
   voiceInboxEnabled = false,
+  smsInboxEnabled = false,
   softphoneEnabled = false,
   visibleChannelIds = [] as MessagingChannel[],
   calls: initialCalls = [],
@@ -59,12 +66,18 @@ function VoiceCallsPanelContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeCallId = searchParams.get("call")?.trim() || null;
+  const phoneDraft = searchParams.get("phone")?.trim() || "";
 
   const [calls, setCalls] = useState(initialCalls);
   const [activeCallDetail, setActiveCallDetail] = useState<VoiceCallDetail | null>(
     initialActiveCall,
   );
   const [callFilter, setCallFilter] = useState<VoiceCallFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [addContactOpen, setAddContactOpen] = useState(false);
+  const [addContactPhone, setAddContactPhone] = useState("");
+  const { detailsOpen, toggleDetails } = useInboxLayout();
 
   useEffect(() => {
     setCalls(initialCalls);
@@ -82,37 +95,49 @@ function VoiceCallsPanelContent({
     onActiveCallChange: setActiveCallDetail,
   });
 
-  const filteredCalls = useMemo(
-    () => filterVoiceCalls(calls, callFilter),
-    [callFilter, calls],
-  );
+  const filteredCalls = useMemo(() => {
+    const byFilter = filterVoiceCalls(calls, callFilter);
+    const query = searchQuery.trim().toLowerCase();
 
-  const liveCall = useMemo(() => findFirstActiveVoiceCall(calls), [calls]);
+    if (!query) {
+      return byFilter;
+    }
+
+    return byFilter.filter((call) => {
+      const name = call.contactName?.toLowerCase() ?? "";
+      const phone = call.phoneNumber.toLowerCase();
+
+      return name.includes(query) || phone.includes(query);
+    });
+  }, [callFilter, calls, searchQuery]);
 
   const selectedCall = useMemo(() => {
-    if (!activeCallId) {
-      return null;
+    if (activeCallId) {
+      if (activeCallDetail?.id === activeCallId) {
+        return activeCallDetail;
+      }
+
+      const listItem = calls.find((call) => call.id === activeCallId);
+
+      if (!listItem) {
+        return activeCallDetail;
+      }
+
+      return {
+        ...listItem,
+        turns: activeCallDetail?.turns ?? [],
+        turnCount: activeCallDetail?.turnCount ?? 0,
+        hasRecording: Boolean(
+          listItem.recordingUrl?.trim() || activeCallDetail?.hasRecording,
+        ),
+      };
     }
 
-    if (activeCallDetail?.id === activeCallId) {
-      return activeCallDetail;
-    }
-
-    const listItem = calls.find((call) => call.id === activeCallId);
-
-    if (!listItem) {
-      return activeCallDetail;
-    }
-
-    return {
-      ...listItem,
-      turns: activeCallDetail?.turns ?? [],
-      turnCount: activeCallDetail?.turnCount ?? 0,
-      hasRecording: Boolean(
-        listItem.recordingUrl?.trim() || activeCallDetail?.hasRecording,
-      ),
-    };
+    return null;
   }, [activeCallDetail, activeCallId, calls]);
+
+  const detailsConversationId = selectedCall?.conversationId ?? null;
+  const showRightPanel = detailsOpen && Boolean(detailsConversationId);
 
   const handleCallSelect = useCallback(
     (callId: string) => {
@@ -124,6 +149,38 @@ function VoiceCallsPanelContent({
   const handleBackToList = useCallback(() => {
     router.push(DASHBOARD_ROUTES.chatsVoice);
   }, [router]);
+
+  const handleSelectionClear = useCallback(() => {
+    if (activeCallId) {
+      router.push(phoneDraft ? `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(phoneDraft)}` : DASHBOARD_ROUTES.chatsVoice);
+    }
+  }, [activeCallId, phoneDraft, router]);
+
+  const handleOpenSms = useCallback(
+    (phoneNumber: string, conversationId?: string | null) => {
+      if (conversationId) {
+        router.push(`${DASHBOARD_ROUTES.chatsSms}?conversation=${conversationId}`);
+        return;
+      }
+
+      router.push(`${DASHBOARD_ROUTES.chatsSms}?phone=${encodeURIComponent(phoneNumber)}`);
+    },
+    [router],
+  );
+
+  const handleContactSelect = useCallback(
+    (contact: PhoneContactListItem) => {
+      router.push(
+        `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.phoneNumber)}`,
+      );
+    },
+    [router],
+  );
+
+  const handleAddContact = useCallback((phoneNumber: string) => {
+    setAddContactPhone(phoneNumber);
+    setAddContactOpen(true);
+  }, []);
 
   if (!hasBusiness) {
     return (
@@ -151,6 +208,7 @@ function VoiceCallsPanelContent({
             activeChannel="voice"
             visibleChannelIds={visibleChannelIds}
             voiceInboxEnabled={false}
+            smsInboxEnabled={smsInboxEnabled}
           />
         }
         listColumn={
@@ -172,34 +230,47 @@ function VoiceCallsPanelContent({
             </Card>
           </div>
         }
-        chatColumn={<VoiceCallDetailPanel call={null} />}
+        chatColumn={
+          <VoiceInboxDialerPanel
+            call={null}
+            searchQuery=""
+            onSearchQueryChange={() => {}}
+            initialPhone={phoneDraft}
+          />
+        }
         detailsColumn={null}
       />
     );
   }
 
-  const showDetailOnMobile = Boolean(activeCallId);
-  const showLiveBanner =
-    liveCall != null && (!activeCallId || liveCall.id !== activeCallId);
+  const showDetailOnMobile = Boolean(activeCallId || phoneDraft);
 
   return (
     <VoiceSoftphoneProvider enabled={softphoneEnabled} businessId={businessId}>
       <InboxShell
         showChatOnMobile={showDetailOnMobile}
-        showRightColumn={false}
+        showRightColumn={showRightPanel}
         channelTabs={
           <InboxChannelTabs
             activeChannel="voice"
             visibleChannelIds={visibleChannelIds}
             voiceInboxEnabled
+            smsInboxEnabled={smsInboxEnabled}
           />
         }
         listColumn={
           <div className="flex min-h-0 flex-1 flex-col">
-            <VoiceSoftphoneBar />
-            {showLiveBanner && liveCall ? <VoiceActiveCallBanner call={liveCall} /> : null}
-            <div className="shrink-0 border-b px-4 py-3">
-              <h1 className="text-base font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
+              <h1 className="text-xl font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setContactsOpen(true)}
+              >
+                <UserIcon className="mr-2 size-4" />
+                {VOICE_MESSAGES.contactsButton}
+              </Button>
             </div>
             <VoiceCallFilters value={callFilter} onChange={setCallFilter} />
             <VoiceCallList
@@ -219,13 +290,40 @@ function VoiceCallsPanelContent({
                 </Button>
               </div>
             ) : null}
-            <VoiceCallDetailPanel
+            <VoiceInboxDialerPanel
               call={selectedCall}
-              isLive={selectedCall ? isActiveVoiceCallStatus(selectedCall.status) : false}
+              allCalls={calls}
+              activeCallId={activeCallId}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              onSelectionClear={handleSelectionClear}
+              onSelectCall={handleCallSelect}
+              initialPhone={phoneDraft}
+              onOpenSms={handleOpenSms}
+              onAddContact={handleAddContact}
+              detailsOpen={detailsOpen}
+              onToggleDetails={toggleDetails}
             />
           </div>
         }
-        detailsColumn={null}
+        detailsColumn={
+          <VoiceInboxDetailsPanel conversationId={detailsConversationId} />
+        }
+      />
+
+      <VoiceContactsDialog
+        open={contactsOpen}
+        onOpenChange={setContactsOpen}
+        onSelectContact={handleContactSelect}
+      />
+
+      <VoiceAddContactDialog
+        open={addContactOpen}
+        onOpenChange={setAddContactOpen}
+        phoneNumber={addContactPhone}
+        onContactCreated={() => {
+          router.refresh();
+        }}
       />
     </VoiceSoftphoneProvider>
   );

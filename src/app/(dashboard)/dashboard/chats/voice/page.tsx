@@ -3,7 +3,7 @@ import { resolveInboxBusinessContext } from "@/services/chat.service";
 import { getVoiceInboxPageData } from "@/services/voice-inbox.service";
 
 type VoiceInboxPageProps = {
-  searchParams: Promise<{ call?: string }>;
+  searchParams: Promise<{ call?: string; phone?: string }>;
 };
 
 export default async function VoiceInboxPage({ searchParams }: VoiceInboxPageProps) {
@@ -16,6 +16,7 @@ export default async function VoiceInboxPage({ searchParams }: VoiceInboxPagePro
       hasBusiness={data.hasBusiness}
       businessId={data.businessId}
       voiceInboxEnabled={data.voiceInboxEnabled}
+      smsInboxEnabled={data.smsInboxEnabled}
       softphoneEnabled={data.softphoneEnabled}
       visibleChannelIds={data.visibleChannelIds}
       calls={data.calls}

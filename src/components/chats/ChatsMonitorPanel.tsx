@@ -69,6 +69,7 @@ function ChatsMonitorPanelContent({
   businessId: initialBusinessId = null,
   channels: initialChannels,
   voiceInboxEnabled: initialVoiceInboxEnabled = false,
+  smsInboxEnabled: initialSmsInboxEnabled = false,
   conversations: initialConversations,
   conversationsTotalCount: initialTotalCount,
   conversationsHasMore: initialHasMore,
@@ -429,6 +430,7 @@ function ChatsMonitorPanelContent({
           unreadByChannel={unreadByChannel}
           visibleChannelIds={visibleChannelIds}
           voiceInboxEnabled={initialVoiceInboxEnabled}
+          smsInboxEnabled={initialSmsInboxEnabled}
         />
       }
       listColumn={

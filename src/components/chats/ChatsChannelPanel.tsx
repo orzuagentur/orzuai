@@ -77,6 +77,7 @@ function ChatsChannelPanelContent({
   channelStats: initialChannelStats,
   visibleChannelIds: initialVisibleChannelIds,
   voiceInboxEnabled: initialVoiceInboxEnabled = false,
+  smsInboxEnabled: initialSmsInboxEnabled = false,
   channelConnected: initialChannelConnected,
   aiEnabled: initialAiEnabled,
   conversations: initialConversations,
@@ -347,6 +348,7 @@ function ChatsChannelPanelContent({
           unreadByChannel={unreadByChannel}
           visibleChannelIds={visibleChannelIds}
           voiceInboxEnabled={initialVoiceInboxEnabled}
+          smsInboxEnabled={initialSmsInboxEnabled}
         />
       }
       listColumn={

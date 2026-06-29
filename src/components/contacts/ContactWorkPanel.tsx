@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import {
   ArrowLeftIcon,
+  KeyboardIcon,
   Loader2Icon,
+  MessageSquareIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
 } from "lucide-react";
@@ -20,6 +23,9 @@ import {
   getChannelBadgeLabel,
 } from "@/features/chats/channel-ui";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { SMS_MESSAGES } from "@/features/sms/constants";
 import type { ContactProfileData } from "@/types/contact.types";
 import { cn } from "@/lib/utils";
 import { formatContactIdentifier } from "@/utils/contact-display";
@@ -115,25 +121,55 @@ export function ContactWorkPanel({
             </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            aria-label={
-              profileOpen
-                ? CONTACTS_MESSAGES.hideContactProfile
-                : CONTACTS_MESSAGES.showContactProfile
-            }
-            aria-pressed={profileOpen}
-            onClick={onToggleProfile}
-          >
-            {profileOpen ? (
-              <PanelRightCloseIcon className="size-4" />
-            ) : (
-              <PanelRightOpenIcon className="size-4" />
-            )}
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              asChild
+              aria-label={VOICE_MESSAGES.softphoneDialpadTitle}
+            >
+              <Link
+                href={`${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.identifier)}`}
+              >
+                <KeyboardIcon className="size-4" />
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              asChild
+              aria-label={SMS_MESSAGES.openThread}
+            >
+              <Link
+                href={`${DASHBOARD_ROUTES.chatsSms}?phone=${encodeURIComponent(contact.identifier)}`}
+              >
+                <MessageSquareIcon className="size-4" />
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0"
+              aria-label={
+                profileOpen
+                  ? CONTACTS_MESSAGES.hideContactProfile
+                  : CONTACTS_MESSAGES.showContactProfile
+              }
+              aria-pressed={profileOpen}
+              onClick={onToggleProfile}
+            >
+              {profileOpen ? (
+                <PanelRightCloseIcon className="size-4" />
+              ) : (
+                <PanelRightOpenIcon className="size-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">

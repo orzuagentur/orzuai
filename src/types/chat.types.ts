@@ -155,6 +155,7 @@ export type ChatsMonitorData = {
   channels: ChatMonitorChannelStats[];
   visibleChannelIds: MessagingChannel[];
   voiceInboxEnabled: boolean;
+  smsInboxEnabled: boolean;
   totalConversations: number;
   totalMessages: number;
   unifiedConversations: ConversationListItem[];
@@ -182,6 +183,7 @@ export type ChatsChannelPageData = {
   cannedResponses: CannedResponseItem[];
   visibleChannelIds: MessagingChannel[];
   voiceInboxEnabled: boolean;
+  smsInboxEnabled: boolean;
 };
 
 export type ChatErrorCode =
