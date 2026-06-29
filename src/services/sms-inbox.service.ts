@@ -23,7 +23,6 @@ export type SmsInboxPageData = {
 export async function getSmsInboxPageData(
   inboxContext?: InboxBusinessContext | null,
   activeConversationId?: string | null,
-  phoneDraft?: string | null,
 ): Promise<SmsInboxPageData> {
   const empty: SmsInboxPageData = {
     hasBusiness: false,

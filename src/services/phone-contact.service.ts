@@ -128,7 +128,8 @@ export async function createPhoneContact(input: {
     const updateResult = await updateContact({
       contactId: context.contactId,
       name,
-      email: email || undefined,
+      email,
+      tags: [],
       customFields: {
         company: company || undefined,
         notes: notes || undefined,

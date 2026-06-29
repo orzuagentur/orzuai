@@ -29,11 +29,12 @@ import { HIGH_INTENT_LEAD_SCORE } from "@/features/chats/constants";
 
 const CHAT_LIST_ROW_ESTIMATE_PX = 80;
 const CHAT_LIST_VIRTUALIZE_THRESHOLD = 20;
+type ChatListChannelId = ChatChannelId | "voice";
 
 type ChatListProps = {
   conversations: ConversationListItem[];
   activeConversationId: string | null;
-  channelId: ChatChannelId;
+  channelId: ChatListChannelId;
   hideChannelBadge?: boolean;
   linkToConversationChannel?: boolean;
   linkMode?: "channel" | "overview" | "favorites";
@@ -46,7 +47,7 @@ type ChatListProps = {
 };
 
 function buildConversationHref(
-  channelId: ChatChannelId,
+  channelId: ChatListChannelId,
   conversationId: string,
   conversationChannel: ConversationListItem["channel"],
   linkToConversationChannel: boolean,
@@ -61,13 +62,17 @@ function buildConversationHref(
   }
 
   const channel = linkToConversationChannel ? conversationChannel : channelId;
+  if (channel === "voice") {
+    return `${DASHBOARD_ROUTES.chatsSms}?conversation=${conversationId}`;
+  }
+
   return `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`;
 }
 
 type ConversationListRowProps = {
   conversation: ConversationListItem;
   activeConversationId: string | null;
-  channelId: ChatChannelId;
+  channelId: ChatListChannelId;
   hideChannelBadge: boolean;
   linkToConversationChannel: boolean;
   linkMode: "channel" | "overview" | "favorites";

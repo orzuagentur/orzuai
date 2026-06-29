@@ -29,7 +29,7 @@ export function VoiceInboxDetailsPanel({
     void fetchConversationDetailAction({ conversationId })
       .then((result) => {
         if (result.success) {
-          setConversation(result.conversation);
+          setConversation(result.data.conversation);
         } else {
           setConversation(null);
         }

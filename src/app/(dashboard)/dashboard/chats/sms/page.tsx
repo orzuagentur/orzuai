@@ -7,12 +7,11 @@ type SmsInboxPageProps = {
 };
 
 export default async function SmsInboxPage({ searchParams }: SmsInboxPageProps) {
-  const { conversation, phone } = await searchParams;
+  const { conversation } = await searchParams;
   const inboxContext = await resolveInboxBusinessContext();
   const data = await getSmsInboxPageData(
     inboxContext,
     conversation?.trim() || null,
-    phone?.trim() || null,
   );
 
   return (
