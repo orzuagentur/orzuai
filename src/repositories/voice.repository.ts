@@ -35,6 +35,7 @@ export type VoiceCallLogInsert = {
   externalCallId?: string | null;
   triggerReason?: string | null;
   aiHandled?: boolean;
+  conversationId?: string | null;
 };
 
 export type VoiceCallLogInboxRow = Pick<
@@ -178,6 +179,24 @@ export class VoiceRepository {
   }
 
   async insertCallLog(input: VoiceCallLogInsert): Promise<void> {
+    const externalCallId = input.externalCallId?.trim() || null;
+
+    if (externalCallId) {
+      const existing = await this.findCallLogByBusinessAndExternalCallId(
+        input.businessId,
+        externalCallId,
+      );
+
+      if (existing) {
+        await this.updateCallLog(existing.id, {
+          contactId: input.contactId ?? existing.contact_id,
+          conversationId: input.conversationId ?? existing.conversation_id,
+          aiHandled: input.aiHandled ?? existing.ai_handled ?? false,
+        });
+        return;
+      }
+    }
+
     const { error } = await this.db.from("voice_call_logs").insert({
       business_id: input.businessId,
       contact_id: input.contactId ?? null,
@@ -185,12 +204,17 @@ export class VoiceRepository {
       phone_number: input.phoneNumber,
       status: input.status,
       provider: input.provider,
-      external_call_id: input.externalCallId ?? null,
+      external_call_id: externalCallId,
       trigger_reason: input.triggerReason ?? null,
       ai_handled: input.aiHandled ?? false,
+      conversation_id: input.conversationId ?? null,
     });
 
     if (error) {
+      if (externalCallId && error.code === "23505") {
+        return;
+      }
+
       throw new Error(error.message);
     }
   }
@@ -302,6 +326,29 @@ export class VoiceRepository {
       .select(
         "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url",
       )
+      .eq("external_call_id", externalCallId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  async findCallLogByBusinessAndExternalCallId(
+    businessId: string,
+    externalCallId: string,
+  ): Promise<
+    Pick<
+      VoiceCallLogRow,
+      "id" | "contact_id" | "conversation_id" | "ai_handled"
+    > | null
+  > {
+    const { data, error } = await this.db
+      .from("voice_call_logs")
+      .select("id, contact_id, conversation_id, ai_handled")
+      .eq("business_id", businessId)
       .eq("external_call_id", externalCallId)
       .maybeSingle();
 
@@ -475,9 +522,39 @@ export class VoiceRepository {
     return data ?? [];
   }
 
+  async claimPendingQueueItems(
+    now: string,
+    limit = 20,
+  ): Promise<
+    Pick<
+      VoiceCallQueueRow,
+      "id" | "business_id" | "contact_id" | "phone_number" | "trigger_reason"
+    >[]
+  > {
+    const pending = await this.listPendingQueueItems(now, limit);
+    const ids = pending.map((item) => item.id);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.db
+      .from("voice_call_queue")
+      .update({ status: "processing" })
+      .in("id", ids)
+      .eq("status", "pending")
+      .select("id, business_id, contact_id, phone_number, trigger_reason");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data ?? [];
+  }
+
   async updateQueueItemStatus(
     id: string,
-    status: "completed" | "failed",
+    status: "processing" | "completed" | "failed",
   ): Promise<void> {
     const { error } = await this.db
       .from("voice_call_queue")

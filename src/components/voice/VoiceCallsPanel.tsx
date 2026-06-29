@@ -18,7 +18,6 @@ import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog"
 import { VoiceContactsDialog } from "@/components/voice/VoiceContactsDialog";
 import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPanel";
 import { VoiceInboxDialerPanel } from "@/components/voice/VoiceInboxDialerPanel";
-import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
 import { VoiceCallFilters } from "@/components/voice/VoiceCallFilters";
 import { VoiceCallList } from "@/components/voice/VoiceCallList";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,6 @@ function VoiceCallsPanelContent({
   businessId = null,
   voiceInboxEnabled = false,
   smsInboxEnabled = false,
-  softphoneEnabled = false,
   visibleChannelIds = [] as MessagingChannel[],
   calls: initialCalls = [],
   activeCall: initialActiveCall = null,
@@ -244,7 +242,7 @@ function VoiceCallsPanelContent({
   const showDetailOnMobile = Boolean(activeCallId || phoneDraft);
 
   return (
-    <VoiceSoftphoneProvider enabled={softphoneEnabled} businessId={businessId}>
+    <>
       <InboxShell
         showChatOnMobile={showDetailOnMobile}
         showRightColumn={showRightPanel}
@@ -323,6 +321,6 @@ function VoiceCallsPanelContent({
           router.refresh();
         }}
       />
-    </VoiceSoftphoneProvider>
+    </>
   );
 }

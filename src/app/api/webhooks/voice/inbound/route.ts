@@ -37,11 +37,22 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
-  await recordInboundVoiceCall({
-    businessId,
-    phoneNumber: params.From ?? "",
-    callSid: params.CallSid ?? "",
-  });
+  try {
+    await recordInboundVoiceCall({
+      businessId,
+      phoneNumber: params.From ?? "",
+      callSid: params.CallSid ?? "",
+    });
+  } catch (error) {
+    console.error(
+      "[voice-webhook] inbound call logging failed",
+      JSON.stringify({
+        businessId,
+        callSid: params.CallSid ?? null,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
 
   const twiml = await getInboundVoiceTwiml(businessId);
 

@@ -29,6 +29,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/voice-callbacks",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/knowledge-embeddings",
       "schedule": "0 3 * * *"
     },

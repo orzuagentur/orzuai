@@ -24,7 +24,9 @@ import { isWithinBusinessHours } from "@/lib/voice/business-hours";
 import { buildStaticSayTwiml, mapVoiceLanguageToTwilioLocale } from "@/lib/voice/twiml";
 import { buildAppUrl } from "@/lib/app-url";
 import { hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getVoiceRepository } from "@/repositories/voice.repository";
+import { resolveInboundMessageContext } from "@/services/inbound-ingest.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type {
@@ -168,19 +170,30 @@ export async function recordInboundVoiceCall(input: {
     return;
   }
 
-  const { resolveInboundCallContactId } = await import(
-    "@/services/voice-inbox.service"
-  );
-  const contactId = await resolveInboundCallContactId(
-    input.businessId,
-    input.phoneNumber,
-  );
+  const phoneNumber = input.phoneNumber.trim();
+  let contactId: string | null = null;
+  let conversationId: string | null = null;
+
+  if (phoneNumber) {
+    const context = await resolveInboundMessageContext(createAdminClient(), {
+      businessId: input.businessId,
+      channel: "voice",
+      contactName: phoneNumber,
+      contactPhone: phoneNumber,
+      identifier: phoneNumber,
+      displayLabel: phoneNumber,
+    });
+
+    contactId = context?.contactId ?? null;
+    conversationId = context?.conversationId ?? null;
+  }
 
   await getVoiceRepository().insertCallLog({
     businessId: input.businessId,
     contactId,
+    conversationId,
     direction: "inbound",
-    phoneNumber: input.phoneNumber || "unknown",
+    phoneNumber: phoneNumber || "unknown",
     status: "active",
     provider: "twilio",
     externalCallId: input.callSid || null,
@@ -511,17 +524,31 @@ export async function processVoiceCallQueue(): Promise<{
 
   const repo = getVoiceRepository();
   const now = new Date().toISOString();
-  const pending = await repo.listPendingQueueItems(now);
+  const pending = await repo.claimPendingQueueItems(now);
 
   let processed = 0;
 
   for (const item of pending) {
-    const result = await placeOutboundVoiceCall({
-      businessId: item.business_id,
-      contactId: item.contact_id,
-      phoneNumber: item.phone_number,
-      triggerReason: item.trigger_reason,
-    });
+    let result: { success: boolean; message?: string };
+
+    try {
+      result = await placeOutboundVoiceCall({
+        businessId: item.business_id,
+        contactId: item.contact_id,
+        phoneNumber: item.phone_number,
+        triggerReason: item.trigger_reason,
+      });
+    } catch (error) {
+      console.error(
+        "[voice-queue] outbound call failed",
+        JSON.stringify({
+          queueItemId: item.id,
+          businessId: item.business_id,
+          error: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+      result = { success: false };
+    }
 
     await repo.updateQueueItemStatus(
       item.id,

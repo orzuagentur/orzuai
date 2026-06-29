@@ -17,6 +17,8 @@ import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
 import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
+import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
+import { VoiceSoftphoneBar } from "@/components/voice/VoiceSoftphoneBar";
 import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-bootstrap";
 
 const DashboardInboundAlerts = dynamic(
@@ -54,12 +56,16 @@ const PlatformCopilotWidget = dynamic(
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
   googleCalendarConnected?: boolean;
+  voiceBusinessId?: string | null;
+  voiceClientEnabled?: boolean;
   children: React.ReactNode;
 };
 
 export function DashboardShell({
   userProfile,
   googleCalendarConnected = false,
+  voiceBusinessId = null,
+  voiceClientEnabled = false,
   children,
 }: DashboardShellProps) {
   useSupabaseRealtimeBootstrap();
@@ -68,38 +74,44 @@ export function DashboardShell({
     <PushNotificationsProvider>
       <DashboardNavBadgesProvider>
         <AiHumanRequestsProvider>
-          <DashboardInboundAlerts />
-          <DashboardAiHumanAlerts />
-        <InboxChromeProvider>
-          <ContactsChromeProvider>
-            <AiAssistantChromeProvider>
-            <CalendarChromeProvider>
-            <AnalyticsChromeProvider>
-            <AutomationsChromeProvider>
-            <DashboardProfileProvider userProfile={userProfile}>
-            <PlatformCopilotProvider>
-            <SidebarProvider>
-              <AppSidebar
-                userProfile={userProfile}
-                googleCalendarConnected={googleCalendarConnected}
-              />
-              <SidebarInset>
-                <DashboardHeader />
-                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                  {children}
-                </div>
-              </SidebarInset>
-            </SidebarProvider>
-            <PlatformCopilotWidget />
-            <AiHumanRequestOverlay />
-            </PlatformCopilotProvider>
-            </DashboardProfileProvider>
-            </AutomationsChromeProvider>
-            </AnalyticsChromeProvider>
-            </CalendarChromeProvider>
-            </AiAssistantChromeProvider>
-          </ContactsChromeProvider>
-        </InboxChromeProvider>
+          <VoiceSoftphoneProvider
+            enabled={voiceClientEnabled}
+            businessId={voiceBusinessId}
+          >
+            <DashboardInboundAlerts />
+            <DashboardAiHumanAlerts />
+            <InboxChromeProvider>
+              <ContactsChromeProvider>
+                <AiAssistantChromeProvider>
+                  <CalendarChromeProvider>
+                    <AnalyticsChromeProvider>
+                      <AutomationsChromeProvider>
+                        <DashboardProfileProvider userProfile={userProfile}>
+                          <PlatformCopilotProvider>
+                            <SidebarProvider>
+                              <AppSidebar
+                                userProfile={userProfile}
+                                googleCalendarConnected={googleCalendarConnected}
+                              />
+                              <SidebarInset>
+                                <DashboardHeader />
+                                <VoiceSoftphoneBar />
+                                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                                  {children}
+                                </div>
+                              </SidebarInset>
+                            </SidebarProvider>
+                            <PlatformCopilotWidget />
+                            <AiHumanRequestOverlay />
+                          </PlatformCopilotProvider>
+                        </DashboardProfileProvider>
+                      </AutomationsChromeProvider>
+                    </AnalyticsChromeProvider>
+                  </CalendarChromeProvider>
+                </AiAssistantChromeProvider>
+              </ContactsChromeProvider>
+            </InboxChromeProvider>
+          </VoiceSoftphoneProvider>
         </AiHumanRequestsProvider>
       </DashboardNavBadgesProvider>
     </PushNotificationsProvider>

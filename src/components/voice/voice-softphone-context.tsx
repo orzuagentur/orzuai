@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 
@@ -32,6 +33,7 @@ type VoiceSoftphoneContextValue = {
   isSpeakerMuted: boolean;
   isOnline: boolean;
   activePhoneNumber: string | null;
+  callElapsedSeconds: number | null;
   goOnline: () => Promise<void>;
   goOffline: () => void;
   placeCall: (phoneNumber: string) => Promise<void>;
@@ -79,6 +81,7 @@ export function useVoiceSoftphone(): VoiceSoftphoneContextValue {
       isSpeakerMuted: false,
       isOnline: false,
       activePhoneNumber: null,
+      callElapsedSeconds: null,
       goOnline: async () => {},
       goOffline: () => {},
       placeCall: async () => {},
@@ -94,6 +97,45 @@ export function useVoiceSoftphone(): VoiceSoftphoneContextValue {
   return context;
 }
 
+function playIncomingCallSound(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    const audioContext = new AudioContextCtor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioContext.currentTime + 0.8,
+    );
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.8);
+    oscillator.addEventListener("ended", () => {
+      void audioContext.close();
+    });
+  } catch {
+    // Browsers may block synthetic audio until the user interacts with the page.
+  }
+}
+
 function useVoiceSoftphoneState(input: {
   enabled: boolean;
   businessId: string | null;
@@ -103,11 +145,41 @@ function useVoiceSoftphoneState(input: {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [activePhoneNumber, setActivePhoneNumber] = useState<string | null>(null);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [callElapsedSeconds, setCallElapsedSeconds] = useState<number | null>(
+    null,
+  );
   const deviceRef = useRef<DeviceInstance | null>(null);
   const activeCallRef = useRef<CallInstance | null>(null);
   const incomingCallRef = useRef<CallInstance | null>(null);
+  const incomingToastIdRef = useRef<string | number | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const isRegisteredRef = useRef(false);
+
+  const dismissIncomingToast = useCallback(() => {
+    if (incomingToastIdRef.current !== null) {
+      toast.dismiss(incomingToastIdRef.current);
+      incomingToastIdRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!callStartedAt) {
+      setCallElapsedSeconds(null);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setCallElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000)),
+      );
+    };
+
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [callStartedAt]);
 
   const cleanupCall = useCallback((call: CallInstance | null) => {
     if (!call) {
@@ -127,6 +199,7 @@ function useVoiceSoftphoneState(input: {
     cleanupCall(incomingCallRef.current);
     activeCallRef.current = null;
     incomingCallRef.current = null;
+    dismissIncomingToast();
 
     if (deviceRef.current) {
       deviceRef.current.removeAllListeners();
@@ -140,10 +213,11 @@ function useVoiceSoftphoneState(input: {
     setIsMuted(false);
     setIsSpeakerMuted(false);
     setActivePhoneNumber(null);
+    setCallStartedAt(null);
     remoteAudioRef.current = null;
     setError(null);
     setStatus("offline");
-  }, [cleanupCall]);
+  }, [cleanupCall, dismissIncomingToast]);
 
   useEffect(() => {
     return () => {
@@ -164,6 +238,8 @@ function useVoiceSoftphoneState(input: {
       });
 
       call.on("accept", () => {
+        dismissIncomingToast();
+        setCallStartedAt(Date.now());
         setStatus("on-call");
         setError(null);
       });
@@ -177,9 +253,11 @@ function useVoiceSoftphoneState(input: {
           incomingCallRef.current = null;
         }
 
+        dismissIncomingToast();
         setIsMuted(false);
         setIsSpeakerMuted(false);
         setActivePhoneNumber(null);
+        setCallStartedAt(null);
         remoteAudioRef.current = null;
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
@@ -189,6 +267,8 @@ function useVoiceSoftphoneState(input: {
           incomingCallRef.current = null;
         }
 
+        dismissIncomingToast();
+        setCallStartedAt(null);
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
 
@@ -197,6 +277,8 @@ function useVoiceSoftphoneState(input: {
           incomingCallRef.current = null;
         }
 
+        dismissIncomingToast();
+        setCallStartedAt(null);
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
 
@@ -213,7 +295,7 @@ function useVoiceSoftphoneState(input: {
         setStatus("incoming");
       }
     },
-    [],
+    [dismissIncomingToast],
   );
 
   const goOnline = useCallback(async () => {
@@ -272,6 +354,19 @@ function useVoiceSoftphoneState(input: {
         if (from) {
           setActivePhoneNumber(from);
         }
+        playIncomingCallSound();
+        incomingToastIdRef.current = toast.info(
+          from ? `Incoming call from ${from}` : "Incoming phone call",
+          {
+            duration: 30000,
+            action: {
+              label: "Answer",
+              onClick: () => {
+                call.accept();
+              },
+            },
+          },
+        );
         attachCallListeners(call, "incoming");
       });
 
@@ -410,6 +505,7 @@ function useVoiceSoftphoneState(input: {
     call.accept();
     activeCallRef.current = call;
     incomingCallRef.current = null;
+    setCallStartedAt(Date.now());
     setStatus("on-call");
   }, []);
 
@@ -422,8 +518,10 @@ function useVoiceSoftphoneState(input: {
 
     call.reject();
     incomingCallRef.current = null;
+    dismissIncomingToast();
+    setCallStartedAt(null);
     setStatus(isRegisteredRef.current ? "ready" : "offline");
-  }, []);
+  }, [dismissIncomingToast]);
 
   return {
     enabled: input.enabled,
@@ -433,6 +531,7 @@ function useVoiceSoftphoneState(input: {
     isSpeakerMuted,
     isOnline: status !== "offline" && status !== "error",
     activePhoneNumber,
+    callElapsedSeconds,
     goOnline,
     goOffline,
     placeCall,

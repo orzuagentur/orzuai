@@ -2,6 +2,7 @@ import "server-only";
 
 import type { NextRequest } from "next/server";
 
+import { buildAppUrl } from "@/lib/app-url";
 import { validateTwilioRequestSignature } from "@/lib/twilio/validate-request";
 
 export async function readTwilioRequestParams(
@@ -31,19 +32,45 @@ export function isTwilioWebhookSignatureValid(input: {
   const authToken = input.authToken?.trim();
 
   if (!authToken) {
-    return true;
+    return isSignatureValidationBypassedForLocalDevelopment();
   }
 
   const signature = input.request.headers.get("x-twilio-signature");
 
   if (!signature) {
-    return true;
+    return isSignatureValidationBypassedForLocalDevelopment();
   }
 
-  return validateTwilioRequestSignature({
+  const rawUrlValid = validateTwilioRequestSignature({
     authToken,
     signature,
     url: input.request.url,
     params: input.params,
   });
+
+  if (rawUrlValid) {
+    return true;
+  }
+
+  const canonicalUrl = buildAppUrl(
+    `${input.request.nextUrl.pathname}${input.request.nextUrl.search}`,
+  );
+
+  if (!canonicalUrl || canonicalUrl === input.request.url) {
+    return false;
+  }
+
+  return validateTwilioRequestSignature({
+    authToken,
+    signature,
+    url: canonicalUrl,
+    params: input.params,
+  });
+}
+
+function isSignatureValidationBypassedForLocalDevelopment(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.TWILIO_DISABLE_SIGNATURE_VALIDATION === "true"
+  );
 }

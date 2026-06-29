@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
 import { getUserProfile } from "@/services/user.service";
+import { getVoiceClientConfig } from "@/services/voice-client.service";
 
 export const metadata = {
   robots: {
@@ -30,11 +31,16 @@ export default async function DashboardLayout({
   const googleCalendarConnected = business
     ? await isGoogleCalendarConnected(business.id)
     : false;
+  const voiceClientConfig = business
+    ? await getVoiceClientConfig(business.id)
+    : { enabled: false, phoneNumber: null };
 
   return (
     <DashboardShell
       userProfile={userProfile}
       googleCalendarConnected={googleCalendarConnected}
+      voiceBusinessId={business?.id ?? null}
+      voiceClientEnabled={voiceClientConfig.enabled}
     >
       {children}
     </DashboardShell>

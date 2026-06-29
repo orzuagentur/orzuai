@@ -12,6 +12,7 @@ import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { Button } from "@/components/ui/button";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
+import { formatVoiceCallDuration } from "@/utils/voice-call-display";
 
 type VoiceSoftphoneBarProps = {
   className?: string;
@@ -76,6 +77,11 @@ export function VoiceSoftphoneBar({ className }: VoiceSoftphoneBarProps) {
                   ? VOICE_MESSAGES.softphoneConnecting
                   : VOICE_MESSAGES.softphoneOnCall}
               </span>
+              {softphone.callElapsedSeconds !== null ? (
+                <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  {formatVoiceCallDuration(softphone.callElapsedSeconds)}
+                </span>
+              ) : null}
               <Button type="button" size="sm" variant="outline" onClick={softphone.toggleMute}>
                 {softphone.isMuted ? (
                   <MicOffIcon className="mr-2 size-4" />

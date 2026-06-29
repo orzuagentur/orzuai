@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { getCallsForContact } from "@/utils/voice-contact-calls";
+import { formatVoiceCallDuration } from "@/utils/voice-call-display";
 
 type VoiceCallCardProps = {
   call: VoiceCallDetail | null;
@@ -147,6 +148,16 @@ export function VoiceCallCard({
                 </Button>
               ) : null}
             </div>
+          ) : null}
+
+          {softphone.status === "on-call" && softphone.callElapsedSeconds !== null ? (
+            <p className="mt-2 font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              {formatVoiceCallDuration(softphone.callElapsedSeconds)}
+            </p>
+          ) : softphone.status === "connecting" ? (
+            <p className="mt-2 text-sm font-medium text-sky-600 dark:text-sky-400">
+              {VOICE_MESSAGES.softphoneConnecting}
+            </p>
           ) : null}
         </div>
 
