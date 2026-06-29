@@ -155,6 +155,7 @@ function useVoiceSoftphoneState(input: {
   const incomingToastIdRef = useRef<string | number | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const isRegisteredRef = useRef(false);
+  const hasDeviceErrorRef = useRef(false);
 
   const dismissIncomingToast = useCallback(() => {
     if (incomingToastIdRef.current !== null) {
@@ -216,6 +217,7 @@ function useVoiceSoftphoneState(input: {
     }
 
     isRegisteredRef.current = false;
+    hasDeviceErrorRef.current = false;
 
     setIsMuted(false);
     setIsSpeakerMuted(false);
@@ -339,16 +341,18 @@ function useVoiceSoftphoneState(input: {
 
       device.on("registered", () => {
         isRegisteredRef.current = true;
+        hasDeviceErrorRef.current = false;
         setStatus("ready");
         setError(null);
       });
 
       device.on("unregistered", () => {
         isRegisteredRef.current = false;
-        setStatus("offline");
+        setStatus(hasDeviceErrorRef.current ? "error" : "offline");
       });
 
       device.on("error", (deviceError) => {
+        hasDeviceErrorRef.current = true;
         setError(deviceError.message || VOICE_MESSAGES.softphoneError);
         setStatus("error");
       });
@@ -385,10 +389,17 @@ function useVoiceSoftphoneState(input: {
           ? registerError.message
           : VOICE_MESSAGES.softphoneRegisterFailed,
       );
+      hasDeviceErrorRef.current = true;
+      if (deviceRef.current) {
+        const failedDevice = deviceRef.current;
+        failedDevice.removeAllListeners();
+        failedDevice.destroy();
+        deviceRef.current = null;
+      }
+      isRegisteredRef.current = false;
       setStatus("error");
-      goOffline();
     }
-  }, [attachCallListeners, goOffline, input.businessId, input.enabled]);
+  }, [attachCallListeners, input.businessId, input.enabled]);
 
   const placeCall = useCallback(
     async (phoneNumber: string) => {
