@@ -202,9 +202,16 @@ function useVoiceSoftphoneState(input: {
     dismissIncomingToast();
 
     if (deviceRef.current) {
-      deviceRef.current.removeAllListeners();
-      void deviceRef.current.unregister();
-      deviceRef.current.destroy();
+      const device = deviceRef.current;
+      device.removeAllListeners();
+
+      if (isRegisteredRef.current) {
+        void device.unregister().catch(() => {
+          // Twilio can already be unregistered after token/signaling failures.
+        });
+      }
+
+      device.destroy();
       deviceRef.current = null;
     }
 

@@ -19,6 +19,7 @@ import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
+import { getTwilioPlatformAccountSid } from "@/lib/twilio/connect";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall } from "@/services/voice-inbox.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
@@ -76,7 +77,10 @@ export async function createVoiceClientTokenForUser(input: {
 
   const credentials = resolveTwilioCredentialsForBusiness(connection);
 
-  if (!credentials?.accountSid) {
+  const voiceTokenAccountSid =
+    getTwilioPlatformAccountSid() ?? credentials?.accountSid;
+
+  if (!voiceTokenAccountSid) {
     return { success: false, message: "Twilio credentials missing." };
   }
 
@@ -86,7 +90,7 @@ export async function createVoiceClientTokenForUser(input: {
 
   try {
     const token = createTwilioVoiceAccessToken({
-      accountSid: credentials.accountSid,
+      accountSid: voiceTokenAccountSid,
       identity,
     });
 
