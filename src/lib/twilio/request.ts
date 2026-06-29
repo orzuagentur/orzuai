@@ -41,31 +41,20 @@ export function isTwilioWebhookSignatureValid(input: {
     return isSignatureValidationBypassedForLocalDevelopment();
   }
 
-  const rawUrlValid = validateTwilioRequestSignature({
-    authToken,
-    signature,
-    url: input.request.url,
-    params: input.params,
-  });
-
-  if (rawUrlValid) {
-    return true;
+  for (const url of getTwilioSignatureUrlCandidates(input.request)) {
+    if (
+      validateTwilioRequestSignature({
+        authToken,
+        signature,
+        url,
+        params: input.params,
+      })
+    ) {
+      return true;
+    }
   }
 
-  const canonicalUrl = buildAppUrl(
-    `${input.request.nextUrl.pathname}${input.request.nextUrl.search}`,
-  );
-
-  if (!canonicalUrl || canonicalUrl === input.request.url) {
-    return false;
-  }
-
-  return validateTwilioRequestSignature({
-    authToken,
-    signature,
-    url: canonicalUrl,
-    params: input.params,
-  });
+  return false;
 }
 
 function isSignatureValidationBypassedForLocalDevelopment(): boolean {
@@ -73,4 +62,32 @@ function isSignatureValidationBypassedForLocalDevelopment(): boolean {
     process.env.NODE_ENV !== "production" &&
     process.env.TWILIO_DISABLE_SIGNATURE_VALIDATION === "true"
   );
+}
+
+function getTwilioSignatureUrlCandidates(request: NextRequest): string[] {
+  const candidates = new Set<string>();
+  const pathAndSearch = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+
+  candidates.add(request.url);
+
+  const canonicalUrl = buildAppUrl(pathAndSearch);
+  if (canonicalUrl) {
+    candidates.add(canonicalUrl);
+  }
+
+  const forwardedProto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = request.headers.get("host")?.trim();
+
+  for (const candidateHost of [forwardedHost, host]) {
+    if (candidateHost) {
+      candidates.add(`${forwardedProto}://${candidateHost}${pathAndSearch}`);
+    }
+  }
+
+  return [...candidates].filter(Boolean);
 }

@@ -5,10 +5,6 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
-import {
-  getTwilioConnection,
-  resolveTwilioCredentialsForBusiness,
-} from "@/services/twilio-integration.service";
 import { buildClientOutboundTwiml } from "@/services/voice-client.service";
 
 export async function POST(request: NextRequest) {
@@ -21,10 +17,7 @@ export async function POST(request: NextRequest) {
   if (!businessId) {
     return new NextResponse("Missing businessId", { status: 400 });
   }
-  const connection = await getTwilioConnection(businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
-  const authToken =
-    credentials?.authToken ?? getTwilioPlatformAuthToken() ?? null;
+  const authToken = getTwilioPlatformAuthToken() ?? null;
 
   if (
     !isTwilioWebhookSignatureValid({
