@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BotIcon,
+  FileTextIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   Settings2Icon,
@@ -39,6 +40,11 @@ const NAV_ITEMS = [
     href: "/team",
     label: "Команда",
     icon: UsersIcon,
+  },
+  {
+    href: "/legal-pages",
+    label: "Legal pages",
+    icon: FileTextIcon,
   },
 ] as const;
 

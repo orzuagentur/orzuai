@@ -15,6 +15,7 @@ import {
 import { LandingPricing } from "@/components/landing/LandingPricing";
 import { LandingProductPreview } from "@/components/landing/LandingProductPreview";
 import { LandingSocialProof } from "@/components/landing/LandingSocialProof";
+import type { LegalFooterLink } from "@/features/legal/types";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { OrzuLogo } from "@/components/landing/OrzuLogo";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,11 @@ import {
 
 const FEATURE_ICONS = [MessageSquareIcon, BotIcon, SparklesIcon] as const;
 
-function LandingPageContent() {
+type LandingPageProps = {
+  legalFooterLinks: LegalFooterLink[];
+};
+
+function LandingPageContent({ legalFooterLinks }: LandingPageProps) {
   const { copy } = useLandingLocale();
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -124,7 +129,7 @@ function LandingPageContent() {
       </main>
 
       <footer className="relative z-10 space-y-3 px-6 pb-8 pt-4 text-center text-xs text-muted-foreground">
-        <LegalFooterLinks />
+        <LegalFooterLinks links={legalFooterLinks} />
         <p>© {new Date().getFullYear()} OrzuX. Built for modern small businesses.</p>
       </footer>
 
@@ -133,11 +138,11 @@ function LandingPageContent() {
   );
 }
 
-export function LandingPage() {
+export function LandingPage({ legalFooterLinks }: LandingPageProps) {
   return (
     <Suspense fallback={null}>
       <LandingLocaleProvider>
-        <LandingPageContent />
+        <LandingPageContent legalFooterLinks={legalFooterLinks} />
       </LandingLocaleProvider>
     </Suspense>
   );

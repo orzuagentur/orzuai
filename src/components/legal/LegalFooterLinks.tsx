@@ -1,22 +1,22 @@
 import Link from "next/link";
 
-import { LEGAL_ROUTES } from "@/constants/routes";
+import type { LegalFooterLink } from "@/features/legal/types";
 import { cn } from "@/lib/utils";
 
 type LegalFooterLinksProps = {
+  links: LegalFooterLink[];
   className?: string;
   inline?: boolean;
 };
 
 export function LegalFooterLinks({
+  links,
   className,
   inline = true,
 }: LegalFooterLinksProps) {
-  const links = [
-    { href: LEGAL_ROUTES.privacy, label: "Privacy Policy" },
-    { href: LEGAL_ROUTES.terms, label: "Terms of Service" },
-    { href: LEGAL_ROUTES.dataDeletion, label: "Data Deletion" },
-  ] as const;
+  if (links.length === 0) {
+    return null;
+  }
 
   return (
     <nav

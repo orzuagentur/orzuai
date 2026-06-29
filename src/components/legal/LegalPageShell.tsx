@@ -5,17 +5,20 @@ import { ArrowLeftIcon } from "lucide-react";
 import { LegalFooterLinks } from "@/components/legal/LegalFooterLinks";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { APP_ROUTES } from "@/constants/routes";
+import type { LegalFooterLink } from "@/features/legal/types";
 import { LEGAL_MESSAGES } from "@/features/legal/constants";
 
 type LegalPageShellProps = {
   title: string;
   description: string;
+  footerLinks: LegalFooterLink[];
   children: ReactNode;
 };
 
 export function LegalPageShell({
   title,
   description,
+  footerLinks,
   children,
 }: LegalPageShellProps) {
   return (
@@ -43,7 +46,7 @@ export function LegalPageShell({
       </main>
 
       <footer className="border-t px-6 py-8 text-center text-xs text-muted-foreground">
-        <LegalFooterLinks className="mb-4" />
+        <LegalFooterLinks links={footerLinks} className="mb-4" />
         <p>© {new Date().getFullYear()} OrzuX. All rights reserved.</p>
       </footer>
     </div>

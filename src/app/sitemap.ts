@@ -1,16 +1,25 @@
 import type { MetadataRoute } from "next";
 
 import { APP_ORIGIN } from "@/constants/app-origin";
+import { legalPagePath } from "@/features/legal/default-pages";
+import { listPublishedLegalPages } from "@/services/legal-pages.service";
 
-const PUBLIC_ROUTES = ["", "/privacy", "/terms", "/data-deletion"] as const;
-
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
+  const legalPages = await listPublishedLegalPages();
 
-  return PUBLIC_ROUTES.map((route) => ({
-    url: `${APP_ORIGIN}${route}`,
-    lastModified: now,
-    changeFrequency: route === "" ? "weekly" : "monthly",
-    priority: route === "" ? 1 : 0.6,
-  }));
+  return [
+    {
+      url: APP_ORIGIN,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 1,
+    },
+    ...legalPages.map((page) => ({
+      url: `${APP_ORIGIN}${legalPagePath(page.slug)}`,
+      lastModified: new Date(page.updatedAt),
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    })),
+  ];
 }

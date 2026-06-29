@@ -1,4 +1,4 @@
-import type { LegalSection } from "@/features/legal/content";
+import type { LegalSection } from "@/features/legal/types";
 
 type LegalDocumentProps = {
   sections: LegalSection[];

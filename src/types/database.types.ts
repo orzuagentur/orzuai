@@ -1773,6 +1773,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      platform_legal_pages: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          description: string;
+          footer_label: string;
+          sections: unknown;
+          sort_order: number;
+          published: boolean;
+          show_in_footer: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          description?: string;
+          footer_label?: string;
+          sections?: unknown;
+          sort_order?: number;
+          published?: boolean;
+          show_in_footer?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          title?: string;
+          description?: string;
+          footer_label?: string;
+          sections?: unknown;
+          sort_order?: number;
+          published?: boolean;
+          show_in_footer?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       calendar_events: {
         Row: {
           id: string;

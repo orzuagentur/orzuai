@@ -1,10 +1,6 @@
-import { SUPPORT_EMAIL } from "@/constants/app-origin";
+import { LEGAL_COMPANY } from "@/features/legal/default-pages";
 
-export const LEGAL_COMPANY = {
-  name: "OrzuX",
-  contactEmail: SUPPORT_EMAIL,
-  lastUpdated: "May 30, 2026",
-} as const;
+export { LEGAL_COMPANY };
 
 export const LEGAL_MESSAGES = {
   privacyTitle: "Privacy Policy",

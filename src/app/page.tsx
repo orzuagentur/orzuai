@@ -4,9 +4,13 @@ import { LandingPage } from "@/components/landing/LandingPage";
 import { APP_ORIGIN } from "@/constants/app-origin";
 import { APP_ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
+import { listFooterLegalLinks } from "@/services/legal-pages.service";
 
 export default async function Home() {
-  const user = await getCurrentUser();
+  const [user, legalFooterLinks] = await Promise.all([
+    getCurrentUser(),
+    listFooterLegalLinks(),
+  ]);
 
   if (user) {
     redirect(APP_ROUTES.dashboard);
@@ -34,7 +38,7 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <LandingPage />
+      <LandingPage legalFooterLinks={legalFooterLinks} />
     </>
   );
 }
