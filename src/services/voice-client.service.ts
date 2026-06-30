@@ -7,6 +7,11 @@ import {
   getTwilioVoiceAccountSid,
   hasTwilioVoiceClientEnv,
 } from "@/lib/twilio/access-token";
+import { listTwilioIncomingPhoneNumbers } from "@/lib/twilio/client";
+import {
+  getTwilioPlatformAccountSid,
+  getTwilioPlatformAuthToken,
+} from "@/lib/twilio/connect";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import {
   buildDialClientTwiml,
@@ -136,6 +141,40 @@ function buildVoiceWebhookUrls(businessId: string) {
   };
 }
 
+async function resolveBrowserPhoneCallerId(
+  preferredCallerId: string,
+): Promise<string | null> {
+  const accountSid = getTwilioPlatformAccountSid();
+  const authToken = getTwilioPlatformAuthToken();
+
+  if (!accountSid || !authToken) {
+    return null;
+  }
+
+  try {
+    const numbers = await listTwilioIncomingPhoneNumbers({
+      accountSid,
+      authToken,
+    });
+    const voiceNumbers = numbers.filter((number) => number.capabilities.voice);
+
+    return (
+      voiceNumbers.find((number) => number.phoneNumber === preferredCallerId)
+        ?.phoneNumber ??
+      voiceNumbers[0]?.phoneNumber ??
+      null
+    );
+  } catch (error) {
+    console.error(
+      "[voice-client] browser caller id lookup failed",
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return null;
+  }
+}
+
 export async function buildClientOutboundTwiml(input: {
   businessId: string;
   toNumber: string;
@@ -169,8 +208,17 @@ export async function buildClientOutboundTwiml(input: {
     });
   }
 
+  const browserCallerId = await resolveBrowserPhoneCallerId(phoneNumber);
+
+  if (!browserCallerId) {
+    return buildStaticSayTwiml({
+      speech: "Browser calling is missing a valid caller ID.",
+      speechLocale,
+    });
+  }
+
   return buildDialPhoneNumberTwiml({
-    callerId: phoneNumber,
+    callerId: browserCallerId,
     toNumber: to,
     recordingStatusCallback: await resolveRecordingCallbackUrl(input.businessId),
   });

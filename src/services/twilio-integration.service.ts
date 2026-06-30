@@ -436,10 +436,8 @@ export async function getTwilioNumberDiagnostics(
           webhooks.inboundWebhookUrl,
         ),
         buildWebhookField("Voice Method", number.voiceMethod, "POST"),
-        buildWebhookField("Voice Application SID", number.voiceApplicationSid, null),
         buildWebhookField("SMS URL", number.smsUrl, webhooks.smsWebhookUrl),
         buildWebhookField("SMS Method", number.smsMethod, "POST"),
-        buildWebhookField("SMS Application SID", number.smsApplicationSid, null),
         buildWebhookField(
           "Status Callback",
           number.statusCallback,
@@ -457,10 +455,6 @@ export async function getTwilioNumberDiagnostics(
           buildAppUrl("/api/webhooks/voice/client"),
         ),
         buildWebhookField("Browser Phone Voice Method", app.voiceMethod, "POST"),
-        buildWebhookField("Browser Phone Status Callback", app.statusCallback, null),
-        buildWebhookField("Browser Phone Status Callback Method", app.statusCallbackMethod, "POST"),
-        buildWebhookField("Browser Phone SMS URL", app.smsUrl, null),
-        buildWebhookField("Browser Phone SMS Method", app.smsMethod, "POST"),
       ]
     : [];
 
