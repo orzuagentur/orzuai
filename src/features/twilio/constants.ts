@@ -10,10 +10,16 @@ export const TWILIO_MESSAGES = {
   connectButton: "Подключить Twilio",
   selectPhoneTitle: "Выберите номер",
   selectPhoneDescription:
-    "Выберите телефонный номер Twilio для входящих и исходящих AI-звонков.",
+    "Выберите существующий номер Twilio. После выбора OrzuX автоматически настроит Voice, SMS и status webhooks.",
+  numberPickerTitle: "Номера в подключённом Twilio аккаунте",
+  numberPickerDescription:
+    "Выберите номер, который должен принимать входящие звонки и SMS в OrzuX. Покупать новый номер нужно только если в аккаунте нет подходящего номера.",
+  changeNumberButton: "Сменить номер",
+  hideNumberPickerButton: "Скрыть выбор номера",
+  currentNumberLabel: "Текущий номер",
   noPhoneNumbersTitle: "Номера не найдены в подключённом аккаунте",
   noPhoneNumbersDescription:
-    "Twilio Connect создаёт отдельный авторизованный аккаунт. Номера из основной Twilio Console могут здесь не отображаться — купите номер через OrzuAI или нажмите «Обновить список».",
+    "Нажмите «Обновить список», чтобы заново получить номера из Twilio. Если номеров нет, можно купить новый номер через OrzuX.",
   buyNumberTitle: "Купить номер через OrzuAI",
   buyNumberDescription:
     "Номер будет куплен в вашем авторизованном Twilio-аккаунте и сразу подключён к AI Voice.",
@@ -77,6 +83,8 @@ export const TWILIO_MESSAGES = {
   phoneNotFound: "Выбранный номер больше недоступен.",
   webhookSetupFailed:
     "Не удалось настроить webhooks на номере. Проверьте права Twilio Connect.",
+  oldWebhookCleanupFailed:
+    "Новый номер настроен, но не удалось снять webhooks со старого номера. Нажмите «Синхронизировать» или проверьте права Twilio.",
   accountVerifyFailed:
     "Не удалось проверить Twilio-аккаунт. Попробуйте подключиться снова.",
   invalidAccountSid: "Некорректный Twilio Account SID.",

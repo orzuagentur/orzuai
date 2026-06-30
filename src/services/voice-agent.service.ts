@@ -75,6 +75,7 @@ export async function getVoiceConnection(
     connectedAt: twilio?.connectedAt ?? null,
     lastSyncedAt: twilio?.lastSyncedAt ?? null,
     accountFriendlyName: twilio?.accountFriendlyName ?? null,
+    phoneSid: twilio?.phoneSid ?? null,
     pendingPhoneSelection: twilio?.status === "authorized",
   };
 
@@ -101,9 +102,10 @@ export async function getVoiceConnection(
   if (!settings.phoneNumber) {
     return {
       status: "disconnected",
-      phoneNumber: null,
-      enabled: false,
       ...base,
+      phoneNumber: null,
+      phoneSid: null,
+      enabled: false,
       pendingPhoneSelection: false,
     };
   }

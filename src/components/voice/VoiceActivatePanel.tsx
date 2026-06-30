@@ -83,6 +83,7 @@ export function VoiceActivatePanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedPhoneSid, setSelectedPhoneSid] = useState<string | null>(null);
+  const [showNumberManager, setShowNumberManager] = useState(false);
   const [isSelectingPhone, setIsSelectingPhone] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
   const [isRefreshingNumbers, setIsRefreshingNumbers] = useState(false);
@@ -106,6 +107,15 @@ export function VoiceActivatePanel({
   useEffect(() => {
     setLocalPhoneNumbers(availablePhoneNumbers);
   }, [availablePhoneNumbers]);
+
+  useEffect(() => {
+    if (
+      selectedPhoneSid &&
+      !availablePhoneNumbers.some((phone) => phone.sid === selectedPhoneSid)
+    ) {
+      setSelectedPhoneSid(null);
+    }
+  }, [availablePhoneNumbers, selectedPhoneSid]);
 
   useEffect(() => {
     if (searchParams.get("connected") === "1") {
@@ -180,6 +190,7 @@ export function VoiceActivatePanel({
       }
 
       toast.success(VOICE_MESSAGES.saved);
+      setShowNumberManager(false);
       router.refresh();
     } finally {
       setIsSelectingPhone(false);
@@ -326,87 +337,25 @@ export function VoiceActivatePanel({
             </p>
           ) : null}
 
-          {localPhoneNumbers.length === 0 ? (
-            <div className="space-y-4">
-              <div className="space-y-3 rounded-lg border border-dashed p-4 text-sm">
-                <p className="font-medium">{TWILIO_MESSAGES.noPhoneNumbersTitle}</p>
-                <p className="text-muted-foreground">
-                  {TWILIO_MESSAGES.noPhoneNumbersDescription}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isRefreshingNumbers}
-                  onClick={() => void handleRefreshNumbers()}
-                >
-                  {isRefreshingNumbers ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <>
-                      <RefreshCwIcon className="size-4" />
-                      {TWILIO_MESSAGES.refreshButton}
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <TwilioBuyNumberSection
-                countryCode={countryCode}
-                areaCode={areaCode}
-                availableToBuy={availableToBuy}
-                isSearching={isSearchingNumbers}
-                purchasingNumber={purchasingNumber}
-                onCountryChange={setCountryCode}
-                onAreaCodeChange={setAreaCode}
-                onSearch={() => void handleSearchNumbers()}
-                onPurchase={(phoneNumber) => void handlePurchaseNumber(phoneNumber)}
-              />
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {localPhoneNumbers.map((phone) => (
-                <button
-                  key={phone.sid}
-                  type="button"
-                  onClick={() => setSelectedPhoneSid(phone.sid)}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    selectedPhoneSid === phone.sid
-                      ? "border-primary bg-primary/5"
-                      : "hover:bg-muted/40",
-                  )}
-                >
-                  <p className="font-medium">{phone.phoneNumber}</p>
-                  {phone.friendlyName ? (
-                    <p className="text-sm text-muted-foreground">{phone.friendlyName}</p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {[
-                      phone.capabilities.voice ? "Voice" : null,
-                      phone.capabilities.sms ? "SMS" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {localPhoneNumbers.length > 0 ? (
-            <Button
-              type="button"
-              disabled={!selectedPhoneSid || isSelectingPhone}
-              onClick={() => void handleSelectPhone()}
-            >
-              {isSelectingPhone ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                TWILIO_MESSAGES.selectPhoneButton
-              )}
-            </Button>
-          ) : null}
+          <TwilioNumberSelectionSection
+            activePhoneSid={null}
+            availableToBuy={availableToBuy}
+            areaCode={areaCode}
+            countryCode={countryCode}
+            isRefreshingNumbers={isRefreshingNumbers}
+            isSearchingNumbers={isSearchingNumbers}
+            isSelectingPhone={isSelectingPhone}
+            localPhoneNumbers={localPhoneNumbers}
+            purchasingNumber={purchasingNumber}
+            selectedPhoneSid={selectedPhoneSid}
+            onAreaCodeChange={setAreaCode}
+            onCountryChange={setCountryCode}
+            onPurchase={(phoneNumber) => void handlePurchaseNumber(phoneNumber)}
+            onRefresh={() => void handleRefreshNumbers()}
+            onSearch={() => void handleSearchNumbers()}
+            onSelectPhone={() => void handleSelectPhone()}
+            onSelectedPhoneChange={setSelectedPhoneSid}
+          />
         </CardContent>
       </Card>
     );
@@ -486,7 +435,39 @@ export function VoiceActivatePanel({
                   </>
                 )}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNumberManager((value) => !value)}
+              >
+                {showNumberManager
+                  ? TWILIO_MESSAGES.hideNumberPickerButton
+                  : TWILIO_MESSAGES.changeNumberButton}
+              </Button>
             </div>
+
+            {showNumberManager ? (
+              <TwilioNumberSelectionSection
+                activePhoneSid={connection.phoneSid}
+                availableToBuy={availableToBuy}
+                areaCode={areaCode}
+                countryCode={countryCode}
+                isRefreshingNumbers={isRefreshingNumbers}
+                isSearchingNumbers={isSearchingNumbers}
+                isSelectingPhone={isSelectingPhone}
+                localPhoneNumbers={localPhoneNumbers}
+                purchasingNumber={purchasingNumber}
+                selectedPhoneSid={selectedPhoneSid}
+                onAreaCodeChange={setAreaCode}
+                onCountryChange={setCountryCode}
+                onPurchase={(phoneNumber) => void handlePurchaseNumber(phoneNumber)}
+                onRefresh={() => void handleRefreshNumbers()}
+                onSearch={() => void handleSearchNumbers()}
+                onSelectPhone={() => void handleSelectPhone()}
+                onSelectedPhoneChange={setSelectedPhoneSid}
+              />
+            ) : null}
 
             <TwilioNumberSettings diagnostics={diagnostics} />
 
@@ -738,6 +719,156 @@ function TwilioErrorLogList({ errors }: { errors: TwilioErrorLogItem[] }) {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+function TwilioNumberSelectionSection({
+  activePhoneSid,
+  availableToBuy,
+  areaCode,
+  countryCode,
+  isRefreshingNumbers,
+  isSearchingNumbers,
+  isSelectingPhone,
+  localPhoneNumbers,
+  purchasingNumber,
+  selectedPhoneSid,
+  onAreaCodeChange,
+  onCountryChange,
+  onPurchase,
+  onRefresh,
+  onSearch,
+  onSelectPhone,
+  onSelectedPhoneChange,
+}: {
+  activePhoneSid: string | null;
+  availableToBuy: TwilioAvailablePhoneNumber[];
+  areaCode: string;
+  countryCode: string;
+  isRefreshingNumbers: boolean;
+  isSearchingNumbers: boolean;
+  isSelectingPhone: boolean;
+  localPhoneNumbers: TwilioPhoneNumberOption[];
+  purchasingNumber: string | null;
+  selectedPhoneSid: string | null;
+  onAreaCodeChange: (value: string) => void;
+  onCountryChange: (value: string) => void;
+  onPurchase: (phoneNumber: string) => void;
+  onRefresh: () => void;
+  onSearch: () => void;
+  onSelectPhone: () => void;
+  onSelectedPhoneChange: (phoneSid: string) => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-lg border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">{TWILIO_MESSAGES.numberPickerTitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {TWILIO_MESSAGES.numberPickerDescription}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={isRefreshingNumbers}
+          onClick={onRefresh}
+        >
+          {isRefreshingNumbers ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <>
+              <RefreshCwIcon className="size-4" />
+              {TWILIO_MESSAGES.refreshButton}
+            </>
+          )}
+        </Button>
+      </div>
+
+      {localPhoneNumbers.length === 0 ? (
+        <div className="space-y-4">
+          <div className="space-y-2 rounded-lg border border-dashed p-4 text-sm">
+            <p className="font-medium">{TWILIO_MESSAGES.noPhoneNumbersTitle}</p>
+            <p className="text-muted-foreground">
+              {TWILIO_MESSAGES.noPhoneNumbersDescription}
+            </p>
+          </div>
+
+          <TwilioBuyNumberSection
+            countryCode={countryCode}
+            areaCode={areaCode}
+            availableToBuy={availableToBuy}
+            isSearching={isSearchingNumbers}
+            purchasingNumber={purchasingNumber}
+            onCountryChange={onCountryChange}
+            onAreaCodeChange={onAreaCodeChange}
+            onSearch={onSearch}
+            onPurchase={onPurchase}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-2">
+            {localPhoneNumbers.map((phone) => {
+              const isActive = phone.sid === activePhoneSid;
+              const isSelected = phone.sid === selectedPhoneSid;
+
+              return (
+                <button
+                  key={phone.sid}
+                  type="button"
+                  onClick={() => onSelectedPhoneChange(phone.sid)}
+                  className={cn(
+                    "rounded-lg border p-4 text-left transition-colors",
+                    isSelected
+                      ? "border-primary bg-primary/5"
+                      : isActive
+                        ? "border-primary/40 bg-muted/30"
+                        : "hover:bg-muted/40",
+                  )}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{phone.phoneNumber}</p>
+                      {phone.friendlyName ? (
+                        <p className="text-sm text-muted-foreground">
+                          {phone.friendlyName}
+                        </p>
+                      ) : null}
+                    </div>
+                    {isActive ? (
+                      <Badge variant="outline">{TWILIO_MESSAGES.currentNumberLabel}</Badge>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {[
+                      phone.capabilities.voice ? "Voice" : null,
+                      phone.capabilities.sms ? "SMS" : null,
+                      phone.capabilities.mms ? "MMS" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          <Button
+            type="button"
+            disabled={!selectedPhoneSid || isSelectingPhone}
+            onClick={onSelectPhone}
+          >
+            {isSelectingPhone ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              TWILIO_MESSAGES.selectPhoneButton
+            )}
+          </Button>
+        </>
       )}
     </div>
   );

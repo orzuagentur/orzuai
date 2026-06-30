@@ -65,22 +65,6 @@ function mapTwilioConnection(row: TwilioConnection): TwilioConnectionData {
   };
 }
 
-function findPreviouslySelectedNumber(
-  numbers: TwilioPhoneNumberOption[],
-  connection: TwilioConnectionData | null,
-  accountSid: string,
-): TwilioPhoneNumberOption | null {
-  if (!connection || connection.connectedAccountSid !== accountSid) {
-    return null;
-  }
-
-  return (
-    numbers.find((number) => number.sid === connection.phoneSid) ??
-    numbers.find((number) => number.phoneNumber === connection.phoneNumber) ??
-    null
-  );
-}
-
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
@@ -562,7 +546,6 @@ export async function completeTwilioConnectAuthorization(input: {
   }
 
   const admin = createAdminClient();
-  const existingConnection = await getTwilioConnection(input.businessId);
   const credentials: TwilioApiCredentials = {
     accountSid,
     authToken: getTwilioPlatformAuthToken()!,
@@ -585,59 +568,15 @@ export async function completeTwilioConnectAuthorization(input: {
     return { success: false, message: TWILIO_MESSAGES.accountVerifyFailed };
   }
 
-  const numbers = await listTwilioIncomingPhoneNumbers(credentials);
-  const previouslySelectedNumber = findPreviouslySelectedNumber(
-    numbers,
-    existingConnection,
-    accountSid,
-  );
-
   await upsertTwilioConnectionRow(admin, input.businessId, {
     twilio_status: "authorized",
     connected_account_sid: accountSid,
     account_friendly_name: friendlyName,
-    phone_number: previouslySelectedNumber?.phoneNumber ?? null,
-    phone_sid: previouslySelectedNumber?.sid ?? null,
+    phone_number: null,
+    phone_sid: null,
     connected_at: null,
     last_synced_at: new Date().toISOString(),
   });
-
-  if (previouslySelectedNumber) {
-    const preservedResult = await selectTwilioPhoneNumber({
-      businessId: input.businessId,
-      phoneSid: previouslySelectedNumber.sid,
-      phoneNumber: previouslySelectedNumber.phoneNumber,
-    });
-
-    if (preservedResult.success) {
-      revalidateTwilioPaths();
-      return {
-        success: true,
-        autoConnected: true,
-        message: "Twilio подключён — предыдущий номер восстановлен автоматически.",
-      };
-    }
-  }
-
-  if (numbers.length === 1) {
-    const singleNumber = numbers[0];
-    if (singleNumber) {
-      const autoResult = await selectTwilioPhoneNumber({
-        businessId: input.businessId,
-        phoneSid: singleNumber.sid,
-        phoneNumber: singleNumber.phoneNumber,
-      });
-
-      if (autoResult.success) {
-        revalidateTwilioPaths();
-        return {
-          success: true,
-          autoConnected: true,
-          message: TWILIO_MESSAGES.autoConnectedSingleNumber,
-        };
-      }
-    }
-  }
 
   revalidateTwilioPaths();
   return { success: true, autoConnected: false };
@@ -678,6 +617,7 @@ export async function selectTwilioPhoneNumber(input: {
 
   const webhooks = buildVoiceWebhookUrls(input.businessId);
   const now = new Date().toISOString();
+  let cleanupPreviousNumber = false;
 
   try {
     await configureTwilioPhoneNumberWebhooks({
@@ -687,6 +627,14 @@ export async function selectTwilioPhoneNumber(input: {
       smsUrl: webhooks.smsWebhookUrl,
       statusCallbackUrl: webhooks.statusCallbackUrl,
     });
+
+    if (ctx.connection.phoneSid && ctx.connection.phoneSid !== selectedSid) {
+      cleanupPreviousNumber = true;
+      await clearTwilioPhoneNumberWebhooks({
+        credentials: ctx.credentials,
+        phoneSid: ctx.connection.phoneSid,
+      });
+    }
   } catch (error) {
     console.error(
       "[twilio] webhook setup failed",
@@ -696,7 +644,12 @@ export async function selectTwilioPhoneNumber(input: {
         error: error instanceof Error ? error.message : "unknown",
       }),
     );
-    return { success: false, message: TWILIO_MESSAGES.webhookSetupFailed };
+    return {
+      success: false,
+      message: cleanupPreviousNumber
+        ? TWILIO_MESSAGES.oldWebhookCleanupFailed
+        : TWILIO_MESSAGES.webhookSetupFailed,
+    };
   }
 
   const admin = createAdminClient();

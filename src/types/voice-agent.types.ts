@@ -20,6 +20,7 @@ export type VoiceConnectionStatus = "connected" | "pending" | "disconnected";
 export type VoiceConnectionData = {
   status: VoiceConnectionStatus;
   phoneNumber: string | null;
+  phoneSid: string | null;
   enabled: boolean;
   callbackAfterOrder: boolean;
   connectedAt: string | null;
