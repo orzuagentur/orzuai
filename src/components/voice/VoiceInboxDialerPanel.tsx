@@ -99,22 +99,6 @@ export function VoiceInboxDialerPanel({
       return;
     }
 
-    if (softphone.enabled) {
-      void softphone
-        .placeCall(phoneToCall)
-        .then(() => {
-          toast.success(VOICE_MESSAGES.callOutboundSuccess);
-        })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : VOICE_MESSAGES.callOutboundFailed,
-          );
-        });
-      return;
-    }
-
     startCalling(async () => {
       const result = await triggerContactVoiceCallAction({
         phoneNumber: phoneToCall,
