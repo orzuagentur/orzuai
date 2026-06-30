@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition, useState } from "react";
+import { useEffect, useTransition, useState } from "react";
 import {
   ArrowLeftIcon,
   Loader2Icon,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import type { VoiceCallDetail } from "@/types/voice-inbox.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import {
+  formatVoiceCallDateParts,
   formatVoiceCallDuration,
   getVoiceCallStatusClassName,
   getVoiceCallStatusLabel,
@@ -50,7 +51,12 @@ export function VoiceCallDetailPanel({
   const [isHandoffPending, setIsHandoffPending] = useState(false);
   const [smsBody, setSmsBody] = useState("");
   const [isSmsSending, setIsSmsSending] = useState(false);
+  const [useLocalTime, setUseLocalTime] = useState(false);
   const softphone = useVoiceSoftphone();
+
+  useEffect(() => {
+    setUseLocalTime(true);
+  }, []);
 
   if (!call) {
     return (
@@ -66,6 +72,9 @@ export function VoiceCallDetailPanel({
     softphone.enabled &&
     call.aiHandled &&
     isActiveVoiceCallStatus(call.status);
+  const callStartedAtLabel = formatVoiceCallDateParts(call.createdAt, {
+    local: useLocalTime,
+  }).fullLabel;
 
   function handleBrowserCall() {
     setIsBrowserCalling(true);
@@ -283,7 +292,7 @@ export function VoiceCallDetailPanel({
             <dt className="text-xs text-muted-foreground">
               {VOICE_MESSAGES.callStartedAt}
             </dt>
-            <dd>{new Date(call.createdAt).toLocaleString()}</dd>
+            <dd>{callStartedAtLabel}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">

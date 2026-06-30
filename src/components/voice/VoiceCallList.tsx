@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { PhoneIncomingIcon, PhoneOutgoingIcon } from "lucide-react";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
@@ -11,6 +12,7 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import type { VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import {
+  formatVoiceCallDateParts,
   formatVoiceCallDuration,
   isMissedVoiceCallStatus,
 } from "@/utils/voice-call-display";
@@ -28,6 +30,12 @@ export function VoiceCallList({
   onCallSelect,
   className,
 }: VoiceCallListProps) {
+  const [useLocalTime, setUseLocalTime] = useState(false);
+
+  useEffect(() => {
+    setUseLocalTime(true);
+  }, []);
+
   if (calls.length === 0) {
     return (
       <EmptyState
@@ -64,6 +72,7 @@ export function VoiceCallList({
               displayName={displayName}
               DirectionIcon={DirectionIcon}
               directionLabel={directionLabel}
+              useLocalTime={useLocalTime}
             />
           );
 
@@ -91,21 +100,16 @@ function CallListRowContent({
   displayName,
   DirectionIcon,
   directionLabel,
+  useLocalTime,
 }: {
   call: VoiceInboxCallListItem;
   displayName: string;
   DirectionIcon: typeof PhoneIncomingIcon;
   directionLabel: string;
+  useLocalTime: boolean;
 }) {
-  const createdAt = new Date(call.createdAt);
-  const dateLabel = createdAt.toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-  const timeLabel = createdAt.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
+  const { dateLabel, timeLabel } = formatVoiceCallDateParts(call.createdAt, {
+    local: useLocalTime,
   });
 
   const subtitle = isMissedVoiceCallStatus(call.status)

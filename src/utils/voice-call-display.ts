@@ -13,6 +13,31 @@ export function formatVoiceCallDuration(seconds: number | null): string {
   return `${minutes}m ${remainder}s`;
 }
 
+export function formatVoiceCallDateParts(
+  isoDate: string,
+  options: { local?: boolean } = {},
+): { dateLabel: string; timeLabel: string; fullLabel: string } {
+  const date = new Date(isoDate);
+  const timeZone = options.local ? undefined : "UTC";
+  const dateLabel = date.toLocaleDateString("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric",
+  });
+  const timeLabel = date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  });
+
+  return {
+    dateLabel,
+    timeLabel,
+    fullLabel: `${dateLabel}, ${timeLabel}`,
+  };
+}
+
 export function getVoiceCallStatusLabel(status: string): string {
   switch (status) {
     case "active":
