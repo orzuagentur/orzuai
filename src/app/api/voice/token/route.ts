@@ -4,13 +4,20 @@ import { getVoiceClientTokenForCurrentUser } from "@/services/voice-client.servi
 
 export async function GET() {
   const result = await getVoiceClientTokenForCurrentUser(true);
+  const headers = { "Cache-Control": "no-store" };
 
   if (!result.success) {
-    return NextResponse.json({ error: result.message }, { status: 400 });
+    return NextResponse.json(
+      { error: result.message },
+      { status: 400, headers },
+    );
   }
 
-  return NextResponse.json({
-    token: result.token,
-    identity: result.identity,
-  });
+  return NextResponse.json(
+    {
+      token: result.token,
+      identity: result.identity,
+    },
+    { headers },
+  );
 }

@@ -323,7 +323,7 @@ function useVoiceSoftphoneState(input: {
     setError(null);
 
     try {
-      const response = await fetch("/api/voice/token");
+      const response = await fetch("/api/voice/token", { cache: "no-store" });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as {

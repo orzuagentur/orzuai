@@ -4,6 +4,7 @@ import { buildAppUrl } from "@/lib/app-url";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
   createTwilioVoiceAccessToken,
+  getTwilioVoiceAccountSid,
   hasTwilioVoiceClientEnv,
 } from "@/lib/twilio/access-token";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
@@ -17,9 +18,7 @@ import { requireUser } from "@/services/auth.service";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import {
   getTwilioConnection,
-  resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
-import { getTwilioPlatformAccountSid } from "@/lib/twilio/connect";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall } from "@/services/voice-inbox.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
@@ -75,18 +74,16 @@ export async function createVoiceClientTokenForUser(input: {
     return { success: false, message: "Twilio is not connected." };
   }
 
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
-
-  const voiceTokenAccountSid =
-    getTwilioPlatformAccountSid() ?? credentials?.accountSid;
+  const voiceTokenAccountSid = getTwilioVoiceAccountSid();
 
   if (!voiceTokenAccountSid) {
-    return { success: false, message: "Twilio credentials missing." };
+    return {
+      success: false,
+      message: "Twilio Voice account SID is not configured.",
+    };
   }
 
-  const identity = input.agentMode
-    ? buildVoiceAgentClientIdentity(input.businessId)
-    : buildVoiceAgentClientIdentity(input.businessId);
+  const identity = buildVoiceAgentClientIdentity(input.businessId);
 
   try {
     const token = createTwilioVoiceAccessToken({

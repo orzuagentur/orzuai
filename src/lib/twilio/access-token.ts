@@ -12,6 +12,10 @@ export function getTwilioApiKeySid(): string | undefined {
   return resolveSecretValue(ENV_KEYS.TWILIO_API_KEY_SID)?.trim() || undefined;
 }
 
+export function getTwilioVoiceAccountSid(): string | undefined {
+  return resolveSecretValue(ENV_KEYS.TWILIO_ACCOUNT_SID)?.trim() || undefined;
+}
+
 export function getTwilioApiKeySecret(): string | undefined {
   return resolveSecretValue(ENV_KEYS.TWILIO_API_KEY_SECRET)?.trim() || undefined;
 }
@@ -22,7 +26,8 @@ export function getTwilioTwimlAppSid(): string | undefined {
 
 export function hasTwilioVoiceClientEnv(): boolean {
   return Boolean(
-    getTwilioApiKeySid() &&
+    getTwilioVoiceAccountSid() &&
+      getTwilioApiKeySid() &&
       getTwilioApiKeySecret() &&
       getTwilioTwimlAppSid(),
   );
