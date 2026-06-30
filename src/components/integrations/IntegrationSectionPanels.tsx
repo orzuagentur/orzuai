@@ -35,7 +35,10 @@ import type {
   ChannelAiSettingsData,
   ChannelContactsData,
 } from "@/types/channel-workspace.types";
-import type { TwilioPhoneNumberOption } from "@/types/twilio-integration.types";
+import type {
+  TwilioNumberDiagnostics,
+  TwilioPhoneNumberOption,
+} from "@/types/twilio-integration.types";
 import type {
   VoiceAgentSettings,
   VoiceCallLogItem,
@@ -78,6 +81,7 @@ type IntegrationSectionPanelsProps = {
     recentCalls: VoiceCallLogItem[];
     connectConfig: VoiceConnectConfig;
     availablePhoneNumbers: TwilioPhoneNumberOption[];
+    diagnostics: TwilioNumberDiagnostics | null;
   };
   googleCalendar?: {
     connection: GoogleCalendarConnectionData | null;
@@ -209,6 +213,7 @@ function ActivateSection({
         recentCalls={voice.recentCalls}
         config={voice.connectConfig}
         availablePhoneNumbers={voice.availablePhoneNumbers}
+        diagnostics={voice.diagnostics}
         hasBusiness={hasBusiness}
         embeddedInHub
       />

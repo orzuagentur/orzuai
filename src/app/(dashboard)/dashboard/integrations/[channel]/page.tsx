@@ -23,7 +23,10 @@ import {
   getVoiceConnection,
   listRecentVoiceCalls,
 } from "@/services/voice-agent.service";
-import { listTwilioPhoneNumbersForBusiness } from "@/services/twilio-integration.service";
+import {
+  getTwilioNumberDiagnostics,
+  listTwilioPhoneNumbersForBusiness,
+} from "@/services/twilio-integration.service";
 import {
   getGmailConnection,
   getGmailConnectConfig,
@@ -100,6 +103,7 @@ export default async function IntegrationsChannelPage({
     voiceRecentCalls,
     voiceConnectConfig,
     twilioPhoneNumbers,
+    twilioNumberDiagnostics,
     googleCalendarConnection,
     googleCalendarConnectConfig,
     gmailConnection,
@@ -121,6 +125,9 @@ export default async function IntegrationsChannelPage({
     business
       ? listTwilioPhoneNumbersForBusiness(business.id)
       : Promise.resolve([]),
+    business && channel === "voice"
+      ? getTwilioNumberDiagnostics(business.id)
+      : Promise.resolve(null),
     business ? getGoogleCalendarConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getGoogleCalendarConnectConfig()),
     business ? getGmailConnection(business.id) : Promise.resolve(null),
@@ -187,6 +194,7 @@ export default async function IntegrationsChannelPage({
                   recentCalls: voiceRecentCalls,
                   connectConfig: voiceConnectConfig,
                   availablePhoneNumbers: twilioPhoneNumbers,
+                  diagnostics: twilioNumberDiagnostics,
                 }
               : undefined
           }

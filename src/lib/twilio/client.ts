@@ -6,6 +6,7 @@ import type {
 } from "@/types/twilio-integration.types";
 
 const TWILIO_API_BASE = "https://api.twilio.com/2010-04-01";
+const TWILIO_MONITOR_BASE = "https://monitor.twilio.com/v1";
 
 export type TwilioApiCredentials = {
   accountSid: string;
@@ -70,10 +71,44 @@ async function twilioRequest<T>(
   return payload;
 }
 
+async function twilioMonitorRequest<T>(
+  credentials: TwilioApiCredentials,
+  path: string,
+): Promise<T> {
+  const response = await fetch(`${TWILIO_MONITOR_BASE}${path}`, {
+    headers: {
+      Authorization: buildAuthHeader(credentials),
+    },
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as T &
+    TwilioApiError;
+
+  if (!response.ok) {
+    throw new TwilioApiRequestError(
+      payload.message ?? `Twilio Monitor API error (${response.status}).`,
+      response.status,
+      payload.code,
+    );
+  }
+
+  return payload;
+}
+
 type IncomingPhoneNumberResource = {
   sid: string;
   phone_number: string;
   friendly_name?: string;
+  account_sid?: string;
+  voice_url?: string | null;
+  voice_method?: string | null;
+  voice_application_sid?: string | null;
+  sms_url?: string | null;
+  sms_method?: string | null;
+  sms_application_sid?: string | null;
+  status_callback?: string | null;
+  status_callback_method?: string | null;
   capabilities?: {
     voice?: boolean;
     sms?: boolean;
@@ -90,6 +125,73 @@ type AccountResource = {
   friendly_name?: string;
 };
 
+export type TwilioIncomingPhoneNumberDetails = {
+  sid: string;
+  accountSid: string | null;
+  phoneNumber: string;
+  friendlyName: string | null;
+  voiceUrl: string | null;
+  voiceMethod: string | null;
+  voiceApplicationSid: string | null;
+  smsUrl: string | null;
+  smsMethod: string | null;
+  smsApplicationSid: string | null;
+  statusCallback: string | null;
+  statusCallbackMethod: string | null;
+};
+
+type TwilioApplicationResource = {
+  sid: string;
+  account_sid?: string;
+  friendly_name?: string | null;
+  voice_url?: string | null;
+  voice_method?: string | null;
+  status_callback?: string | null;
+  status_callback_method?: string | null;
+  sms_url?: string | null;
+  sms_method?: string | null;
+};
+
+export type TwilioApplicationDetails = {
+  sid: string;
+  accountSid: string | null;
+  friendlyName: string | null;
+  voiceUrl: string | null;
+  voiceMethod: string | null;
+  statusCallback: string | null;
+  statusCallbackMethod: string | null;
+  smsUrl: string | null;
+  smsMethod: string | null;
+};
+
+type TwilioMonitorAlertResource = {
+  sid: string;
+  account_sid?: string;
+  alert_text?: string | null;
+  error_code?: string | number | null;
+  log_level?: string | null;
+  request_method?: string | null;
+  request_url?: string | null;
+  response_body?: string | null;
+  date_created?: string | null;
+};
+
+type TwilioMonitorAlertsResponse = {
+  alerts?: TwilioMonitorAlertResource[];
+};
+
+export type TwilioMonitorAlert = {
+  sid: string;
+  accountSid: string | null;
+  alertText: string | null;
+  errorCode: string | null;
+  logLevel: string | null;
+  requestMethod: string | null;
+  requestUrl: string | null;
+  responseBody: string | null;
+  dateCreated: string | null;
+};
+
 export async function fetchTwilioAccount(
   credentials: TwilioApiCredentials,
 ): Promise<AccountResource> {
@@ -97,6 +199,79 @@ export async function fetchTwilioAccount(
     credentials,
     `/Accounts/${credentials.accountSid}.json`,
   );
+}
+
+export async function fetchTwilioIncomingPhoneNumber(
+  credentials: TwilioApiCredentials,
+  phoneSid: string,
+): Promise<TwilioIncomingPhoneNumberDetails> {
+  const entry = await twilioRequest<IncomingPhoneNumberResource>(
+    credentials,
+    `/Accounts/${credentials.accountSid}/IncomingPhoneNumbers/${phoneSid}.json`,
+  );
+
+  return {
+    sid: entry.sid,
+    accountSid: entry.account_sid ?? null,
+    phoneNumber: entry.phone_number,
+    friendlyName: entry.friendly_name ?? null,
+    voiceUrl: entry.voice_url ?? null,
+    voiceMethod: entry.voice_method ?? null,
+    voiceApplicationSid: entry.voice_application_sid ?? null,
+    smsUrl: entry.sms_url ?? null,
+    smsMethod: entry.sms_method ?? null,
+    smsApplicationSid: entry.sms_application_sid ?? null,
+    statusCallback: entry.status_callback ?? null,
+    statusCallbackMethod: entry.status_callback_method ?? null,
+  };
+}
+
+export async function fetchTwilioApplication(
+  credentials: TwilioApiCredentials,
+  applicationSid: string,
+): Promise<TwilioApplicationDetails> {
+  const app = await twilioRequest<TwilioApplicationResource>(
+    credentials,
+    `/Accounts/${credentials.accountSid}/Applications/${applicationSid}.json`,
+  );
+
+  return {
+    sid: app.sid,
+    accountSid: app.account_sid ?? null,
+    friendlyName: app.friendly_name ?? null,
+    voiceUrl: app.voice_url ?? null,
+    voiceMethod: app.voice_method ?? null,
+    statusCallback: app.status_callback ?? null,
+    statusCallbackMethod: app.status_callback_method ?? null,
+    smsUrl: app.sms_url ?? null,
+    smsMethod: app.sms_method ?? null,
+  };
+}
+
+export async function listTwilioMonitorAlerts(
+  credentials: TwilioApiCredentials,
+  limit = 10,
+): Promise<TwilioMonitorAlert[]> {
+  const params = new URLSearchParams({
+    PageSize: String(Math.min(Math.max(limit, 1), 50)),
+    LogLevel: "error",
+  });
+  const response = await twilioMonitorRequest<TwilioMonitorAlertsResponse>(
+    credentials,
+    `/Alerts?${params.toString()}`,
+  );
+
+  return (response.alerts ?? []).map((alert) => ({
+    sid: alert.sid,
+    accountSid: alert.account_sid ?? null,
+    alertText: alert.alert_text ?? null,
+    errorCode: alert.error_code == null ? null : String(alert.error_code),
+    logLevel: alert.log_level ?? null,
+    requestMethod: alert.request_method ?? null,
+    requestUrl: alert.request_url ?? null,
+    responseBody: alert.response_body ?? null,
+    dateCreated: alert.date_created ?? null,
+  }));
 }
 
 export async function listTwilioIncomingPhoneNumbers(

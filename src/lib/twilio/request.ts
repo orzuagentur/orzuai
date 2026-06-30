@@ -68,11 +68,11 @@ function getTwilioSignatureUrlCandidates(request: NextRequest): string[] {
   const candidates = new Set<string>();
   const pathAndSearch = `${request.nextUrl.pathname}${request.nextUrl.search}`;
 
-  candidates.add(request.url);
+  addUrlCandidate(candidates, request.url);
 
   const canonicalUrl = buildAppUrl(pathAndSearch);
   if (canonicalUrl) {
-    candidates.add(canonicalUrl);
+    addUrlCandidate(candidates, canonicalUrl);
   }
 
   const forwardedProto =
@@ -85,9 +85,36 @@ function getTwilioSignatureUrlCandidates(request: NextRequest): string[] {
 
   for (const candidateHost of [forwardedHost, host]) {
     if (candidateHost) {
-      candidates.add(`${forwardedProto}://${candidateHost}${pathAndSearch}`);
+      addUrlCandidate(
+        candidates,
+        `${forwardedProto}://${candidateHost}${pathAndSearch}`,
+      );
     }
   }
 
   return [...candidates].filter(Boolean);
+}
+
+function addUrlCandidate(candidates: Set<string>, url: string): void {
+  if (!url) {
+    return;
+  }
+
+  candidates.add(url);
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.host;
+
+    if (host.startsWith("www.")) {
+      parsed.host = host.slice(4);
+      candidates.add(parsed.toString());
+      return;
+    }
+
+    parsed.host = `www.${host}`;
+    candidates.add(parsed.toString());
+  } catch {
+    // Ignore malformed candidate URLs.
+  }
 }

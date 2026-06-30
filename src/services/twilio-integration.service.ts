@@ -9,14 +9,19 @@ import {
   buildTwilioConnectAuthorizeUrl,
   createTwilioConnectState,
   getTwilioConnectAppSid,
+  getTwilioPlatformAccountSid,
   getTwilioPlatformAuthToken,
   hasTwilioConnectEnv,
   hasTwilioPlatformEnv,
 } from "@/lib/twilio/connect";
+import { getTwilioTwimlAppSid } from "@/lib/twilio/access-token";
 import {
   clearTwilioPhoneNumberWebhooks,
   configureTwilioPhoneNumberWebhooks,
+  fetchTwilioApplication,
   fetchTwilioAccount,
+  fetchTwilioIncomingPhoneNumber,
+  listTwilioMonitorAlerts,
   listTwilioIncomingPhoneNumbers,
   purchaseTwilioPhoneNumber,
   searchTwilioAvailablePhoneNumbers,
@@ -31,7 +36,10 @@ import type {
   TwilioAvailablePhoneNumber,
   TwilioConnectConfig,
   TwilioConnectionData,
+  TwilioErrorLogItem,
+  TwilioNumberDiagnostics,
   TwilioPhoneNumberOption,
+  TwilioWebhookField,
 } from "@/types/twilio-integration.types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -293,6 +301,191 @@ function buildVoiceWebhookUrls(businessId: string) {
     outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
     statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
     smsWebhookUrl: `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`,
+  };
+}
+
+function buildWebhookField(
+  label: string,
+  value: string | null,
+  expected?: string | null,
+): TwilioWebhookField {
+  return {
+    label,
+    value,
+    expected,
+    ok: expected == null ? true : value === expected,
+  };
+}
+
+function maskTwilioSid(value: string | null): string | null {
+  if (!value || value.length <= 8) {
+    return value;
+  }
+
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
+}
+
+function diagnoseTwilioAlert(alert: {
+  errorCode: string | null;
+  requestUrl: string | null;
+  responseBody: string | null;
+  alertText: string | null;
+}): string {
+  const responseBody = alert.responseBody?.trim() ?? "";
+  const requestUrl = alert.requestUrl ?? "";
+
+  if (
+    alert.errorCode === "11200" &&
+    requestUrl.includes("/api/webhooks/voice/client") &&
+    responseBody.includes("Invalid Twilio signature")
+  ) {
+    return "Browser Phone TwiML App callback reached OrzuX, but OrzuX rejected X-Twilio-Signature. The most common non-key cause here is URL mismatch between orzux.com and www.orzux.com for the TwiML App callback.";
+  }
+
+  if (alert.errorCode === "11200") {
+    return "Twilio reached a webhook URL but received a non-success response. Check the request URL and response body shown below.";
+  }
+
+  return alert.alertText ?? "Twilio reported an error. Check the request URL and response body.";
+}
+
+function mapErrorLog(alert: {
+  sid: string;
+  dateCreated: string | null;
+  errorCode: string | null;
+  alertText: string | null;
+  requestMethod: string | null;
+  requestUrl: string | null;
+  responseBody: string | null;
+}): TwilioErrorLogItem {
+  return {
+    sid: alert.sid,
+    dateCreated: alert.dateCreated,
+    errorCode: alert.errorCode,
+    message: alert.alertText ?? "Twilio error",
+    requestMethod: alert.requestMethod,
+    requestUrl: alert.requestUrl,
+    responseBody: alert.responseBody,
+    diagnosis: diagnoseTwilioAlert(alert),
+  };
+}
+
+export async function getTwilioNumberDiagnostics(
+  businessId: string,
+): Promise<TwilioNumberDiagnostics> {
+  const connection = await getTwilioConnection(businessId);
+  const webhooks = buildVoiceWebhookUrls(businessId);
+  const platformAccountSid = getTwilioPlatformAccountSid() ?? null;
+  const platformAuthToken = getTwilioPlatformAuthToken() ?? null;
+  const browserTwimlAppSid = getTwilioTwimlAppSid() ?? null;
+
+  const base: TwilioNumberDiagnostics = {
+    status: "unavailable",
+    summary: "Twilio diagnostics are unavailable until Twilio is connected.",
+    connectedAccountSid: connection?.connectedAccountSid ?? null,
+    platformAccountSid: maskTwilioSid(platformAccountSid),
+    selectedPhoneSid: connection?.phoneSid ?? null,
+    selectedPhoneNumber: connection?.phoneNumber ?? null,
+    browserTwimlAppSid: maskTwilioSid(browserTwimlAppSid),
+    numberFields: [],
+    browserAppFields: [],
+    errorLogs: [],
+  };
+
+  if (!connection || connection.status === "disconnected") {
+    return base;
+  }
+
+  const ctx = await getTwilioCredentialsForBusiness(businessId);
+
+  if (!ctx || !connection.phoneSid) {
+    return {
+      ...base,
+      status: "warning",
+      summary: "Twilio is authorized, but no selected phone number is available.",
+    };
+  }
+
+  const [numberResult, appResult, alertsResult] = await Promise.allSettled([
+    fetchTwilioIncomingPhoneNumber(ctx.credentials, connection.phoneSid),
+    platformAccountSid && platformAuthToken && browserTwimlAppSid
+      ? fetchTwilioApplication(
+          { accountSid: platformAccountSid, authToken: platformAuthToken },
+          browserTwimlAppSid,
+        )
+      : Promise.resolve(null),
+    platformAccountSid && platformAuthToken
+      ? listTwilioMonitorAlerts(
+          { accountSid: platformAccountSid, authToken: platformAuthToken },
+          10,
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const number =
+    numberResult.status === "fulfilled" ? numberResult.value : null;
+  const app = appResult.status === "fulfilled" ? appResult.value : null;
+  const alerts =
+    alertsResult.status === "fulfilled" ? alertsResult.value : [];
+
+  const numberFields = number
+    ? [
+        buildWebhookField(
+          "Voice URL",
+          number.voiceUrl,
+          webhooks.inboundWebhookUrl,
+        ),
+        buildWebhookField("Voice Method", number.voiceMethod, "POST"),
+        buildWebhookField("Voice Application SID", number.voiceApplicationSid, null),
+        buildWebhookField("SMS URL", number.smsUrl, webhooks.smsWebhookUrl),
+        buildWebhookField("SMS Method", number.smsMethod, "POST"),
+        buildWebhookField("SMS Application SID", number.smsApplicationSid, null),
+        buildWebhookField(
+          "Status Callback",
+          number.statusCallback,
+          webhooks.statusCallbackUrl,
+        ),
+        buildWebhookField("Status Callback Method", number.statusCallbackMethod, "POST"),
+      ]
+    : [];
+
+  const browserAppFields = app
+    ? [
+        buildWebhookField(
+          "Browser Phone Voice URL",
+          app.voiceUrl,
+          buildAppUrl("/api/webhooks/voice/client"),
+        ),
+        buildWebhookField("Browser Phone Voice Method", app.voiceMethod, "POST"),
+        buildWebhookField("Browser Phone Status Callback", app.statusCallback, null),
+        buildWebhookField("Browser Phone Status Callback Method", app.statusCallbackMethod, "POST"),
+        buildWebhookField("Browser Phone SMS URL", app.smsUrl, null),
+        buildWebhookField("Browser Phone SMS Method", app.smsMethod, "POST"),
+      ]
+    : [];
+
+  const errorLogs = alerts.map(mapErrorLog).filter((alert) => {
+    const url = alert.requestUrl ?? "";
+    return url.includes("/api/webhooks/voice") || alert.errorCode === "11200";
+  });
+  const hasInvalidSignature = errorLogs.some((alert) =>
+    alert.responseBody?.includes("Invalid Twilio signature"),
+  );
+  const hasFieldMismatch = [...numberFields, ...browserAppFields].some(
+    (field) => field.ok === false,
+  );
+
+  return {
+    ...base,
+    status: hasInvalidSignature || hasFieldMismatch ? "error" : "ok",
+    summary: hasInvalidSignature
+      ? "Latest Twilio error is an invalid webhook signature on the Browser Phone TwiML App callback."
+      : hasFieldMismatch
+        ? "One or more Twilio webhook settings do not match the expected OrzuX configuration."
+        : "Selected phone number webhooks and Browser Phone TwiML App settings match the expected OrzuX configuration.",
+    numberFields,
+    browserAppFields,
+    errorLogs,
   };
 }
 
