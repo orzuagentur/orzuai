@@ -13,6 +13,7 @@ import {
   createTwilioOutboundCall,
 } from "@/lib/twilio/client";
 import { hasTwilioPlatformEnv } from "@/lib/twilio/connect";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { isVoiceAiConfigured } from "@/lib/voice/ai-config";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
@@ -157,9 +158,18 @@ export async function disconnectVoiceAgent(
 
 function buildWebhookUrls(businessId: string) {
   return {
-    inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
-    outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
-    statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
+    inboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
+      businessId,
+    ),
+    outboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
+      businessId,
+    ),
+    statusCallbackUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
+      businessId,
+    ),
   };
 }
 

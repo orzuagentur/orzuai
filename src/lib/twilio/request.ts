@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 
 import { buildAppUrl } from "@/lib/app-url";
 import { validateTwilioRequestSignature } from "@/lib/twilio/validate-request";
+import { isOrzuSignedTwilioWebhookValid } from "@/lib/twilio/webhook-token";
 
 export async function readTwilioRequestParams(
   request: NextRequest,
@@ -28,17 +29,25 @@ export function isTwilioWebhookSignatureValid(input: {
   request: NextRequest;
   params: Record<string, string>;
   authToken: string | null | undefined;
+  businessId?: string | null;
 }): boolean {
   const authToken = input.authToken?.trim();
+  const businessId = input.businessId?.trim();
 
   if (!authToken) {
-    return isSignatureValidationBypassedForLocalDevelopment();
+    return (
+      isOrzuSignedRequestValid(input.request, businessId) ||
+      isSignatureValidationBypassedForLocalDevelopment()
+    );
   }
 
   const signature = input.request.headers.get("x-twilio-signature");
 
   if (!signature) {
-    return isSignatureValidationBypassedForLocalDevelopment();
+    return (
+      isOrzuSignedRequestValid(input.request, businessId) ||
+      isSignatureValidationBypassedForLocalDevelopment()
+    );
   }
 
   for (const url of getTwilioSignatureUrlCandidates(input.request)) {
@@ -54,7 +63,7 @@ export function isTwilioWebhookSignatureValid(input: {
     }
   }
 
-  return false;
+  return isOrzuSignedRequestValid(input.request, businessId);
 }
 
 function isSignatureValidationBypassedForLocalDevelopment(): boolean {
@@ -117,4 +126,18 @@ function addUrlCandidate(candidates: Set<string>, url: string): void {
   } catch {
     // Ignore malformed candidate URLs.
   }
+}
+
+function isOrzuSignedRequestValid(
+  request: NextRequest,
+  businessId: string | null | undefined,
+): boolean {
+  if (!businessId) {
+    return false;
+  }
+
+  return isOrzuSignedTwilioWebhookValid({
+    businessId,
+    signature: request.nextUrl.searchParams.get("orzuSig"),
+  });
 }

@@ -5,6 +5,7 @@ import { buildAppUrl } from "@/lib/app-url";
 import { hasSupabaseEnv } from "@/lib/env";
 import { isVoiceAiConfigured } from "@/lib/voice/ai-config";
 import { hasTwilioPlatformEnv } from "@/lib/twilio/connect";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { getVoiceRepository } from "@/repositories/voice.repository";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import type { VoiceAgentSettings, VoiceProvider } from "@/types/voice-agent.types";
@@ -64,8 +65,14 @@ function isVoiceProviderConfigured(
 
 function buildWebhookUrls(businessId: string) {
   return {
-    inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
-    outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
+    inboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
+      businessId,
+    ),
+    outboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
+      businessId,
+    ),
   };
 }
 

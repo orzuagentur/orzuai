@@ -2,6 +2,7 @@ import "server-only";
 
 import { buildAppUrl } from "@/lib/app-url";
 import { sendTwilioSms } from "@/lib/twilio/client";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
@@ -149,5 +150,8 @@ export async function sendVoiceChannelSms(input: {
 }
 
 export function buildSmsWebhookUrl(businessId: string): string {
-  return `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`;
+  return appendTwilioWebhookSignature(
+    `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`,
+    businessId,
+  );
 }

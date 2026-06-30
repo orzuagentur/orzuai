@@ -14,6 +14,7 @@ import {
   hasTwilioConnectEnv,
   hasTwilioPlatformEnv,
 } from "@/lib/twilio/connect";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { getTwilioTwimlAppSid } from "@/lib/twilio/access-token";
 import {
   clearTwilioPhoneNumberWebhooks,
@@ -300,10 +301,22 @@ export async function purchaseAndConnectTwilioNumber(input: {
 
 function buildVoiceWebhookUrls(businessId: string) {
   return {
-    inboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
-    outboundWebhookUrl: `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
-    statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
-    smsWebhookUrl: `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`,
+    inboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/inbound")}?businessId=${businessId}`,
+      businessId,
+    ),
+    outboundWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/outbound")}?businessId=${businessId}`,
+      businessId,
+    ),
+    statusCallbackUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
+      businessId,
+    ),
+    smsWebhookUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/sms")}?businessId=${businessId}`,
+      businessId,
+    ),
   };
 }
 

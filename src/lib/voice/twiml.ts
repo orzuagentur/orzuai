@@ -1,4 +1,5 @@
 import { getAppUrl } from "@/lib/env";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 
 const MAX_SPEECH_CHARS = 480;
 
@@ -55,7 +56,7 @@ export function buildGatherActionUrl(input: {
     url.searchParams.set("triggerReason", input.triggerReason);
   }
 
-  return url.toString();
+  return appendTwilioWebhookSignature(url.toString(), input.businessId);
 }
 
 export function buildSayAndGatherTwiml(input: {
@@ -139,14 +140,14 @@ export function buildRecordingStatusCallbackUrl(businessId: string): string {
   const base = getAppUrl();
   const url = new URL(`${base}/api/webhooks/voice/recording`);
   url.searchParams.set("businessId", businessId);
-  return url.toString();
+  return appendTwilioWebhookSignature(url.toString(), businessId);
 }
 
 export function buildHandoffTwimlUrl(businessId: string): string {
   const base = getAppUrl();
   const url = new URL(`${base}/api/webhooks/voice/handoff`);
   url.searchParams.set("businessId", businessId);
-  return url.toString();
+  return appendTwilioWebhookSignature(url.toString(), businessId);
 }
 
 export function withCallRecording(

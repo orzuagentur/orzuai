@@ -14,6 +14,7 @@ import {
   getTwilioPlatformAccountSid,
   getTwilioPlatformAuthToken,
 } from "@/lib/twilio/connect";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import {
   buildDialClientTwiml,
@@ -138,8 +139,14 @@ export async function getVoiceClientTokenForCurrentUser(
 
 function buildVoiceWebhookUrls(businessId: string) {
   return {
-    statusCallbackUrl: `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
-    clientNoAnswerUrl: `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
+    statusCallbackUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
+      businessId,
+    ),
+    clientNoAnswerUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
+      businessId,
+    ),
   };
 }
 

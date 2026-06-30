@@ -3,6 +3,7 @@ import "server-only";
 import { buildAppUrl } from "@/lib/app-url";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import { redirectTwilioCall } from "@/lib/twilio/client";
+import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import {
   buildHandoffToAgentTwiml,
   buildRecordingStatusCallbackUrl,
@@ -29,7 +30,10 @@ export async function buildHandoffAgentTwiml(
   return buildHandoffToAgentTwiml({
     speechLocale,
     clientIdentity: buildVoiceAgentClientIdentity(businessId),
-    actionUrl: `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
+    actionUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
+      businessId,
+    ),
     recordingStatusCallback: recordingCallback,
   });
 }
@@ -67,7 +71,10 @@ export async function handoffActiveVoiceCallToAgent(input: {
     return { success: false, message: "Twilio credentials missing." };
   }
 
-  const handoffUrl = `${buildAppUrl("/api/webhooks/voice/handoff")}?businessId=${input.businessId}`;
+  const handoffUrl = appendTwilioWebhookSignature(
+    `${buildAppUrl("/api/webhooks/voice/handoff")}?businessId=${input.businessId}`,
+    input.businessId,
+  );
 
   try {
     await redirectTwilioCall({
