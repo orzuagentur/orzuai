@@ -1,7 +1,9 @@
 import "server-only";
 
+import { ENV_KEYS } from "@/constants/env-keys";
 import { buildAppUrl } from "@/lib/app-url";
 import { hasSupabaseEnv } from "@/lib/env";
+import { resolveSecretValue } from "@/lib/secrets/resolver";
 import {
   createTwilioVoiceAccessToken,
   getTwilioVoiceAccountSid,
@@ -141,6 +143,25 @@ function buildVoiceWebhookUrls(businessId: string) {
   };
 }
 
+function getConfiguredBrowserCallerId(): string | null {
+  return (
+    resolveSecretValue(ENV_KEYS.TWILIO_BROWSER_CALLER_ID)?.trim() || null
+  );
+}
+
+function isDemoConferenceNumber(voiceUrl?: string | null): boolean {
+  if (!voiceUrl) {
+    return false;
+  }
+
+  const normalized = voiceUrl.toLowerCase();
+  return (
+    normalized.includes("conference") ||
+    normalized.includes("demo.twilio.com") ||
+    normalized.includes(".twil.io")
+  );
+}
+
 async function resolveBrowserPhoneCallerId(
   preferredCallerId: string,
 ): Promise<string | null> {
@@ -157,10 +178,19 @@ async function resolveBrowserPhoneCallerId(
       authToken,
     });
     const voiceNumbers = numbers.filter((number) => number.capabilities.voice);
+    const configuredCallerId = getConfiguredBrowserCallerId();
+    const configuredNumber = configuredCallerId
+      ? voiceNumbers.find((number) => number.phoneNumber === configuredCallerId)
+      : null;
+    const nonDemoNumbers = voiceNumbers.filter(
+      (number) => !isDemoConferenceNumber(number.voiceUrl),
+    );
 
     return (
+      configuredNumber?.phoneNumber ??
       voiceNumbers.find((number) => number.phoneNumber === preferredCallerId)
         ?.phoneNumber ??
+      nonDemoNumbers[0]?.phoneNumber ??
       voiceNumbers[0]?.phoneNumber ??
       null
     );

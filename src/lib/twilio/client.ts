@@ -286,6 +286,8 @@ export async function listTwilioIncomingPhoneNumbers(
     sid: entry.sid,
     phoneNumber: entry.phone_number,
     friendlyName: entry.friendly_name ?? null,
+    voiceUrl: entry.voice_url ?? null,
+    smsUrl: entry.sms_url ?? null,
     capabilities: {
       voice: entry.capabilities?.voice ?? false,
       sms: entry.capabilities?.sms ?? false,

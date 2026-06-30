@@ -65,6 +65,22 @@ function mapTwilioConnection(row: TwilioConnection): TwilioConnectionData {
   };
 }
 
+function findPreviouslySelectedNumber(
+  numbers: TwilioPhoneNumberOption[],
+  connection: TwilioConnectionData | null,
+  accountSid: string,
+): TwilioPhoneNumberOption | null {
+  if (!connection || connection.connectedAccountSid !== accountSid) {
+    return null;
+  }
+
+  return (
+    numbers.find((number) => number.sid === connection.phoneSid) ??
+    numbers.find((number) => number.phoneNumber === connection.phoneNumber) ??
+    null
+  );
+}
+
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
@@ -546,6 +562,7 @@ export async function completeTwilioConnectAuthorization(input: {
   }
 
   const admin = createAdminClient();
+  const existingConnection = await getTwilioConnection(input.businessId);
   const credentials: TwilioApiCredentials = {
     accountSid,
     authToken: getTwilioPlatformAuthToken()!,
@@ -568,17 +585,39 @@ export async function completeTwilioConnectAuthorization(input: {
     return { success: false, message: TWILIO_MESSAGES.accountVerifyFailed };
   }
 
+  const numbers = await listTwilioIncomingPhoneNumbers(credentials);
+  const previouslySelectedNumber = findPreviouslySelectedNumber(
+    numbers,
+    existingConnection,
+    accountSid,
+  );
+
   await upsertTwilioConnectionRow(admin, input.businessId, {
     twilio_status: "authorized",
     connected_account_sid: accountSid,
     account_friendly_name: friendlyName,
-    phone_number: null,
-    phone_sid: null,
+    phone_number: previouslySelectedNumber?.phoneNumber ?? null,
+    phone_sid: previouslySelectedNumber?.sid ?? null,
     connected_at: null,
     last_synced_at: new Date().toISOString(),
   });
 
-  const numbers = await listTwilioIncomingPhoneNumbers(credentials);
+  if (previouslySelectedNumber) {
+    const preservedResult = await selectTwilioPhoneNumber({
+      businessId: input.businessId,
+      phoneSid: previouslySelectedNumber.sid,
+      phoneNumber: previouslySelectedNumber.phoneNumber,
+    });
+
+    if (preservedResult.success) {
+      revalidateTwilioPaths();
+      return {
+        success: true,
+        autoConnected: true,
+        message: "Twilio подключён — предыдущий номер восстановлен автоматически.",
+      };
+    }
+  }
 
   if (numbers.length === 1) {
     const singleNumber = numbers[0];
@@ -829,7 +868,11 @@ export async function disconnectTwilioIntegration(
   const admin = createAdminClient();
 
   if (connection) {
-    await admin.from("twilio_connections").delete().eq("business_id", businessId);
+    await upsertTwilioConnectionRow(admin, businessId, {
+      twilio_status: "disconnected",
+      connected_at: null,
+      last_synced_at: new Date().toISOString(),
+    });
   }
 
   const existingSettings = await import("@/services/voice-config.service").then(

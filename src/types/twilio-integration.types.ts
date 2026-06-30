@@ -14,6 +14,8 @@ export type TwilioPhoneNumberOption = {
   sid: string;
   phoneNumber: string;
   friendlyName: string | null;
+  voiceUrl?: string | null;
+  smsUrl?: string | null;
   capabilities: {
     voice: boolean;
     sms: boolean;
