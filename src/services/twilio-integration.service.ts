@@ -171,6 +171,7 @@ export async function listTwilioPhoneNumbersForBusiness(
 
 export async function refreshTwilioPhoneNumbers(
   businessId: string,
+  options: { revalidate?: boolean } = {},
 ): Promise<{
   success: boolean;
   numbers: TwilioPhoneNumberOption[];
@@ -204,7 +205,9 @@ export async function refreshTwilioPhoneNumbers(
       last_synced_at: new Date().toISOString(),
     });
 
-    revalidateTwilioPaths();
+    if (options.revalidate) {
+      revalidateTwilioPaths();
+    }
 
     return { success: true, numbers };
   } catch (error) {
@@ -702,7 +705,9 @@ export async function resyncTwilioConnection(
   }
 
   if (connection.status === "authorized") {
-    const refreshed = await refreshTwilioPhoneNumbers(businessId);
+    const refreshed = await refreshTwilioPhoneNumbers(businessId, {
+      revalidate: true,
+    });
     return {
       success: refreshed.success,
       message: refreshed.success
@@ -881,7 +886,9 @@ export async function refreshTwilioForCurrentUser(): Promise<{
     return { success: false, message: TWILIO_MESSAGES.noBusiness };
   }
 
-  const result = await refreshTwilioPhoneNumbers(businessId);
+  const result = await refreshTwilioPhoneNumbers(businessId, {
+    revalidate: true,
+  });
   return {
     success: result.success,
     message: result.success
