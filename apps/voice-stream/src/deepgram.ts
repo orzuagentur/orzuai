@@ -5,6 +5,11 @@ export type DeepgramLiveSession = {
   close: () => void;
 };
 
+type DeepgramListenConfig = {
+  model: string;
+  language: string;
+};
+
 function resolveDeepgramLanguage(language: string): string {
   const normalized = language.trim().toLowerCase();
 
@@ -36,13 +41,23 @@ function resolveDeepgramLanguage(language: string): string {
   return language.trim();
 }
 
-function buildDeepgramListenUrl(language: string): string {
+function resolveDeepgramListenConfig(language: string): DeepgramListenConfig {
+  const resolvedLanguage = resolveDeepgramLanguage(language);
+
+  // nova-2-phonecall is English-only. Other languages need nova-2 general.
+  return {
+    model: resolvedLanguage === "en" ? "nova-2-phonecall" : "nova-2",
+    language: resolvedLanguage,
+  };
+}
+
+function buildDeepgramListenUrl(config: DeepgramListenConfig): string {
   const url = new URL("wss://api.deepgram.com/v1/listen");
-  url.searchParams.set("model", "nova-2-phonecall");
+  url.searchParams.set("model", config.model);
   url.searchParams.set("encoding", "mulaw");
   url.searchParams.set("sample_rate", "8000");
   url.searchParams.set("channels", "1");
-  url.searchParams.set("language", resolveDeepgramLanguage(language));
+  url.searchParams.set("language", config.language);
   url.searchParams.set("interim_results", "true");
   url.searchParams.set("utterance_end_ms", "1000");
   url.searchParams.set("endpointing", "300");
@@ -68,7 +83,8 @@ export function startDeepgramLive(input: {
   onError?: (message: string) => void;
 }): DeepgramLiveSession {
   const apiKey = input.apiKey.trim();
-  const listenUrl = buildDeepgramListenUrl(input.language);
+  const listenConfig = resolveDeepgramListenConfig(input.language);
+  const listenUrl = buildDeepgramListenUrl(listenConfig);
 
   let socket: WebSocket | null = new WebSocket(listenUrl, {
     headers: {
@@ -104,7 +120,15 @@ export function startDeepgramLive(input: {
       return;
     }
 
-    console.error("[voice-stream] deepgram error", message, detail ?? "");
+    console.error(
+      "[voice-stream] deepgram error",
+      message,
+      JSON.stringify({
+        model: listenConfig.model,
+        language: listenConfig.language,
+        detail: detail ?? null,
+      }),
+    );
     input.onError?.(message);
   };
 
@@ -112,10 +136,7 @@ export function startDeepgramLive(input: {
     ws.on("open", () => {
       console.info(
         "[voice-stream] deepgram connected",
-        JSON.stringify({
-          model: "nova-2-phonecall",
-          language: resolveDeepgramLanguage(input.language),
-        }),
+        JSON.stringify(listenConfig),
       );
       flushPendingAudio();
 
