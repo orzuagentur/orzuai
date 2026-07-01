@@ -5,6 +5,7 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
+import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
 import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
@@ -38,28 +39,34 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
-  try {
-    await recordInboundVoiceCall({
-      businessId,
-      phoneNumber: params.From ?? "",
-      callSid: params.CallSid ?? "",
-    });
-  } catch (error) {
-    console.error(
-      "[voice-webhook] inbound call logging failed",
-      JSON.stringify({
+  return runVoiceTwimlWebhook(async () => {
+    try {
+      await recordInboundVoiceCall({
         businessId,
-        callSid: params.CallSid ?? null,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
-    );
-  }
+        phoneNumber: params.From ?? "",
+        callSid: params.CallSid ?? "",
+      });
+    } catch (error) {
+      console.error(
+        "[voice-webhook] inbound call logging failed",
+        JSON.stringify({
+          businessId,
+          callSid: params.CallSid ?? null,
+          error: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+    }
 
-  const twiml = await getInboundVoiceTwiml(businessId);
+    const twiml = await getInboundVoiceTwiml(businessId);
 
-  return new NextResponse(twiml, {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
+    return new NextResponse(twiml, {
+      status: 200,
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
+    });
+  }, {
+    route: "inbound",
+    businessId,
+    callSid: params.CallSid ?? null,
   });
 }
 

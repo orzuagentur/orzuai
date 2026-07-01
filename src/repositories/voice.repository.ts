@@ -50,6 +50,7 @@ export type VoiceCallLogInsert = {
   humanHandled?: boolean;
   conversationId?: string | null;
   operatorUserId?: string | null;
+  customPrompt?: string | null;
 };
 
 export type VoiceCallLogInboxRow = Pick<
@@ -251,6 +252,7 @@ export class VoiceRepository {
         ai_handled: input.aiHandled ?? false,
         human_handled: input.humanHandled ?? false,
         conversation_id: input.conversationId ?? null,
+        custom_prompt: input.customPrompt?.trim() || null,
       })
       .select("id")
       .single();
@@ -375,12 +377,13 @@ export class VoiceRepository {
       | "conversation_id"
       | "recording_url"
       | "call_mode"
+      | "custom_prompt"
     > | null
   > {
     const { data, error } = await this.db
       .from("voice_call_logs")
       .select(
-        "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url, call_mode",
+        "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url, call_mode, custom_prompt",
       )
       .eq("external_call_id", externalCallId)
       .maybeSingle();

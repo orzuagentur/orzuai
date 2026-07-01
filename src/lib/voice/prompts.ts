@@ -6,6 +6,7 @@ export function buildVoiceSystemPrompt(input: {
   language: string;
   knowledgeContext: GeminiKnowledgeContext[];
   customVoicePrompt?: string | null;
+  callObjective?: string | null;
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
 }): string {
@@ -27,6 +28,7 @@ export function buildVoiceSystemPrompt(input: {
         : "A customer called the business phone line. Help them as a phone receptionist.";
 
   const custom = input.customVoicePrompt?.trim();
+  const objective = input.callObjective?.trim();
 
   return [
     `You are the AI voice assistant for ${input.businessName}.`,
@@ -38,6 +40,9 @@ export function buildVoiceSystemPrompt(input: {
     "- Use only the business knowledge below.",
     "- If you cannot help, offer to have a human follow up.",
     custom ? `\nVoice instructions:\n${custom}` : "",
+    objective
+      ? `\nCall objective for this conversation:\n${objective}\nTurn this into a professional, helpful phone conversation.`
+      : "",
     "\nBusiness instructions:",
     input.systemPrompt,
     "\nBusiness knowledge:",

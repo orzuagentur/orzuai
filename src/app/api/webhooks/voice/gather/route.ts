@@ -5,6 +5,7 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
+import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
 import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
@@ -42,18 +43,24 @@ export async function POST(request: NextRequest) {
   const callSid = params.CallSid ?? "unknown";
   const callerPhone = params.From ?? params.To ?? "";
 
-  const twiml = await handleVoiceGatherInput({
+  return runVoiceTwimlWebhook(async () => {
+    const twiml = await handleVoiceGatherInput({
+      businessId,
+      callSid,
+      direction,
+      speechResult,
+      triggerReason,
+      callerPhone: callerPhone || null,
+    });
+
+    return new NextResponse(twiml, {
+      status: 200,
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
+    });
+  }, {
+    route: "gather",
     businessId,
     callSid,
-    direction,
-    speechResult,
-    triggerReason,
-    callerPhone: callerPhone || null,
-  });
-
-  return new NextResponse(twiml, {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
   });
 }
 

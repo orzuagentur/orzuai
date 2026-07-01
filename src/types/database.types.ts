@@ -2828,6 +2828,7 @@ export type Database = {
           conversation_id: string | null;
           handoff_at: string | null;
           human_handled: boolean;
+          custom_prompt: string | null;
         };
         Insert: {
           id?: string;
@@ -2850,6 +2851,7 @@ export type Database = {
           conversation_id?: string | null;
           handoff_at?: string | null;
           human_handled?: boolean;
+          custom_prompt?: string | null;
         };
         Update: {
           id?: string;
@@ -2872,6 +2874,7 @@ export type Database = {
           conversation_id?: string | null;
           handoff_at?: string | null;
           human_handled?: boolean;
+          custom_prompt?: string | null;
         };
         Relationships: [
           {

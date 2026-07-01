@@ -14,6 +14,7 @@ import { VoiceCallCard } from "@/components/voice/VoiceCallCard";
 import {
   VoiceCallModeDialog,
   type VoiceCallMode,
+  type VoiceCallModeSelection,
 } from "@/components/voice/VoiceCallModeDialog";
 import { VoiceDialPad } from "@/components/voice/VoiceDialPad";
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
@@ -114,11 +115,12 @@ export function VoiceInboxDialerPanel({
     setCallModeOpen(true);
   }
 
-  function handleCallModeSelect(mode: VoiceCallMode) {
+  function handleCallModeSelect(selection: VoiceCallModeSelection) {
     if (!phoneToCall || pendingCallMode) {
       return;
     }
 
+    const mode = selection.mode;
     setPendingCallMode(mode);
 
     if (mode === "human") {
@@ -160,6 +162,7 @@ export function VoiceInboxDialerPanel({
         const result = await triggerContactVoiceCallAction({
           phoneNumber: phoneToCall,
           contactId: call?.contactId ?? undefined,
+          customPrompt: selection.customPrompt,
         });
 
         if (!result.success) {

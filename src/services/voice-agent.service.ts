@@ -290,6 +290,7 @@ async function logVoiceCall(input: {
   externalCallId?: string | null;
   triggerReason?: string | null;
   callMode?: "ai" | "human" | "handoff" | "unknown";
+  customPrompt?: string | null;
 }): Promise<string | null> {
   const repo = getVoiceRepository();
 
@@ -305,6 +306,7 @@ async function logVoiceCall(input: {
     triggerReason: input.triggerReason,
     aiHandled: input.callMode === "ai",
     humanHandled: input.callMode === "human",
+    customPrompt: input.customPrompt,
   });
 
   await repo.insertCallEvent({
@@ -431,6 +433,7 @@ export async function placeOutboundVoiceCall(input: {
   phoneNumber: string;
   triggerReason: string;
   requireAiAssistant?: boolean;
+  customPrompt?: string | null;
 }): Promise<{ success: boolean; message?: string; callLogId?: string }> {
   const settings = await getVoiceAgentSettings(input.businessId);
 
@@ -544,6 +547,7 @@ export async function placeOutboundVoiceCall(input: {
     externalCallId,
     triggerReason: input.triggerReason,
     callMode: input.requireAiAssistant ? "ai" : "unknown",
+    customPrompt: input.customPrompt,
   });
 
   return { success: true, callLogId: callLogId ?? undefined };

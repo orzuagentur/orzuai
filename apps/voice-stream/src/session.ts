@@ -69,66 +69,74 @@ export class VoiceStreamSession {
   }
 
   private async handleStart(message: TwilioStreamStart): Promise<void> {
-    this.streamSid = message.start.streamSid;
-    this.callSid = message.start.callSid;
-    const params = message.start.customParameters ?? {};
-    this.businessId = params.businessId?.trim() || null;
-    this.direction = params.direction === "outbound" ? "outbound" : "inbound";
-    this.triggerReason = params.triggerReason?.trim() || null;
+    try {
+      this.streamSid = message.start.streamSid;
+      this.callSid = message.start.callSid;
+      const params = message.start.customParameters ?? {};
+      this.businessId = params.businessId?.trim() || null;
+      this.direction = params.direction === "outbound" ? "outbound" : "inbound";
+      this.triggerReason = params.triggerReason?.trim() || null;
 
-    if (!this.businessId || !this.callSid) {
-      console.error("[voice-stream] missing businessId or callSid");
-      this.ws.close();
-      return;
-    }
+      if (!this.businessId || !this.callSid) {
+        console.error("[voice-stream] missing businessId or callSid");
+        this.ws.close();
+        return;
+      }
 
-    if (
-      !verifyStreamToken({
+      if (
+        !verifyStreamToken({
+          businessId: this.businessId,
+          callSid: this.callSid,
+          secret: this.options.streamSecret,
+          token: params.streamToken,
+        })
+      ) {
+        console.error("[voice-stream] invalid stream token");
+        this.ws.close();
+        return;
+      }
+
+      this.context = await fetchVoiceStreamContext({
+        appUrl: this.options.appUrl,
+        secret: this.options.streamSecret,
         businessId: this.businessId,
         callSid: this.callSid,
+        direction: this.direction,
+        triggerReason: this.triggerReason,
+      });
+
+      await notifyVoiceStreamLifecycle({
+        appUrl: this.options.appUrl,
         secret: this.options.streamSecret,
-        token: params.streamToken,
-      })
-    ) {
-      console.error("[voice-stream] invalid stream token");
+        businessId: this.businessId,
+        callSid: this.callSid,
+        direction: this.direction,
+        event: "start",
+        triggerReason: this.triggerReason,
+      });
+
+      this.deepgram = startDeepgramLive({
+        apiKey: this.options.deepgramApiKey,
+        language: this.context.deepgramLanguage,
+        onSpeechStarted: () => {
+          void this.handleBargeIn();
+        },
+        onFinalTranscript: (text) => {
+          this.queueTranscript(text);
+        },
+        onError: (message) => {
+          console.error("[voice-stream] deepgram live failed", message);
+        },
+      });
+
+      await this.speak(this.context.openingLine);
+    } catch (error) {
+      console.error(
+        "[voice-stream] handleStart failed",
+        error instanceof Error ? error.message : "unknown",
+      );
       this.ws.close();
-      return;
     }
-
-    this.context = await fetchVoiceStreamContext({
-      appUrl: this.options.appUrl,
-      secret: this.options.streamSecret,
-      businessId: this.businessId,
-      callSid: this.callSid,
-      direction: this.direction,
-      triggerReason: this.triggerReason,
-    });
-
-    await notifyVoiceStreamLifecycle({
-      appUrl: this.options.appUrl,
-      secret: this.options.streamSecret,
-      businessId: this.businessId,
-      callSid: this.callSid,
-      direction: this.direction,
-      event: "start",
-      triggerReason: this.triggerReason,
-    });
-
-    this.deepgram = startDeepgramLive({
-      apiKey: this.options.deepgramApiKey,
-      language: this.context.deepgramLanguage,
-      onSpeechStarted: () => {
-        void this.handleBargeIn();
-      },
-      onFinalTranscript: (text) => {
-        this.queueTranscript(text);
-      },
-      onError: (message) => {
-        console.error("[voice-stream] deepgram live failed", message);
-      },
-    });
-
-    await this.speak(this.context.openingLine);
   }
 
   private handleMedia(message: TwilioStreamMedia): void {

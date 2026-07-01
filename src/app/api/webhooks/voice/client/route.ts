@@ -5,6 +5,7 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
+import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
 import { buildClientOutboundTwiml } from "@/services/voice-client.service";
 
 export async function POST(request: NextRequest) {
@@ -37,15 +38,21 @@ export async function POST(request: NextRequest) {
     "";
   const callSid = params.CallSid?.trim() || null;
 
-  const twiml = await buildClientOutboundTwiml({
-    businessId,
-    toNumber,
-    callSid,
-  });
+  return runVoiceTwimlWebhook(async () => {
+    const twiml = await buildClientOutboundTwiml({
+      businessId,
+      toNumber,
+      callSid,
+    });
 
-  return new NextResponse(twiml, {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
+    return new NextResponse(twiml, {
+      status: 200,
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
+    });
+  }, {
+    route: "client",
+    businessId,
+    callSid,
   });
 }
 

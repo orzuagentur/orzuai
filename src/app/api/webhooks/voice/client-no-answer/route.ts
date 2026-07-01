@@ -5,6 +5,7 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
+import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
 import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
@@ -38,14 +39,19 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
-  const twiml = await buildClientNoAnswerTwiml(
-    businessId,
-    params.CallSid?.trim() || null,
-  );
+  const callSid = params.CallSid?.trim() || null;
 
-  return new NextResponse(twiml, {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
+  return runVoiceTwimlWebhook(async () => {
+    const twiml = await buildClientNoAnswerTwiml(businessId, callSid);
+
+    return new NextResponse(twiml, {
+      status: 200,
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
+    });
+  }, {
+    route: "client-no-answer",
+    businessId,
+    callSid,
   });
 }
 

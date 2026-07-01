@@ -137,6 +137,7 @@ export async function generateVoiceAiReply(input: {
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
   settings: VoiceAgentSettings;
+  callObjective?: string | null;
 }): Promise<{ success: true; text: string } | { success: false; message: string }> {
   const context = await loadBusinessContext(input.businessId);
   const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
@@ -149,6 +150,7 @@ export async function generateVoiceAiReply(input: {
     language,
     knowledgeContext: context.knowledgeContext,
     customVoicePrompt: input.settings.voiceSystemPrompt,
+    callObjective: input.callObjective,
     direction: input.direction,
     triggerReason: input.triggerReason,
   });
@@ -180,6 +182,50 @@ export async function generateVoiceAiReply(input: {
     success: true,
     text: sanitizeForSpeech(result.data.text),
   };
+}
+
+export async function generateVoiceOpeningLine(input: {
+  businessId: string;
+  direction: "inbound" | "outbound";
+  callObjective: string;
+  settings: VoiceAgentSettings;
+  triggerReason?: string | null;
+}): Promise<string | null> {
+  const objective = input.callObjective.trim();
+  if (!objective) {
+    return null;
+  }
+
+  const context = await loadBusinessContext(input.businessId);
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+  const language =
+    phoneVoice.language || input.settings.voiceLanguage || context.language;
+
+  const systemPrompt = buildVoiceSystemPrompt({
+    businessName: context.businessName,
+    systemPrompt: context.systemPrompt,
+    language,
+    knowledgeContext: context.knowledgeContext,
+    customVoicePrompt: input.settings.voiceSystemPrompt,
+    callObjective: objective,
+    direction: input.direction,
+    triggerReason: input.triggerReason,
+  });
+
+  const result = await generateText({
+    businessId: input.businessId,
+    provider: context.provider as "gemini" | "openai" | "claude",
+    model: context.model,
+    systemInstruction: systemPrompt,
+    prompt:
+      "Write only one short opening sentence for this phone call. No quotes, no markdown.",
+  });
+
+  if (!result.success) {
+    return null;
+  }
+
+  return sanitizeForSpeech(result.data.text);
 }
 
 function resolveOpeningLine(
@@ -269,7 +315,7 @@ export async function buildVoiceConversationTwiml(input: {
     );
   }
 
-  if (isVoiceStreamEnabled() && callSid) {
+  if (isVoiceStreamEnabled() && callSid && phoneVoice.voiceId) {
     const wsBase = getVoiceStreamWsUrl();
     if (wsBase) {
       const wsUrl = `${wsBase.replace(/\/$/, "")}/voice/stream`;
@@ -398,6 +444,7 @@ export async function handleVoiceGatherInput(input: {
     direction: input.direction,
     triggerReason: input.triggerReason,
     settings,
+    callObjective: callLog?.custom_prompt,
   });
 
   const assistantText = reply.success

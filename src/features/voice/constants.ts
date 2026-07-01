@@ -76,6 +76,11 @@ export const VOICE_MESSAGES = {
     "Use the browser phone for a live human conversation without AI.",
   callModeHumanUnavailable:
     "Browser phone is not configured or unavailable for this workspace.",
+  callModeAiPromptLabel: "What should the AI do on this call?",
+  callModeAiPromptPlaceholder:
+    "e.g. confirm delivery, follow up on quote, schedule meeting",
+  callModeAiPromptHint:
+    "Write a few words — the AI will turn this into a professional conversation.",
   callDetailTitle: "Call transcript",
   callDetailEmpty: "Select a call to view the transcript.",
   callPostCallTitle: "Post-call analysis",

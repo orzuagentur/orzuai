@@ -12,6 +12,7 @@ import {
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import {
   generateVoiceAiReply,
+  generateVoiceOpeningLine,
 } from "@/services/voice-ai.service";
 import {
   markInboundCallAiFallback,
@@ -90,10 +91,11 @@ export async function getVoiceStreamSessionContext(input: {
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
 }) {
-  const [settings, phoneVoice, businessContext] = await Promise.all([
+  const [settings, phoneVoice, businessContext, callLog] = await Promise.all([
     getVoiceAgentSettings(input.businessId),
     loadPhoneVoiceSettings(input.businessId),
     getVoiceAiBusinessContext(input.businessId),
+    getVoiceRepository().findCallLogByExternalCallId(input.callSid),
   ]);
 
   if (!phoneVoice.voiceId) {
@@ -101,6 +103,27 @@ export async function getVoiceStreamSessionContext(input: {
   }
 
   const prompts = getVoicePhonePrompts(phoneVoice.language);
+  const callObjective = callLog?.custom_prompt?.trim() || null;
+
+  let openingLine = resolveStreamOpeningLine({
+    settings,
+    direction: input.direction,
+    language: phoneVoice.language,
+  });
+
+  if (callObjective) {
+    const generatedOpening = await generateVoiceOpeningLine({
+      businessId: input.businessId,
+      direction: input.direction,
+      callObjective,
+      settings,
+      triggerReason: input.triggerReason,
+    });
+
+    if (generatedOpening) {
+      openingLine = generatedOpening;
+    }
+  }
 
   return {
     businessId: input.businessId,
@@ -108,16 +131,13 @@ export async function getVoiceStreamSessionContext(input: {
     language: phoneVoice.language,
     languageCode: phoneVoice.languageCode,
     voiceId: phoneVoice.voiceId,
-    openingLine: resolveStreamOpeningLine({
-      settings,
-      direction: input.direction,
-      language: phoneVoice.language,
-    }),
+    openingLine,
     errorPrompt: prompts.error,
     repeatPrompt: prompts.repeat,
     direction: input.direction,
     triggerReason: input.triggerReason ?? null,
     deepgramLanguage: resolveDeepgramLanguageCode(phoneVoice.language),
+    callObjective,
   };
 }
 
@@ -131,6 +151,9 @@ export async function generateVoiceStreamReply(input: {
   const settings = await getVoiceAgentSettings(input.businessId);
   const prompts = getVoicePhonePrompts(
     (await loadPhoneVoiceSettings(input.businessId)).language,
+  );
+  const callLog = await getVoiceRepository().findCallLogByExternalCallId(
+    input.callSid,
   );
   const session = await getOrCreateStreamSession({
     businessId: input.businessId,
@@ -153,6 +176,7 @@ export async function generateVoiceStreamReply(input: {
     direction: input.direction,
     triggerReason: input.triggerReason,
     settings,
+    callObjective: callLog?.custom_prompt,
   });
 
   const assistantText = reply.success

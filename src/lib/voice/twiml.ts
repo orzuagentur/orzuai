@@ -1,4 +1,4 @@
-import { getAppUrl } from "@/lib/env";
+import { buildAppUrl } from "@/lib/app-url";
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 
 const MAX_SPEECH_CHARS = 480;
@@ -47,7 +47,7 @@ export function buildGatherActionUrl(input: {
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
 }): string {
-  const base = getAppUrl();
+  const base = buildAppUrl("");
   const url = new URL(`${base}/api/webhooks/voice/gather`);
   url.searchParams.set("businessId", input.businessId);
   url.searchParams.set("direction", input.direction);
@@ -182,7 +182,7 @@ export function buildConferenceStatusCallbackUrl(input: {
   businessId: string;
   parentCallSid?: string | null;
 }): string {
-  const base = getAppUrl();
+  const base = buildAppUrl("");
   const url = new URL(`${base}/api/webhooks/voice/conference`);
   url.searchParams.set("businessId", input.businessId);
 
@@ -248,7 +248,7 @@ export function buildRecordingStatusCallbackUrl(
   businessId: string,
   parentCallSid?: string | null,
 ): string {
-  const base = getAppUrl();
+  const base = buildAppUrl("");
   const url = new URL(`${base}/api/webhooks/voice/recording`);
   url.searchParams.set("businessId", businessId);
 
@@ -260,7 +260,7 @@ export function buildRecordingStatusCallbackUrl(
 }
 
 export function buildHandoffTwimlUrl(businessId: string): string {
-  const base = getAppUrl();
+  const base = buildAppUrl("");
   const url = new URL(`${base}/api/webhooks/voice/handoff`);
   url.searchParams.set("businessId", businessId);
   return appendTwilioWebhookSignature(url.toString(), businessId);

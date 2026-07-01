@@ -9,6 +9,7 @@ import { placeOutboundVoiceCall } from "@/services/voice-agent.service";
 const schema = z.object({
   phoneNumber: z.string().trim().min(8).max(32),
   contactId: z.string().uuid().optional(),
+  customPrompt: z.string().trim().max(500).optional(),
 });
 
 export async function triggerContactVoiceCallAction(
@@ -36,5 +37,6 @@ export async function triggerContactVoiceCallAction(
     phoneNumber: parsed.data.phoneNumber,
     triggerReason: "contact_call",
     requireAiAssistant: true,
+    customPrompt: parsed.data.customPrompt ?? null,
   });
 }

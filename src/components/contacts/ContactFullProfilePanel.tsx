@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import {
   VoiceCallModeDialog,
   type VoiceCallMode,
+  type VoiceCallModeSelection,
 } from "@/components/voice/VoiceCallModeDialog";
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import {
@@ -155,13 +156,14 @@ export function ContactFullProfilePanel({
     setCallModeOpen(true);
   }
 
-  function handleCallModeSelect(mode: VoiceCallMode) {
+  function handleCallModeSelect(selection: VoiceCallModeSelection) {
     const phoneNumber = contact.identifier?.trim();
 
     if (!phoneNumber || pendingCallMode) {
       return;
     }
 
+    const mode = selection.mode;
     setPendingCallMode(mode);
 
     if (mode === "human") {
@@ -188,6 +190,7 @@ export function ContactFullProfilePanel({
       const result = await triggerContactVoiceCallAction({
         phoneNumber,
         contactId: contact.id,
+        customPrompt: selection.customPrompt,
       });
 
       if (!result.success) {

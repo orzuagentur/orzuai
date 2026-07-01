@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   VoiceCallModeDialog,
   type VoiceCallMode,
+  type VoiceCallModeSelection,
 } from "@/components/voice/VoiceCallModeDialog";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
@@ -301,11 +302,12 @@ export function VoiceCallDetailPanel({
     setCallModeOpen(true);
   }
 
-  function handleCallModeSelect(mode: VoiceCallMode) {
+  function handleCallModeSelect(selection: VoiceCallModeSelection) {
     if (!call || pendingCallMode) {
       return;
     }
 
+    const mode = selection.mode;
     setPendingCallMode(mode);
 
     if (mode === "human") {
@@ -334,6 +336,7 @@ export function VoiceCallDetailPanel({
         const result = await triggerContactVoiceCallAction({
           phoneNumber: call.phoneNumber,
           contactId: call.contactId ?? undefined,
+          customPrompt: selection.customPrompt,
         });
 
         if (!result.success) {

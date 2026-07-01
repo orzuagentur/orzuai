@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BotIcon,
   HeadphonesIcon,
@@ -14,10 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 
 export type VoiceCallMode = "ai" | "human";
+
+export type VoiceCallModeSelection = {
+  mode: VoiceCallMode;
+  customPrompt?: string;
+};
 
 type VoiceCallModeDialogProps = {
   open: boolean;
@@ -25,7 +32,7 @@ type VoiceCallModeDialogProps = {
   humanAvailable: boolean;
   pendingMode: VoiceCallMode | null;
   onOpenChange: (open: boolean) => void;
-  onSelectMode: (mode: VoiceCallMode) => void;
+  onSelectMode: (selection: VoiceCallModeSelection) => void;
 };
 
 export function VoiceCallModeDialog({
@@ -36,10 +43,19 @@ export function VoiceCallModeDialog({
   onOpenChange,
   onSelectMode,
 }: VoiceCallModeDialogProps) {
+  const [customPrompt, setCustomPrompt] = useState("");
   const normalizedPhone = phoneNumber.trim();
 
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      setCustomPrompt("");
+    }
+
+    onOpenChange(nextOpen);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{VOICE_MESSAGES.callModeTitle}</DialogTitle>
@@ -54,13 +70,39 @@ export function VoiceCallModeDialog({
         </DialogHeader>
 
         <div className="grid gap-3">
+          <div className="rounded-xl border bg-muted/20 p-3">
+            <label
+              htmlFor="voice-call-ai-prompt"
+              className="block text-sm font-medium"
+            >
+              {VOICE_MESSAGES.callModeAiPromptLabel}
+            </label>
+            <Textarea
+              id="voice-call-ai-prompt"
+              value={customPrompt}
+              onChange={(event) => setCustomPrompt(event.target.value)}
+              placeholder={VOICE_MESSAGES.callModeAiPromptPlaceholder}
+              rows={3}
+              disabled={Boolean(pendingMode)}
+              className="mt-2 resize-none"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              {VOICE_MESSAGES.callModeAiPromptHint}
+            </p>
+          </div>
+
           <CallModeButton
             icon={BotIcon}
             title={VOICE_MESSAGES.callModeAiTitle}
             description={VOICE_MESSAGES.callModeAiDescription}
             disabled={Boolean(pendingMode)}
             pending={pendingMode === "ai"}
-            onClick={() => onSelectMode("ai")}
+            onClick={() =>
+              onSelectMode({
+                mode: "ai",
+                customPrompt: customPrompt.trim() || undefined,
+              })
+            }
           />
           <CallModeButton
             icon={HeadphonesIcon}
@@ -72,7 +114,7 @@ export function VoiceCallModeDialog({
             }
             disabled={Boolean(pendingMode) || !humanAvailable}
             pending={pendingMode === "human"}
-            onClick={() => onSelectMode("human")}
+            onClick={() => onSelectMode({ mode: "human" })}
           />
         </div>
       </DialogContent>
