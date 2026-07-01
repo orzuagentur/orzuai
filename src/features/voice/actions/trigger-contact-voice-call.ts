@@ -35,5 +35,6 @@ export async function triggerContactVoiceCallAction(
     contactId: parsed.data.contactId ?? null,
     phoneNumber: parsed.data.phoneNumber,
     triggerReason: "contact_call",
+    requireAiAssistant: true,
   });
 }

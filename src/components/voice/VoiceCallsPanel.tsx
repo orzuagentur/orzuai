@@ -126,6 +126,7 @@ function VoiceCallsPanelContent({
         hasRecording: Boolean(
           listItem.recordingUrl?.trim() || activeCallDetail?.hasRecording,
         ),
+        events: activeCallDetail?.events ?? [],
       };
     }
 

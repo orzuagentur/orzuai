@@ -159,6 +159,7 @@ export function VoiceDialPad({
           size="icon"
           disabled={callDisabled || !value.trim()}
           onClick={onCall}
+          aria-label={VOICE_MESSAGES.callOutbound}
           className="size-14 rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
         >
           <PhoneIcon className="size-6" />

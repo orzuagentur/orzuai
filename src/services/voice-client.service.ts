@@ -9,7 +9,10 @@ import {
   getTwilioVoiceAccountSid,
   hasTwilioVoiceClientEnv,
 } from "@/lib/twilio/access-token";
-import { listTwilioIncomingPhoneNumbers } from "@/lib/twilio/client";
+import {
+  createTwilioOutboundCallWithTwiml,
+  listTwilioIncomingPhoneNumbers,
+} from "@/lib/twilio/client";
 import {
   getTwilioPlatformAccountSid,
   getTwilioPlatformAuthToken,
@@ -17,8 +20,10 @@ import {
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import {
+  buildConferenceStatusCallbackUrl,
+  buildDialConferenceTwiml,
   buildDialClientTwiml,
-  buildDialPhoneNumberTwiml,
+  buildRecordingStatusCallbackUrl,
   buildStaticSayTwiml,
   mapVoiceLanguageToTwilioLocale,
 } from "@/lib/voice/twiml";
@@ -30,6 +35,9 @@ import {
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall } from "@/services/voice-inbox.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
+
+const CONFERENCE_WAIT_URL =
+  "http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical";
 
 export type VoiceClientConfig = {
   enabled: boolean;
@@ -212,6 +220,15 @@ async function resolveBrowserPhoneCallerId(
   }
 }
 
+function buildOutboundConferenceName(input: {
+  businessId: string;
+  callSid: string;
+}): string {
+  const businessPart = input.businessId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
+  const callPart = input.callSid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 34);
+  return `orzux-${businessPart}-${callPart}`.slice(0, 80);
+}
+
 export async function buildClientOutboundTwiml(input: {
   businessId: string;
   toNumber: string;
@@ -237,13 +254,30 @@ export async function buildClientOutboundTwiml(input: {
     });
   }
 
-  if (input.callSid) {
-    await recordClientOutboundVoiceCall({
-      businessId: input.businessId,
-      phoneNumber: to,
-      callSid: input.callSid,
+  if (!input.callSid?.trim()) {
+    return buildStaticSayTwiml({
+      speech: "Browser call session is missing.",
+      speechLocale,
     });
   }
+
+  const parentCallSid = input.callSid.trim();
+  const conferenceName = buildOutboundConferenceName({
+    businessId: input.businessId,
+    callSid: parentCallSid,
+  });
+  const conferenceStatusCallback = buildConferenceStatusCallbackUrl({
+    businessId: input.businessId,
+    parentCallSid,
+  });
+  const recordingCallback = settings.recordingEnabled
+    ? buildRecordingStatusCallbackUrl(input.businessId, parentCallSid)
+    : null;
+  const callLog = await recordClientOutboundVoiceCall({
+    businessId: input.businessId,
+    phoneNumber: to,
+    callSid: parentCallSid,
+  });
 
   const browserCallerId = await resolveBrowserPhoneCallerId(phoneNumber);
 
@@ -254,10 +288,68 @@ export async function buildClientOutboundTwiml(input: {
     });
   }
 
-  return buildDialPhoneNumberTwiml({
-    callerId: browserCallerId,
-    toNumber: to,
-    recordingStatusCallback: await resolveRecordingCallbackUrl(input.businessId),
+  const platformAccountSid = getTwilioPlatformAccountSid();
+  const platformAuthToken = getTwilioPlatformAuthToken();
+
+  if (!platformAccountSid || !platformAuthToken) {
+    return buildStaticSayTwiml({
+      speech: "Twilio platform credentials are missing.",
+      speechLocale,
+    });
+  }
+
+  const customerTwiml = buildDialConferenceTwiml({
+    conferenceName,
+    participantLabel: "customer",
+    statusCallbackUrl: conferenceStatusCallback,
+    startConferenceOnEnter: false,
+    endConferenceOnExit: false,
+    waitUrl: CONFERENCE_WAIT_URL,
+  });
+
+  try {
+    const customerCallSid = await createTwilioOutboundCallWithTwiml({
+      credentials: {
+        accountSid: platformAccountSid,
+        authToken: platformAuthToken,
+      },
+      from: browserCallerId,
+      to,
+      twiml: customerTwiml,
+    });
+
+    console.info(
+      "[voice-client] conference customer leg created",
+      JSON.stringify({
+        businessId: input.businessId,
+        parentCallSid,
+        customerCallSid,
+        callLogId: callLog.callLogId,
+      }),
+    );
+  } catch (error) {
+    console.error(
+      "[voice-client] conference customer leg failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        parentCallSid,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+
+    return buildStaticSayTwiml({
+      speech: "Unable to connect the customer call.",
+      speechLocale,
+    });
+  }
+
+  return buildDialConferenceTwiml({
+    conferenceName,
+    participantLabel: "operator",
+    statusCallbackUrl: conferenceStatusCallback,
+    startConferenceOnEnter: true,
+    endConferenceOnExit: true,
+    recordingStatusCallback: recordingCallback,
   });
 }
 

@@ -502,11 +502,7 @@ export function useConversationRealtime({
         gapSyncInFlightRef.current = false;
       }
     })();
-  }, [
-    conversationId,
-    reconnectCursor?.afterCreatedAt,
-    reconnectCursor?.afterMessageId,
-  ]);
+  }, [conversationId, reconnectCursor]);
 
   return {
     isClientTyping,

@@ -110,7 +110,7 @@ export function ContactPipelineBoard({
     }
 
     return map;
-  }, [columns]);
+  }, [columns, stages]);
 
   if (!hasBusiness) {
     return null;

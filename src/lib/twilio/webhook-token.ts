@@ -2,24 +2,39 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "crypto";
 
+import { ENV_KEYS } from "@/constants/env-keys";
+import { resolveSecretValue } from "@/lib/secrets/resolver";
 import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
 
 const WEBHOOK_SIGNATURE_PARAM = "orzuSig";
+const WEBHOOK_SIGNATURE_VERSION_PARAM = "orzuSigVersion";
+const CURRENT_SIGNATURE_VERSION = "v1";
 
-function getWebhookSigningSecret(): string | null {
-  return getTwilioPlatformAuthToken() ?? null;
+function getWebhookSigningSecrets(): string[] {
+  const secrets = [
+    resolveSecretValue(ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET),
+    resolveSecretValue(ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET_PREVIOUS),
+    getTwilioPlatformAuthToken(),
+  ];
+
+  return Array.from(
+    new Set(
+      secrets
+        .map((secret) => secret?.trim())
+        .filter((secret): secret is string => Boolean(secret)),
+    ),
+  );
 }
 
-function signBusinessWebhook(businessId: string): string | null {
-  const secret = getWebhookSigningSecret();
+function signBusinessWebhook(businessId: string, secret: string): string | null {
   const normalizedBusinessId = businessId.trim();
 
-  if (!secret || !normalizedBusinessId) {
+  if (!normalizedBusinessId) {
     return null;
   }
 
   return createHmac("sha256", secret)
-    .update(`twilio-webhook:${normalizedBusinessId}`)
+    .update(`${CURRENT_SIGNATURE_VERSION}:twilio-webhook:${normalizedBusinessId}`)
     .digest("base64url");
 }
 
@@ -38,13 +53,18 @@ export function appendTwilioWebhookSignature(
   url: string,
   businessId: string,
 ): string {
-  const signature = signBusinessWebhook(businessId);
+  const secret = getWebhookSigningSecrets()[0];
+  const signature = secret ? signBusinessWebhook(businessId, secret) : null;
 
   if (!signature) {
     return url;
   }
 
   const parsed = new URL(url);
+  parsed.searchParams.set(
+    WEBHOOK_SIGNATURE_VERSION_PARAM,
+    CURRENT_SIGNATURE_VERSION,
+  );
   parsed.searchParams.set(WEBHOOK_SIGNATURE_PARAM, signature);
   return parsed.toString();
 }
@@ -52,13 +72,17 @@ export function appendTwilioWebhookSignature(
 export function isOrzuSignedTwilioWebhookValid(input: {
   businessId: string;
   signature: string | null | undefined;
+  version?: string | null | undefined;
 }): boolean {
-  const expected = signBusinessWebhook(input.businessId);
   const provided = input.signature?.trim();
+  const version = input.version?.trim() || CURRENT_SIGNATURE_VERSION;
 
-  if (!expected || !provided) {
+  if (!provided || version !== CURRENT_SIGNATURE_VERSION) {
     return false;
   }
 
-  return safeEqual(provided, expected);
+  return getWebhookSigningSecrets().some((secret) => {
+    const expected = signBusinessWebhook(input.businessId, secret);
+    return expected ? safeEqual(provided, expected) : false;
+  });
 }

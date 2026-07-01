@@ -345,12 +345,7 @@ export function ChatWindow({
       scrollToLatestMessage();
       onConversationViewed?.();
     }
-  }, [
-    conversation?.id,
-    conversation?.messages.at(-1)?.id,
-    onConversationViewed,
-    scrollToLatestMessage,
-  ]);
+  }, [conversation, onConversationViewed, scrollToLatestMessage]);
 
   function handleScrolledToBottom() {
     setShowScrollToBottom(false);

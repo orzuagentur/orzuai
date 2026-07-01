@@ -101,13 +101,55 @@ export function buildDialPhoneNumberTwiml(input: {
   const callerId = escapeXml(input.callerId);
   const toNumber = escapeXml(input.toNumber);
   const recordingAttrs = input.recordingStatusCallback
-    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial callerId="${callerId}"${recordingAttrs}>
     <Number>${toNumber}</Number>
+  </Dial>
+</Response>`;
+}
+
+export function buildConferenceStatusCallbackUrl(input: {
+  businessId: string;
+  parentCallSid?: string | null;
+}): string {
+  const base = getAppUrl();
+  const url = new URL(`${base}/api/webhooks/voice/conference`);
+  url.searchParams.set("businessId", input.businessId);
+
+  if (input.parentCallSid?.trim()) {
+    url.searchParams.set("parentCallSid", input.parentCallSid.trim());
+  }
+
+  return appendTwilioWebhookSignature(url.toString(), input.businessId);
+}
+
+export function buildDialConferenceTwiml(input: {
+  conferenceName: string;
+  participantLabel: "operator" | "customer" | "ai" | "supervisor";
+  statusCallbackUrl: string;
+  startConferenceOnEnter: boolean;
+  endConferenceOnExit: boolean;
+  waitUrl?: string;
+  recordingStatusCallback?: string | null;
+}): string {
+  const conferenceName = escapeXml(input.conferenceName);
+  const participantLabel = escapeXml(input.participantLabel);
+  const statusCallbackUrl = escapeXml(input.statusCallbackUrl);
+  const waitUrl = input.waitUrl
+    ? ` waitUrl="${escapeXml(input.waitUrl)}"`
+    : "";
+  const recordingAttrs = input.recordingStatusCallback
+    ? ` record="record-from-start" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    : "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference participantLabel="${participantLabel}" startConferenceOnEnter="${input.startConferenceOnEnter}" endConferenceOnExit="${input.endConferenceOnExit}" beep="false" statusCallback="${statusCallbackUrl}" statusCallbackMethod="POST" statusCallbackEvent="start end join leave mute hold speaker"${waitUrl}${recordingAttrs}>${conferenceName}</Conference>
   </Dial>
 </Response>`;
 }
@@ -125,7 +167,7 @@ export function buildDialClientTwiml(input: {
     ? ` action="${escapeXml(input.actionUrl)}"`
     : "";
   const recordingAttrs = input.recordingStatusCallback
-    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -136,10 +178,18 @@ export function buildDialClientTwiml(input: {
 </Response>`;
 }
 
-export function buildRecordingStatusCallbackUrl(businessId: string): string {
+export function buildRecordingStatusCallbackUrl(
+  businessId: string,
+  parentCallSid?: string | null,
+): string {
   const base = getAppUrl();
   const url = new URL(`${base}/api/webhooks/voice/recording`);
   url.searchParams.set("businessId", businessId);
+
+  if (parentCallSid?.trim()) {
+    url.searchParams.set("parentCallSid", parentCallSid.trim());
+  }
+
   return appendTwilioWebhookSignature(url.toString(), businessId);
 }
 
@@ -179,7 +229,7 @@ export function buildHandoffToAgentTwiml(input: {
     ? ` action="${escapeXml(input.actionUrl)}"`
     : "";
   const recordingAttrs = input.recordingStatusCallback
-    ? ` record="record-from-answer" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
+    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>

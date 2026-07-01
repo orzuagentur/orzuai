@@ -183,6 +183,8 @@ export async function recordInboundVoiceCall(input: {
   }
 
   const phoneNumber = input.phoneNumber.trim();
+  const settings = await getVoiceAgentSettings(input.businessId);
+  const callMode = settings.aiEnabled ? "ai" : "human";
   let contactId: string | null = null;
   let conversationId: string | null = null;
 
@@ -200,16 +202,33 @@ export async function recordInboundVoiceCall(input: {
     conversationId = context?.conversationId ?? null;
   }
 
-  await getVoiceRepository().insertCallLog({
+  const repo = getVoiceRepository();
+
+  await repo.insertCallLog({
     businessId: input.businessId,
     contactId,
     conversationId,
+    callMode,
     direction: "inbound",
     phoneNumber: phoneNumber || "unknown",
     status: "active",
     provider: "twilio",
     externalCallId: input.callSid || null,
     triggerReason: "inbound_call",
+    aiHandled: callMode === "ai",
+    humanHandled: callMode === "human",
+  });
+
+  await repo.insertCallEvent({
+    businessId: input.businessId,
+    callSid: input.callSid || null,
+    eventType: "call.created",
+    actorType: "twilio",
+    payload: {
+      direction: "inbound",
+      phoneNumber: phoneNumber || "unknown",
+      callMode,
+    },
   });
 }
 
@@ -270,16 +289,37 @@ async function logVoiceCall(input: {
   provider: VoiceProvider;
   externalCallId?: string | null;
   triggerReason?: string | null;
+  callMode?: "ai" | "human" | "handoff" | "unknown";
 }) {
-  await getVoiceRepository().insertCallLog({
+  const repo = getVoiceRepository();
+
+  await repo.insertCallLog({
     businessId: input.businessId,
     contactId: input.contactId,
+    callMode: input.callMode,
     direction: input.direction,
     phoneNumber: input.phoneNumber,
     status: input.status,
     provider: input.provider,
     externalCallId: input.externalCallId,
     triggerReason: input.triggerReason,
+    aiHandled: input.callMode === "ai",
+    humanHandled: input.callMode === "human",
+  });
+
+  await repo.insertCallEvent({
+    businessId: input.businessId,
+    callSid: input.externalCallId ?? null,
+    eventType: "call.created",
+    actorType: input.callMode === "ai" ? "ai" : "system",
+    payload: {
+      direction: input.direction,
+      phoneNumber: input.phoneNumber,
+      status: input.status,
+      provider: input.provider,
+      triggerReason: input.triggerReason ?? null,
+      callMode: input.callMode ?? "unknown",
+    },
   });
 }
 
@@ -387,6 +427,7 @@ export async function placeOutboundVoiceCall(input: {
   contactId?: string | null;
   phoneNumber: string;
   triggerReason: string;
+  requireAiAssistant?: boolean;
 }): Promise<{ success: boolean; message?: string }> {
   const settings = await getVoiceAgentSettings(input.businessId);
 
@@ -411,6 +452,17 @@ export async function placeOutboundVoiceCall(input: {
 
   if (!settings.providerConfigured) {
     return { success: false, message: VOICE_MESSAGES.platformMissing };
+  }
+
+  if (
+    input.requireAiAssistant &&
+    settings.provider === "twilio" &&
+    (!settings.aiEnabled || !settings.aiConfigured)
+  ) {
+    return {
+      success: false,
+      message: VOICE_MESSAGES.callModeAiUnavailable,
+    };
   }
 
   const webhooks = buildWebhookUrls(input.businessId);
@@ -484,6 +536,7 @@ export async function placeOutboundVoiceCall(input: {
     provider: settings.provider,
     externalCallId,
     triggerReason: input.triggerReason,
+    callMode: input.requireAiAssistant ? "ai" : "unknown",
   });
 
   return { success: true };

@@ -34,9 +34,15 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Cursor MCP configs can contain local access tokens
+.cursor/mcp.json
+.cursor/**/mcp.json
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

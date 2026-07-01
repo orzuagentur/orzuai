@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
 import {
@@ -91,7 +91,10 @@ export function useChatMediaUrl(
 ): UseChatMediaUrlResult {
   const enabled = options.enabled ?? true;
   const storagePath = resolveMediaStoragePath(media);
-  const cacheKeys = getCandidateCacheKeys(media, options.messageId);
+  const cacheKeys = useMemo(
+    () => getCandidateCacheKeys(media, options.messageId),
+    [media, options.messageId],
+  );
   const managedBlobUrlRef = useRef<string | null>(null);
 
   const [url, setUrl] = useState<string | null>(() =>
@@ -233,15 +236,7 @@ export function useChatMediaUrl(
     return () => {
       cancelled = true;
     };
-  }, [
-    cacheKeys.join("|"),
-    enabled,
-    media.mimeType,
-    media.path,
-    media.url,
-    options.messageId,
-    storagePath,
-  ]);
+  }, [cacheKeys, enabled, media, options.messageId, storagePath]);
 
   return { url, isLoading, error };
 }

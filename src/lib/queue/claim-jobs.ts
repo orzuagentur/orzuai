@@ -9,6 +9,8 @@ type AiReplyJobRow = Database["public"]["Tables"]["ai_reply_jobs"]["Row"];
 type WebhookJob = Database["public"]["Tables"]["inbound_webhook_queue"]["Row"];
 type DeliveryJob = Database["public"]["Tables"]["message_deliveries"]["Row"];
 type AttachmentJob = Database["public"]["Tables"]["message_attachments"]["Row"];
+type VoicePostCallJob =
+  Database["public"]["Tables"]["voice_post_call_jobs"]["Row"];
 
 export async function claimInboundWebhookJobs(
   limit: number,
@@ -163,6 +165,21 @@ export async function claimAiOrchestrationJobs(
 ): Promise<Database["public"]["Tables"]["ai_orchestration_jobs"]["Row"][]> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("claim_ai_orchestration_jobs", {
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+export async function claimVoicePostCallJobs(
+  limit: number,
+): Promise<VoicePostCallJob[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("claim_voice_post_call_jobs", {
     p_limit: limit,
   });
 

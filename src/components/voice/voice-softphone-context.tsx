@@ -404,13 +404,13 @@ function useVoiceSoftphoneState(input: {
   const placeCall = useCallback(
     async (phoneNumber: string) => {
       if (!input.businessId) {
-        return;
+        throw new Error(VOICE_MESSAGES.softphoneNotConfigured);
       }
 
       const normalized = phoneNumber.trim();
 
       if (!normalized) {
-        return;
+        throw new Error(VOICE_MESSAGES.callOutboundFailed);
       }
 
       if (!deviceRef.current || !isRegisteredRef.current) {
@@ -422,7 +422,7 @@ function useVoiceSoftphoneState(input: {
       if (!device || !isRegisteredRef.current) {
         setError(VOICE_MESSAGES.softphoneRegisterFailed);
         setStatus("error");
-        return;
+        throw new Error(VOICE_MESSAGES.softphoneRegisterFailed);
       }
 
       setStatus("connecting");
@@ -445,6 +445,9 @@ function useVoiceSoftphoneState(input: {
             : VOICE_MESSAGES.callOutboundFailed,
         );
         setStatus("ready");
+        throw callError instanceof Error
+          ? callError
+          : new Error(VOICE_MESSAGES.callOutboundFailed);
       }
     },
     [attachCallListeners, goOnline, input.businessId],

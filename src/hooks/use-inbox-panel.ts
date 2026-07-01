@@ -221,13 +221,7 @@ export function useInboxPanel({
         }
       },
     );
-  }, [
-    activeConversation.conversation,
-    activeConversation.selectedConversationId,
-    activeConversation.syncConversationReadNow,
-    clearConversationUnread,
-    navBadges,
-  ]);
+  }, [activeConversation, clearConversationUnread, navBadges]);
 
   const handleConversationViewed = useCallback(() => {
     if (!activeConversation.selectedConversationId) {
@@ -236,11 +230,7 @@ export function useInboxPanel({
 
     clearConversationUnread(activeConversation.selectedConversationId);
     activeConversation.markConversationViewed();
-  }, [
-    activeConversation.markConversationViewed,
-    activeConversation.selectedConversationId,
-    clearConversationUnread,
-  ]);
+  }, [activeConversation, clearConversationUnread]);
 
   const handleReadProgress = useCallback(
     (readAt: string) => {
@@ -270,13 +260,7 @@ export function useInboxPanel({
         activeConversation.markConversationViewed();
       }
     },
-    [
-      activeConversation.conversation,
-      activeConversation.markConversationViewed,
-      activeConversation.selectedConversationId,
-      activeConversation.updateReadProgress,
-      clearConversationUnread,
-    ],
+    [activeConversation, clearConversationUnread],
   );
 
   useInboxListRealtime({

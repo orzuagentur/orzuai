@@ -372,6 +372,36 @@ export async function createTwilioOutboundCall(input: {
   return response.sid ?? "unknown";
 }
 
+export async function createTwilioOutboundCallWithTwiml(input: {
+  credentials: TwilioApiCredentials;
+  from: string;
+  to: string;
+  twiml: string;
+  statusCallbackUrl?: string;
+}): Promise<string> {
+  const body = new URLSearchParams({
+    To: input.to,
+    From: input.from,
+    Twiml: input.twiml,
+  });
+
+  if (input.statusCallbackUrl) {
+    body.set("StatusCallback", input.statusCallbackUrl);
+    body.set("StatusCallbackMethod", "POST");
+    for (const event of ["initiated", "ringing", "answered", "completed"]) {
+      body.append("StatusCallbackEvent", event);
+    }
+  }
+
+  const response = await twilioRequest<{ sid?: string }>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Calls.json`,
+    { method: "POST", body },
+  );
+
+  return response.sid ?? "unknown";
+}
+
 export async function redirectTwilioCall(input: {
   credentials: TwilioApiCredentials;
   callSid: string;
@@ -385,6 +415,39 @@ export async function redirectTwilioCall(input: {
   await twilioRequest(
     input.credentials,
     `/Accounts/${input.credentials.accountSid}/Calls/${input.callSid}.json`,
+    { method: "POST", body },
+  );
+}
+
+export async function updateTwilioConferenceParticipant(input: {
+  credentials: TwilioApiCredentials;
+  conferenceSid: string;
+  participantCallSid: string;
+  hold?: boolean;
+  muted?: boolean;
+  status?: "completed";
+}): Promise<void> {
+  const body = new URLSearchParams();
+
+  if (input.hold !== undefined) {
+    body.set("Hold", input.hold ? "true" : "false");
+  }
+
+  if (input.muted !== undefined) {
+    body.set("Muted", input.muted ? "true" : "false");
+  }
+
+  if (input.status) {
+    body.set("Status", input.status);
+  }
+
+  if ([...body.keys()].length === 0) {
+    return;
+  }
+
+  await twilioRequest(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Conferences/${input.conferenceSid}/Participants/${input.participantCallSid}.json`,
     { method: "POST", body },
   );
 }

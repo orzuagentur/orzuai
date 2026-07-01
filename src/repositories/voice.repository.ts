@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database } from "@/types/database.types";
+import type { Database, Json } from "@/types/database.types";
 import type { SaveVoiceAgentSettingsInput, VoiceProvider } from "@/types/voice-agent.types";
 
 type DbClient = SupabaseClient<Database>;
@@ -17,6 +17,9 @@ export type VoiceCallLogRow =
 export type VoiceCallSessionRow =
   Database["public"]["Tables"]["voice_call_sessions"]["Row"];
 
+export type VoiceCallEventRow =
+  Database["public"]["Tables"]["voice_call_events"]["Row"];
+
 export type VoiceCallSessionRecord = Pick<
   VoiceCallSessionRow,
   "id" | "business_id" | "call_sid" | "direction" | "turns" | "turn_count"
@@ -24,6 +27,14 @@ export type VoiceCallSessionRecord = Pick<
 
 export type VoiceCallQueueRow =
   Database["public"]["Tables"]["voice_call_queue"]["Row"];
+
+export type VoiceCallMode = "ai" | "human" | "handoff" | "unknown";
+export type VoicePostCallJobType =
+  | "transcribe"
+  | "summarize"
+  | "extract_actions"
+  | "sync_crm"
+  | "booking";
 
 export type VoiceCallLogInsert = {
   businessId: string;
@@ -34,8 +45,11 @@ export type VoiceCallLogInsert = {
   provider: VoiceProvider;
   externalCallId?: string | null;
   triggerReason?: string | null;
+  callMode?: VoiceCallMode;
   aiHandled?: boolean;
+  humanHandled?: boolean;
   conversationId?: string | null;
+  operatorUserId?: string | null;
 };
 
 export type VoiceCallLogInboxRow = Pick<
@@ -48,6 +62,8 @@ export type VoiceCallLogInboxRow = Pick<
   | "trigger_reason"
   | "created_at"
   | "contact_id"
+  | "call_mode"
+  | "operator_user_id"
   | "ended_at"
   | "duration_seconds"
   | "ai_handled"
@@ -72,6 +88,25 @@ export type VoiceCallLogUpdate = {
   conversationId?: string | null;
   handoffAt?: string | null;
   humanHandled?: boolean;
+  callMode?: VoiceCallMode;
+  operatorUserId?: string | null;
+};
+
+export type VoiceCallEventInsert = {
+  businessId: string;
+  callLogId?: string | null;
+  callSid?: string | null;
+  eventType: string;
+  actorType?: "system" | "ai" | "customer" | "operator" | "twilio";
+  actorUserId?: string | null;
+  payload?: Json;
+};
+
+export type VoicePostCallJobInsert = {
+  businessId: string;
+  callLogId: string;
+  jobType: VoicePostCallJobType;
+  payload?: Json;
 };
 
 export type VoiceCallSessionTurn = {
@@ -192,6 +227,9 @@ export class VoiceRepository {
           contactId: input.contactId ?? existing.contact_id,
           conversationId: input.conversationId ?? existing.conversation_id,
           aiHandled: input.aiHandled ?? existing.ai_handled ?? false,
+          humanHandled: input.humanHandled,
+          callMode: input.callMode,
+          operatorUserId: input.operatorUserId,
         });
         return;
       }
@@ -200,6 +238,8 @@ export class VoiceRepository {
     const { error } = await this.db.from("voice_call_logs").insert({
       business_id: input.businessId,
       contact_id: input.contactId ?? null,
+      call_mode: input.callMode ?? "unknown",
+      operator_user_id: input.operatorUserId ?? null,
       direction: input.direction,
       phone_number: input.phoneNumber,
       status: input.status,
@@ -207,6 +247,7 @@ export class VoiceRepository {
       external_call_id: externalCallId,
       trigger_reason: input.triggerReason ?? null,
       ai_handled: input.aiHandled ?? false,
+      human_handled: input.humanHandled ?? false,
       conversation_id: input.conversationId ?? null,
     });
 
@@ -235,6 +276,8 @@ export class VoiceRepository {
         trigger_reason,
         created_at,
         contact_id,
+        call_mode,
+        operator_user_id,
         ended_at,
         duration_seconds,
         ai_handled,
@@ -278,6 +321,8 @@ export class VoiceRepository {
         trigger_reason,
         created_at,
         contact_id,
+        call_mode,
+        operator_user_id,
         ended_at,
         duration_seconds,
         ai_handled,
@@ -406,6 +451,14 @@ export class VoiceRepository {
       updatePayload.human_handled = patch.humanHandled;
     }
 
+    if (patch.callMode !== undefined) {
+      updatePayload.call_mode = patch.callMode;
+    }
+
+    if (patch.operatorUserId !== undefined) {
+      updatePayload.operator_user_id = patch.operatorUserId;
+    }
+
     if (Object.keys(updatePayload).length === 0) {
       return;
     }
@@ -434,6 +487,77 @@ export class VoiceRepository {
     }
 
     return data;
+  }
+
+  async insertCallEvent(input: VoiceCallEventInsert): Promise<void> {
+    const { error } = await this.db.from("voice_call_events").insert({
+      business_id: input.businessId,
+      call_log_id: input.callLogId ?? null,
+      call_sid: input.callSid ?? null,
+      event_type: input.eventType,
+      actor_type: input.actorType ?? "system",
+      actor_user_id: input.actorUserId ?? null,
+      payload: input.payload ?? {},
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async listCallEvents(
+    businessId: string,
+    callLogId: string,
+    limit = 50,
+  ): Promise<VoiceCallEventRow[]> {
+    const { data, error } = await this.db
+      .from("voice_call_events")
+      .select("*")
+      .eq("business_id", businessId)
+      .eq("call_log_id", callLogId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data ?? [];
+  }
+
+  async enqueuePostCallJob(input: VoicePostCallJobInsert): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await this.db
+      .from("voice_post_call_jobs")
+      .insert({
+        business_id: input.businessId,
+        call_log_id: input.callLogId,
+        job_type: input.jobType,
+        status: "pending",
+        next_attempt_at: now,
+        payload: input.payload ?? {},
+      });
+
+    if (error) {
+      if (error.code === "23505") {
+        await this.db
+          .from("voice_post_call_jobs")
+          .update({
+            status: "pending",
+            next_attempt_at: now,
+            processed_at: null,
+            last_error: null,
+            payload: input.payload ?? {},
+          })
+          .eq("business_id", input.businessId)
+          .eq("call_log_id", input.callLogId)
+          .eq("job_type", input.jobType)
+          .in("status", ["skipped", "failed"]);
+        return;
+      }
+
+      throw new Error(error.message);
+    }
   }
 
   async createSession(input: {

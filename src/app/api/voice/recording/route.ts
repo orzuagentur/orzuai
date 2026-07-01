@@ -4,10 +4,7 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import { requireUser } from "@/services/auth.service";
-import {
-  getTwilioConnection,
-  resolveTwilioCredentialsForBusiness,
-} from "@/services/twilio-integration.service";
+import { downloadTwilioRecordingAudio } from "@/services/voice-recording.service";
 
 export async function GET(request: NextRequest) {
   if (!hasSupabaseEnv()) {
@@ -36,35 +33,19 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Recording not found", { status: 404 });
   }
 
-  const connection = await getTwilioConnection(business.id);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
-
-  if (!credentials?.accountSid || !credentials.authToken) {
-    return new NextResponse("Twilio credentials missing", { status: 503 });
-  }
-
-  const recordingUrl = `${callLog.recording_url}.mp3`;
-  const authHeader = `Basic ${Buffer.from(
-    `${credentials.accountSid}:${credentials.authToken}`,
-  ).toString("base64")}`;
-
-  const upstream = await fetch(recordingUrl, {
-    headers: { Authorization: authHeader },
-    cache: "no-store",
+  const recording = await downloadTwilioRecordingAudio({
+    businessId: business.id,
+    recordingUrl: callLog.recording_url,
   });
 
-  if (!upstream.ok) {
-    return new NextResponse("Unable to fetch recording", {
-      status: upstream.status,
-    });
+  if (!recording.success) {
+    return new NextResponse(recording.message, { status: 503 });
   }
 
-  const bytes = await upstream.arrayBuffer();
-
-  return new NextResponse(bytes, {
+  return new NextResponse(new Uint8Array(recording.buffer), {
     status: 200,
     headers: {
-      "Content-Type": upstream.headers.get("Content-Type") ?? "audio/mpeg",
+      "Content-Type": recording.mimeType,
       "Cache-Control": "private, max-age=3600",
     },
   });

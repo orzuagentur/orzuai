@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { fetchVoiceCallsAction } from "@/features/voice/actions/fetch-voice-calls";
 import { fetchVoiceCallDetailAction } from "@/features/voice/actions/fetch-voice-call-detail";
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
@@ -22,6 +23,8 @@ type VoiceCallLogRealtimeRow = {
   status: string;
   provider: string;
   trigger_reason: string | null;
+  call_mode: string;
+  operator_user_id: string | null;
   created_at: string;
   contact_id: string | null;
   ended_at: string | null;
@@ -41,6 +44,12 @@ type VoiceCallSessionRealtimeRow = {
   direction: string;
   turns: VoiceCallSessionTurn[];
   turn_count: number;
+};
+
+type VoiceCallEventRealtimeRow = {
+  id: string;
+  business_id: string;
+  call_log_id: string | null;
 };
 
 type UseVoiceCallsRealtimeOptions = {
@@ -63,6 +72,8 @@ function mapLogRowToListItem(row: VoiceCallLogRealtimeRow): VoiceInboxCallListIt
     status: row.status,
     provider: row.provider,
     triggerReason: row.trigger_reason,
+    callMode: row.call_mode,
+    operatorUserId: row.operator_user_id,
     createdAt: row.created_at,
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
@@ -158,6 +169,8 @@ export function useVoiceCallsRealtime({
           status: result.data.status,
           provider: result.data.provider,
           triggerReason: result.data.triggerReason,
+          callMode: result.data.callMode,
+          operatorUserId: result.data.operatorUserId,
           createdAt: result.data.createdAt,
           endedAt: result.data.endedAt,
           durationSeconds: result.data.durationSeconds,
@@ -197,14 +210,7 @@ export function useVoiceCallsRealtime({
       }
     };
 
-    const handleSessionUpdate = (
-      row: VoiceCallSessionRealtimeRow,
-      activeCall: VoiceCallDetail | null,
-    ) => {
-      if (!activeCall || activeCall.externalCallId !== row.call_sid) {
-        return;
-      }
-
+    const handleSessionUpdate = (row: VoiceCallSessionRealtimeRow) => {
       onActiveCallChangeRef.current((current) => {
         if (!current || current.externalCallId !== row.call_sid) {
           return current;
@@ -216,6 +222,14 @@ export function useVoiceCallsRealtime({
           turnCount: row.turn_count,
         };
       });
+    };
+
+    const handleEventInsert = async (row: VoiceCallEventRealtimeRow) => {
+      if (!row.call_log_id || activeCallIdRef.current !== row.call_log_id) {
+        return;
+      }
+
+      await refreshActiveCall(row.call_log_id);
     };
 
     void (async () => {
@@ -266,10 +280,19 @@ export function useVoiceCallsRealtime({
             filter: postgresFilter,
           },
           (payload) => {
-            handleSessionUpdate(
-              payload.new as VoiceCallSessionRealtimeRow,
-              null,
-            );
+            handleSessionUpdate(payload.new as VoiceCallSessionRealtimeRow);
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "voice_call_events",
+            filter: postgresFilter,
+          },
+          (payload) => {
+            void handleEventInsert(payload.new as VoiceCallEventRealtimeRow);
           },
         )
         .subscribe((status) => {
@@ -316,6 +339,8 @@ export function useVoiceCallsRealtime({
                     status: result.data.status,
                     provider: result.data.provider,
                     triggerReason: result.data.triggerReason,
+                    callMode: result.data.callMode,
+                    operatorUserId: result.data.operatorUserId,
                     createdAt: result.data.createdAt,
                     endedAt: result.data.endedAt,
                     durationSeconds: result.data.durationSeconds,
@@ -339,6 +364,27 @@ export function useVoiceCallsRealtime({
       window.clearInterval(intervalId);
     };
   }, [activeCallId, businessId, enabled, realtimeConnected]);
+
+  useEffect(() => {
+    if (!enabled || !businessId || realtimeConnected) {
+      return;
+    }
+
+    const refreshCalls = () => {
+      void fetchVoiceCallsAction().then((result) => {
+        if (result.success) {
+          onCallsChangeRef.current(() => result.data);
+        }
+      });
+    };
+
+    refreshCalls();
+    const intervalId = window.setInterval(refreshCalls, POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [businessId, enabled, realtimeConnected]);
 
   return { realtimeConnected };
 }

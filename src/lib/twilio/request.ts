@@ -139,5 +139,6 @@ function isOrzuSignedRequestValid(
   return isOrzuSignedTwilioWebhookValid({
     businessId,
     signature: request.nextUrl.searchParams.get("orzuSig"),
+    version: request.nextUrl.searchParams.get("orzuSigVersion"),
   });
 }

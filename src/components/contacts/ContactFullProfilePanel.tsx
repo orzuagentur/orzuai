@@ -20,6 +20,11 @@ import { ContactProfileInsightsFooter } from "@/components/contacts/ContactProfi
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  VoiceCallModeDialog,
+  type VoiceCallMode,
+} from "@/components/voice/VoiceCallModeDialog";
+import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -76,10 +81,14 @@ export function ContactFullProfilePanel({
     () => contactToFormValues(profile.contact),
   );
   const [isFavoriteBusy, setIsFavoriteBusy] = useState(false);
-  const [isCalling, setIsCalling] = useState(false);
+  const [callModeOpen, setCallModeOpen] = useState(false);
+  const [pendingCallMode, setPendingCallMode] = useState<VoiceCallMode | null>(
+    null,
+  );
   const [editAdditionalContacts, setEditAdditionalContacts] = useState<
     AdditionalContactEntry[]
   >([]);
+  const softphone = useVoiceSoftphone();
 
   const { contact } = profile;
   const infoRows = buildContactProfileInfoRows(profile);
@@ -133,16 +142,46 @@ export function ContactFullProfilePanel({
     }
   }
 
-  async function handleCallContact() {
+  function handleCallContact() {
     const phoneNumber = contact.identifier?.trim();
 
     if (!phoneNumber) {
       return;
     }
 
-    setIsCalling(true);
+    setCallModeOpen(true);
+  }
 
-    try {
+  function handleCallModeSelect(mode: VoiceCallMode) {
+    const phoneNumber = contact.identifier?.trim();
+
+    if (!phoneNumber || pendingCallMode) {
+      return;
+    }
+
+    setPendingCallMode(mode);
+
+    if (mode === "human") {
+      void softphone
+        .placeCall(phoneNumber)
+        .then(() => {
+          toast.success(VOICE_MESSAGES.callOutboundSuccess);
+          setCallModeOpen(false);
+        })
+        .catch((error: unknown) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : VOICE_MESSAGES.callOutboundFailed,
+          );
+        })
+        .finally(() => {
+          setPendingCallMode(null);
+        });
+      return;
+    }
+
+    void (async () => {
       const result = await triggerContactVoiceCallAction({
         phoneNumber,
         contactId: contact.id,
@@ -154,9 +193,19 @@ export function ContactFullProfilePanel({
       }
 
       toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
-    } finally {
-      setIsCalling(false);
-    }
+      setCallModeOpen(false);
+      await onRefresh();
+    })()
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : VOICE_MESSAGES.callOutboundFailed,
+        );
+      })
+      .finally(() => {
+        setPendingCallMode(null);
+      });
   }
 
   async function handleToggleFavorite() {
@@ -239,13 +288,13 @@ export function ContactFullProfilePanel({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  disabled={isCalling}
+                  disabled={Boolean(pendingCallMode)}
                   onClick={() => {
-                    void handleCallContact();
+                    handleCallContact();
                   }}
                   aria-label={VOICE_MESSAGES.callOutbound}
                 >
-                  {isCalling ? (
+                  {pendingCallMode ? (
                     <Loader2Icon className="size-4 animate-spin" />
                   ) : (
                     <PhoneIcon className="size-4" />
@@ -453,6 +502,22 @@ export function ContactFullProfilePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <VoiceCallModeDialog
+        open={callModeOpen}
+        phoneNumber={contact.identifier ?? ""}
+        humanAvailable={
+          softphone.enabled &&
+          ![
+            "registering",
+            "connecting",
+            "on-call",
+            "incoming",
+          ].includes(softphone.status)
+        }
+        pendingMode={pendingCallMode}
+        onOpenChange={setCallModeOpen}
+        onSelectMode={handleCallModeSelect}
+      />
     </>
   );
 }

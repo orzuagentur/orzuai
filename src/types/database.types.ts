@@ -2811,6 +2811,8 @@ export type Database = {
           id: string;
           business_id: string;
           contact_id: string | null;
+          call_mode: string;
+          operator_user_id: string | null;
           direction: string;
           phone_number: string;
           status: string;
@@ -2831,6 +2833,8 @@ export type Database = {
           id?: string;
           business_id: string;
           contact_id?: string | null;
+          call_mode?: string;
+          operator_user_id?: string | null;
           direction: string;
           phone_number: string;
           status?: string;
@@ -2851,6 +2855,8 @@ export type Database = {
           id?: string;
           business_id?: string;
           contact_id?: string | null;
+          call_mode?: string;
+          operator_user_id?: string | null;
           direction?: string;
           phone_number?: string;
           status?: string;
@@ -2887,6 +2893,137 @@ export type Database = {
             columns: ["conversation_id"];
             isOneToOne: false;
             referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_logs_operator_user_id_fkey";
+            columns: ["operator_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_call_events: {
+        Row: {
+          id: string;
+          business_id: string;
+          call_log_id: string | null;
+          call_sid: string | null;
+          event_type: string;
+          actor_type: string;
+          actor_user_id: string | null;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          call_log_id?: string | null;
+          call_sid?: string | null;
+          event_type: string;
+          actor_type?: string;
+          actor_user_id?: string | null;
+          payload?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          call_log_id?: string | null;
+          call_sid?: string | null;
+          event_type?: string;
+          actor_type?: string;
+          actor_user_id?: string | null;
+          payload?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_events_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_events_call_log_id_fkey";
+            columns: ["call_log_id"];
+            isOneToOne: false;
+            referencedRelation: "voice_call_logs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_call_events_actor_user_id_fkey";
+            columns: ["actor_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voice_post_call_jobs: {
+        Row: {
+          id: string;
+          business_id: string;
+          call_log_id: string;
+          job_type: string;
+          status: string;
+          attempt_count: number;
+          max_attempts: number;
+          next_attempt_at: string;
+          processing_started_at: string | null;
+          processed_at: string | null;
+          last_error: string | null;
+          payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          call_log_id: string;
+          job_type: string;
+          status?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          processing_started_at?: string | null;
+          processed_at?: string | null;
+          last_error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          call_log_id?: string;
+          job_type?: string;
+          status?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          processing_started_at?: string | null;
+          processed_at?: string | null;
+          last_error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_post_call_jobs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_post_call_jobs_call_log_id_fkey";
+            columns: ["call_log_id"];
+            isOneToOne: false;
+            referencedRelation: "voice_call_logs";
             referencedColumns: ["id"];
           },
         ];
@@ -3000,6 +3137,12 @@ export type Database = {
           p_limit?: number;
         };
         Returns: Database["public"]["Tables"]["ai_orchestration_jobs"]["Row"][];
+      };
+      claim_voice_post_call_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["voice_post_call_jobs"]["Row"][];
       };
       match_knowledge_by_embedding: {
         Args: {

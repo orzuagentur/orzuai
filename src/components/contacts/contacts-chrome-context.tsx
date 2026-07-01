@@ -157,8 +157,8 @@ export function useContactsChromeRegistration(config: ContactsChromeConfig | nul
       dealsView,
       onDealsViewChange,
       onNewDeal,
-      crmListData: config?.crmListData,
-      crmDealsData: config?.crmDealsData,
+      crmListData,
+      crmDealsData,
     });
 
     return () => {

@@ -9,7 +9,15 @@ import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
+import { getVoiceRepository, type VoicePostCallJobType } from "@/repositories/voice.repository";
 import { handleTwilioRecordingStatusUpdate } from "@/services/voice-recording.service";
+import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
+
+const RECORDING_READY_JOB_TYPES: VoicePostCallJobType[] = [
+  "transcribe",
+  "summarize",
+  "extract_actions",
+];
 
 export async function POST(request: NextRequest) {
   const businessId = request.nextUrl.searchParams.get("businessId");
@@ -36,21 +44,45 @@ export async function POST(request: NextRequest) {
   }
 
   const callSid = params.CallSid?.trim();
+  const parentCallSid = request.nextUrl.searchParams.get("parentCallSid")?.trim();
   const recordingSid = params.RecordingSid?.trim();
   const recordingUrl = params.RecordingUrl?.trim();
   const recordingStatus = params.RecordingStatus?.trim();
+  const callLogCallSid = parentCallSid || callSid;
 
-  if (!callSid || !recordingSid || !recordingUrl || !recordingStatus) {
+  if (!callLogCallSid || !recordingSid || !recordingUrl || !recordingStatus) {
     return new NextResponse("Missing recording fields", { status: 400 });
   }
 
-  await handleTwilioRecordingStatusUpdate({
+  const result = await handleTwilioRecordingStatusUpdate({
     businessId,
-    callSid,
+    callSid: callLogCallSid,
     recordingSid,
     recordingUrl,
     recordingStatus,
   });
+
+  if (result.callLogId) {
+    const repo = getVoiceRepository();
+
+    await Promise.allSettled(
+      RECORDING_READY_JOB_TYPES.map((jobType) =>
+        repo.enqueuePostCallJob({
+          businessId,
+          callLogId: result.callLogId!,
+          jobType,
+          payload: {
+            callSid: callLogCallSid,
+            participantCallSid: callSid ?? null,
+            recordingSid,
+            recordingUrl,
+          },
+        }),
+      ),
+    );
+
+    dispatchVoicePostCallWorker("enqueue");
+  }
 
   return new NextResponse("OK", { status: 200 });
 }

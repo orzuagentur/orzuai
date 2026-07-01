@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   PanelRightCloseIcon,
   PanelRightOpenIcon,
@@ -10,12 +11,17 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { VoiceCallCard } from "@/components/voice/VoiceCallCard";
+import {
+  VoiceCallModeDialog,
+  type VoiceCallMode,
+} from "@/components/voice/VoiceCallModeDialog";
 import { VoiceDialPad } from "@/components/voice/VoiceDialPad";
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
+import { scheduleVoiceInboxRefresh } from "@/utils/voice-inbox-refresh";
 import { phoneDigits } from "@/utils/voice-contact-calls";
 
 type VoiceInboxDialerPanelProps = {
@@ -49,8 +55,13 @@ export function VoiceInboxDialerPanel({
   onToggleDetails,
   className,
 }: VoiceInboxDialerPanelProps) {
+  const router = useRouter();
   const softphone = useVoiceSoftphone();
   const [dialedNumber, setDialedNumber] = useState(initialPhone);
+  const [callModeOpen, setCallModeOpen] = useState(false);
+  const [pendingCallMode, setPendingCallMode] = useState<VoiceCallMode | null>(
+    null,
+  );
   const [isCalling, startCalling] = useTransition();
   const syncedCallIdRef = useRef<string | null>(null);
   const syncedPhoneRef = useRef("");
@@ -99,18 +110,55 @@ export function VoiceInboxDialerPanel({
       return;
     }
 
+    setCallModeOpen(true);
+  }
+
+  function handleCallModeSelect(mode: VoiceCallMode) {
+    if (!phoneToCall || pendingCallMode) {
+      return;
+    }
+
+    setPendingCallMode(mode);
+
+    if (mode === "human") {
+      void softphone
+        .placeCall(phoneToCall)
+        .then(() => {
+          toast.success(VOICE_MESSAGES.callOutboundSuccess);
+          setCallModeOpen(false);
+          scheduleVoiceInboxRefresh(() => router.refresh());
+        })
+        .catch((error: unknown) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : VOICE_MESSAGES.callOutboundFailed,
+          );
+        })
+        .finally(() => {
+          setPendingCallMode(null);
+        });
+      return;
+    }
+
     startCalling(async () => {
-      const result = await triggerContactVoiceCallAction({
-        phoneNumber: phoneToCall,
-        contactId: call?.contactId ?? undefined,
-      });
+      try {
+        const result = await triggerContactVoiceCallAction({
+          phoneNumber: phoneToCall,
+          contactId: call?.contactId ?? undefined,
+        });
 
-      if (!result.success) {
-        toast.error(result.message ?? VOICE_MESSAGES.callOutboundFailed);
-        return;
+        if (!result.success) {
+          toast.error(result.message ?? VOICE_MESSAGES.callOutboundFailed);
+          return;
+        }
+
+        toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
+        setCallModeOpen(false);
+        router.refresh();
+      } finally {
+        setPendingCallMode(null);
       }
-
-      toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
     });
   }
 
@@ -122,6 +170,11 @@ export function VoiceInboxDialerPanel({
 
   const isOnCall =
     softphone.status === "on-call" || softphone.status === "connecting";
+  const isSoftphoneBusy =
+    softphone.status === "registering" ||
+    softphone.status === "connecting" ||
+    softphone.status === "on-call" ||
+    softphone.status === "incoming";
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
@@ -167,7 +220,16 @@ export function VoiceInboxDialerPanel({
         onChange={handleDialedNumberChange}
         onCall={handleCall}
         onDigitPress={handleDigitPress}
-        callDisabled={isCalling || isOnCall}
+        callDisabled={isCalling || Boolean(pendingCallMode) || isOnCall}
+      />
+
+      <VoiceCallModeDialog
+        open={callModeOpen}
+        phoneNumber={phoneToCall}
+        humanAvailable={softphone.enabled && !isSoftphoneBusy}
+        pendingMode={pendingCallMode}
+        onOpenChange={setCallModeOpen}
+        onSelectMode={handleCallModeSelect}
       />
 
       {canAddContact ? (

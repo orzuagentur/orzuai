@@ -6,6 +6,8 @@ import { getConversationRepository } from "@/repositories/conversation.repositor
 import { getMessageRepository } from "@/repositories/message.repository";
 import {
   getVoiceRepository,
+  type VoicePostCallJobType,
+  type VoiceCallEventRow,
   type VoiceCallLogInboxRow,
   type VoiceCallSessionTurn,
 } from "@/repositories/voice.repository";
@@ -14,12 +16,14 @@ import { getChannelConnectionStatuses } from "@/services/channel-workspace.servi
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
+import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import {
   getActiveMessagingChannelIds,
 } from "@/features/integrations";
 import type {
   VoiceCallDetail,
+  VoiceCallEventItem,
   VoiceInboxCallListItem,
   VoiceInboxPageData,
 } from "@/types/voice-inbox.types";
@@ -32,6 +36,8 @@ function mapCallLogRow(row: VoiceCallLogInboxRow): VoiceInboxCallListItem {
     status: row.status,
     provider: row.provider,
     triggerReason: row.trigger_reason,
+    callMode: row.call_mode,
+    operatorUserId: row.operator_user_id,
     createdAt: row.created_at,
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
@@ -43,6 +49,16 @@ function mapCallLogRow(row: VoiceCallLogInboxRow): VoiceInboxCallListItem {
     externalCallId: row.external_call_id,
     recordingUrl: row.recording_url,
     conversationId: row.conversation_id,
+  };
+}
+
+function mapCallEventRow(row: VoiceCallEventRow): VoiceCallEventItem {
+  return {
+    id: row.id,
+    eventType: row.event_type,
+    actorType: row.actor_type,
+    payload: row.payload,
+    createdAt: row.created_at,
   };
 }
 
@@ -134,6 +150,17 @@ export async function getVoiceInboxPageData(
   };
 }
 
+export async function getVoiceInboxCalls(
+  businessId: string,
+): Promise<VoiceInboxCallListItem[]> {
+  if (!hasSupabaseEnv()) {
+    return [];
+  }
+
+  const calls = await getVoiceRepository().listCallLogsForInbox(businessId);
+  return calls.map(mapCallLogRow);
+}
+
 export async function getVoiceCallDetail(
   businessId: string,
   callLogId: string,
@@ -161,11 +188,14 @@ export async function getVoiceCallDetail(
     }
   }
 
+  const events = await repo.listCallEvents(businessId, callLogId);
+
   return {
     ...mapCallLogRow(row),
     turns,
     turnCount,
     hasRecording: Boolean(row.recording_url?.trim()),
+    events: events.map(mapCallEventRow),
   };
 }
 
@@ -244,6 +274,14 @@ function mapTwilioCallStatus(callStatus: string): string {
   }
 }
 
+const POST_CALL_JOB_TYPES: VoicePostCallJobType[] = [
+  "transcribe",
+  "summarize",
+  "extract_actions",
+  "sync_crm",
+  "booking",
+];
+
 export async function handleTwilioCallStatusUpdate(input: {
   businessId: string;
   callSid: string;
@@ -287,6 +325,22 @@ export async function handleTwilioCallStatusUpdate(input: {
 
   await repo.updateCallLog(existing.id, patch);
 
+  await repo.insertCallEvent({
+    businessId: input.businessId,
+    callLogId: existing.id,
+    callSid: input.callSid,
+    eventType: "call.status",
+    actorType: "twilio",
+    payload: {
+      rawStatus: input.callStatus,
+      status: mappedStatus,
+      durationSeconds: durationSeconds ?? null,
+      direction: input.direction ?? null,
+      from: input.from ?? null,
+      to: input.to ?? null,
+    },
+  });
+
   if (mappedStatus === "completed" || mappedStatus === "missed") {
     void syncVoiceCallToConversation({
       businessId: input.businessId,
@@ -297,7 +351,104 @@ export async function handleTwilioCallStatusUpdate(input: {
         error instanceof Error ? error.message : "unknown",
       );
     });
+
+    const enqueueResults = await Promise.allSettled(
+      POST_CALL_JOB_TYPES.map((jobType) =>
+        repo.enqueuePostCallJob({
+          businessId: input.businessId,
+          callLogId: existing.id,
+          jobType,
+          payload: {
+            callSid: input.callSid,
+            status: mappedStatus,
+            durationSeconds: durationSeconds ?? null,
+          },
+        }),
+      ),
+    );
+
+    enqueueResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const jobType = POST_CALL_JOB_TYPES[index];
+        const error = result.reason;
+        console.warn(
+          "[voice-inbox] post-call job enqueue failed",
+          JSON.stringify({
+            callSid: input.callSid,
+            jobType,
+            error: error instanceof Error ? error.message : "unknown",
+          }),
+        );
+      }
+    });
+
+    if (enqueueResults.some((result) => result.status === "fulfilled")) {
+      dispatchVoicePostCallWorker("enqueue");
+    }
   }
+}
+
+export async function handleTwilioConferenceEvent(input: {
+  businessId: string;
+  parentCallSid: string;
+  participantCallSid?: string | null;
+  conferenceSid?: string | null;
+  conferenceName?: string | null;
+  eventName?: string | null;
+  participantLabel?: string | null;
+  muted?: string | null;
+  hold?: string | null;
+  rawPayload?: Record<string, string>;
+}): Promise<void> {
+  if (!hasSupabaseEnv() || !input.parentCallSid.trim()) {
+    return;
+  }
+
+  const repo = getVoiceRepository();
+  const callLog = await repo.findCallLogByExternalCallId(input.parentCallSid);
+
+  if (!callLog) {
+    return;
+  }
+
+  const eventName = input.eventName?.trim() || "unknown";
+  const activeEvents = new Set([
+    "start",
+    "join",
+    "conference-start",
+    "participant-join",
+    "speaker",
+  ]);
+  const completedEvents = new Set(["end", "conference-end"]);
+
+  if (activeEvents.has(eventName) && callLog.status !== "active") {
+    await repo.updateCallLog(callLog.id, { status: "active" });
+  }
+
+  if (completedEvents.has(eventName) && callLog.status !== "completed") {
+    await repo.updateCallLog(callLog.id, {
+      status: "completed",
+      endedAt: new Date().toISOString(),
+    });
+  }
+
+  await repo.insertCallEvent({
+    businessId: input.businessId,
+    callLogId: callLog.id,
+    callSid: input.participantCallSid ?? input.parentCallSid,
+    eventType: `conference.${eventName}`,
+    actorType: "twilio",
+    payload: {
+      parentCallSid: input.parentCallSid,
+      participantCallSid: input.participantCallSid ?? null,
+      conferenceSid: input.conferenceSid ?? null,
+      conferenceName: input.conferenceName ?? null,
+      participantLabel: input.participantLabel ?? null,
+      muted: input.muted ?? null,
+      hold: input.hold ?? null,
+      raw: input.rawPayload ?? {},
+    },
+  });
 }
 
 export async function recordClientOutboundVoiceCall(input: {
@@ -305,16 +456,16 @@ export async function recordClientOutboundVoiceCall(input: {
   phoneNumber: string;
   callSid: string;
   contactId?: string | null;
-}): Promise<void> {
+}): Promise<{ callLogId: string | null }> {
   if (!hasSupabaseEnv() || !input.callSid.trim()) {
-    return;
+    return { callLogId: null };
   }
 
   const repo = getVoiceRepository();
   const existing = await repo.findCallLogByExternalCallId(input.callSid);
 
   if (existing) {
-    return;
+    return { callLogId: existing.id };
   }
 
   await repo.insertCallLog({
@@ -326,7 +477,27 @@ export async function recordClientOutboundVoiceCall(input: {
     provider: "twilio",
     externalCallId: input.callSid,
     triggerReason: "browser_call",
+    callMode: "human",
+    humanHandled: true,
   });
+
+  const created = await repo.findCallLogByExternalCallId(input.callSid);
+
+  await repo.insertCallEvent({
+    businessId: input.businessId,
+    callLogId: created?.id ?? null,
+    callSid: input.callSid,
+    eventType: "call.created",
+    actorType: "operator",
+    payload: {
+      direction: "outbound",
+      phoneNumber: input.phoneNumber,
+      callMode: "human",
+      triggerReason: "browser_call",
+    },
+  });
+
+  return { callLogId: created?.id ?? null };
 }
 
 export async function syncVoiceCallToConversation(input: {

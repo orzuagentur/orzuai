@@ -1,4 +1,5 @@
 import type { VoiceCallSessionTurn } from "@/repositories/voice.repository";
+import type { Json } from "@/types/database.types";
 
 export type VoiceInboxCallListItem = {
   id: string;
@@ -7,6 +8,8 @@ export type VoiceInboxCallListItem = {
   status: string;
   provider: string;
   triggerReason: string | null;
+  callMode: string;
+  operatorUserId: string | null;
   createdAt: string;
   endedAt: string | null;
   durationSeconds: number | null;
@@ -24,6 +27,15 @@ export type VoiceCallDetail = VoiceInboxCallListItem & {
   turns: VoiceCallSessionTurn[];
   turnCount: number;
   hasRecording: boolean;
+  events: VoiceCallEventItem[];
+};
+
+export type VoiceCallEventItem = {
+  id: string;
+  eventType: string;
+  actorType: string;
+  payload: Json;
+  createdAt: string;
 };
 
 export type VoiceInboxPageData = {
