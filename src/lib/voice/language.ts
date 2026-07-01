@@ -42,23 +42,8 @@ export function resolveElevenLabsLanguageCode(
   return undefined;
 }
 
-export function resolveDeepgramLanguageCode(language: string): string {
-  const code = resolveElevenLabsLanguageCode(language);
-
-  switch (code) {
-    case "uk":
-      return "uk";
-    case "ru":
-      return "ru";
-    case "de":
-      return "de";
-    case "es":
-      return "es";
-    case "uz":
-      return "en";
-    default:
-      return "en";
-  }
+export function resolveDeepgramLanguageCode(_language: string): string {
+  return "multi";
 }
 
 export type VoicePhonePrompts = {

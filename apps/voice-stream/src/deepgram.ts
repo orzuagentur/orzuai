@@ -5,62 +5,21 @@ export type DeepgramLiveSession = {
   close: () => void;
 };
 
-type DeepgramListenConfig = {
-  model: string;
-  language: string;
-};
+const DEEPGRAM_LISTEN_CONFIG = {
+  model: "nova-3",
+  language: "multi",
+} as const;
 
-function resolveDeepgramLanguage(language: string): string {
-  const normalized = language.trim().toLowerCase();
-
-  if (normalized.startsWith("uk") || normalized.includes("ukrain")) {
-    return "uk";
-  }
-
-  if (normalized.startsWith("ru") || normalized.includes("russ")) {
-    return "ru";
-  }
-
-  if (normalized.startsWith("de") || normalized.includes("german")) {
-    return "de";
-  }
-
-  if (normalized.startsWith("es") || normalized.includes("spanish")) {
-    return "es";
-  }
-
-  if (
-    normalized.startsWith("en") ||
-    normalized === "english" ||
-    normalized === "multi" ||
-    !normalized
-  ) {
-    return "en";
-  }
-
-  return language.trim();
-}
-
-function resolveDeepgramListenConfig(language: string): DeepgramListenConfig {
-  const resolvedLanguage = resolveDeepgramLanguage(language);
-
-  // nova-2-phonecall is English-only. Other languages need nova-2 general.
-  return {
-    model: resolvedLanguage === "en" ? "nova-2-phonecall" : "nova-2",
-    language: resolvedLanguage,
-  };
-}
-
-function buildDeepgramListenUrl(config: DeepgramListenConfig): string {
+function buildDeepgramListenUrl(): string {
   const url = new URL("wss://api.deepgram.com/v1/listen");
-  url.searchParams.set("model", config.model);
+  url.searchParams.set("model", DEEPGRAM_LISTEN_CONFIG.model);
+  url.searchParams.set("language", DEEPGRAM_LISTEN_CONFIG.language);
   url.searchParams.set("encoding", "mulaw");
   url.searchParams.set("sample_rate", "8000");
   url.searchParams.set("channels", "1");
-  url.searchParams.set("language", config.language);
   url.searchParams.set("interim_results", "true");
   url.searchParams.set("utterance_end_ms", "1000");
-  url.searchParams.set("endpointing", "300");
+  url.searchParams.set("endpointing", "100");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("vad_events", "true");
   return url.toString();
@@ -82,9 +41,9 @@ export function startDeepgramLive(input: {
   onSpeechStarted: () => void;
   onError?: (message: string) => void;
 }): DeepgramLiveSession {
+  void input.language;
   const apiKey = input.apiKey.trim();
-  const listenConfig = resolveDeepgramListenConfig(input.language);
-  const listenUrl = buildDeepgramListenUrl(listenConfig);
+  const listenUrl = buildDeepgramListenUrl();
 
   let socket: WebSocket | null = new WebSocket(listenUrl, {
     headers: {
@@ -124,8 +83,7 @@ export function startDeepgramLive(input: {
       "[voice-stream] deepgram error",
       message,
       JSON.stringify({
-        model: listenConfig.model,
-        language: listenConfig.language,
+        ...DEEPGRAM_LISTEN_CONFIG,
         detail: detail ?? null,
       }),
     );
@@ -136,7 +94,7 @@ export function startDeepgramLive(input: {
     ws.on("open", () => {
       console.info(
         "[voice-stream] deepgram connected",
-        JSON.stringify(listenConfig),
+        JSON.stringify(DEEPGRAM_LISTEN_CONFIG),
       );
       flushPendingAudio();
 

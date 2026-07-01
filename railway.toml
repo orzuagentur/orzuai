@@ -6,7 +6,7 @@ builder = "RAILPACK"
 watchPatterns = ["apps/voice-stream/**", "package.json", "package-lock.json"]
 
 [deploy]
-startCommand = "npm run start --workspace=@orzu/voice-stream"
+startCommand = "node --import tsx apps/voice-stream/src/server.ts"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
