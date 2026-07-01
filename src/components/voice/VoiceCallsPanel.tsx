@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -46,8 +46,18 @@ type VoiceCallsPanelProps = Partial<VoiceInboxPageData>;
 export function VoiceCallsPanel(props: VoiceCallsPanelProps) {
   return (
     <InboxLayoutProvider>
-      <VoiceCallsPanelContent {...props} />
+      <Suspense fallback={<VoiceCallsPanelFallback />}>
+        <VoiceCallsPanelContent {...props} />
+      </Suspense>
     </InboxLayoutProvider>
+  );
+}
+
+function VoiceCallsPanelFallback() {
+  return (
+    <div className="flex h-full min-h-[320px] items-center justify-center text-sm text-muted-foreground">
+      {VOICE_MESSAGES.inboxLoading}
+    </div>
   );
 }
 
@@ -75,6 +85,7 @@ function VoiceCallsPanelContent({
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addContactPhone, setAddContactPhone] = useState("");
   const { detailsOpen, toggleDetails } = useInboxLayout();
+  const notifiedInboundCallsRef = useRef(new Set<string>());
 
   useEffect(() => {
     setCalls(initialCalls);
@@ -90,11 +101,21 @@ function VoiceCallsPanelContent({
         return;
       }
 
+      if (notifiedInboundCallsRef.current.has(call.id)) {
+        return;
+      }
+
+      notifiedInboundCallsRef.current.add(call.id);
+
       toast.info(VOICE_MESSAGES.inboundCallReceived, {
         description: call.contactName ?? call.phoneNumber,
+        action: {
+          label: VOICE_MESSAGES.inboundCallOpen,
+          onClick: () => {
+            router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`);
+          },
+        },
       });
-
-      router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`);
     },
     [router],
   );

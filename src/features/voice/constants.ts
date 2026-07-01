@@ -87,6 +87,8 @@ export const VOICE_MESSAGES = {
   callEventLogTitle: "Event log",
   callDirectionInbound: "Inbound",
   inboundCallReceived: "Incoming call",
+  inboundCallOpen: "Open",
+  inboxLoading: "Loading calls…",
   callDirectionOutbound: "Outbound",
   callAiHandled: "AI handled",
   callDuration: "Duration",

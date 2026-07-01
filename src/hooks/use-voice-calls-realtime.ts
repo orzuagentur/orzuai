@@ -196,7 +196,14 @@ export function useVoiceCallsRealtime({
           return [listItem, ...current];
         });
 
-        onNewCallRef.current?.(listItem);
+        if (
+          listItem.direction === "inbound" &&
+          ["ringing", "initiated", "queued", "in-progress"].includes(
+            listItem.status,
+          )
+        ) {
+          onNewCallRef.current?.(listItem);
+        }
       }
 
       if (activeCallIdRef.current === row.id) {
