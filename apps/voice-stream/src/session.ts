@@ -7,7 +7,7 @@ import {
   verifyStreamToken,
   type VoiceStreamContext,
 } from "./config.js";
-import { sendDeepgramAudio, startDeepgramLive } from "./deepgram.js";
+import { startDeepgramLive } from "./deepgram.js";
 import {
   sendTwilioClear,
   streamElevenLabsUlawToTwilio,
@@ -123,6 +123,9 @@ export class VoiceStreamSession {
       onFinalTranscript: (text) => {
         this.queueTranscript(text);
       },
+      onError: (message) => {
+        console.error("[voice-stream] deepgram live failed", message);
+      },
     });
 
     await this.speak(this.context.openingLine);
@@ -133,7 +136,7 @@ export class VoiceStreamSession {
       return;
     }
 
-    sendDeepgramAudio(this.deepgram.connection, message.media.payload);
+    this.deepgram.sendAudio(message.media.payload);
   }
 
   private queueTranscript(text: string): void {
@@ -193,6 +196,12 @@ export class VoiceStreamSession {
         "[voice-stream] process message failed",
         error instanceof Error ? error.message : "unknown",
       );
+
+      const fallback =
+        this.context.errorPrompt?.trim() ||
+        "Sorry, something went wrong. Could you please repeat that?";
+
+      await this.speak(fallback);
     } finally {
       this.isProcessing = false;
     }

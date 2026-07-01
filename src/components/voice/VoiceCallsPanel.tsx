@@ -7,6 +7,7 @@ import {
   ArrowLeftIcon,
   UserIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
@@ -32,7 +33,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
-import type { VoiceCallDetail, VoiceInboxPageData } from "@/types/voice-inbox.types";
+import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
 import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
@@ -83,12 +84,28 @@ function VoiceCallsPanelContent({
     setActiveCallDetail(initialActiveCall);
   }, [initialActiveCall]);
 
+  const handleNewCall = useCallback(
+    (call: VoiceInboxCallListItem) => {
+      if (call.direction !== "inbound") {
+        return;
+      }
+
+      toast.info(VOICE_MESSAGES.inboundCallReceived, {
+        description: call.contactName ?? call.phoneNumber,
+      });
+
+      router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`);
+    },
+    [router],
+  );
+
   useVoiceCallsRealtime({
     enabled: voiceInboxEnabled && Boolean(businessId),
     businessId,
     activeCallId,
     onCallsChange: setCalls,
     onActiveCallChange: setActiveCallDetail,
+    onNewCall: handleNewCall,
   });
 
   const filteredCalls = useMemo(() => {

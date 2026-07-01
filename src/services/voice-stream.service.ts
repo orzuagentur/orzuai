@@ -24,13 +24,33 @@ import { getVoiceAiBusinessContext } from "@/repositories/business-context.repos
 
 const MAX_STREAM_TURNS = 24;
 
-function resolveOpeningLine(
-  settings: Awaited<ReturnType<typeof getVoiceAgentSettings>>,
-  direction: "inbound" | "outbound",
-) {
-  return direction === "inbound"
-    ? settings.inboundGreeting
-    : settings.outboundScript;
+function resolveStreamOpeningLine(input: {
+  settings: Awaited<ReturnType<typeof getVoiceAgentSettings>>;
+  direction: "inbound" | "outbound";
+  language: string;
+}) {
+  const prompts = getVoicePhonePrompts(input.language);
+  const configuredLine =
+    input.direction === "inbound"
+      ? input.settings.inboundGreeting?.trim()
+      : input.settings.outboundScript?.trim();
+
+  const defaultEnglishInbound =
+    "Thank you for calling. How can we help you today?";
+  const defaultEnglishOutbound =
+    "Hello! This is your AI assistant calling to confirm your order and see if you have any questions.";
+
+  if (
+    configuredLine &&
+    configuredLine !== defaultEnglishInbound &&
+    configuredLine !== defaultEnglishOutbound
+  ) {
+    return configuredLine;
+  }
+
+  return input.direction === "inbound"
+    ? prompts.inboundReprompt
+    : prompts.outboundReprompt;
 }
 
 async function getOrCreateStreamSession(input: {
@@ -80,13 +100,21 @@ export async function getVoiceStreamSessionContext(input: {
     throw new Error("ElevenLabs voice is not configured.");
   }
 
+  const prompts = getVoicePhonePrompts(phoneVoice.language);
+
   return {
     businessId: input.businessId,
     businessName: businessContext.businessName,
     language: phoneVoice.language,
     languageCode: phoneVoice.languageCode,
     voiceId: phoneVoice.voiceId,
-    openingLine: resolveOpeningLine(settings, input.direction),
+    openingLine: resolveStreamOpeningLine({
+      settings,
+      direction: input.direction,
+      language: phoneVoice.language,
+    }),
+    errorPrompt: prompts.error,
+    repeatPrompt: prompts.repeat,
     direction: input.direction,
     triggerReason: input.triggerReason ?? null,
     deepgramLanguage: resolveDeepgramLanguageCode(phoneVoice.language),

@@ -122,6 +122,19 @@ export function VoiceInboxDialerPanel({
     setPendingCallMode(mode);
 
     if (mode === "human") {
+      if (!softphone.isOnline) {
+        toast.message(VOICE_MESSAGES.softphoneGoOnlineFirst);
+        void softphone.goOnline().catch((error: unknown) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : VOICE_MESSAGES.softphoneUnavailable,
+          );
+        });
+        setPendingCallMode(null);
+        return;
+      }
+
       void softphone
         .placeCall(phoneToCall)
         .then(() => {

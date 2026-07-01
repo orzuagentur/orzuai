@@ -86,6 +86,7 @@ export const VOICE_MESSAGES = {
   callActionItemsTitle: "Action items",
   callEventLogTitle: "Event log",
   callDirectionInbound: "Inbound",
+  inboundCallReceived: "Incoming call",
   callDirectionOutbound: "Outbound",
   callAiHandled: "AI handled",
   callDuration: "Duration",
@@ -129,6 +130,9 @@ export const VOICE_MESSAGES = {
   callConferenceControlFailed: "Unable to update conference.",
   softphoneTitle: "Browser phone",
   softphoneGoOnline: "Go online",
+  softphoneGoOnlineFirst:
+    "Go online first to receive and place browser calls.",
+  softphoneUnavailable: "Browser phone is unavailable.",
   softphoneGoOffline: "Go offline",
   softphoneOnlineHint: "Ready for browser calls and inbound when AI is off.",
   softphoneOfflineHint: "Go online to call from your browser or receive inbound calls.",

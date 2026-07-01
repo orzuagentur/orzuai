@@ -62,6 +62,7 @@ type UseVoiceCallsRealtimeOptions = {
   onActiveCallChange: (
     updater: (current: VoiceCallDetail | null) => VoiceCallDetail | null,
   ) => void;
+  onNewCall?: (call: VoiceInboxCallListItem) => void;
 };
 
 function mapLogRowToListItem(row: VoiceCallLogRealtimeRow): VoiceInboxCallListItem {
@@ -109,15 +110,18 @@ export function useVoiceCallsRealtime({
   activeCallId = null,
   onCallsChange,
   onActiveCallChange,
+  onNewCall,
 }: UseVoiceCallsRealtimeOptions) {
   const onCallsChangeRef = useRef(onCallsChange);
   const onActiveCallChangeRef = useRef(onActiveCallChange);
+  const onNewCallRef = useRef(onNewCall);
   const activeCallIdRef = useRef(activeCallId);
   const [reconnectNonce, setReconnectNonce] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   onCallsChangeRef.current = onCallsChange;
   onActiveCallChangeRef.current = onActiveCallChange;
+  onNewCallRef.current = onNewCall;
   activeCallIdRef.current = activeCallId;
 
   useEffect(() => {
@@ -191,6 +195,8 @@ export function useVoiceCallsRealtime({
 
           return [listItem, ...current];
         });
+
+        onNewCallRef.current?.(listItem);
       }
 
       if (activeCallIdRef.current === row.id) {

@@ -13,6 +13,34 @@ export function formatVoiceCallDuration(seconds: number | null): string {
   return `${minutes}m ${remainder}s`;
 }
 
+const PHONE_COUNTRY_PREFIXES: Array<{ prefix: string; label: string }> = [
+  { prefix: "+380", label: "Ukraine" },
+  { prefix: "+49", label: "Germany" },
+  { prefix: "+48", label: "Poland" },
+  { prefix: "+44", label: "United Kingdom" },
+  { prefix: "+998", label: "Uzbekistan" },
+  { prefix: "+7", label: "Russia / Kazakhstan" },
+  { prefix: "+1", label: "US / Canada" },
+  { prefix: "+34", label: "Spain" },
+  { prefix: "+33", label: "France" },
+  { prefix: "+39", label: "Italy" },
+  { prefix: "+90", label: "Turkey" },
+];
+
+export function getPhoneCountryLabel(phoneNumber: string): string | null {
+  const normalized = phoneNumber.trim().replace(/[^\d+]/g, "");
+
+  if (!normalized.startsWith("+")) {
+    return null;
+  }
+
+  const match = PHONE_COUNTRY_PREFIXES.find((entry) =>
+    normalized.startsWith(entry.prefix),
+  );
+
+  return match?.label ?? null;
+}
+
 export function formatVoiceCallDateParts(
   isoDate: string,
   options: { local?: boolean } = {},

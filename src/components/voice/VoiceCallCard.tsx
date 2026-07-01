@@ -24,6 +24,7 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { formatContactIdentifier } from "@/utils/contact-display";
+import { getPhoneCountryLabel } from "@/utils/voice-call-display";
 import { getCallsForContact } from "@/utils/voice-contact-calls";
 import { formatVoiceCallDuration } from "@/utils/voice-call-display";
 
@@ -73,6 +74,7 @@ export function VoiceCallCard({
       : VOICE_MESSAGES.callDetailEmpty);
 
   const phoneLabel = call?.phoneNumber ?? effectiveNumber;
+  const phoneCountry = phoneLabel ? getPhoneCountryLabel(phoneLabel) : null;
 
   const contactCalls = useMemo(
     () =>
@@ -115,6 +117,10 @@ export function VoiceCallCard({
               {VOICE_MESSAGES.callCardTapToCall}
             </p>
           )}
+
+          {phoneCountry ? (
+            <p className="mt-1 text-xs text-muted-foreground">{phoneCountry}</p>
+          ) : null}
 
           {hasQuickActions && !isOnCall && !isIncoming ? (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">

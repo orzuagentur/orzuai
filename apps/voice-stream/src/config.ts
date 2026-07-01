@@ -57,6 +57,8 @@ export type VoiceStreamContext = {
   languageCode?: string;
   voiceId: string;
   openingLine: string;
+  errorPrompt: string;
+  repeatPrompt: string;
   direction: "inbound" | "outbound";
   triggerReason: string | null;
   deepgramLanguage: string;
