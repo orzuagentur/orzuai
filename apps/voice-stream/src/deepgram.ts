@@ -8,27 +8,44 @@ export type DeepgramLiveSession = {
 function resolveDeepgramLanguage(language: string): string {
   const normalized = language.trim().toLowerCase();
 
-  if (
-    normalized === "multi" ||
-    normalized.startsWith("en") ||
-    normalized === "english" ||
-    !normalized
-  ) {
-    return "multi";
+  if (normalized.startsWith("uk") || normalized.includes("ukrain")) {
+    return "uk";
   }
 
-  return language;
+  if (normalized.startsWith("ru") || normalized.includes("russ")) {
+    return "ru";
+  }
+
+  if (normalized.startsWith("de") || normalized.includes("german")) {
+    return "de";
+  }
+
+  if (normalized.startsWith("es") || normalized.includes("spanish")) {
+    return "es";
+  }
+
+  if (
+    normalized.startsWith("en") ||
+    normalized === "english" ||
+    normalized === "multi" ||
+    !normalized
+  ) {
+    return "en";
+  }
+
+  return language.trim();
 }
 
 function buildDeepgramListenUrl(language: string): string {
   const url = new URL("wss://api.deepgram.com/v1/listen");
-  url.searchParams.set("model", "nova-2");
+  url.searchParams.set("model", "nova-2-phonecall");
   url.searchParams.set("encoding", "mulaw");
   url.searchParams.set("sample_rate", "8000");
+  url.searchParams.set("channels", "1");
   url.searchParams.set("language", resolveDeepgramLanguage(language));
   url.searchParams.set("interim_results", "true");
-  url.searchParams.set("utterance_end_ms", "900");
-  url.searchParams.set("endpointing", "250");
+  url.searchParams.set("utterance_end_ms", "1000");
+  url.searchParams.set("endpointing", "300");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("vad_events", "true");
   return url.toString();
@@ -83,13 +100,23 @@ export function startDeepgramLive(input: {
   };
 
   const reportError = (message: string, detail?: unknown) => {
+    if (isClosed) {
+      return;
+    }
+
     console.error("[voice-stream] deepgram error", message, detail ?? "");
     input.onError?.(message);
   };
 
   const attachSocketHandlers = (ws: WebSocket) => {
     ws.on("open", () => {
-      console.info("[voice-stream] deepgram connected");
+      console.info(
+        "[voice-stream] deepgram connected",
+        JSON.stringify({
+          model: "nova-2-phonecall",
+          language: resolveDeepgramLanguage(input.language),
+        }),
+      );
       flushPendingAudio();
 
       keepAliveTimer = setInterval(() => {
@@ -136,9 +163,10 @@ export function startDeepgramLive(input: {
       });
 
       response.on("end", () => {
+        const dgError = response.headers["dg-error"];
         reportError(
           `Deepgram handshake failed (${response.statusCode} ${response.statusMessage})`,
-          body.trim() || undefined,
+          dgError || body.trim() || undefined,
         );
       });
     });
@@ -184,12 +212,22 @@ export function startDeepgramLive(input: {
         return;
       }
 
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "CloseStream" }));
+      const ws = socket;
+      socket = null;
+
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: "CloseStream" }));
+        } catch {
+          // Ignore close race while stream is shutting down.
+        }
+        ws.close();
+        return;
       }
 
-      socket.close();
-      socket = null;
+      if (ws.readyState === WebSocket.CONNECTING) {
+        ws.terminate();
+      }
     },
   };
 }
