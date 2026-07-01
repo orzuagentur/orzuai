@@ -1,9 +1,12 @@
 import "server-only";
 
 import { buildVoiceSystemPrompt } from "@/lib/voice/prompts";
+import { getVoicePhonePrompts } from "@/lib/voice/language";
 import {
   buildGatherActionUrl,
   buildGoodbyeTwiml,
+  buildPlayAndGatherTwiml,
+  buildPlayTwiml,
   buildSayAndGatherTwiml,
   buildStaticSayTwiml,
   mapVoiceLanguageToTwilioLocale,
@@ -30,6 +33,10 @@ import {
   customerExplicitlyRequestedHuman,
 } from "@/utils/human-handoff-policy";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
+import {
+  loadPhoneVoiceSettings,
+  synthesizePhoneSpeechAudio,
+} from "@/services/voice-phone-tts.service";
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
 
 const MAX_VOICE_TURNS = 8;
@@ -44,20 +51,25 @@ type VoiceSessionState = {
 };
 
 async function loadBusinessContext(businessId: string) {
-  const [context, knowledgeEntries] = await Promise.all([
+  const admin = getVoiceRepository().client;
+  const [context, knowledgeEntries, profileResult] = await Promise.all([
     getVoiceAiBusinessContext(businessId),
-    listKnowledgeEntriesForBusiness(
-      getVoiceRepository().client,
-      businessId,
-    ),
+    listKnowledgeEntriesForBusiness(admin, businessId),
+    admin
+      .from("ai_assistant_profile")
+      .select("system_prompt, language")
+      .eq("business_id", businessId)
+      .maybeSingle(),
   ]);
+
+  const profile = profileResult.data;
 
   return {
     businessName: context.businessName,
     provider: context.provider,
     model: context.model,
-    language: context.language,
-    systemPrompt: context.systemPrompt,
+    language: profile?.language?.trim() || context.language,
+    systemPrompt: profile?.system_prompt?.trim() || context.systemPrompt,
     knowledgeContext: knowledgeEntries.map((entry) => ({
       category: entry.category ?? "",
       title: entry.title,
@@ -122,7 +134,9 @@ export async function generateVoiceAiReply(input: {
   settings: VoiceAgentSettings;
 }): Promise<{ success: true; text: string } | { success: false; message: string }> {
   const context = await loadBusinessContext(input.businessId);
-  const language = input.settings.voiceLanguage || context.language;
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+  const language =
+    phoneVoice.language || input.settings.voiceLanguage || context.language;
 
   const systemPrompt = buildVoiceSystemPrompt({
     businessName: context.businessName,
@@ -163,22 +177,87 @@ export async function generateVoiceAiReply(input: {
   };
 }
 
-function resolveOpeningLine(settings: VoiceAgentSettings, direction: "inbound" | "outbound") {
+function resolveOpeningLine(
+  settings: VoiceAgentSettings,
+  direction: "inbound" | "outbound",
+) {
   return direction === "inbound"
     ? settings.inboundGreeting
     : settings.outboundScript;
+}
+
+async function buildSpokenConversationTwiml(input: {
+  businessId: string;
+  callSid: string;
+  speech: string;
+  gatherActionUrl: string;
+  speechLocale: string;
+  language: string;
+  repromptSpeech: string;
+  goodbyeSpeech: string;
+  turnKey: string;
+  includeGather?: boolean;
+}): Promise<string> {
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+
+  if (phoneVoice.useElevenLabs && input.callSid.trim()) {
+    const audio = await synthesizePhoneSpeechAudio({
+      businessId: input.businessId,
+      callSid: input.callSid,
+      text: input.speech,
+      turnKey: input.turnKey,
+    });
+
+    if (audio.success) {
+      if (input.includeGather === false) {
+        return buildPlayTwiml({
+          audioUrl: audio.audioUrl,
+          speechLocale: input.speechLocale,
+          goodbyeSpeech: input.goodbyeSpeech,
+        });
+      }
+
+      return buildPlayAndGatherTwiml({
+        audioUrl: audio.audioUrl,
+        gatherActionUrl: input.gatherActionUrl,
+        speechLocale: input.speechLocale,
+        repromptSpeech: input.repromptSpeech,
+        goodbyeSpeech: input.goodbyeSpeech,
+      });
+    }
+  }
+
+  if (input.includeGather === false) {
+    return buildStaticSayTwiml({
+      speech: `${input.speech} ${input.goodbyeSpeech}`,
+      speechLocale: input.speechLocale,
+    });
+  }
+
+  return buildSayAndGatherTwiml({
+    speech: input.speech,
+    gatherActionUrl: input.gatherActionUrl,
+    speechLocale: input.speechLocale,
+    reprompt: input.repromptSpeech,
+  });
 }
 
 export async function buildVoiceConversationTwiml(input: {
   businessId: string;
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
+  forceAi?: boolean;
+  callSid?: string | null;
 }): Promise<string> {
   const settings = await getVoiceAgentSettings(input.businessId);
-  const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+  const speechLocale = mapVoiceLanguageToTwilioLocale(phoneVoice.language);
+  const prompts = getVoicePhonePrompts(phoneVoice.language);
   const opening = resolveOpeningLine(settings, input.direction);
+  const aiActive = input.forceAi || settings.aiEnabled;
+  const callSid = input.callSid?.trim() || `opening-${Date.now()}`;
 
-  if (!settings.aiEnabled) {
+  if (!aiActive) {
     return applyCallRecordingToTwiml(
       input.businessId,
       buildStaticSayTwiml({ speech: opening, speechLocale }),
@@ -191,14 +270,19 @@ export async function buildVoiceConversationTwiml(input: {
     triggerReason: input.triggerReason,
   });
 
-  const twiml = buildSayAndGatherTwiml({
+  const twiml = await buildSpokenConversationTwiml({
+    businessId: input.businessId,
+    callSid,
     speech: opening,
     gatherActionUrl: gatherUrl,
     speechLocale,
-    reprompt:
+    language: phoneVoice.language,
+    repromptSpeech:
       input.direction === "outbound"
-        ? "Please tell me if you have any questions about your request."
-        : "How can I help you today?",
+        ? prompts.outboundReprompt
+        : prompts.inboundReprompt,
+    goodbyeSpeech: prompts.goodbye,
+    turnKey: "opening",
   });
 
   return applyCallRecordingToTwiml(input.businessId, twiml);
@@ -213,9 +297,17 @@ export async function handleVoiceGatherInput(input: {
   callerPhone?: string | null;
 }): Promise<string> {
   const settings = await getVoiceAgentSettings(input.businessId);
-  const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+  const speechLocale = mapVoiceLanguageToTwilioLocale(phoneVoice.language);
+  const prompts = getVoicePhonePrompts(phoneVoice.language);
+  const repo = getVoiceRepository();
+  const callLog = await repo.findCallLogByExternalCallId(input.callSid);
+  const aiActive =
+    settings.aiEnabled ||
+    callLog?.call_mode === "ai" ||
+    callLog?.call_mode === "handoff";
 
-  if (!settings.aiEnabled) {
+  if (!aiActive) {
     void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: false });
     return buildGoodbyeTwiml(speechLocale);
   }
@@ -228,7 +320,7 @@ export async function handleVoiceGatherInput(input: {
 
   if (!session) {
     return buildStaticSayTwiml({
-      speech: "Sorry, something went wrong. Please try again later.",
+      speech: prompts.error,
       speechLocale,
     });
   }
@@ -242,10 +334,16 @@ export async function handleVoiceGatherInput(input: {
       triggerReason: input.triggerReason,
     });
 
-    return buildSayAndGatherTwiml({
-      speech: "I did not hear you. Could you please repeat that?",
+    return await buildSpokenConversationTwiml({
+      businessId: input.businessId,
+      callSid: input.callSid,
+      speech: prompts.repeat,
       gatherActionUrl: gatherUrl,
       speechLocale,
+      language: phoneVoice.language,
+      repromptSpeech: prompts.repeat,
+      goodbyeSpeech: prompts.goodbye,
+      turnKey: `repeat-${session.turn_count}`,
     });
   }
 
@@ -302,13 +400,24 @@ export async function handleVoiceGatherInput(input: {
     });
   }
 
-  if (session.turn_count + 1 >= MAX_VOICE_TURNS) {
+  const nextTurnCount = session.turn_count + 1;
+
+  if (nextTurnCount >= MAX_VOICE_TURNS) {
     void markVoiceCallCompleted({ callSid: input.callSid, aiHandled: true });
+
     return applyCallRecordingToTwiml(
       input.businessId,
-      buildStaticSayTwiml({
-        speech: `${assistantText} Thank you for calling. Goodbye.`,
+      await buildSpokenConversationTwiml({
+        businessId: input.businessId,
+        callSid: input.callSid,
+        speech: `${assistantText} ${prompts.goodbye}`,
+        gatherActionUrl: "",
         speechLocale,
+        language: phoneVoice.language,
+        repromptSpeech: prompts.repeat,
+        goodbyeSpeech: prompts.goodbye,
+        turnKey: `final-${nextTurnCount}`,
+        includeGather: false,
       }),
     );
   }
@@ -321,10 +430,16 @@ export async function handleVoiceGatherInput(input: {
 
   return applyCallRecordingToTwiml(
     input.businessId,
-    buildSayAndGatherTwiml({
+    await buildSpokenConversationTwiml({
+      businessId: input.businessId,
+      callSid: input.callSid,
       speech: assistantText,
       gatherActionUrl: gatherUrl,
       speechLocale,
+      language: phoneVoice.language,
+      repromptSpeech: prompts.repeat,
+      goodbyeSpeech: prompts.goodbye,
+      turnKey: `turn-${nextTurnCount}`,
     }),
   );
 }

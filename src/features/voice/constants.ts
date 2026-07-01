@@ -145,6 +145,7 @@ export const VOICE_MESSAGES = {
   callCardSelected: "Selected call",
   callCardTapToCall: "Tap the green button to call",
   softphoneConnecting: "Connecting…",
+  aiCallLive: "AI call in progress…",
   softphoneOnCall: "On call",
   softphoneIncoming: "Incoming call",
   softphoneAccept: "Answer",

@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
-  const twiml = await buildClientNoAnswerTwiml(businessId);
+  const twiml = await buildClientNoAnswerTwiml(
+    businessId,
+    params.CallSid?.trim() || null,
+  );
 
   return new NextResponse(twiml, {
     status: 200,

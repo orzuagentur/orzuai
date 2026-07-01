@@ -183,8 +183,7 @@ export async function recordInboundVoiceCall(input: {
   }
 
   const phoneNumber = input.phoneNumber.trim();
-  const settings = await getVoiceAgentSettings(input.businessId);
-  const callMode = settings.aiEnabled ? "ai" : "human";
+  const callMode = "human";
   let contactId: string | null = null;
   let conversationId: string | null = null;
 
@@ -204,23 +203,24 @@ export async function recordInboundVoiceCall(input: {
 
   const repo = getVoiceRepository();
 
-  await repo.insertCallLog({
+  const callLogId = await repo.insertCallLog({
     businessId: input.businessId,
     contactId,
     conversationId,
     callMode,
     direction: "inbound",
     phoneNumber: phoneNumber || "unknown",
-    status: "active",
+    status: "ringing",
     provider: "twilio",
     externalCallId: input.callSid || null,
     triggerReason: "inbound_call",
-    aiHandled: callMode === "ai",
-    humanHandled: callMode === "human",
+    aiHandled: false,
+    humanHandled: true,
   });
 
   await repo.insertCallEvent({
     businessId: input.businessId,
+    callLogId,
     callSid: input.callSid || null,
     eventType: "call.created",
     actorType: "twilio",
@@ -290,10 +290,10 @@ async function logVoiceCall(input: {
   externalCallId?: string | null;
   triggerReason?: string | null;
   callMode?: "ai" | "human" | "handoff" | "unknown";
-}) {
+}): Promise<string | null> {
   const repo = getVoiceRepository();
 
-  await repo.insertCallLog({
+  const callLogId = await repo.insertCallLog({
     businessId: input.businessId,
     contactId: input.contactId,
     callMode: input.callMode,
@@ -309,6 +309,7 @@ async function logVoiceCall(input: {
 
   await repo.insertCallEvent({
     businessId: input.businessId,
+    callLogId,
     callSid: input.externalCallId ?? null,
     eventType: "call.created",
     actorType: input.callMode === "ai" ? "ai" : "system",
@@ -321,6 +322,8 @@ async function logVoiceCall(input: {
       callMode: input.callMode ?? "unknown",
     },
   });
+
+  return callLogId;
 }
 
 async function twilioCreateCall(input: {
@@ -428,7 +431,7 @@ export async function placeOutboundVoiceCall(input: {
   phoneNumber: string;
   triggerReason: string;
   requireAiAssistant?: boolean;
-}): Promise<{ success: boolean; message?: string }> {
+}): Promise<{ success: boolean; message?: string; callLogId?: string }> {
   const settings = await getVoiceAgentSettings(input.businessId);
 
   if (!settings.enabled || !settings.outboundEnabled) {
@@ -476,6 +479,10 @@ export async function placeOutboundVoiceCall(input: {
 
     const outboundUrl = new URL(webhooks.outboundWebhookUrl);
     outboundUrl.searchParams.set("triggerReason", input.triggerReason);
+
+    if (input.requireAiAssistant) {
+      outboundUrl.searchParams.set("callMode", "ai");
+    }
 
     const result = await twilioCreateCall({
       credentials: twilioCredentials,
@@ -527,7 +534,7 @@ export async function placeOutboundVoiceCall(input: {
     status = "initiated";
   }
 
-  await logVoiceCall({
+  const callLogId = await logVoiceCall({
     businessId: input.businessId,
     contactId: input.contactId,
     direction: "outbound",
@@ -539,7 +546,7 @@ export async function placeOutboundVoiceCall(input: {
     callMode: input.requireAiAssistant ? "ai" : "unknown",
   });
 
-  return { success: true };
+  return { success: true, callLogId: callLogId ?? undefined };
 }
 
 export async function scheduleOutboundCallAfterOrder(input: {
@@ -678,19 +685,10 @@ export async function getInboundVoiceTwiml(
     );
   }
 
-  let twiml: string;
-
-  if (!settings.aiEnabled) {
-    const { buildInboundBrowserTwiml } = await import(
-      "@/services/voice-client.service"
-    );
-    twiml = await buildInboundBrowserTwiml(businessId);
-  } else {
-    twiml = await buildVoiceConversationTwiml({
-      businessId,
-      direction: "inbound",
-    });
-  }
+  const { buildInboundBrowserTwiml } = await import(
+    "@/services/voice-client.service"
+  );
+  const twiml = await buildInboundBrowserTwiml(businessId);
 
   return applyCallRecordingToTwiml(businessId, twiml);
 }
@@ -698,11 +696,15 @@ export async function getInboundVoiceTwiml(
 export async function getOutboundVoiceTwiml(
   businessId: string,
   triggerReason?: string | null,
+  callMode?: string | null,
+  callSid?: string | null,
 ): Promise<string> {
   return buildVoiceConversationTwiml({
     businessId,
     direction: "outbound",
     triggerReason,
+    forceAi: callMode === "ai",
+    callSid,
   });
 }
 

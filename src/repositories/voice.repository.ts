@@ -213,7 +213,7 @@ export class VoiceRepository {
     return data ?? [];
   }
 
-  async insertCallLog(input: VoiceCallLogInsert): Promise<void> {
+  async insertCallLog(input: VoiceCallLogInsert): Promise<string | null> {
     const externalCallId = input.externalCallId?.trim() || null;
 
     if (externalCallId) {
@@ -231,33 +231,43 @@ export class VoiceRepository {
           callMode: input.callMode,
           operatorUserId: input.operatorUserId,
         });
-        return;
+        return existing.id;
       }
     }
 
-    const { error } = await this.db.from("voice_call_logs").insert({
-      business_id: input.businessId,
-      contact_id: input.contactId ?? null,
-      call_mode: input.callMode ?? "unknown",
-      operator_user_id: input.operatorUserId ?? null,
-      direction: input.direction,
-      phone_number: input.phoneNumber,
-      status: input.status,
-      provider: input.provider,
-      external_call_id: externalCallId,
-      trigger_reason: input.triggerReason ?? null,
-      ai_handled: input.aiHandled ?? false,
-      human_handled: input.humanHandled ?? false,
-      conversation_id: input.conversationId ?? null,
-    });
+    const { data, error } = await this.db
+      .from("voice_call_logs")
+      .insert({
+        business_id: input.businessId,
+        contact_id: input.contactId ?? null,
+        call_mode: input.callMode ?? "unknown",
+        operator_user_id: input.operatorUserId ?? null,
+        direction: input.direction,
+        phone_number: input.phoneNumber,
+        status: input.status,
+        provider: input.provider,
+        external_call_id: externalCallId,
+        trigger_reason: input.triggerReason ?? null,
+        ai_handled: input.aiHandled ?? false,
+        human_handled: input.humanHandled ?? false,
+        conversation_id: input.conversationId ?? null,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       if (externalCallId && error.code === "23505") {
-        return;
+        const existing = await this.findCallLogByBusinessAndExternalCallId(
+          input.businessId,
+          externalCallId,
+        );
+        return existing?.id ?? null;
       }
 
       throw new Error(error.message);
     }
+
+    return data?.id ?? null;
   }
 
   async listCallLogsForInbox(
@@ -364,12 +374,13 @@ export class VoiceRepository {
       | "phone_number"
       | "conversation_id"
       | "recording_url"
+      | "call_mode"
     > | null
   > {
     const { data, error } = await this.db
       .from("voice_call_logs")
       .select(
-        "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url",
+        "id, business_id, created_at, status, duration_seconds, contact_id, phone_number, conversation_id, recording_url, call_mode",
       )
       .eq("external_call_id", externalCallId)
       .maybeSingle();

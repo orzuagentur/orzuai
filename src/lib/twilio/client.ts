@@ -402,6 +402,21 @@ export async function createTwilioOutboundCallWithTwiml(input: {
   return response.sid ?? "unknown";
 }
 
+export async function completeTwilioCall(input: {
+  credentials: TwilioApiCredentials;
+  callSid: string;
+}): Promise<void> {
+  const body = new URLSearchParams({
+    Status: "completed",
+  });
+
+  await twilioRequest(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Calls/${input.callSid}.json`,
+    { method: "POST", body },
+  );
+}
+
 export async function redirectTwilioCall(input: {
   credentials: TwilioApiCredentials;
   callSid: string;

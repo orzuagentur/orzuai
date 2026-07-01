@@ -36,7 +36,14 @@ export async function POST(request: NextRequest) {
   }
 
   const triggerReason = request.nextUrl.searchParams.get("triggerReason");
-  const twiml = await getOutboundVoiceTwiml(businessId, triggerReason);
+  const callMode = request.nextUrl.searchParams.get("callMode");
+  const callSid = params.CallSid?.trim() || null;
+  const twiml = await getOutboundVoiceTwiml(
+    businessId,
+    triggerReason,
+    callMode,
+    callSid,
+  );
 
   return new NextResponse(twiml, {
     status: 200,

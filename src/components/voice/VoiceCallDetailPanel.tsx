@@ -343,7 +343,12 @@ export function VoiceCallDetailPanel({
 
         toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
         setCallModeOpen(false);
-        router.refresh();
+
+        if (result.callLogId) {
+          router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+        }
+
+        scheduleVoiceInboxRefresh(() => router.refresh());
       } finally {
         setPendingCallMode(null);
       }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Loader2Icon,
   PencilIcon,
@@ -36,6 +37,7 @@ import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-con
 import { deleteContactAction } from "@/features/contacts/actions/delete-contact";
 import { updateContactAction } from "@/features/contacts/actions/update-contact";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
@@ -89,6 +91,7 @@ export function ContactFullProfilePanel({
     AdditionalContactEntry[]
   >([]);
   const softphone = useVoiceSoftphone();
+  const router = useRouter();
 
   const { contact } = profile;
   const infoRows = buildContactProfileInfoRows(profile);
@@ -194,6 +197,11 @@ export function ContactFullProfilePanel({
 
       toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
       setCallModeOpen(false);
+
+      if (result.callLogId) {
+        router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+      }
+
       await onRefresh();
     })()
       .catch((error: unknown) => {

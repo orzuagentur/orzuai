@@ -19,6 +19,7 @@ import { VoiceDialPad } from "@/components/voice/VoiceDialPad";
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { scheduleVoiceInboxRefresh } from "@/utils/voice-inbox-refresh";
@@ -155,7 +156,12 @@ export function VoiceInboxDialerPanel({
 
         toast.success(result.message ?? VOICE_MESSAGES.callOutboundSuccess);
         setCallModeOpen(false);
-        router.refresh();
+
+        if (result.callLogId) {
+          router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+        }
+
+        scheduleVoiceInboxRefresh(() => router.refresh());
       } finally {
         setPendingCallMode(null);
       }

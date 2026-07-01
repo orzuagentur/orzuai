@@ -33,7 +33,7 @@ import {
   getTwilioConnection,
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
-import { recordClientOutboundVoiceCall } from "@/services/voice-inbox.service";
+import { recordClientOutboundVoiceCall, markInboundCallAiFallback } from "@/services/voice-inbox.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
 
 const CONFERENCE_WAIT_URL =
@@ -303,7 +303,7 @@ export async function buildClientOutboundTwiml(input: {
     participantLabel: "customer",
     statusCallbackUrl: conferenceStatusCallback,
     startConferenceOnEnter: false,
-    endConferenceOnExit: false,
+    endConferenceOnExit: true,
     waitUrl: CONFERENCE_WAIT_URL,
   });
 
@@ -373,9 +373,27 @@ export async function buildInboundBrowserTwiml(
 
 export async function buildClientNoAnswerTwiml(
   businessId: string,
+  callSid?: string | null,
 ): Promise<string> {
   const settings = await getVoiceAgentSettings(businessId);
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
+
+  if (settings.aiEnabled && settings.aiConfigured) {
+    if (callSid?.trim()) {
+      await markInboundCallAiFallback(businessId, callSid.trim());
+    }
+
+    const { buildVoiceConversationTwiml } = await import(
+      "@/services/voice-ai.service"
+    );
+
+    return buildVoiceConversationTwiml({
+      businessId,
+      direction: "inbound",
+      forceAi: true,
+      callSid: callSid?.trim() || null,
+    });
+  }
 
   return buildStaticSayTwiml({
     speech: settings.inboundGreeting,

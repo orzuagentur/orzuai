@@ -94,6 +94,7 @@ export async function synthesizeElevenLabsSpeech(input: {
   text: string;
   voiceId: string;
   languageCode?: string;
+  modelId?: string;
 }): Promise<{ success: true; buffer: Buffer; mimeType: string } | { success: false; message: string }> {
   const apiKey = getElevenLabsApiKey();
   const text = input.text.trim();
@@ -122,7 +123,7 @@ export async function synthesizeElevenLabsSpeech(input: {
         },
         body: JSON.stringify({
           text,
-          model_id: DEFAULT_TTS_MODEL,
+          model_id: input.modelId?.trim() || DEFAULT_TTS_MODEL,
           language_code: input.languageCode?.trim() || undefined,
         }),
       },

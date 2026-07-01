@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getTwilioPlatformAccountSid, getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
-import { updateTwilioConferenceParticipant } from "@/lib/twilio/client";
+import { completeTwilioCall, updateTwilioConferenceParticipant } from "@/lib/twilio/client";
 import { getVoiceRepository, type VoiceCallEventRow } from "@/repositories/voice.repository";
 import type { Json } from "@/types/database.types";
 
@@ -154,4 +154,32 @@ export async function controlVoiceConferenceParticipant(input: {
   });
 
   return { success: true, message: "Conference participant updated." };
+}
+
+export async function completeOperatorCallAfterCustomerLeave(input: {
+  businessId: string;
+  parentCallSid: string;
+}): Promise<void> {
+  const accountSid = getTwilioPlatformAccountSid();
+  const authToken = getTwilioPlatformAuthToken();
+
+  if (!accountSid || !authToken || !input.parentCallSid.trim()) {
+    return;
+  }
+
+  try {
+    await completeTwilioCall({
+      credentials: { accountSid, authToken },
+      callSid: input.parentCallSid.trim(),
+    });
+  } catch (error) {
+    console.warn(
+      "[voice-conference] failed to complete operator call after customer leave",
+      JSON.stringify({
+        businessId: input.businessId,
+        parentCallSid: input.parentCallSid,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
 }

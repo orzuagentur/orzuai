@@ -13,7 +13,7 @@ const schema = z.object({
 
 export async function triggerContactVoiceCallAction(
   input: z.infer<typeof schema>,
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; message?: string; callLogId?: string }> {
   const parsed = schema.safeParse(input);
 
   if (!parsed.success) {

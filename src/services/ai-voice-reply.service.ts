@@ -7,6 +7,7 @@ import {
 import { deliverChannelMediaMessage } from "@/services/channels/deliver-media";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
 import { synthesizeElevenLabsSpeech } from "@/services/elevenlabs.service";
+import { resolveElevenLabsLanguageCode } from "@/lib/voice/language";
 import { markMessageAttachmentReady } from "@/services/message-attachment.service";
 import { transcodeVoiceNoteToOggOpus } from "@/services/voice-note-transcode.service";
 import { logAiUsage } from "@/services/ai-usage.service";
@@ -103,21 +104,7 @@ export async function shouldUseVoiceAutoReply(input: {
 }
 
 function resolveLanguageCode(language: string): string | undefined {
-  const normalized = language.trim().toLowerCase();
-
-  if (normalized.startsWith("ru") || normalized === "russian" || normalized === "русский") {
-    return "ru";
-  }
-
-  if (normalized.startsWith("uz") || normalized === "uzbek" || normalized.includes("o'zbek")) {
-    return "uz";
-  }
-
-  if (normalized.startsWith("en") || normalized === "english") {
-    return "en";
-  }
-
-  return undefined;
+  return resolveElevenLabsLanguageCode(language);
 }
 
 export async function sendChannelAutoReplyVoice(input: {

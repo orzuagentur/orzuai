@@ -14,6 +14,7 @@ import {
 import type { InboxBusinessContext } from "@/services/chat.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
+import { completeOperatorCallAfterCustomerLeave } from "@/services/voice-conference.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
@@ -432,6 +433,19 @@ export async function handleTwilioConferenceEvent(input: {
     });
   }
 
+  const leaveEvents = new Set(["leave", "participant-leave"]);
+
+  if (
+    leaveEvents.has(eventName) &&
+    input.participantLabel === "customer" &&
+    callLog.status !== "completed"
+  ) {
+    await completeOperatorCallAfterCustomerLeave({
+      businessId: input.businessId,
+      parentCallSid: input.parentCallSid,
+    });
+  }
+
   await repo.insertCallEvent({
     businessId: input.businessId,
     callLogId: callLog.id,
@@ -447,6 +461,40 @@ export async function handleTwilioConferenceEvent(input: {
       muted: input.muted ?? null,
       hold: input.hold ?? null,
       raw: input.rawPayload ?? {},
+    },
+  });
+}
+
+export async function markInboundCallAiFallback(
+  businessId: string,
+  callSid: string,
+): Promise<void> {
+  if (!hasSupabaseEnv() || !callSid.trim()) {
+    return;
+  }
+
+  const repo = getVoiceRepository();
+  const callLog = await repo.findCallLogByExternalCallId(callSid);
+
+  if (!callLog || callLog.business_id !== businessId) {
+    return;
+  }
+
+  await repo.updateCallLog(callLog.id, {
+    callMode: "handoff",
+    aiHandled: true,
+    humanHandled: false,
+    handoffAt: new Date().toISOString(),
+  });
+
+  await repo.insertCallEvent({
+    businessId,
+    callLogId: callLog.id,
+    callSid,
+    eventType: "call.ai_fallback",
+    actorType: "system",
+    payload: {
+      reason: "operator_no_answer",
     },
   });
 }

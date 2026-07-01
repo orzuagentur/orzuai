@@ -52,6 +52,16 @@ export function VoiceCallCard({
   const isOnCall =
     softphone.status === "on-call" || softphone.status === "connecting";
   const isIncoming = softphone.status === "incoming";
+  const activeCallStatuses = new Set([
+    "active",
+    "ringing",
+    "initiated",
+    "in-progress",
+  ]);
+  const isAiCallLive =
+    Boolean(call) &&
+    (call?.callMode === "ai" || call?.callMode === "handoff") &&
+    activeCallStatuses.has((call?.status ?? "").toLowerCase());
 
   const liveNumber = softphone.activePhoneNumber?.trim() || "";
   const effectiveNumber = liveNumber || dialedNumber.trim();
@@ -153,6 +163,11 @@ export function VoiceCallCard({
           {softphone.status === "on-call" && softphone.callElapsedSeconds !== null ? (
             <p className="mt-2 font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
               {formatVoiceCallDuration(softphone.callElapsedSeconds)}
+            </p>
+          ) : isAiCallLive ? (
+            <p className="mt-2 flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+              <Loader2Icon className="size-4 animate-spin" />
+              {VOICE_MESSAGES.aiCallLive}
             </p>
           ) : softphone.status === "connecting" ? (
             <p className="mt-2 text-sm font-medium text-sky-600 dark:text-sky-400">

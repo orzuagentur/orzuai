@@ -59,6 +59,68 @@ export function buildGatherActionUrl(input: {
   return appendTwilioWebhookSignature(url.toString(), input.businessId);
 }
 
+export function mapVoiceLanguageToPollyVoice(speechLocale: string): string {
+  switch (speechLocale) {
+    case "uk-UA":
+      return "Polly.Olena";
+    case "ru-RU":
+      return "Polly.Tatyana";
+    case "de-DE":
+      return "Polly.Marlene";
+    case "es-ES":
+      return "Polly.Conchita";
+    default:
+      return "Polly.Joanna";
+  }
+}
+
+export function buildPlayAndGatherTwiml(input: {
+  audioUrl: string;
+  gatherActionUrl: string;
+  speechLocale: string;
+  repromptSpeech?: string;
+  goodbyeSpeech?: string;
+}): string {
+  const audioUrl = escapeXml(input.audioUrl);
+  const reprompt = escapeXml(
+    sanitizeForSpeech(
+      input.repromptSpeech ??
+        "I did not catch that. Please say that again.",
+    ),
+  );
+  const goodbye = escapeXml(
+    sanitizeForSpeech(input.goodbyeSpeech ?? "Thank you for calling. Goodbye."),
+  );
+  const voice = mapVoiceLanguageToPollyVoice(input.speechLocale);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play>${audioUrl}</Play>
+  <Gather input="speech" action="${escapeXml(input.gatherActionUrl)}" method="POST" speechTimeout="auto" language="${input.speechLocale}" timeout="5">
+    <Say voice="${voice}" language="${input.speechLocale}">${reprompt}</Say>
+  </Gather>
+  <Say voice="${voice}" language="${input.speechLocale}">${goodbye}</Say>
+</Response>`;
+}
+
+export function buildPlayTwiml(input: {
+  audioUrl: string;
+  speechLocale: string;
+  goodbyeSpeech?: string;
+}): string {
+  const audioUrl = escapeXml(input.audioUrl);
+  const goodbye = escapeXml(
+    sanitizeForSpeech(input.goodbyeSpeech ?? "Thank you for calling. Goodbye."),
+  );
+  const voice = mapVoiceLanguageToPollyVoice(input.speechLocale);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play>${audioUrl}</Play>
+  <Say voice="${voice}" language="${input.speechLocale}">${goodbye}</Say>
+</Response>`;
+}
+
 export function buildSayAndGatherTwiml(input: {
   speech: string;
   gatherActionUrl: string;
@@ -69,14 +131,15 @@ export function buildSayAndGatherTwiml(input: {
   const reprompt = escapeXml(
     sanitizeForSpeech(input.reprompt ?? "I did not catch that. Please say that again."),
   );
+  const voice = mapVoiceLanguageToPollyVoice(input.speechLocale);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna" language="${input.speechLocale}">${sayText}</Say>
+  <Say voice="${voice}" language="${input.speechLocale}">${sayText}</Say>
   <Gather input="speech" action="${escapeXml(input.gatherActionUrl)}" method="POST" speechTimeout="auto" language="${input.speechLocale}" timeout="5">
-    <Say voice="Polly.Joanna" language="${input.speechLocale}">${reprompt}</Say>
+    <Say voice="${voice}" language="${input.speechLocale}">${reprompt}</Say>
   </Gather>
-  <Say voice="Polly.Joanna" language="${input.speechLocale}">Thank you for calling. Goodbye.</Say>
+  <Say voice="${voice}" language="${input.speechLocale}">Thank you for calling. Goodbye.</Say>
 </Response>`;
 }
 
@@ -85,12 +148,15 @@ export function buildStaticSayTwiml(input: {
   speechLocale: string;
 }): string {
   const sayText = escapeXml(sanitizeForSpeech(input.speech));
+  const voice = mapVoiceLanguageToPollyVoice(input.speechLocale);
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna" language="${input.speechLocale}">${sayText}</Say></Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${voice}" language="${input.speechLocale}">${sayText}</Say></Response>`;
 }
 
 export function buildGoodbyeTwiml(speechLocale: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna" language="${speechLocale}">Thank you for calling. Goodbye.</Say></Response>`;
+  const voice = mapVoiceLanguageToPollyVoice(speechLocale);
+
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${voice}" language="${speechLocale}">Thank you for calling. Goodbye.</Say></Response>`;
 }
 
 export function buildDialPhoneNumberTwiml(input: {
