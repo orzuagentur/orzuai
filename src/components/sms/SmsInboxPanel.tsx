@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -14,6 +14,7 @@ import { ChatList } from "@/components/chats/ChatList";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
+import { InboxPageSkeleton } from "@/components/chats/inbox/InboxPageSkeleton";
 import { useInboxLayout, InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import { SmsThreadPanel } from "@/components/sms/SmsThreadPanel";
 import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog";
@@ -47,7 +48,9 @@ type SmsInboxPanelProps = Partial<SmsInboxPageData>;
 export function SmsInboxPanel(props: SmsInboxPanelProps) {
   return (
     <InboxLayoutProvider>
-      <SmsInboxPanelContent {...props} />
+      <Suspense fallback={<InboxPageSkeleton />}>
+        <SmsInboxPanelContent {...props} />
+      </Suspense>
     </InboxLayoutProvider>
   );
 }
@@ -152,15 +155,8 @@ function SmsInboxPanelContent({
   const handleConversationSelect = useCallback(
     (id: string | null) => {
       selectConversation(id);
-
-      if (!id) {
-        router.push(phoneDraft ? `${DASHBOARD_ROUTES.chatsSms}?phone=${encodeURIComponent(phoneDraft)}` : DASHBOARD_ROUTES.chatsSms);
-        return;
-      }
-
-      router.push(`${DASHBOARD_ROUTES.chatsSms}?conversation=${id}`);
     },
-    [phoneDraft, router, selectConversation],
+    [selectConversation],
   );
 
   const handleContactSelect = useCallback(

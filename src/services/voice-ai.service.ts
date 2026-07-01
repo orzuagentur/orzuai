@@ -20,7 +20,8 @@ import {
   getVoiceRepository,
   type VoiceCallSessionTurn,
 } from "@/repositories/voice.repository";
-import { generateText } from "@/services/llm.service";
+import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
+import { generateTextWithFallback } from "@/services/llm.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
@@ -45,6 +46,10 @@ import {
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
 
 const MAX_VOICE_TURNS = 8;
+const MAX_VOICE_HISTORY_TURNS = 6;
+const MAX_VOICE_PROMPT_CHARS = 3500;
+const MAX_KNOWLEDGE_ENTRIES = 12;
+const MAX_KNOWLEDGE_CONTENT_CHARS = 400;
 
 type VoiceSessionState = {
   id: string;
@@ -62,25 +67,53 @@ async function loadBusinessContext(businessId: string) {
     listKnowledgeEntriesForBusiness(admin, businessId),
     admin
       .from("ai_assistant_profile")
-      .select("system_prompt, language")
+      .select("system_prompt, language, communication_style, name")
       .eq("business_id", businessId)
       .maybeSingle(),
   ]);
 
   const profile = profileResult.data;
+  const baseSystemPrompt = profile?.system_prompt?.trim() || context.systemPrompt;
 
   return {
     businessName: context.businessName,
+    agentName: profile?.name?.trim() || null,
     provider: context.provider,
     model: context.model,
     language: profile?.language?.trim() || context.language,
-    systemPrompt: profile?.system_prompt?.trim() || context.systemPrompt,
-    knowledgeContext: knowledgeEntries.map((entry) => ({
+    systemPrompt: buildEffectiveAgentPrompt({
+      systemPrompt: baseSystemPrompt,
+      communicationStyle: profile?.communication_style,
+    }),
+    knowledgeContext: knowledgeEntries.slice(0, MAX_KNOWLEDGE_ENTRIES).map((entry) => ({
       category: entry.category ?? "",
       title: entry.title,
-      content: entry.content,
+      content: entry.content.slice(0, MAX_KNOWLEDGE_CONTENT_CHARS),
     })),
   };
+}
+
+function buildVoiceConversationPrompt(input: {
+  userMessage: string;
+  conversationHistory: VoiceCallSessionTurn[];
+}): string {
+  const recentHistory = input.conversationHistory.slice(
+    -MAX_VOICE_HISTORY_TURNS * 2,
+  );
+  const historyLines = recentHistory.map((turn) =>
+    turn.role === "user"
+      ? `Customer: ${turn.content}`
+      : `Assistant: ${turn.content}`,
+  );
+  historyLines.push(`Customer: ${input.userMessage}`);
+  historyLines.push("Assistant:");
+
+  const prompt = historyLines.join("\n");
+  if (prompt.length <= MAX_VOICE_PROMPT_CHARS) {
+    return prompt;
+  }
+
+  return prompt.slice(-MAX_VOICE_PROMPT_CHARS);
 }
 
 async function getOrCreateSession(input: {
@@ -155,23 +188,28 @@ export async function generateVoiceAiReply(input: {
     triggerReason: input.triggerReason,
   });
 
-  const historyLines = input.conversationHistory.map((turn) =>
-    turn.role === "user"
-      ? `Customer: ${turn.content}`
-      : `Assistant: ${turn.content}`,
-  );
-  historyLines.push(`Customer: ${input.userMessage}`);
-  historyLines.push("Assistant:");
-
-  const result = await generateText({
+  const result = await generateTextWithFallback({
     businessId: input.businessId,
-    provider: context.provider as "gemini" | "openai" | "claude",
+    preferredProvider: context.provider as "gemini" | "openai" | "claude",
     model: context.model,
     systemInstruction: systemPrompt,
-    prompt: historyLines.join("\n"),
+    prompt: buildVoiceConversationPrompt({
+      userMessage: input.userMessage,
+      conversationHistory: input.conversationHistory,
+    }),
+    callType: "voice",
   });
 
   if (!result.success) {
+    console.error(
+      "[voice-ai] reply generation failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        error: result.error.message,
+        attemptedProviders: "attemptedProviders" in result ? result.attemptedProviders : [],
+      }),
+    );
+
     return {
       success: false,
       message: result.error.message,
@@ -212,13 +250,14 @@ export async function generateVoiceOpeningLine(input: {
     triggerReason: input.triggerReason,
   });
 
-  const result = await generateText({
+  const result = await generateTextWithFallback({
     businessId: input.businessId,
-    provider: context.provider as "gemini" | "openai" | "claude",
+    preferredProvider: context.provider as "gemini" | "openai" | "claude",
     model: context.model,
     systemInstruction: systemPrompt,
     prompt:
       "Write only one short opening sentence for this phone call. No quotes, no markdown.",
+    callType: "voice",
   });
 
   if (!result.success) {

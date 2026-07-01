@@ -5,6 +5,7 @@ import {
   notifyVoiceStreamLifecycle,
   requestVoiceStreamReply,
   verifyStreamToken,
+  appendVoiceStreamTurn,
   type VoiceStreamContext,
 } from "./config.js";
 import { startDeepgramLive } from "./deepgram.js";
@@ -130,6 +131,17 @@ export class VoiceStreamSession {
       });
 
       await this.speak(this.context.openingLine);
+
+      if (this.businessId && this.callSid && this.context.openingLine.trim()) {
+        void appendVoiceStreamTurn({
+          appUrl: this.options.appUrl,
+          secret: this.options.streamSecret,
+          businessId: this.businessId,
+          callSid: this.callSid,
+          role: "assistant",
+          content: this.context.openingLine,
+        });
+      }
     } catch (error) {
       console.error(
         "[voice-stream] handleStart failed",

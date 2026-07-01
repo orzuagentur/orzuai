@@ -64,11 +64,7 @@ function DashboardInboundAlertsContent() {
   }, []);
 
   const shouldShowInAppAlert = useCallback((conversationId: string) => {
-    if (isViewingConversation(conversationId)) {
-      return false;
-    }
-
-    return !pathnameRef.current.startsWith(DASHBOARD_ROUTES.chats);
+    return !isViewingConversation(conversationId);
   }, [isViewingConversation]);
 
   const showInboundAlert = useCallback(

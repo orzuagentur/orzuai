@@ -179,6 +179,18 @@ export async function generateVoiceStreamReply(input: {
     callObjective: callLog?.custom_prompt,
   });
 
+  if (!reply.success) {
+    console.error(
+      "[voice-stream] LLM reply failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        callSid: input.callSid,
+        message: reply.message,
+        hasCustomPrompt: Boolean(callLog?.custom_prompt?.trim()),
+      }),
+    );
+  }
+
   const assistantText = reply.success
     ? reply.text
     : "Sorry, I could not process that right now.";
