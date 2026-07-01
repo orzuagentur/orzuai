@@ -1,0 +1,13 @@
+# OrzuAI voice-stream service (Twilio Media Streams WebSocket worker).
+# Deploy from repo root so npm workspaces resolve @orzu/voice-stream dependencies.
+
+[build]
+builder = "RAILPACK"
+watchPatterns = ["apps/voice-stream/**", "package.json", "package-lock.json"]
+
+[deploy]
+startCommand = "npm run start --workspace=@orzu/voice-stream"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

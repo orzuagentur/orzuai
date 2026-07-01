@@ -12,6 +12,8 @@ import {
   mapVoiceLanguageToTwilioLocale,
   sanitizeForSpeech,
 } from "@/lib/voice/twiml";
+import { isVoiceStreamEnabled, getVoiceStreamWsUrl } from "@/lib/voice/stream-config";
+import { buildMediaStreamConnectTwiml } from "@/lib/voice/stream-twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
 import {
@@ -22,7 +24,10 @@ import { generateText } from "@/services/llm.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
-import { applyCallRecordingToTwiml } from "@/services/voice-recording.service";
+import {
+  applyCallRecordingToTwiml,
+  resolveRecordingCallbackUrl,
+} from "@/services/voice-recording.service";
 import {
   buildHandoffAgentTwiml,
   markVoiceCallHandoffByCallSid,
@@ -262,6 +267,26 @@ export async function buildVoiceConversationTwiml(input: {
       input.businessId,
       buildStaticSayTwiml({ speech: opening, speechLocale }),
     );
+  }
+
+  if (isVoiceStreamEnabled() && callSid) {
+    const wsBase = getVoiceStreamWsUrl();
+    if (wsBase) {
+      const wsUrl = `${wsBase.replace(/\/$/, "")}/voice/stream`;
+      const recordingCallback = await resolveRecordingCallbackUrl(input.businessId);
+
+      return applyCallRecordingToTwiml(
+        input.businessId,
+        buildMediaStreamConnectTwiml({
+          businessId: input.businessId,
+          wsUrl,
+          callSid,
+          direction: input.direction,
+          triggerReason: input.triggerReason,
+          recordingStatusCallback: recordingCallback,
+        }),
+      );
+    }
   }
 
   const gatherUrl = buildGatherActionUrl({
