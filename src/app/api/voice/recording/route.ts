@@ -50,3 +50,54 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export async function DELETE(request: NextRequest) {
+  if (!hasSupabaseEnv()) {
+    return NextResponse.json(
+      { success: false, message: "Not configured" },
+      { status: 503 },
+    );
+  }
+
+  const user = await requireUser();
+  const business = await getAccessibleBusiness(user.id);
+
+  if (!business) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 403 },
+    );
+  }
+
+  const body = (await request.json()) as { callLogId?: string };
+  const callLogId = body.callLogId?.trim();
+
+  if (!callLogId) {
+    return NextResponse.json(
+      { success: false, message: "Missing callLogId" },
+      { status: 400 },
+    );
+  }
+
+  const callLog = await getVoiceRepository().findCallLogById(
+    business.id,
+    callLogId,
+  );
+
+  if (!callLog?.recording_url) {
+    return NextResponse.json(
+      { success: false, message: "Recording not found" },
+      { status: 404 },
+    );
+  }
+
+  await getVoiceRepository().updateCallLog(callLogId, {
+    recordingUrl: null,
+    recordingSid: null,
+  });
+
+  return NextResponse.json({
+    success: true,
+    message: "Recording deleted.",
+  });
+}

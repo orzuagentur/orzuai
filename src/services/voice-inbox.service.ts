@@ -22,6 +22,7 @@ import { updateConversationLastMessageFromInsert } from "@/services/conversation
 import {
   getActiveMessagingChannelIds,
 } from "@/features/integrations";
+import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 import type {
   VoiceCallDetail,
   VoiceCallEventItem,
@@ -387,6 +388,62 @@ export async function handleTwilioCallStatusUpdate(input: {
       dispatchVoicePostCallWorker("enqueue");
     }
   }
+}
+
+export async function handleTwilioCustomerLegStatusUpdate(input: {
+  businessId: string;
+  parentCallSid: string;
+  callSid: string;
+  callStatus: string;
+}): Promise<void> {
+  if (!hasSupabaseEnv() || !input.parentCallSid.trim() || !input.callSid.trim()) {
+    return;
+  }
+
+  const terminalStatuses = new Set([
+    "busy",
+    "no-answer",
+    "failed",
+    "canceled",
+    "completed",
+  ]);
+
+  if (!terminalStatuses.has(input.callStatus)) {
+    return;
+  }
+
+  const repo = getVoiceRepository();
+  const callLog = await repo.findCallLogByExternalCallId(input.parentCallSid);
+
+  if (callLog && isActiveVoiceCallStatus(callLog.status)) {
+    const mappedStatus =
+      input.callStatus === "completed" && callLog.status === "ringing"
+        ? "missed"
+        : mapTwilioCallStatus(input.callStatus);
+
+    await repo.updateCallLog(callLog.id, {
+      status: mappedStatus,
+      endedAt: new Date().toISOString(),
+    });
+
+    await repo.insertCallEvent({
+      businessId: input.businessId,
+      callLogId: callLog.id,
+      callSid: input.callSid,
+      eventType: "call.customer_leg_ended",
+      actorType: "twilio",
+      payload: {
+        parentCallSid: input.parentCallSid,
+        rawStatus: input.callStatus,
+        status: mappedStatus,
+      },
+    });
+  }
+
+  await completeOperatorCallAfterCustomerLeave({
+    businessId: input.businessId,
+    parentCallSid: input.parentCallSid,
+  });
 }
 
 export async function handleTwilioConferenceEvent(input: {

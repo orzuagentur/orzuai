@@ -388,7 +388,16 @@ export async function createTwilioOutboundCallWithTwiml(input: {
   if (input.statusCallbackUrl) {
     body.set("StatusCallback", input.statusCallbackUrl);
     body.set("StatusCallbackMethod", "POST");
-    for (const event of ["initiated", "ringing", "answered", "completed"]) {
+    for (const event of [
+      "initiated",
+      "ringing",
+      "answered",
+      "completed",
+      "busy",
+      "no-answer",
+      "failed",
+      "canceled",
+    ]) {
       body.append("StatusCallbackEvent", event);
     }
   }

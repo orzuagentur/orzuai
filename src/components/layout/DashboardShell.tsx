@@ -18,7 +18,7 @@ import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
 import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
-import { VoiceSoftphoneBar } from "@/components/voice/VoiceSoftphoneBar";
+import { VoiceSoftphoneBarGate } from "@/components/voice/VoiceSoftphoneBar";
 import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-bootstrap";
 
 const DashboardInboundAlerts = dynamic(
@@ -95,7 +95,7 @@ export function DashboardShell({
                               />
                               <SidebarInset>
                                 <DashboardHeader />
-                                <VoiceSoftphoneBar />
+                                <VoiceSoftphoneBarGate />
                                 <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                                   {children}
                                 </div>

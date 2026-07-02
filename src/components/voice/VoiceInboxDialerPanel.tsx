@@ -331,6 +331,11 @@ export function VoiceInboxDialerPanel({
       <VoiceLiveTranscriptPanel
         turns={call?.turns ?? []}
         isLive={isSelectedCallLive}
+        callTiming={
+          call
+            ? { createdAt: call.createdAt, endedAt: call.endedAt }
+            : undefined
+        }
       />
     </div>
   );

@@ -5,7 +5,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
-  HeadphonesIcon,
   UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +22,9 @@ import {
 } from "@/components/voice/VoiceActiveCallBanner";
 import { VoiceContactsDialog } from "@/components/voice/VoiceContactsDialog";
 import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPanel";
-import { VoiceInboxDialerPanel } from "@/components/voice/VoiceInboxDialerPanel";
+import { VoiceInboxToolbar } from "@/components/voice/VoiceInboxToolbar";
+import { VoiceWorkspacePanel } from "@/components/voice/workspace/VoiceWorkspacePanel";
+import type { VoiceWorkspaceView } from "@/components/voice/workspace/voice-workspace.types";
 import { VoiceCallFilters } from "@/components/voice/VoiceCallFilters";
 import { VoiceCallList } from "@/components/voice/VoiceCallList";
 import { Button } from "@/components/ui/button";
@@ -37,14 +38,22 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
 import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
   filterVoiceCalls,
+  isActiveVoiceCallStatus,
   type VoiceCallFilter,
 } from "@/utils/voice-call-display";
+import {
+  dedupeVoiceCallsByContact,
+  enrichVoiceCallsWithPhonebook,
+  getVoiceCallListKey,
+  phonesMatch,
+} from "@/utils/voice-contact-calls";
 
 type VoiceCallsPanelProps = Partial<VoiceInboxPageData>;
 
@@ -85,11 +94,12 @@ function VoiceCallsPanelContent({
     initialActiveCall,
   );
   const [callFilter, setCallFilter] = useState<VoiceCallFilter>("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [contactsOpen, setContactsOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addContactPhone, setAddContactPhone] = useState("");
-  const { detailsOpen, toggleDetails } = useInboxLayout();
+  const [workspaceView, setWorkspaceView] = useState<VoiceWorkspaceView>({ mode: "dialpad" });
+  const [phonebookContacts, setPhonebookContacts] = useState<PhoneContactListItem[]>([]);
+  const { detailsOpen } = useInboxLayout();
   const notifiedInboundCallsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -134,21 +144,27 @@ function VoiceCallsPanelContent({
     onNewCall: handleNewCall,
   });
 
-  const filteredCalls = useMemo(() => {
-    const byFilter = filterVoiceCalls(calls, callFilter);
-    const query = searchQuery.trim().toLowerCase();
+  const refreshPhonebookContacts = useCallback(() => {
+    void listPhoneContactsAction("phonebook").then(setPhonebookContacts);
+  }, []);
 
-    if (!query) {
-      return byFilter;
+  useEffect(() => {
+    if (!voiceInboxEnabled) {
+      return;
     }
 
-    return byFilter.filter((call) => {
-      const name = call.contactName?.toLowerCase() ?? "";
-      const phone = call.phoneNumber.toLowerCase();
+    refreshPhonebookContacts();
+  }, [refreshPhonebookContacts, voiceInboxEnabled]);
 
-      return name.includes(query) || phone.includes(query);
-    });
-  }, [callFilter, calls, searchQuery]);
+  const filteredCalls = useMemo(() => filterVoiceCalls(calls, callFilter), [callFilter, calls]);
+  const listCalls = useMemo(() => {
+    const deduped = dedupeVoiceCallsByContact(filteredCalls);
+    return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
+  }, [filteredCalls, phonebookContacts]);
+  const activeContactKey = useMemo(() => {
+    const active = calls.find((call) => call.id === activeCallId);
+    return active ? getVoiceCallListKey(active) : null;
+  }, [activeCallId, calls]);
 
   const selectedCall = useMemo(() => {
     if (activeCallId) {
@@ -162,8 +178,14 @@ function VoiceCallsPanelContent({
         return activeCallDetail;
       }
 
+      const phonebookMatch = phonebookContacts.find((contact) =>
+        phonesMatch(contact.phoneNumber, listItem.phoneNumber),
+      );
+
       return {
         ...listItem,
+        contactName: listItem.contactName ?? phonebookMatch?.name ?? null,
+        contactId: listItem.contactId ?? phonebookMatch?.id ?? null,
         turns: activeCallDetail?.turns ?? [],
         turnCount: activeCallDetail?.turnCount ?? 0,
         hasRecording: Boolean(
@@ -174,28 +196,96 @@ function VoiceCallsPanelContent({
     }
 
     return null;
-  }, [activeCallDetail, activeCallId, calls]);
+  }, [activeCallDetail, activeCallId, calls, phonebookContacts]);
 
   const detailsConversationId = selectedCall?.conversationId ?? null;
   const showRightPanel = detailsOpen && Boolean(detailsConversationId);
   const liveCall = useMemo(() => findFirstActiveVoiceCall(calls), [calls]);
+  const hasNumberSelected = Boolean(activeCallId || phoneDraft);
+
+  useEffect(() => {
+    if (!activeCallId && !phoneDraft) {
+      setWorkspaceView((current) => {
+        if (["history", "recordings", "transcripts", "transcript", "live"].includes(current.mode)) {
+          return current;
+        }
+        return { mode: "dialpad" };
+      });
+      return;
+    }
+
+    if (phoneDraft && !activeCallId) {
+      setWorkspaceView((current) => {
+        if (["history", "recordings", "transcripts", "transcript", "live"].includes(current.mode)) {
+          return current;
+        }
+        if (current.mode === "dialpad") {
+          return current;
+        }
+        return { mode: "home" };
+      });
+      return;
+    }
+
+    if (!activeCallId) {
+      return;
+    }
+
+    const listCall = calls.find((item) => item.id === activeCallId);
+    if (!listCall) {
+      return;
+    }
+
+    setWorkspaceView((current) => {
+      if (["history", "recordings", "transcripts"].includes(current.mode)) {
+        return current;
+      }
+
+      if (isActiveVoiceCallStatus(listCall.status)) {
+        return { mode: "live", callId: activeCallId };
+      }
+
+      return { mode: "home" };
+    });
+  }, [activeCallId, calls, phoneDraft]);
+
+  useEffect(() => {
+    if (!liveCall) {
+      return;
+    }
+
+    setWorkspaceView((current) => {
+      if (current.mode === "home" || current.mode === "dialpad") {
+        return { mode: "live", callId: liveCall.id };
+      }
+      return current;
+    });
+  }, [liveCall]);
+
+  const handleOpenDialpad = useCallback(() => {
+    setWorkspaceView({ mode: "dialpad" });
+  }, []);
+
+  const handleWorkspaceViewChange = useCallback((view: VoiceWorkspaceView) => {
+    setWorkspaceView(view);
+  }, []);
 
   const handleCallSelect = useCallback(
     (callId: string) => {
+      const selected = calls.find((item) => item.id === callId);
       router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${callId}`);
+      if (selected && isActiveVoiceCallStatus(selected.status)) {
+        setWorkspaceView({ mode: "live", callId });
+      } else {
+        setWorkspaceView({ mode: "home" });
+      }
     },
-    [router],
+    [calls, router],
   );
 
   const handleBackToList = useCallback(() => {
     router.push(DASHBOARD_ROUTES.chatsVoice);
   }, [router]);
-
-  const handleSelectionClear = useCallback(() => {
-    if (activeCallId) {
-      router.push(phoneDraft ? `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(phoneDraft)}` : DASHBOARD_ROUTES.chatsVoice);
-    }
-  }, [activeCallId, phoneDraft, router]);
 
   const handleOpenSms = useCallback(
     (phoneNumber: string, conversationId?: string | null) => {
@@ -211,6 +301,7 @@ function VoiceCallsPanelContent({
 
   const handleContactSelect = useCallback(
     (contact: PhoneContactListItem) => {
+      setWorkspaceView({ mode: "home" });
       router.push(
         `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.phoneNumber)}`,
       );
@@ -222,6 +313,40 @@ function VoiceCallsPanelContent({
     setAddContactPhone(phoneNumber);
     setAddContactOpen(true);
   }, []);
+
+  const handleContactUpdated = useCallback(
+    (input: { contactId: string; phoneNumber: string; name: string }) => {
+      refreshPhonebookContacts();
+      router.refresh();
+
+      if (!activeCallId && phoneDraft) {
+        router.push(
+          `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(input.phoneNumber)}`,
+        );
+      }
+    },
+    [activeCallId, phoneDraft, refreshPhonebookContacts, router],
+  );
+
+  const handleContactDeleted = useCallback(
+    (_contactId: string) => {
+      refreshPhonebookContacts();
+      setWorkspaceView({ mode: "dialpad" });
+      router.push(DASHBOARD_ROUTES.chatsVoice);
+      router.refresh();
+    },
+    [refreshPhonebookContacts, router],
+  );
+
+  const handlePhoneHistoryDeleted = useCallback(
+    (_phoneNumber: string) => {
+      refreshPhonebookContacts();
+      setWorkspaceView({ mode: "dialpad" });
+      router.push(DASHBOARD_ROUTES.chatsVoice);
+      router.refresh();
+    },
+    [refreshPhonebookContacts, router],
+  );
 
   if (!hasBusiness) {
     return (
@@ -272,10 +397,11 @@ function VoiceCallsPanelContent({
           </div>
         }
         chatColumn={
-          <VoiceInboxDialerPanel
+          <VoiceWorkspacePanel
+            view={{ mode: "dialpad" }}
+            onViewChange={() => {}}
             call={null}
-            searchQuery=""
-            onSearchQueryChange={() => {}}
+            allCalls={[]}
             initialPhone={phoneDraft}
           />
         }
@@ -284,7 +410,7 @@ function VoiceCallsPanelContent({
     );
   }
 
-  const showDetailOnMobile = Boolean(activeCallId || phoneDraft);
+  const showDetailOnMobile = true;
 
   return (
     <>
@@ -302,16 +428,15 @@ function VoiceCallsPanelContent({
         listColumn={
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
-              <h1 className="text-xl font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <h1 className="text-xl font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
+                <VoiceInboxToolbar
+                  showDialpadToggle={hasNumberSelected && workspaceView.mode === "home"}
+                  dialpadOpen={workspaceView.mode === "dialpad"}
+                  onOpenDialpad={handleOpenDialpad}
+                />
+              </div>
               <div className="flex items-center gap-2">
-                {liveCall ? (
-                  <Button type="button" size="sm" variant="outline" asChild>
-                    <Link href={DASHBOARD_ROUTES.chatsVoiceMonitor}>
-                      <HeadphonesIcon className="mr-2 size-4" />
-                      {VOICE_MESSAGES.callMonitorOpen}
-                    </Link>
-                  </Button>
-                ) : null}
                 <Button
                   type="button"
                   size="sm"
@@ -326,8 +451,9 @@ function VoiceCallsPanelContent({
             {liveCall ? <VoiceActiveCallBanner call={liveCall} /> : null}
             <VoiceCallFilters value={callFilter} onChange={setCallFilter} />
             <VoiceCallList
-              calls={filteredCalls}
+              calls={listCalls}
               activeCallId={activeCallId}
+              activeContactKey={activeContactKey}
               onCallSelect={handleCallSelect}
             />
           </div>
@@ -342,19 +468,21 @@ function VoiceCallsPanelContent({
                 </Button>
               </div>
             ) : null}
-            <VoiceInboxDialerPanel
+            <VoiceWorkspacePanel
+              view={workspaceView}
+              onViewChange={handleWorkspaceViewChange}
               call={selectedCall}
               allCalls={calls}
               activeCallId={activeCallId}
-              searchQuery={searchQuery}
-              onSearchQueryChange={setSearchQuery}
-              onSelectionClear={handleSelectionClear}
-              onSelectCall={handleCallSelect}
               initialPhone={phoneDraft}
+              phonebookContacts={phonebookContacts}
+              onSelectCall={handleCallSelect}
               onOpenSms={handleOpenSms}
               onAddContact={handleAddContact}
-              detailsOpen={detailsOpen}
-              onToggleDetails={toggleDetails}
+              onContactUpdated={handleContactUpdated}
+              onContactDeleted={handleContactDeleted}
+              onPhoneHistoryDeleted={handlePhoneHistoryDeleted}
+              onRecordingDeleted={() => router.refresh()}
             />
           </div>
         }
@@ -367,6 +495,8 @@ function VoiceCallsPanelContent({
         open={contactsOpen}
         onOpenChange={setContactsOpen}
         onSelectContact={handleContactSelect}
+        contactScope="phonebook"
+        onContactsChange={refreshPhonebookContacts}
       />
 
       <VoiceAddContactDialog
@@ -374,6 +504,7 @@ function VoiceCallsPanelContent({
         onOpenChange={setAddContactOpen}
         phoneNumber={addContactPhone}
         onContactCreated={() => {
+          refreshPhonebookContacts();
           router.refresh();
         }}
       />

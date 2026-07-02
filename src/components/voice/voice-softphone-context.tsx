@@ -272,21 +272,31 @@ function useVoiceSoftphoneState(input: {
       });
 
       call.on("cancel", () => {
+        if (activeCallRef.current === call) {
+          activeCallRef.current = null;
+        }
+
         if (incomingCallRef.current === call) {
           incomingCallRef.current = null;
         }
 
         dismissIncomingToast();
+        setActivePhoneNumber(null);
         setCallStartedAt(null);
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
 
       call.on("reject", () => {
+        if (activeCallRef.current === call) {
+          activeCallRef.current = null;
+        }
+
         if (incomingCallRef.current === call) {
           incomingCallRef.current = null;
         }
 
         dismissIncomingToast();
+        setActivePhoneNumber(null);
         setCallStartedAt(null);
         setStatus(isRegisteredRef.current ? "ready" : "offline");
       });
@@ -461,6 +471,7 @@ function useVoiceSoftphoneState(input: {
     setIsMuted(false);
     setIsSpeakerMuted(false);
     setActivePhoneNumber(null);
+    setCallStartedAt(null);
     remoteAudioRef.current = null;
     setStatus(isRegisteredRef.current ? "ready" : "offline");
   }, [cleanupCall]);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { DeleteIcon, PhoneIcon } from "lucide-react";
+import { DeleteIcon, PhoneIcon, UserPlusIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
@@ -30,6 +30,7 @@ type VoiceDialPadProps = {
   onCall: () => void;
   onDigitPress?: (digit: string) => void;
   callDisabled?: boolean;
+  onAddContact?: () => void;
   className?: string;
 };
 
@@ -39,6 +40,7 @@ export function VoiceDialPad({
   onCall,
   onDigitPress,
   callDisabled = false,
+  onAddContact,
   className,
 }: VoiceDialPadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -165,7 +167,18 @@ export function VoiceDialPad({
           <PhoneIcon className="size-6" />
         </Button>
 
-        <div className="size-12" aria-hidden />
+        <div className="size-12" aria-hidden={!onAddContact}>
+          {onAddContact ? (
+            <button
+              type="button"
+              onClick={onAddContact}
+              aria-label={VOICE_MESSAGES.addContactButton}
+              className="flex size-12 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <UserPlusIcon className="size-5" />
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

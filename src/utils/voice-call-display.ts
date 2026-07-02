@@ -1,3 +1,5 @@
+import type { VoiceCallDetail } from "@/types/voice-inbox.types";
+
 export function formatVoiceCallDuration(seconds: number | null): string {
   if (seconds == null || seconds <= 0) {
     return "—";
@@ -116,8 +118,49 @@ export function isActiveVoiceCallStatus(status: string): boolean {
   );
 }
 
+export function isRingingVoiceCallStatus(status: string): boolean {
+  return ["ringing", "initiated", "queued"].includes(status);
+}
+
+export function isConnectedVoiceCallStatus(status: string): boolean {
+  return ["active", "answered", "in-progress"].includes(status);
+}
+
 export function isMissedVoiceCallStatus(status: string): boolean {
   return ["missed", "no-answer", "failed", "busy", "canceled"].includes(status);
+}
+
+export function getVoiceCallDirectionKind(
+  call: { direction: "inbound" | "outbound"; status: string },
+): "inbound" | "outbound" | "missed" {
+  if (isMissedVoiceCallStatus(call.status)) {
+    return "missed";
+  }
+
+  return call.direction;
+}
+
+export function resolveVoiceTurnTimestamp(
+  turn: { at?: string },
+  call: { createdAt: string; endedAt: string | null },
+  index: number,
+  totalTurns: number,
+): string {
+  if (turn.at) {
+    return turn.at;
+  }
+
+  const startMs = new Date(call.createdAt).getTime();
+  const endMs = call.endedAt
+    ? new Date(call.endedAt).getTime()
+    : Date.now();
+
+  if (totalTurns <= 1) {
+    return call.createdAt;
+  }
+
+  const progress = index / Math.max(totalTurns - 1, 1);
+  return new Date(startMs + (endMs - startMs) * progress).toISOString();
 }
 
 export type VoiceCallFilter = "all" | "inbound" | "outbound" | "missed";
@@ -139,4 +182,42 @@ export function filterVoiceCalls<T extends { direction: "inbound" | "outbound"; 
   }
 
   return calls.filter((call) => isMissedVoiceCallStatus(call.status));
+}
+
+export function buildPlaceholderVoiceCallDetail(input: {
+  id: string;
+  phoneNumber: string;
+  status?: string;
+  contactId?: string | null;
+  contactName?: string | null;
+  callMode?: string;
+  direction?: "inbound" | "outbound";
+  aiHandled?: boolean;
+  humanHandled?: boolean;
+}): VoiceCallDetail {
+  return {
+    id: input.id,
+    direction: input.direction ?? "outbound",
+    phoneNumber: input.phoneNumber,
+    status: input.status ?? "ringing",
+    provider: "twilio",
+    triggerReason: null,
+    callMode: input.callMode ?? "human",
+    operatorUserId: null,
+    createdAt: new Date().toISOString(),
+    endedAt: null,
+    durationSeconds: null,
+    aiHandled: input.aiHandled ?? false,
+    humanHandled: input.humanHandled ?? false,
+    handoffAt: null,
+    contactId: input.contactId ?? null,
+    contactName: input.contactName ?? null,
+    externalCallId: null,
+    recordingUrl: null,
+    conversationId: null,
+    turns: [],
+    turnCount: 0,
+    hasRecording: false,
+    events: [],
+  };
 }

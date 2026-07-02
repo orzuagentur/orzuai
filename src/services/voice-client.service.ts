@@ -151,6 +151,11 @@ function buildVoiceWebhookUrls(businessId: string) {
       `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
       businessId,
     ),
+    customerLegStatusCallbackUrl: (parentCallSid: string) =>
+      appendTwilioWebhookSignature(
+        `${buildAppUrl("/api/webhooks/voice/customer-leg-status")}?businessId=${businessId}&parentCallSid=${encodeURIComponent(parentCallSid)}`,
+        businessId,
+      ),
     clientNoAnswerUrl: appendTwilioWebhookSignature(
       `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
       businessId,
@@ -273,6 +278,7 @@ export async function buildClientOutboundTwiml(input: {
   const recordingCallback = settings.recordingEnabled
     ? buildRecordingStatusCallbackUrl(input.businessId, parentCallSid)
     : null;
+  const webhooks = buildVoiceWebhookUrls(input.businessId);
   const callLog = await recordClientOutboundVoiceCall({
     businessId: input.businessId,
     phoneNumber: to,
@@ -316,6 +322,7 @@ export async function buildClientOutboundTwiml(input: {
       from: browserCallerId,
       to,
       twiml: customerTwiml,
+      statusCallbackUrl: webhooks.customerLegStatusCallbackUrl(parentCallSid),
     });
 
     console.info(

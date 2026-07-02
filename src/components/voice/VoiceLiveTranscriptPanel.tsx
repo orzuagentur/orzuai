@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { SparklesIcon, UserIcon } from "lucide-react";
 
+import { VoiceTranscriptTurns } from "@/components/voice/VoiceTranscriptTurns";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type { VoiceCallSessionTurn } from "@/repositories/voice.repository";
@@ -10,12 +10,14 @@ import type { VoiceCallSessionTurn } from "@/repositories/voice.repository";
 type VoiceLiveTranscriptPanelProps = {
   turns: VoiceCallSessionTurn[];
   isLive?: boolean;
+  callTiming?: { createdAt: string; endedAt: string | null };
   className?: string;
 };
 
 export function VoiceLiveTranscriptPanel({
   turns,
   isLive = false,
+  callTiming = { createdAt: new Date().toISOString(), endedAt: null },
   className,
 }: VoiceLiveTranscriptPanelProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -52,40 +54,8 @@ export function VoiceLiveTranscriptPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {turns.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {VOICE_MESSAGES.callNoTranscript}
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {turns.map((turn, index) => (
-              <article
-                key={`${turn.role}-${index}-${turn.content.slice(0, 24)}`}
-                className={cn(
-                  "rounded-xl border px-4 py-3 text-sm shadow-sm",
-                  turn.role === "assistant"
-                    ? "border-indigo-200 bg-indigo-50/60 dark:border-indigo-900 dark:bg-indigo-950/30"
-                    : "border-border bg-muted/30",
-                )}
-              >
-                <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  {turn.role === "assistant" ? (
-                    <SparklesIcon className="size-3.5 text-indigo-600" />
-                  ) : (
-                    <UserIcon className="size-3.5" />
-                  )}
-                  {turn.role === "assistant"
-                    ? VOICE_MESSAGES.callTranscriptAssistant
-                    : VOICE_MESSAGES.callTranscriptUser}
-                </div>
-                <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">
-                  {turn.content}
-                </p>
-              </article>
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        )}
+        <VoiceTranscriptTurns turns={turns} callTiming={callTiming} />
+        <div ref={bottomRef} />
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import {
 import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog";
 import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
 import type { PhoneContactListItem } from "@/services/phone-contact.service";
+import type { PhoneContactListScope } from "@/services/phone-contact.service";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { formatContactIdentifier } from "@/utils/contact-display";
 
@@ -22,12 +23,16 @@ type VoiceContactsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectContact: (contact: PhoneContactListItem) => void;
+  contactScope?: PhoneContactListScope;
+  onContactsChange?: () => void;
 };
 
 export function VoiceContactsDialog({
   open,
   onOpenChange,
   onSelectContact,
+  contactScope = "phonebook",
+  onContactsChange,
 }: VoiceContactsDialogProps) {
   const [contacts, setContacts] = useState<PhoneContactListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +46,10 @@ export function VoiceContactsDialog({
 
     setIsLoading(true);
 
-    void listPhoneContactsAction()
+    void listPhoneContactsAction(contactScope)
       .then(setContacts)
       .finally(() => setIsLoading(false));
-  }, [open]);
+  }, [contactScope, open]);
 
   return (
     <>
@@ -118,7 +123,8 @@ export function VoiceContactsDialog({
         onOpenChange={setAddContactOpen}
         phoneNumber={prefillPhone}
         onContactCreated={() => {
-          void listPhoneContactsAction().then(setContacts);
+          void listPhoneContactsAction(contactScope).then(setContacts);
+          onContactsChange?.();
         }}
       />
     </>

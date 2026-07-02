@@ -376,6 +376,7 @@ function SmsInboxPanelContent({
         open={contactsOpen}
         onOpenChange={setContactsOpen}
         onSelectContact={handleContactSelect}
+        contactScope="all"
       />
 
       <VoiceAddContactDialog

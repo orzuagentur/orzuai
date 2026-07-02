@@ -209,10 +209,11 @@ export async function generateVoiceStreamReply(input: {
     ? reply.text
     : "Sorry, I could not process that right now.";
 
+  const turnAt = new Date().toISOString();
   const updatedTurns: VoiceCallSessionTurn[] = [
     ...session.turns,
-    { role: "user", content: input.userMessage.trim() },
-    { role: "assistant", content: assistantText },
+    { role: "user", content: input.userMessage.trim(), at: turnAt },
+    { role: "assistant", content: assistantText, at: turnAt },
   ];
 
   await getVoiceRepository().updateSessionTurns({
@@ -297,10 +298,11 @@ export async function* generateVoiceStreamReplyStream(input: {
     assistantText = "Sorry, I could not process that right now.";
   }
 
+  const turnAt = new Date().toISOString();
   const updatedTurns: VoiceCallSessionTurn[] = [
     ...session.turns,
-    { role: "user", content: input.userMessage.trim() },
-    { role: "assistant", content: assistantText },
+    { role: "user", content: input.userMessage.trim(), at: turnAt },
+    { role: "assistant", content: assistantText, at: turnAt },
   ];
 
   await getVoiceRepository().updateSessionTurns({
@@ -337,9 +339,10 @@ export async function appendVoiceStreamSessionTurn(input: {
     return;
   }
 
+  const now = new Date().toISOString();
   const turns: VoiceCallSessionTurn[] = [
     ...session.turns,
-    { role: input.role, content: input.content.trim() },
+    { role: input.role, content: input.content.trim(), at: now },
   ];
 
   await getVoiceRepository().updateSessionTurns({

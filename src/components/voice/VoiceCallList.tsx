@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PhoneIncomingIcon, PhoneOutgoingIcon } from "lucide-react";
+import { PhoneIncomingIcon, PhoneMissedIcon, PhoneOutgoingIcon } from "lucide-react";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,12 +14,14 @@ import { formatContactIdentifier } from "@/utils/contact-display";
 import {
   formatVoiceCallDateParts,
   formatVoiceCallDuration,
-  isMissedVoiceCallStatus,
+  getVoiceCallDirectionKind,
 } from "@/utils/voice-call-display";
+import { getVoiceCallListKey } from "@/utils/voice-contact-calls";
 
 type VoiceCallListProps = {
   calls: VoiceInboxCallListItem[];
   activeCallId: string | null;
+  activeContactKey?: string | null;
   onCallSelect?: (callId: string) => void;
   className?: string;
 };
@@ -27,6 +29,7 @@ type VoiceCallListProps = {
 export function VoiceCallList({
   calls,
   activeCallId,
+  activeContactKey = null,
   onCallSelect,
   className,
 }: VoiceCallListProps) {
@@ -50,16 +53,25 @@ export function VoiceCallList({
     <div className={cn("min-h-0 flex-1 overflow-y-auto", className)}>
       <ul>
         {calls.map((call) => {
-          const isActive = call.id === activeCallId;
+          const rowKey = getVoiceCallListKey(call);
+          const isActive =
+            rowKey === activeContactKey || call.id === activeCallId;
+          const directionKind = getVoiceCallDirectionKind(call);
           const DirectionIcon =
-            call.direction === "inbound" ? PhoneIncomingIcon : PhoneOutgoingIcon;
+            directionKind === "missed"
+              ? PhoneMissedIcon
+              : call.direction === "inbound"
+                ? PhoneIncomingIcon
+                : PhoneOutgoingIcon;
           const displayName =
             call.contactName ?? formatContactIdentifier(call.phoneNumber);
           const href = `${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`;
           const directionLabel =
-            call.direction === "inbound"
-              ? VOICE_MESSAGES.callDirectionInbound
-              : VOICE_MESSAGES.callDirectionOutbound;
+            directionKind === "missed"
+              ? VOICE_MESSAGES.callHistoryMissedLabel
+              : call.direction === "inbound"
+                ? VOICE_MESSAGES.callDirectionInbound
+                : VOICE_MESSAGES.callDirectionOutbound;
 
           const rowClassName = cn(
             "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
@@ -73,6 +85,7 @@ export function VoiceCallList({
               DirectionIcon={DirectionIcon}
               directionLabel={directionLabel}
               useLocalTime={useLocalTime}
+              isMissed={directionKind === "missed"}
             />
           );
 
@@ -101,19 +114,21 @@ function CallListRowContent({
   DirectionIcon,
   directionLabel,
   useLocalTime,
+  isMissed,
 }: {
   call: VoiceInboxCallListItem;
   displayName: string;
   DirectionIcon: typeof PhoneIncomingIcon;
   directionLabel: string;
   useLocalTime: boolean;
+  isMissed: boolean;
 }) {
   const { dateLabel, timeLabel } = formatVoiceCallDateParts(call.createdAt, {
     local: useLocalTime,
   });
 
-  const subtitle = isMissedVoiceCallStatus(call.status)
-    ? VOICE_MESSAGES.callHistoryMissedLabel
+  const subtitle = isMissed
+    ? null
     : call.status === "completed" && call.durationSeconds
       ? formatVoiceCallDuration(call.durationSeconds)
       : null;
@@ -123,7 +138,12 @@ function CallListRowContent({
       <ContactAvatar name={displayName} className="size-11 shrink-0 text-sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{displayName}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <p
+          className={cn(
+            "mt-0.5 flex items-center gap-1.5 text-sm",
+            isMissed ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+          )}
+        >
           <DirectionIcon className="size-3.5 shrink-0" />
           <span>{directionLabel}</span>
           {subtitle ? <span>· {subtitle}</span> : null}

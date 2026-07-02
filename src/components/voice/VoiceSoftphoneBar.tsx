@@ -1,7 +1,7 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
-  Loader2Icon,
   MicIcon,
   MicOffIcon,
   PhoneIcon,
@@ -10,6 +10,7 @@ import {
 
 import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { Button } from "@/components/ui/button";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import { formatVoiceCallDuration } from "@/utils/voice-call-display";
@@ -17,6 +18,16 @@ import { formatVoiceCallDuration } from "@/utils/voice-call-display";
 type VoiceSoftphoneBarProps = {
   className?: string;
 };
+
+export function VoiceSoftphoneBarGate({ className }: VoiceSoftphoneBarProps) {
+  const pathname = usePathname();
+
+  if (pathname?.startsWith(DASHBOARD_ROUTES.chatsVoice)) {
+    return null;
+  }
+
+  return <VoiceSoftphoneBar className={className} />;
+}
 
 export function VoiceSoftphoneBar({ className }: VoiceSoftphoneBarProps) {
   const softphone = useVoiceSoftphone();
@@ -28,8 +39,11 @@ export function VoiceSoftphoneBar({ className }: VoiceSoftphoneBarProps) {
   const isBusy =
     softphone.status === "connecting" ||
     softphone.status === "on-call" ||
-    softphone.status === "incoming" ||
-    softphone.status === "registering";
+    softphone.status === "incoming";
+
+  if (!isBusy) {
+    return null;
+  }
 
   return (
     <div
@@ -41,11 +55,6 @@ export function VoiceSoftphoneBar({ className }: VoiceSoftphoneBarProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium">{VOICE_MESSAGES.softphoneTitle}</p>
-          <p className="text-xs text-muted-foreground">
-            {softphone.isOnline
-              ? VOICE_MESSAGES.softphoneOnlineHint
-              : VOICE_MESSAGES.softphoneOfflineHint}
-          </p>
           {softphone.error ? (
             <p className="mt-1 text-xs text-destructive">{softphone.error}</p>
           ) : null}
@@ -97,30 +106,6 @@ export function VoiceSoftphoneBar({ className }: VoiceSoftphoneBarProps) {
                 {VOICE_MESSAGES.softphoneHangUp}
               </Button>
             </>
-          ) : null}
-
-          {!isBusy ? (
-            softphone.isOnline ? (
-              <Button type="button" size="sm" variant="outline" onClick={softphone.goOffline}>
-                {VOICE_MESSAGES.softphoneGoOffline}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                disabled={softphone.status === "registering"}
-                onClick={() => {
-                  void softphone.goOnline();
-                }}
-              >
-                {softphone.status === "registering" ? (
-                  <Loader2Icon className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <PhoneIcon className="mr-2 size-4" />
-                )}
-                {VOICE_MESSAGES.softphoneGoOnline}
-              </Button>
-            )
           ) : null}
         </div>
       </div>

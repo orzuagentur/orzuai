@@ -186,27 +186,6 @@ export function VoiceCallCard({
           <InCallControls />
         ) : null}
 
-        {!softphone.isOnline && softphone.enabled && !isOnCall && !isIncoming ? (
-          <div className="mx-auto mt-4 flex max-w-sm justify-center">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={softphone.status === "registering"}
-              onClick={() => {
-                void softphone.goOnline();
-              }}
-            >
-              {softphone.status === "registering" ? (
-                <Loader2Icon className="mr-2 size-4 animate-spin" />
-              ) : (
-                <PhoneIcon className="mr-2 size-4" />
-              )}
-              {VOICE_MESSAGES.softphoneGoOnline}
-            </Button>
-          </div>
-        ) : null}
-
         {softphone.error ? (
           <p className="mx-auto mt-2 max-w-sm text-center text-xs text-destructive">
             {softphone.error}

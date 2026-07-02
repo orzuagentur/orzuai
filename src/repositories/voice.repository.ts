@@ -113,6 +113,7 @@ export type VoicePostCallJobInsert = {
 export type VoiceCallSessionTurn = {
   role: "user" | "assistant";
   content: string;
+  at?: string;
 };
 
 export class VoiceRepository {
@@ -769,6 +770,58 @@ export class VoiceRepository {
     if (error) {
       throw new Error(error.message);
     }
+  }
+
+  async deleteCallLogsByPhoneNumber(
+    businessId: string,
+    phoneNumber: string,
+  ): Promise<number> {
+    const digits = phoneNumber.replace(/\D/g, "");
+
+    if (!digits || digits.length < 8) {
+      return 0;
+    }
+
+    const { data, error } = await this.db
+      .from("voice_call_logs")
+      .select("id, phone_number")
+      .eq("business_id", businessId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const ids = (data ?? [])
+      .filter((row) => {
+        const rowDigits = (row.phone_number ?? "").replace(/\D/g, "");
+
+        if (!rowDigits) {
+          return false;
+        }
+
+        return (
+          rowDigits === digits
+          || rowDigits.endsWith(digits)
+          || digits.endsWith(rowDigits)
+        );
+      })
+      .map((row) => row.id);
+
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const { error: deleteError } = await this.db
+      .from("voice_call_logs")
+      .delete()
+      .in("id", ids)
+      .eq("business_id", businessId);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
+
+    return ids.length;
   }
 }
 

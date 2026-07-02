@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -31,7 +31,9 @@ import {
   getVoiceCallStatusClassName,
   getVoiceCallStatusLabel,
   isActiveVoiceCallStatus,
+  isConnectedVoiceCallStatus,
 } from "@/utils/voice-call-display";
+import { phonesMatch } from "@/utils/voice-contact-calls";
 
 type ConferenceParticipant = {
   callSid: string;
@@ -110,18 +112,24 @@ function parseConferenceParticipants(
 
 function useLiveCallDuration(
   createdAt: string,
-  isActive: boolean,
+  isConnected: boolean,
   fallbackSeconds: number | null,
 ): number | null {
   const [elapsed, setElapsed] = useState<number | null>(fallbackSeconds);
+  const answeredAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isActive) {
+    if (!isConnected) {
+      answeredAtRef.current = null;
       setElapsed(fallbackSeconds);
       return;
     }
 
-    const startedAt = new Date(createdAt).getTime();
+    if (!answeredAtRef.current) {
+      answeredAtRef.current = Date.now();
+    }
+
+    const startedAt = answeredAtRef.current;
 
     const tick = () => {
       setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
@@ -130,7 +138,7 @@ function useLiveCallDuration(
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [createdAt, fallbackSeconds, isActive]);
+  }, [createdAt, fallbackSeconds, isConnected]);
 
   return elapsed;
 }
@@ -149,11 +157,15 @@ export function VoiceLiveCallCard({
   >(null);
 
   const isLive = isActiveVoiceCallStatus(call.status);
+  const isConnected =
+    isConnectedVoiceCallStatus(call.status)
+    || (softphone.status === "on-call"
+      && phonesMatch(softphone.activePhoneNumber ?? "", call.phoneNumber));
   const displayName =
     call.contactName ?? formatContactIdentifier(call.phoneNumber);
   const durationSeconds = useLiveCallDuration(
     call.createdAt,
-    isLive,
+    isConnected,
     call.durationSeconds,
   );
   const conferenceParticipants = useMemo(
@@ -324,9 +336,15 @@ export function VoiceLiveCallCard({
                 {getVoiceCallStatusLabel(call.status)}
               </span>
               <span className="text-muted-foreground">·</span>
-              <span className="font-mono font-medium">
-                {formatVoiceCallDuration(durationSeconds)}
-              </span>
+              {isConnected && durationSeconds !== null ? (
+                <span className="font-mono font-medium">
+                  {formatVoiceCallDuration(durationSeconds)}
+                </span>
+              ) : (
+                <span className="text-amber-700 dark:text-amber-300">
+                  {VOICE_MESSAGES.callOutboundPending}
+                </span>
+              )}
               <span className="text-muted-foreground">·</span>
               <Badge variant="secondary">{modeLabel}</Badge>
             </div>
