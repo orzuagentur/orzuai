@@ -204,15 +204,23 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
         return;
       }
 
-      const { secrets, aiCredentials, useCasesLinked, sources, warnings, targetProject } =
+      const { secrets, aiCredentials, useCasesLinked, sources, infos, warnings, targetProject } =
         result.result;
 
       const aiCount =
         aiCredentials.created.length + aiCredentials.updated.length;
 
-      toast.success(
-        `Синхронизация из «${targetProject.name}»: ${secrets.created.length} новых, ${secrets.updated.length} обновлено, ${aiCount} AI ключей в General API.`,
-      );
+      const changedSecrets = secrets.created.length + secrets.updated.length;
+
+      if (changedSecrets > 0 || aiCount > 0) {
+        toast.success(
+          `Синхронизация из «${targetProject.name}»: ${secrets.created.length} новых, ${secrets.updated.length} обновлено, ${aiCount} AI ключей в General API.`,
+        );
+      } else {
+        toast.message(
+          `Синхронизация из «${targetProject.name}» завершена. Новых ключей из Vercel нет.`,
+        );
+      }
 
       if (sources.length > 0) {
         toast.message(`Источники: ${sources.join(", ")}`);
@@ -220,6 +228,10 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
 
       if (useCasesLinked.length > 0) {
         toast.message(`Сценарии AI связаны: ${useCasesLinked.length}`);
+      }
+
+      for (const info of infos) {
+        toast.message(info);
       }
 
       for (const warning of warnings) {
@@ -236,8 +248,11 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
         <div>
           <h1 className="text-2xl font-semibold">API ключи</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Зашифрованные секреты платформы. «Синхронизация с Vercel» загружает
-            ключи из основного проекта orzuaibot (orzux.com), не из админки.
+            Зашифрованные секреты платформы. «Синхронизация с Vercel» читает
+            orzuaibot (orzux.com). На orzuai-admin нужны{" "}
+            <code className="text-xs">VERCEL_ACCESS_TOKEN</code> и{" "}
+            <code className="text-xs">VERCEL_TEAM_ID</code>. Если ключи уже в
+            vault — добавьте вручную ниже.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

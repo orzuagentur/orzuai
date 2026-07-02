@@ -41,7 +41,15 @@ export type VercelSecretsSyncResult = {
     skipped: string[];
   };
   useCasesLinked: string[];
+  infos: string[];
   warnings: string[];
+  diagnostics: {
+    tokenConfigured: boolean;
+    vercelEnvRows: number;
+    vercelMigratableKeys: number;
+    vercelUndecryptableKeys: string[];
+    vaultAiLinked: number;
+  };
 };
 
 type VercelEnvRow = {
@@ -194,67 +202,103 @@ function mergeEnvMaps(
 
 async function fetchVercelProjectEnvMap(
   targetProject: VercelSyncTargetProject,
-): Promise<Map<string, string>> {
+): Promise<{
+  envMap: Map<string, string>;
+  stats: {
+    totalRows: number;
+    migratableCount: number;
+    undecryptableKeys: string[];
+  };
+}> {
   const token = getVercelAccessToken();
   const teamId = process.env.VERCEL_TEAM_ID?.trim();
 
   if (!token) {
     throw new Error(
-      "VERCEL_ACCESS_TOKEN не задан. Добавьте токен в env проекта orzuai-admin для чтения ключей из orzuaibot.",
+      "VERCEL_ACCESS_TOKEN не задан. Добавьте токен в env проекта orzuai-admin (Settings → Environment Variables).",
     );
   }
 
-  const url = new URL(
-    `https://api.vercel.com/v10/projects/${encodeURIComponent(targetProject.id)}/env`,
-  );
-  url.searchParams.set("decrypt", "true");
-  if (teamId) {
-    url.searchParams.set("teamId", teamId);
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(
-      body.slice(0, 300) ||
-        `Vercel env API failed (${response.status} ${response.statusText}).`,
-    );
-  }
-
-  const payload = (await response.json()) as { envs?: VercelEnvRow[] };
-  const envs = payload.envs ?? [];
   const byKey = new Map<string, { value: string; rank: number }>();
+  const undecryptableKeys: string[] = [];
+  let totalRows = 0;
+  let nextCursor: number | null = null;
 
-  for (const row of envs) {
-    const key = row.key?.trim();
-    const value = row.value?.trim();
-
-    if (!key || !value || !isMigratableAppSecretKey(key)) {
-      continue;
+  do {
+    const url = new URL(
+      `https://api.vercel.com/v10/projects/${encodeURIComponent(targetProject.id)}/env`,
+    );
+    url.searchParams.set("decrypt", "true");
+    url.searchParams.set("source", "vercel-cli:pull");
+    if (teamId) {
+      url.searchParams.set("teamId", teamId);
+    }
+    if (nextCursor) {
+      url.searchParams.set("until", String(nextCursor));
     }
 
-    const targets = row.target ?? [];
-    const rank = targets.includes("production")
-      ? 0
-      : targets.includes("preview")
-        ? 1
-        : 2;
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
 
-    const existing = byKey.get(key);
-    if (!existing || rank < existing.rank) {
-      byKey.set(key, { value, rank });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        body.slice(0, 300) ||
+          `Vercel env API failed (${response.status} ${response.statusText}). Проверьте VERCEL_ACCESS_TOKEN и VERCEL_TEAM_ID на orzuai-admin.`,
+      );
     }
-  }
 
-  return new Map(
+    const payload = (await response.json()) as {
+      envs?: VercelEnvRow[];
+      pagination?: { next?: number | null };
+    };
+    const envs = payload.envs ?? [];
+    totalRows += envs.length;
+
+    for (const row of envs) {
+      const key = row.key?.trim();
+      if (!key || !isMigratableAppSecretKey(key)) {
+        continue;
+      }
+
+      const value = row.value?.trim();
+      if (!value) {
+        undecryptableKeys.push(key);
+        continue;
+      }
+
+      const targets = row.target ?? [];
+      const rank = targets.includes("production")
+        ? 0
+        : targets.includes("preview")
+          ? 1
+          : 2;
+
+      const existing = byKey.get(key);
+      if (!existing || rank < existing.rank) {
+        byKey.set(key, { value, rank });
+      }
+    }
+
+    nextCursor = payload.pagination?.next ?? null;
+  } while (nextCursor);
+
+  const envMap = new Map(
     [...byKey.entries()].map(([key, entry]) => [key, entry.value]),
   );
+
+  return {
+    envMap,
+    stats: {
+      totalRows,
+      migratableCount: envMap.size,
+      undecryptableKeys: [...new Set(undecryptableKeys)],
+    },
+  };
 }
 
 function collectRuntimeEnvMap(): Map<string, string> {
@@ -269,39 +313,63 @@ function collectRuntimeEnvMap(): Map<string, string> {
 async function resolveSyncEnvMap(): Promise<{
   envMap: Map<string, string>;
   sources: VercelSyncSource[];
+  infos: string[];
   warnings: string[];
   targetProject: VercelSyncTargetProject;
+  diagnostics: VercelSecretsSyncResult["diagnostics"];
 }> {
+  const infos: string[] = [];
   const warnings: string[] = [];
   const sources: VercelSyncSource[] = [];
   const targetProject = await resolveVercelSyncTargetProject();
+  const tokenConfigured = Boolean(getVercelAccessToken());
   const includeRuntime = shouldIncludeRuntimeEnv(targetProject);
   const runtimeMap = includeRuntime ? collectRuntimeEnvMap() : new Map<string, string>();
 
   if (includeRuntime && runtimeMap.size > 0) {
     sources.push("runtime_env");
-  } else if (!includeRuntime && collectRuntimeEnvMap().size > 0) {
-    warnings.push(
-      `Runtime env админки (orzuai-admin) пропущен. Источник: Vercel проект «${targetProject.name}» (${targetProject.id}).`,
-    );
   }
 
-  const vercelApiMap = await fetchVercelProjectEnvMap(targetProject);
+  const { envMap: vercelApiMap, stats } =
+    await fetchVercelProjectEnvMap(targetProject);
+
   if (vercelApiMap.size > 0) {
     sources.push("vercel_api");
+    infos.push(
+      `Из Vercel «${targetProject.name}» загружено ${vercelApiMap.size} ключей.`,
+    );
+  } else if (stats.totalRows === 0) {
+    warnings.push(
+      `Vercel API не вернул переменных для «${targetProject.name}». Проверьте VERCEL_ACCESS_TOKEN и VERCEL_TEAM_ID=team_rRA61vEP6JGZ9Ezty2ElzGy8 на orzuai-admin.`,
+    );
+  } else if (stats.undecryptableKeys.length > 0) {
+    warnings.push(
+      `Найдены ключи (${stats.undecryptableKeys.slice(0, 5).join(", ")}${stats.undecryptableKeys.length > 5 ? "…" : ""}), но Vercel не отдал значения (Sensitive/encrypted). Добавьте их вручную в «API ключи» или снимите флаг Sensitive в Vercel.`,
+    );
+  } else {
+    infos.push(
+      `В orzuaibot на Vercel нет API-ключей (только bootstrap). Если ключи уже в vault админки — добавьте вручную или выполните npm run migrate:secrets локально.`,
+    );
   }
 
   const envMap = includeRuntime
     ? mergeEnvMaps(vercelApiMap, runtimeMap)
     : vercelApiMap;
 
-  if (envMap.size === 0) {
-    warnings.push(
-      `Не найдено ключей в Vercel проекте «${targetProject.name}». Добавьте переменные в orzuaibot (orzux.com).`,
-    );
-  }
-
-  return { envMap, sources, warnings, targetProject };
+  return {
+    envMap,
+    sources,
+    infos,
+    warnings,
+    targetProject,
+    diagnostics: {
+      tokenConfigured,
+      vercelEnvRows: stats.totalRows,
+      vercelMigratableKeys: stats.migratableCount,
+      vercelUndecryptableKeys: stats.undecryptableKeys,
+      vaultAiLinked: 0,
+    },
+  };
 }
 
 async function importSecretsToVault(input: {
@@ -500,7 +568,8 @@ export async function syncVercelSecretsAndAiCredentials(input: {
   actorUserId: string;
   actorEmail: string;
 }): Promise<VercelSecretsSyncResult> {
-  const { envMap, sources, warnings, targetProject } = await resolveSyncEnvMap();
+  const { envMap, sources, infos, warnings, targetProject, diagnostics } =
+    await resolveSyncEnvMap();
 
   const secrets = await importSecretsToVault({
     supabase: input.supabase,
@@ -520,6 +589,21 @@ export async function syncVercelSecretsAndAiCredentials(input: {
     credentialIdsByProvider: aiCredentials.credentialIdsByProvider,
   });
 
+  const aiLinked =
+    aiCredentials.created.length + aiCredentials.updated.length;
+  diagnostics.vaultAiLinked = aiLinked;
+
+  if (
+    envMap.size === 0 &&
+    aiLinked > 0 &&
+    secrets.created.length === 0 &&
+    secrets.updated.length === 0
+  ) {
+    infos.push(
+      `Ключи уже в vault админки — General API обновлён (${aiLinked} провайдеров). Синхронизация из Vercel не требуется.`,
+    );
+  }
+
   return {
     success: true,
     targetProject,
@@ -531,6 +615,8 @@ export async function syncVercelSecretsAndAiCredentials(input: {
       skipped: aiCredentials.skipped,
     },
     useCasesLinked,
+    infos,
     warnings,
+    diagnostics,
   };
 }

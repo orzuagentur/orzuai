@@ -61,7 +61,9 @@ VALUES ('<auth.users uuid>', 'owner');
 | `VERCEL_SYNC_PROJECT_NAME` | `orzuaibot` (опционально, для отображения) |
 | `VERCEL_TEAM_ID` | `team_rRA61vEP6JGZ9Ezty2ElzGy8` |
 
-Без `VERCEL_ACCESS_TOKEN` синхронизация не выполнится — runtime env админки намеренно не используется.
+Если API-ключи уже перенесены в vault (`npm run migrate:secrets`) и удалены из Vercel — синхронизация из Vercel ничего не найдёт. Добавьте ключи вручную в **API ключи** или **General API AI**.
+
+Переменные с флагом **Sensitive** в Vercel нельзя прочитать через API — добавьте их вручную в админке.
 
 ## 3. Миграция секретов из Vercel в БД
 

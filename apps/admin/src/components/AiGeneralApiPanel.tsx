@@ -146,11 +146,25 @@ export function AiGeneralApiPanel({
         return;
       }
 
-      const { targetProject } = result.result;
+      const { targetProject, infos, warnings, aiCredentials } = result.result;
+      const aiCount =
+        aiCredentials.created.length + aiCredentials.updated.length;
 
-      toast.success(
-        `Ключи синхронизированы из Vercel проекта «${targetProject.name}».`,
-      );
+      if (aiCount > 0) {
+        toast.success(
+          `Ключи синхронизированы из «${targetProject.name}» (${aiCount} в General API).`,
+        );
+      } else {
+        toast.message(`Синхронизация из «${targetProject.name}» завершена.`);
+      }
+
+      for (const info of infos) {
+        toast.message(info);
+      }
+
+      for (const warning of warnings) {
+        toast.warning(warning);
+      }
       router.refresh();
     });
   }
