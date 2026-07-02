@@ -34,6 +34,7 @@ import {
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall, markInboundCallAiFallback } from "@/services/voice-inbox.service";
+import { recordCustomerOutboundLeg } from "@/services/voice-outbound-cancel.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
 
 const CONFERENCE_WAIT_URL =
@@ -334,6 +335,14 @@ export async function buildClientOutboundTwiml(input: {
         callLogId: callLog.callLogId,
       }),
     );
+
+    await recordCustomerOutboundLeg({
+      businessId: input.businessId,
+      callLogId: callLog.callLogId,
+      parentCallSid,
+      customerCallSid,
+      phoneNumber: to,
+    });
   } catch (error) {
     console.error(
       "[voice-client] conference customer leg failed",

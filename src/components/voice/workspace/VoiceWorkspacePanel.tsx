@@ -8,11 +8,15 @@ import {
   HeadphonesIcon,
   HistoryIcon,
   MessageSquareIcon,
+  MicIcon,
+  MicOffIcon,
   PencilIcon,
   PhoneIcon,
   PhoneOffIcon,
   UserPlusIcon,
   VoicemailIcon,
+  Volume2Icon,
+  VolumeXIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +49,12 @@ import {
   isActiveVoiceCallStatus,
 } from "@/utils/voice-call-display";
 import { findFirstActiveVoiceCall } from "@/components/voice/VoiceActiveCallBanner";
+import {
+  playCallDisconnectedTone,
+  startOutboundRingback,
+  stopOutboundRingback,
+} from "@/lib/voice/call-sounds";
+import { requestEndVoiceCall } from "@/lib/voice/request-end-call";
 import { scheduleVoiceInboxRefresh } from "@/utils/voice-inbox-refresh";
 import {
   getCallsForContact,
@@ -203,19 +213,39 @@ export function VoiceWorkspacePanel({
               softphone.status === "on-call" ? "in-progress" : "ringing",
             contactId: call?.contactId ?? null,
             contactName: call?.contactName ?? null,
-            callMode: "human",
-            humanHandled: true,
+            callMode: optimisticLiveCall?.callMode ?? "human",
+            aiHandled: optimisticLiveCall?.aiHandled ?? false,
+            humanHandled: optimisticLiveCall?.humanHandled ?? true,
           });
         }
       }
+
+      const phone =
+        softphone.activePhoneNumber?.trim()
+        || phoneToCall
+        || call?.phoneNumber
+        || "";
+
+      if (phone) {
+        return buildPlaceholderVoiceCallDetail({
+          id: view.callId,
+          phoneNumber: phone,
+          status:
+            softphone.status === "on-call" ? "in-progress" : "ringing",
+          contactId: call?.contactId ?? null,
+          contactName: call?.contactName ?? null,
+          callMode: optimisticLiveCall?.callMode ?? call?.callMode ?? "human",
+          aiHandled: optimisticLiveCall?.aiHandled ?? call?.aiHandled ?? false,
+          humanHandled:
+            optimisticLiveCall?.humanHandled ?? call?.humanHandled ?? true,
+        });
+      }
+
+      return null;
     }
 
     if (call && isActiveVoiceCallStatus(call.status)) {
       return call;
-    }
-
-    if (lineBusyCall) {
-      return mergeListItemToDetail(lineBusyCall, call);
     }
 
     if (
@@ -254,7 +284,6 @@ export function VoiceWorkspacePanel({
   }, [
     allCalls,
     call,
-    lineBusyCall,
     optimisticLiveCall,
     phoneToCall,
     softphone.activePhoneNumber,
@@ -457,43 +486,35 @@ export function VoiceWorkspacePanel({
 
   const handleEndCall = useCallback(
     (callLogId: string) => {
+      const parentCallSid = softphone.activeCallSid;
+      const isEphemeral =
+        isEphemeralLiveCallId(callLogId) || callLogId === "softphone-live";
+
+      stopOutboundRingback();
+
       if (
         softphone.status === "connecting"
         || softphone.status === "on-call"
         || softphone.status === "incoming"
       ) {
         softphone.hangUp();
+      } else {
+        playCallDisconnectedTone();
       }
 
       setOptimisticLiveCall(null);
       onViewChange(resolveBackView());
 
       void (async () => {
-        if (isEphemeralLiveCallId(callLogId) || callLogId === "softphone-live") {
-          scheduleVoiceInboxRefresh(() => router.refresh());
-          return;
-        }
+        const result = await requestEndVoiceCall({
+          callLogId: isEphemeral ? undefined : callLogId,
+          parentCallSid: parentCallSid ?? undefined,
+        });
 
-        try {
-          const response = await fetch("/api/voice/end-call", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ callLogId }),
-          });
-          const result = (await response.json()) as {
-            success?: boolean;
-            message?: string;
-          };
+        scheduleVoiceInboxRefresh(() => router.refresh());
 
-          if (!result.success) {
-            throw new Error(result.message ?? VOICE_MESSAGES.callEndFailed);
-          }
-
-          scheduleVoiceInboxRefresh(() => router.refresh());
-        } catch (error) {
-          toast.error(
-            error instanceof Error ? error.message : VOICE_MESSAGES.callEndFailed,
-          );
+        if (!result.success && !isEphemeral && !parentCallSid) {
+          toast.error(result.message ?? VOICE_MESSAGES.callEndFailed);
         }
       })();
     },
@@ -509,12 +530,20 @@ export function VoiceWorkspacePanel({
       return;
     }
 
+    if (
+      softphone.status === "connecting"
+      || softphone.status === "on-call"
+      || softphone.status === "incoming"
+    ) {
+      return;
+    }
+
     const listCall = allCalls.find((item) => item.id === view.callId);
     if (listCall && !isActiveVoiceCallStatus(listCall.status)) {
       setOptimisticLiveCall(null);
       onViewChange(resolveBackView());
     }
-  }, [allCalls, onViewChange, resolveBackView, view]);
+  }, [allCalls, onViewChange, resolveBackView, softphone.status, view]);
 
   useEffect(() => {
     const previous = prevSoftphoneStatusRef.current;
@@ -875,6 +904,10 @@ function WorkspaceContactInfo({
   );
 }
 
+function isAiOnlyLiveCall(call: VoiceCallDetail): boolean {
+  return call.aiHandled && !call.humanHandled;
+}
+
 function WorkspaceLiveView({
   call,
   onBack,
@@ -889,6 +922,7 @@ function WorkspaceLiveView({
   const softphone = useVoiceSoftphone();
   const displayName =
     call.contactName ?? formatContactIdentifier(call.phoneNumber);
+  const isOperatorCall = !isAiOnlyLiveCall(call);
   const { isRinging, isConnected, displaySeconds } = useLiveCallTimer(call, {
     status: softphone.status,
     activePhoneNumber: softphone.activePhoneNumber,
@@ -899,7 +933,11 @@ function WorkspaceLiveView({
     enabled: false,
   });
   const [listening, setListening] = useState(false);
-  const canMonitor = !isEphemeralLiveCallId(call.id) && call.id !== "softphone-live";
+  const canMonitor =
+    isAiOnlyLiveCall(call)
+    && !isEphemeralLiveCallId(call.id)
+    && call.id !== "softphone-live";
+  const isLiveSession = isRinging || isConnected || softphone.status === "incoming";
 
   useEffect(() => {
     if (listening) {
@@ -909,9 +947,45 @@ function WorkspaceLiveView({
     stop();
   }, [listening, reconnect, stop]);
 
+  useEffect(() => {
+    if (!isAiOnlyLiveCall(call) || !isRinging) {
+      return;
+    }
+
+    startOutboundRingback();
+    return () => {
+      stopOutboundRingback();
+    };
+  }, [call.aiHandled, call.humanHandled, isRinging]);
+
+  const prevRingingRef = useRef(isRinging);
+  useEffect(() => {
+    const wasRinging = prevRingingRef.current;
+    prevRingingRef.current = isRinging;
+
+    if (
+      isAiOnlyLiveCall(call)
+      && wasRinging
+      && !isRinging
+      && !isConnected
+    ) {
+      playCallDisconnectedTone();
+    }
+  }, [call.aiHandled, call.humanHandled, isConnected, isRinging]);
+
+  const handleBack = () => {
+    if (isLiveSession) {
+      return;
+    }
+    onBack();
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <WorkspaceTopBar title={VOICE_MESSAGES.callLiveCardTitle} onBack={onBack} />
+      <WorkspaceTopBar
+        title={VOICE_MESSAGES.callLiveCardTitle}
+        onBack={isLiveSession ? undefined : handleBack}
+      />
 
       <div className="flex flex-1 flex-col p-4">
         <div className="rounded-2xl border bg-gradient-to-b from-red-50/80 to-background p-5 dark:from-red-950/20">
@@ -957,37 +1031,41 @@ function WorkspaceLiveView({
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {canMonitor ? (
+          {isOperatorCall ? (
+            <WorkspaceOperatorInCallControls onEndCall={onEndCall} />
+          ) : (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {canMonitor ? (
+                <Button
+                  type="button"
+                  variant={listening ? "default" : "outline"}
+                  onClick={() => setListening((value) => !value)}
+                >
+                  <HeadphonesIcon className="mr-2 size-4" />
+                  {listening
+                    ? VOICE_MESSAGES.callMonitorAudioStop
+                    : VOICE_MESSAGES.callListenLive}
+                </Button>
+              ) : null}
+              {canMonitor ? (
+                <Button type="button" variant="outline" onClick={onOpenTranscript}>
+                  <FileTextIcon className="mr-2 size-4" />
+                  {VOICE_MESSAGES.callTranscriptLive}
+                </Button>
+              ) : null}
               <Button
                 type="button"
-                variant={listening ? "default" : "outline"}
-                onClick={() => setListening((value) => !value)}
+                variant="destructive"
+                onClick={onEndCall}
               >
-                <HeadphonesIcon className="mr-2 size-4" />
-                {listening
-                  ? VOICE_MESSAGES.callMonitorAudioStop
-                  : VOICE_MESSAGES.callListenLive}
+                <PhoneOffIcon className="mr-2 size-4" />
+                {VOICE_MESSAGES.callEnd}
               </Button>
-            ) : null}
-            {canMonitor ? (
-              <Button type="button" variant="outline" onClick={onOpenTranscript}>
-                <FileTextIcon className="mr-2 size-4" />
-                {VOICE_MESSAGES.callTranscriptLive}
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={onEndCall}
-            >
-              <PhoneOffIcon className="mr-2 size-4" />
-              {VOICE_MESSAGES.callEnd}
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
 
-        {listening ? (
+        {canMonitor && listening ? (
           <div className="mt-4 space-y-3">
             <VoiceMonitorWaveform active={isListening} />
             <div className="flex justify-end">
@@ -1004,16 +1082,104 @@ function WorkspaceLiveView({
           </div>
         ) : null}
 
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border p-4">
-          <VoiceTranscriptTurns
-            turns={call.turns}
-            callTiming={{
-              createdAt: call.createdAt,
-              endedAt: call.endedAt,
-            }}
-          />
-        </div>
+        {isAiOnlyLiveCall(call) ? (
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border p-4">
+            <VoiceTranscriptTurns
+              turns={call.turns}
+              callTiming={{
+                createdAt: call.createdAt,
+                endedAt: call.endedAt,
+              }}
+            />
+          </div>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function WorkspaceOperatorInCallControls({
+  onEndCall,
+}: {
+  onEndCall: () => void;
+}) {
+  const softphone = useVoiceSoftphone();
+  const isIncoming = softphone.status === "incoming";
+
+  if (isIncoming) {
+    return (
+      <div className="mx-auto mt-5 flex max-w-sm items-center justify-center gap-3">
+        <Button
+          type="button"
+          size="lg"
+          className="rounded-full"
+          onClick={softphone.acceptIncoming}
+        >
+          <PhoneIcon className="mr-2 size-4" />
+          {VOICE_MESSAGES.softphoneAccept}
+        </Button>
+        <Button
+          type="button"
+          size="lg"
+          variant="outline"
+          className="rounded-full"
+          onClick={softphone.rejectIncoming}
+        >
+          <PhoneOffIcon className="mr-2 size-4" />
+          {VOICE_MESSAGES.softphoneReject}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto mt-5 flex max-w-sm items-center justify-center gap-2">
+      <Button
+        type="button"
+        size="icon"
+        variant={softphone.isMuted ? "default" : "outline"}
+        className="size-11 rounded-full"
+        onClick={softphone.toggleMute}
+        aria-label={
+          softphone.isMuted ? VOICE_MESSAGES.softphoneUnmute : VOICE_MESSAGES.softphoneMute
+        }
+      >
+        {softphone.isMuted ? (
+          <MicOffIcon className="size-5" />
+        ) : (
+          <MicIcon className="size-5" />
+        )}
+      </Button>
+
+      <Button
+        type="button"
+        size="icon"
+        variant={softphone.isSpeakerMuted ? "default" : "outline"}
+        className="size-11 rounded-full"
+        onClick={softphone.toggleSpeaker}
+        aria-label={
+          softphone.isSpeakerMuted
+            ? VOICE_MESSAGES.softphoneSpeaker
+            : VOICE_MESSAGES.softphoneSpeakerOff
+        }
+      >
+        {softphone.isSpeakerMuted ? (
+          <VolumeXIcon className="size-5" />
+        ) : (
+          <Volume2Icon className="size-5" />
+        )}
+      </Button>
+
+      <Button
+        type="button"
+        size="icon"
+        variant="destructive"
+        className="size-11 rounded-full"
+        onClick={onEndCall}
+        aria-label={VOICE_MESSAGES.callEnd}
+      >
+        <PhoneOffIcon className="size-5" />
+      </Button>
     </div>
   );
 }
@@ -1081,13 +1247,17 @@ function WorkspaceTopBar({
   onBack,
 }: {
   title: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   return (
     <div className="flex items-center gap-2 border-b px-3 py-2">
-      <Button type="button" size="icon" variant="ghost" onClick={onBack}>
-        <ArrowLeftIcon className="size-4" />
-      </Button>
+      {onBack ? (
+        <Button type="button" size="icon" variant="ghost" onClick={onBack}>
+          <ArrowLeftIcon className="size-4" />
+        </Button>
+      ) : (
+        <span className="size-9 shrink-0" aria-hidden />
+      )}
       <h2 className="text-sm font-semibold">{title}</h2>
     </div>
   );

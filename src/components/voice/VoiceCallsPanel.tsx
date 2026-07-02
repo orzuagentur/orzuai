@@ -237,7 +237,11 @@ function VoiceCallsPanelContent({
     }
 
     setWorkspaceView((current) => {
-      if (["history", "recordings", "transcripts"].includes(current.mode)) {
+      if (["history", "recordings", "transcripts", "transcript"].includes(current.mode)) {
+        return current;
+      }
+
+      if (current.mode === "live") {
         return current;
       }
 
@@ -248,19 +252,6 @@ function VoiceCallsPanelContent({
       return { mode: "home" };
     });
   }, [activeCallId, calls, phoneDraft]);
-
-  useEffect(() => {
-    if (!liveCall) {
-      return;
-    }
-
-    setWorkspaceView((current) => {
-      if (current.mode === "home" || current.mode === "dialpad") {
-        return { mode: "live", callId: liveCall.id };
-      }
-      return current;
-    });
-  }, [liveCall]);
 
   const handleOpenDialpad = useCallback(() => {
     setWorkspaceView({ mode: "dialpad" });

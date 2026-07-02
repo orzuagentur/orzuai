@@ -15,6 +15,7 @@ import type { InboxBusinessContext } from "@/services/chat.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { completeOperatorCallAfterCustomerLeave } from "@/services/voice-conference.service";
+import { cancelOutboundVoiceCall } from "@/services/voice-outbound-cancel.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
@@ -440,9 +441,10 @@ export async function handleTwilioCustomerLegStatusUpdate(input: {
     });
   }
 
-  await completeOperatorCallAfterCustomerLeave({
+  await cancelOutboundVoiceCall({
     businessId: input.businessId,
     parentCallSid: input.parentCallSid,
+    reason: "operator_hangup",
   });
 }
 

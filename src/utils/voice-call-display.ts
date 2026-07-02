@@ -83,6 +83,7 @@ export function getVoiceCallStatusLabel(status: string): string {
     case "missed":
     case "no-answer":
     case "failed":
+    case "canceled":
       return "Missed";
     default:
       return status;

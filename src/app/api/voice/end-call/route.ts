@@ -25,13 +25,15 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as {
     callLogId?: string;
+    parentCallSid?: string;
   } | null;
 
   const callLogId = body?.callLogId?.trim();
+  const parentCallSid = body?.parentCallSid?.trim();
 
-  if (!callLogId) {
+  if (!callLogId && !parentCallSid) {
     return NextResponse.json(
-      { success: false, message: "Missing callLogId." },
+      { success: false, message: "Missing call identifier." },
       { status: 400 },
     );
   }
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
   const result = await endActiveVoiceCall({
     businessId: business.id,
     callLogId,
+    parentCallSid,
   });
 
   return NextResponse.json(result, {
