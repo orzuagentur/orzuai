@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import { notifyInboundMessagePush } from "@/services/push-notifications.service";
 import type {
   AutomationActionType,
@@ -190,6 +191,10 @@ export async function runAutomationsForTrigger(
   context: AutomationTriggerContext,
 ): Promise<void> {
   if (!hasSupabaseEnv()) {
+    return;
+  }
+
+  if (!(await isPlatformFeatureAllowed(context.businessId, "automations"))) {
     return;
   }
 

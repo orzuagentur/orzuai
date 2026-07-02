@@ -1755,6 +1755,207 @@ export type Database = {
         };
         Relationships: [];
       };
+      platform_announcement_dismissals: {
+        Row: {
+          announcement_id: string;
+          user_id: string;
+          dismissed_at: string;
+        };
+        Insert: {
+          announcement_id: string;
+          user_id: string;
+          dismissed_at?: string;
+        };
+        Update: {
+          announcement_id?: string;
+          user_id?: string;
+          dismissed_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_announcements: {
+        Row: {
+          id: string;
+          title: string;
+          body: string;
+          severity: string;
+          target_audience: string;
+          target_business_ids: string[];
+          is_active: boolean;
+          starts_at: string | null;
+          ends_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          body: string;
+          severity?: string;
+          target_audience?: string;
+          target_business_ids?: string[];
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          body?: string;
+          severity?: string;
+          target_audience?: string;
+          target_business_ids?: string[];
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_business_admin_audit_log: {
+        Row: {
+          id: string;
+          business_id: string | null;
+          action: string;
+          actor_user_id: string | null;
+          actor_email: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id?: string | null;
+          action: string;
+          actor_user_id?: string | null;
+          actor_email?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string | null;
+          action?: string;
+          actor_user_id?: string | null;
+          actor_email?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_business_controls: {
+        Row: {
+          business_id: string;
+          account_status: string;
+          ai_enabled: boolean;
+          voice_enabled: boolean;
+          sms_enabled: boolean;
+          automations_enabled: boolean;
+          outbound_ai_enabled: boolean;
+          admin_notes: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          business_id: string;
+          account_status?: string;
+          ai_enabled?: boolean;
+          voice_enabled?: boolean;
+          sms_enabled?: boolean;
+          automations_enabled?: boolean;
+          outbound_ai_enabled?: boolean;
+          admin_notes?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          business_id?: string;
+          account_status?: string;
+          ai_enabled?: boolean;
+          voice_enabled?: boolean;
+          sms_enabled?: boolean;
+          automations_enabled?: boolean;
+          outbound_ai_enabled?: boolean;
+          admin_notes?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      platform_support_messages: {
+        Row: {
+          id: string;
+          thread_id: string;
+          sender_type: string;
+          sender_admin_user_id: string | null;
+          sender_business_user_id: string | null;
+          content: string;
+          read_by_platform_at: string | null;
+          read_by_business_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          thread_id: string;
+          sender_type: string;
+          sender_admin_user_id?: string | null;
+          sender_business_user_id?: string | null;
+          content: string;
+          read_by_platform_at?: string | null;
+          read_by_business_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          thread_id?: string;
+          sender_type?: string;
+          sender_admin_user_id?: string | null;
+          sender_business_user_id?: string | null;
+          content?: string;
+          read_by_platform_at?: string | null;
+          read_by_business_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_support_threads: {
+        Row: {
+          id: string;
+          business_id: string;
+          subject: string;
+          last_message_at: string | null;
+          unread_by_platform: number;
+          unread_by_business: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          subject?: string;
+          last_message_at?: string | null;
+          unread_by_platform?: number;
+          unread_by_business?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          subject?: string;
+          last_message_at?: string | null;
+          unread_by_platform?: number;
+          unread_by_business?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       platform_admins: {
         Row: {
           user_id: string;

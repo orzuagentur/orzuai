@@ -17,6 +17,7 @@ import {
   formatCrmContextForSystemPrompt,
   type CrmReplyContactSnapshot,
 } from "@/lib/ai/crm-reply-context";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
   formatCalendarResourcesForAiPrompt,
@@ -598,6 +599,10 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   language: string;
   sendFollowUp?: (text: string) => Promise<{ success: boolean }>;
 }): Promise<void> {
+  if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
+    return;
+  }
+
   const subscriptionPlan = await fetchBusinessSubscriptionPlan(
     input.admin,
     input.businessId,

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { generateTextWithFallback } from "@/services/llm.service";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import type { ContactSnapshot } from "@/services/agent-task-executor.service";
 import {
   orchestratorResponseSchema,
@@ -260,6 +261,15 @@ export async function runAutoReplyOrchestrator(input: {
   bookingPagesText?: string;
   availabilityText?: string;
 }): Promise<OrchestratorRunResult> {
+  if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
+    return {
+      success: false,
+      errorCode: "llm_failed",
+      errorMessage: "AI is disabled for this business.",
+      attemptedProviders: [],
+    };
+  }
+
   const conversationHistory = input.conversationHistory ?? [];
   const calendarBookingEnabled =
     input.calendarBookingEnabled ?? input.calendarConnected ?? false;

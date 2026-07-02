@@ -15,6 +15,9 @@ import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-cont
 import { AiHumanRequestsProvider } from "@/contexts/ai-human-requests-context";
 import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
 import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
+import { PlatformSupportProvider } from "@/contexts/platform-support-context";
+import { PlatformAnnouncementsBanner } from "@/components/dashboard/PlatformAnnouncementsBanner";
+import type { PlatformAnnouncement } from "@/services/platform-announcements.service";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
 import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
@@ -53,11 +56,21 @@ const PlatformCopilotWidget = dynamic(
   { ssr: false },
 );
 
+const PlatformSupportWidget = dynamic(
+  () =>
+    import("@/components/platform-support/PlatformSupportWidget").then(
+      (mod) => mod.PlatformSupportWidget,
+    ),
+  { ssr: false },
+);
+
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
   googleCalendarConnected?: boolean;
   voiceBusinessId?: string | null;
   voiceClientEnabled?: boolean;
+  announcements?: PlatformAnnouncement[];
+  supportUnreadCount?: number;
   children: React.ReactNode;
 };
 
@@ -66,6 +79,8 @@ export function DashboardShell({
   googleCalendarConnected = false,
   voiceBusinessId = null,
   voiceClientEnabled = false,
+  announcements = [],
+  supportUnreadCount = 0,
   children,
 }: DashboardShellProps) {
   useSupabaseRealtimeBootstrap();
@@ -88,21 +103,29 @@ export function DashboardShell({
                       <AutomationsChromeProvider>
                         <DashboardProfileProvider userProfile={userProfile}>
                           <PlatformCopilotProvider>
-                            <SidebarProvider>
-                              <AppSidebar
-                                userProfile={userProfile}
-                                googleCalendarConnected={googleCalendarConnected}
-                              />
-                              <SidebarInset>
-                                <DashboardHeader />
-                                <VoiceSoftphoneBarGate />
-                                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                                  {children}
-                                </div>
-                              </SidebarInset>
-                            </SidebarProvider>
-                            <PlatformCopilotWidget />
-                            <AiHumanRequestOverlay />
+                            <PlatformSupportProvider
+                              initialUnreadCount={supportUnreadCount}
+                            >
+                              <SidebarProvider>
+                                <AppSidebar
+                                  userProfile={userProfile}
+                                  googleCalendarConnected={googleCalendarConnected}
+                                />
+                                <SidebarInset>
+                                  <DashboardHeader />
+                                  <PlatformAnnouncementsBanner
+                                    announcements={announcements}
+                                  />
+                                  <VoiceSoftphoneBarGate />
+                                  <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                                    {children}
+                                  </div>
+                                </SidebarInset>
+                              </SidebarProvider>
+                              <PlatformCopilotWidget />
+                              <PlatformSupportWidget />
+                              <AiHumanRequestOverlay />
+                            </PlatformSupportProvider>
                           </PlatformCopilotProvider>
                         </DashboardProfileProvider>
                       </AutomationsChromeProvider>

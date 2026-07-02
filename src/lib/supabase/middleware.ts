@@ -71,5 +71,34 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  if (
+    user &&
+    pathname.startsWith("/dashboard") &&
+    pathname !== DASHBOARD_ROUTES.onboarding &&
+    pathname !== DASHBOARD_ROUTES.suspended
+  ) {
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (business?.id) {
+      const { data: controls } = await supabase
+        .from("platform_business_controls")
+        .select("account_status")
+        .eq("business_id", business.id)
+        .maybeSingle();
+
+      if (controls?.account_status === "suspended") {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = DASHBOARD_ROUTES.suspended;
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
+  }
+
   return supabaseResponse;
 }

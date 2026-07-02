@@ -202,6 +202,30 @@ export function scheduleNewLeadPush(input: NewLeadPushInput): void {
   });
 }
 
+export async function notifyPlatformAnnouncementPush(input: {
+  businessId: string;
+  announcementId: string;
+  title: string;
+  body: string;
+  severity: string;
+  url: string;
+}): Promise<PushDeliveryResult> {
+  const payload = JSON.stringify({
+    title: input.title,
+    body: input.body.slice(0, 180),
+    url: input.url,
+    tag: `announcement-${input.announcementId}`,
+    sound: LEAD_NOTIFICATION_SOUND,
+  });
+
+  try {
+    return await deliverPushToBusiness(input.businessId, payload);
+  } catch (error) {
+    console.error("[push] failed to notify platform announcement", error);
+    return { sent: 0, failed: 0, skipped: true };
+  }
+}
+
 export async function sendTestPushNotification(
   businessId: string,
 ): Promise<PushDeliveryResult> {

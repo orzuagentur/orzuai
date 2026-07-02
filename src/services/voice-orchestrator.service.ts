@@ -12,6 +12,7 @@ import {
 } from "@/services/ai-calendar-booking.service";
 import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
 import { listPublishedBookingPagesForBusinessAdmin } from "@/services/booking-pages.service";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
   applyPreparedExecutorPlan,
@@ -49,6 +50,10 @@ async function runVoiceTurnOrchestration(input: {
   clientMessage: string;
   conversationHistory: VoiceCallSessionTurn[];
 }): Promise<void> {
+  if (!(await isPlatformFeatureAllowed(input.businessId, "voice"))) {
+    return;
+  }
+
   const admin = createAdminClient();
   const conversationRepo = getConversationRepository(admin);
   const contactId = await conversationRepo.findContactIdByPhone(

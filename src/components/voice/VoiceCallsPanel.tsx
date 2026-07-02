@@ -171,11 +171,11 @@ function VoiceCallsPanelContent({
     const deduped = dedupeVoiceCallsByContact(filteredCalls);
     return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
   }, [filteredCalls, phonebookContacts]);
-  const workspaceCalls = useMemo(() => {
-    const deduped = dedupeVoiceCallsByContact(
+  const workspaceAllCalls = useMemo(() => {
+    return enrichVoiceCallsWithPhonebook(
       filterVoiceCalls(sanitizedCalls, callFilter),
+      phonebookContacts,
     );
-    return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
   }, [callFilter, phonebookContacts, sanitizedCalls]);
   const activeContactKey = useMemo(() => {
     const active = calls.find((call) => call.id === activeCallId);
@@ -560,7 +560,7 @@ function VoiceCallsPanelContent({
               view={workspaceView}
               onViewChange={handleWorkspaceViewChange}
               call={selectedCall}
-              allCalls={workspaceCalls}
+              allCalls={workspaceAllCalls}
               activeCallId={activeCallId}
               initialPhone={phoneDraft}
               phonebookContacts={phonebookContacts}

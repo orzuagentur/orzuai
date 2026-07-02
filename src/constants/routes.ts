@@ -28,6 +28,7 @@ export const AUTH_ROUTES = {
 export const DASHBOARD_ROUTES = {
   overview: "/dashboard",
   onboarding: "/dashboard/onboarding",
+  suspended: "/dashboard/suspended",
   chats: "/dashboard/chats",
   chatsMonitor: "/dashboard/chats",
   chatsFavorites: "/dashboard/chats/favorites",

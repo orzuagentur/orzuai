@@ -12,6 +12,7 @@ import {
 import {
   createTwilioOutboundCallWithTwiml,
   listTwilioIncomingPhoneNumbers,
+  TwilioApiRequestError,
 } from "@/lib/twilio/client";
 import {
   getTwilioPlatformAccountSid,
@@ -235,6 +236,44 @@ function buildOutboundConferenceName(input: {
   return `orzux-${businessPart}-${callPart}`.slice(0, 80);
 }
 
+function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
+  if (error instanceof TwilioApiRequestError) {
+    const message = error.message.toLowerCase();
+
+    if (
+      error.code === 21215
+      || message.includes("not allowed to call")
+      || message.includes("geo permission")
+    ) {
+      return "This destination country is blocked in Twilio Geo Permissions. Open Twilio Console, Voice, Geo Permissions, and enable the destination country.";
+    }
+
+    if (error.code === 21211 || message.includes("invalid 'to' phone number")) {
+      return "The destination phone number is invalid.";
+    }
+
+    if (
+      error.code === 13227
+      || message.includes("unverified")
+      || message.includes("verified numbers")
+    ) {
+      return "Twilio trial accounts can only call verified numbers. Verify the destination number in Twilio Console or upgrade the account.";
+    }
+
+    if (message.includes("fraud") || message.includes("blocked")) {
+      return "Twilio blocked this outbound call. Check Twilio Monitor alerts and Fraud Guard settings.";
+    }
+
+    return `Unable to connect the customer call. ${error.message}`;
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return `Unable to connect the customer call. ${error.message}`;
+  }
+
+  return "Unable to connect the customer call.";
+}
+
 export async function buildClientOutboundTwiml(input: {
   businessId: string;
   toNumber: string;
@@ -354,7 +393,7 @@ export async function buildClientOutboundTwiml(input: {
     );
 
     return buildStaticSayTwiml({
-      speech: "Unable to connect the customer call.",
+      speech: resolveOutboundCustomerLegErrorSpeech(error),
       speechLocale,
     });
   }

@@ -18,7 +18,7 @@ export default function AdminPanelLayout({
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-7xl flex-col md:flex-row">
+      <div className="mx-auto flex max-w-[1400px] flex-col md:flex-row">
         <AdminSidebar />
         <main className="min-w-0 flex-1 px-4 py-6 md:px-6">{children}</main>
       </div>

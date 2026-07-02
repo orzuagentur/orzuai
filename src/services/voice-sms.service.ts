@@ -1,6 +1,7 @@
 import "server-only";
 
 import { buildAppUrl } from "@/lib/app-url";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import { sendTwilioSms } from "@/lib/twilio/client";
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -75,6 +76,10 @@ export async function sendVoiceChannelSms(input: {
   phoneNumber: string;
   body: string;
 }): Promise<{ success: boolean; message?: string }> {
+  if (!(await isPlatformFeatureAllowed(input.businessId, "sms"))) {
+    return { success: false, message: "SMS is disabled for this business." };
+  }
+
   if (!hasSupabaseEnv()) {
     return { success: false, message: "Configuration missing." };
   }
