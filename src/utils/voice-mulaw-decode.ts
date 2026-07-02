@@ -2,7 +2,7 @@ const MULAW_DECODE_TABLE = (() => {
   const table = new Int16Array(256);
 
   for (let index = 0; index < 256; index += 1) {
-    let mu = ~index;
+    const mu = ~index;
     const sign = mu & 0x80;
     const exponent = (mu >> 4) & 0x07;
     const mantissa = mu & 0x0f;
