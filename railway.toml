@@ -3,7 +3,7 @@
 
 [build]
 builder = "RAILPACK"
-watchPatterns = ["apps/voice-stream/**", "package.json", "package-lock.json"]
+watchPatterns = ["apps/voice-stream/**", "package.json", "package-lock.json", "railway.toml", "railpack.json"]
 
 [deploy]
 startCommand = "node --import tsx apps/voice-stream/src/server.ts"
