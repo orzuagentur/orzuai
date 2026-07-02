@@ -174,6 +174,10 @@ function buildWebhookUrls(businessId: string) {
       `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
       businessId,
     ),
+    amdStatusCallbackUrl: appendTwilioWebhookSignature(
+      `${buildAppUrl("/api/webhooks/voice/amd-status")}?businessId=${businessId}`,
+      businessId,
+    ),
   };
 }
 
@@ -338,6 +342,7 @@ async function twilioCreateCall(input: {
   to: string;
   twimlUrl: string;
   statusCallbackUrl?: string;
+  amdStatusCallbackUrl?: string;
 }): Promise<{ success: true; callSid: string } | { success: false; message: string }> {
   try {
     const callSid = await createTwilioOutboundCall({
@@ -346,6 +351,7 @@ async function twilioCreateCall(input: {
       to: input.to,
       twimlUrl: input.twimlUrl,
       statusCallbackUrl: input.statusCallbackUrl,
+      amdStatusCallbackUrl: input.amdStatusCallbackUrl,
     });
     return { success: true, callSid };
   } catch (error) {
@@ -509,6 +515,9 @@ export async function placeOutboundVoiceCall(input: {
       to: input.phoneNumber,
       twimlUrl: outboundUrl.toString(),
       statusCallbackUrl: webhooks.statusCallbackUrl,
+      amdStatusCallbackUrl: input.requireAiAssistant
+        ? webhooks.amdStatusCallbackUrl
+        : undefined,
     });
 
     if (!result.success) {

@@ -15,6 +15,7 @@ import type { InboxBusinessContext } from "@/services/chat.service";
 import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
 import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { completeOperatorCallAfterCustomerLeave } from "@/services/voice-conference.service";
+import { guardAiOutboundOnMissedStatus } from "@/services/voice-ai-outbound-guard.service";
 import { cancelOutboundVoiceCall } from "@/services/voice-outbound-cancel.service";
 import { getVoiceClientConfig } from "@/services/voice-client.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
@@ -305,6 +306,12 @@ export async function handleTwilioCallStatusUpdate(input: {
   if (!existing) {
     return;
   }
+
+  await guardAiOutboundOnMissedStatus({
+    businessId: input.businessId,
+    callSid: input.callSid,
+    callStatus: input.callStatus,
+  });
 
   const parsedDuration = input.callDuration
     ? Number.parseInt(input.callDuration, 10)

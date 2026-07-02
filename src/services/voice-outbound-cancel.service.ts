@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Json } from "@/types/database.types";
-import { completeTwilioCall } from "@/lib/twilio/client";
+import { completeTwilioCallSafely } from "@/lib/twilio/client";
 import {
   getTwilioPlatformAccountSid,
   getTwilioPlatformAuthToken,
@@ -65,22 +65,7 @@ async function terminateTwilioCallSafely(
   credentials: { accountSid: string; authToken: string },
   callSid: string,
 ): Promise<void> {
-  try {
-    await completeTwilioCall({ credentials, callSid });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message.toLowerCase() : "unknown";
-
-    if (
-      /not found|404|invalid|completed|no longer|finished|canceled|cancelled/.test(
-        message,
-      )
-    ) {
-      return;
-    }
-
-    throw error;
-  }
+  await completeTwilioCallSafely({ credentials, callSid });
 }
 
 export async function recordCustomerOutboundLeg(input: {

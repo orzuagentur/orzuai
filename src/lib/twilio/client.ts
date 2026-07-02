@@ -348,6 +348,7 @@ export async function createTwilioOutboundCall(input: {
   to: string;
   twimlUrl: string;
   statusCallbackUrl?: string;
+  amdStatusCallbackUrl?: string;
 }): Promise<string> {
   const body = new URLSearchParams({
     To: input.to,
@@ -358,9 +359,26 @@ export async function createTwilioOutboundCall(input: {
   if (input.statusCallbackUrl) {
     body.set("StatusCallback", input.statusCallbackUrl);
     body.set("StatusCallbackMethod", "POST");
-    for (const event of ["initiated", "ringing", "answered", "completed"]) {
+    for (const event of [
+      "initiated",
+      "ringing",
+      "answered",
+      "completed",
+      "busy",
+      "no-answer",
+      "failed",
+      "canceled",
+    ]) {
       body.append("StatusCallbackEvent", event);
     }
+  }
+
+  if (input.amdStatusCallbackUrl) {
+    body.set("MachineDetection", "Enable");
+    body.set("AsyncAmd", "true");
+    body.set("AsyncAmdStatusCallback", input.amdStatusCallbackUrl);
+    body.set("AsyncAmdStatusCallbackMethod", "POST");
+    body.set("MachineDetectionTimeout", "30");
   }
 
   const response = await twilioRequest<{ sid?: string }>(
@@ -424,6 +442,28 @@ export async function completeTwilioCall(input: {
     `/Accounts/${input.credentials.accountSid}/Calls/${input.callSid}.json`,
     { method: "POST", body },
   );
+}
+
+export async function completeTwilioCallSafely(input: {
+  credentials: TwilioApiCredentials;
+  callSid: string;
+}): Promise<void> {
+  try {
+    await completeTwilioCall(input);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : "unknown";
+
+    if (
+      /not found|404|invalid|completed|no longer|finished|canceled|cancelled/.test(
+        message,
+      )
+    ) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 export async function redirectTwilioCall(input: {
