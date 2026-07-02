@@ -1,6 +1,10 @@
 import "server-only";
 
-import { getElevenLabsApiKey, hasElevenLabsEnv } from "@/lib/env";
+import {
+  getCachedElevenLabsApiKey,
+  resolveElevenLabsApiKey,
+} from "@/lib/ai/platform-api-keys";
+import { getElevenLabsApiKey as getLegacyElevenLabsApiKey } from "@/lib/env";
 import type { ElevenLabsVoiceSummary } from "@/types/elevenlabs.types";
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
@@ -30,8 +34,12 @@ function mapVoiceRow(voice: ElevenLabsVoiceApiRow): ElevenLabsVoiceSummary {
   };
 }
 
+async function resolveApiKey(): Promise<string | null> {
+  return (await resolveElevenLabsApiKey()) ?? getLegacyElevenLabsApiKey() ?? null;
+}
+
 export function hasElevenLabsConfigured(): boolean {
-  return hasElevenLabsEnv();
+  return Boolean(getCachedElevenLabsApiKey() || getLegacyElevenLabsApiKey());
 }
 
 export async function listElevenLabsVoices(): Promise<{
@@ -39,7 +47,7 @@ export async function listElevenLabsVoices(): Promise<{
   voices: ElevenLabsVoiceSummary[];
   message?: string;
 }> {
-  const apiKey = getElevenLabsApiKey();
+  const apiKey = await resolveApiKey();
 
   if (!apiKey) {
     return {
@@ -96,7 +104,7 @@ export async function synthesizeElevenLabsSpeech(input: {
   languageCode?: string;
   modelId?: string;
 }): Promise<{ success: true; buffer: Buffer; mimeType: string } | { success: false; message: string }> {
-  const apiKey = getElevenLabsApiKey();
+  const apiKey = await resolveApiKey();
   const text = input.text.trim();
 
   if (!apiKey) {

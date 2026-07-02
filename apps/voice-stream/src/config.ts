@@ -99,6 +99,75 @@ export async function fetchVoiceStreamContext(input: {
   return (await response.json()) as VoiceStreamContext;
 }
 
+export type VoiceStreamReplyStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; text: string; endCall?: boolean };
+
+export async function* requestVoiceStreamReplyStream(input: {
+  appUrl: string;
+  secret: string;
+  businessId: string;
+  callSid: string;
+  direction: "inbound" | "outbound";
+  userMessage: string;
+  triggerReason?: string | null;
+  abortSignal?: AbortSignal;
+}): AsyncGenerator<VoiceStreamReplyStreamEvent, void, void> {
+  const response = await fetch(
+    `${input.appUrl}/api/internal/voice-stream/reply/stream`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        businessId: input.businessId,
+        callSid: input.callSid,
+        direction: input.direction,
+        userMessage: input.userMessage,
+        triggerReason: input.triggerReason ?? null,
+      }),
+      cache: "no-store",
+      signal: input.abortSignal,
+    },
+  );
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Reply stream failed (${response.status})`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+
+      const chunk = JSON.parse(trimmed) as VoiceStreamReplyStreamEvent;
+      yield chunk;
+    }
+  }
+
+  const trailing = buffer.trim();
+  if (trailing) {
+    yield JSON.parse(trailing) as VoiceStreamReplyStreamEvent;
+  }
+}
+
 export async function requestVoiceStreamReply(input: {
   appUrl: string;
   secret: string;

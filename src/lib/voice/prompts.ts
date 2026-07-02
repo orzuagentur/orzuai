@@ -9,6 +9,7 @@ export function buildVoiceSystemPrompt(input: {
   callObjective?: string | null;
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
+  realtime?: boolean;
 }): string {
   const knowledgeSection =
     input.knowledgeContext.length > 0
@@ -34,7 +35,9 @@ export function buildVoiceSystemPrompt(input: {
     `You are the AI voice assistant for ${input.businessName}.`,
     callContext,
     "Rules for phone conversation:",
-    "- Speak naturally in short sentences (1-3 sentences per reply).",
+    input.realtime
+      ? "- This is a live phone call: reply in 1-2 short spoken sentences only."
+      : "- Speak naturally in short sentences (1-3 sentences per reply).",
     "- No markdown, lists, emojis, or URLs.",
     `- Always respond in ${input.language}.`,
     "- Use only the business knowledge below.",

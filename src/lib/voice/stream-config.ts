@@ -3,6 +3,13 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
+import {
+  getCachedDeepgramApiKey,
+  getCachedElevenLabsApiKey,
+  hasDeepgramConfiguredAsync,
+  hasElevenLabsConfiguredAsync,
+  resolveRuntimeAiKeys,
+} from "@/lib/ai/platform-api-keys";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
 
 export function getVoiceStreamSecret(): string | undefined {
@@ -13,13 +20,35 @@ export function getVoiceStreamWsUrl(): string | undefined {
   return process.env[ENV_KEYS.VOICE_STREAM_WS_URL]?.trim() || undefined;
 }
 
-export function isVoiceStreamEnabled(): boolean {
+function hasLegacyVoiceStreamKeys(): boolean {
   return Boolean(
-    getVoiceStreamWsUrl() &&
-      getVoiceStreamSecret() &&
-      process.env[ENV_KEYS.DEEPGRAM_API_KEY]?.trim() &&
-      process.env[ENV_KEYS.ELEVENLABS_API_KEY]?.trim(),
+    resolveSecretValue(ENV_KEYS.DEEPGRAM_API_KEY)?.trim() &&
+      resolveSecretValue(ENV_KEYS.ELEVENLABS_API_KEY)?.trim(),
   );
+}
+
+export function isVoiceStreamEnabled(): boolean {
+  const cachedKeys = getCachedElevenLabsApiKey() && getCachedDeepgramApiKey();
+
+  return Boolean(
+    getVoiceStreamWsUrl() && getVoiceStreamSecret() && (cachedKeys || hasLegacyVoiceStreamKeys()),
+  );
+}
+
+export async function isVoiceStreamEnabledAsync(): Promise<boolean> {
+  const [elevenlabs, deepgram] = await Promise.all([
+    hasElevenLabsConfiguredAsync(),
+    hasDeepgramConfiguredAsync(),
+  ]);
+
+  return Boolean(getVoiceStreamWsUrl() && getVoiceStreamSecret() && elevenlabs && deepgram);
+}
+
+export async function ensureVoiceStreamRuntimeKeys(): Promise<{
+  elevenlabsApiKey: string | null;
+  deepgramApiKey: string | null;
+}> {
+  return resolveRuntimeAiKeys();
 }
 
 export function signVoiceStreamToken(input: {

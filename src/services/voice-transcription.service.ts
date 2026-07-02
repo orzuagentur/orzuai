@@ -3,8 +3,10 @@ import "server-only";
 import {
   estimateAudioDurationSeconds,
 } from "@/lib/ai/cost";
+import { resolvePlatformAiForUseCase } from "@/services/platform-ai-config.service";
 import { logAiUsage } from "@/services/ai-usage.service";
-import { hasOpenAiEnv } from "@/services/openai.service";
+import { resolveSecretValue } from "@/lib/secrets/resolver";
+import { ENV_KEYS } from "@/constants/env-keys";
 
 const WHISPER_MODEL = "whisper-1";
 
@@ -18,8 +20,13 @@ const MIME_EXTENSION: Record<string, string> = {
   "audio/x-m4a": "m4a",
 };
 
-function getOpenAiApiKey(): string | null {
-  return process.env.OPENAI_API_KEY?.trim() || null;
+async function resolveOpenAiApiKeyForStt(): Promise<string | null> {
+  const fromUseCase = await resolvePlatformAiForUseCase("voice_message_stt");
+  if (fromUseCase?.apiKey?.trim()) {
+    return fromUseCase.apiKey.trim();
+  }
+
+  return resolveSecretValue(ENV_KEYS.OPENAI_API_KEY)?.trim() ?? null;
 }
 
 function resolveTranscriptionFileName(fileName: string, mimeType: string): string {
@@ -43,14 +50,12 @@ export async function transcribeAudioBuffer(input: {
   businessId: string;
   conversationId?: string | null;
 }): Promise<string | null> {
-  if (!hasOpenAiEnv()) {
-    console.warn("[voice-transcription] OPENAI_API_KEY missing, skipping Whisper");
-    return null;
-  }
-
-  const apiKey = getOpenAiApiKey();
+  const apiKey = await resolveOpenAiApiKeyForStt();
 
   if (!apiKey) {
+    console.warn(
+      "[voice-transcription] OpenAI key missing for voice_message_stt, skipping Whisper",
+    );
     return null;
   }
 

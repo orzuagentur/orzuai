@@ -37,6 +37,8 @@ async function callOpenAiChat(input: {
   systemInstruction?: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   apiKey?: string;
+  maxTokens?: number;
+  temperature?: number;
 }): Promise<
   | { success: true; text: string; model: string; usage: OpenAiUsage }
   | { success: false; message: string }
@@ -60,8 +62,8 @@ async function callOpenAiChat(input: {
     body: JSON.stringify({
       model: input.model,
       messages,
-      temperature: 0.7,
-      max_tokens: 1024,
+      temperature: input.temperature ?? 0.7,
+      max_tokens: input.maxTokens ?? 1024,
     }),
   });
 
@@ -100,6 +102,89 @@ async function callOpenAiChat(input: {
 }
 
 type ProviderInput<T> = T & { apiKey?: string };
+
+export async function* streamOpenAiText(input: {
+  model: string;
+  systemInstruction?: string;
+  prompt: string;
+  apiKey?: string;
+  maxTokens?: number;
+  temperature?: number;
+}): AsyncGenerator<string, void, void> {
+  const apiKey = input.apiKey?.trim() || getOpenAiApiKey();
+
+  if (!apiKey) {
+    throw new Error("OpenAI API key missing.");
+  }
+
+  const messages = input.systemInstruction
+    ? [
+        { role: "system" as const, content: input.systemInstruction },
+        { role: "user" as const, content: input.prompt },
+      ]
+    : [{ role: "user" as const, content: input.prompt }];
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages,
+      temperature: input.temperature ?? 0.6,
+      max_tokens: input.maxTokens ?? 180,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    const body = await response.text();
+    throw new Error(
+      body.slice(0, 300) || `OpenAI stream failed (${response.status}).`,
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) {
+        continue;
+      }
+
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") {
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          yield content;
+        }
+      } catch {
+        // Ignore malformed SSE chunks.
+      }
+    }
+  }
+}
 
 export async function generateOpenAiText(
   input: ProviderInput<GenerateTextInput>,

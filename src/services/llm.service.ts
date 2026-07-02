@@ -9,6 +9,10 @@ import { resolveLlmModel, type AiProvider } from "@/lib/ai/constants";
 import {
   getPlatformLlmProviderQueue,
 } from "@/lib/ai/platform-llm-config";
+import {
+  getPlatformAiFallbackProviders,
+  resolvePlatformAiForCallType,
+} from "@/services/platform-ai-config.service";
 import { hasGeminiEnv } from "@/lib/env";
 import {
   generateClaudeAssistantReply,
@@ -353,6 +357,66 @@ function getFallbackProviderOrder(
   return [preferred, ...queue.filter((provider) => provider !== preferred)];
 }
 
+async function getFallbackProviderOrderForCall(input: {
+  preferred?: AiProvider;
+  callType?: AiCallType;
+}): Promise<readonly AiProvider[]> {
+  if (input.callType) {
+    return getPlatformAiFallbackProviders(input.callType);
+  }
+
+  return getFallbackProviderOrder(input.preferred);
+}
+
+async function resolveCallTypePlatformOverrides(input: {
+  callType?: AiCallType;
+  preferredProvider?: AiProvider;
+  model?: string;
+  apiKey?: string;
+}): Promise<{
+  preferredProvider?: AiProvider;
+  model?: string;
+  apiKey?: string;
+}> {
+  if (!input.callType) {
+    return {
+      preferredProvider: input.preferredProvider,
+      model: input.model,
+      apiKey: input.apiKey,
+    };
+  }
+
+  const platformConfig = await resolvePlatformAiForCallType(input.callType);
+
+  if (!platformConfig) {
+    return {
+      preferredProvider: input.preferredProvider,
+      model: input.model,
+      apiKey: input.apiKey,
+    };
+  }
+
+  const provider = platformConfig.provider;
+
+  if (
+    provider !== "gemini" &&
+    provider !== "openai" &&
+    provider !== "claude"
+  ) {
+    return {
+      preferredProvider: input.preferredProvider,
+      model: input.model,
+      apiKey: input.apiKey,
+    };
+  }
+
+  return {
+    preferredProvider: provider,
+    model: platformConfig.model ?? input.model,
+    apiKey: platformConfig.apiKey ?? input.apiKey,
+  };
+}
+
 export function getPlatformLlmFallbackOrder(
   preferred?: AiProvider,
 ): AiProvider[] {
@@ -362,17 +426,28 @@ export function getPlatformLlmFallbackOrder(
 export async function generateAssistantReplyWithFallback(
   input: LlmAssistantInput & { preferredProvider?: AiProvider },
 ): Promise<LlmFallbackResult> {
+  const platformOverrides = await resolveCallTypePlatformOverrides({
+    callType: input.callType,
+    preferredProvider: input.preferredProvider,
+    model: input.model,
+    apiKey: input.apiKey,
+  });
+
   const attemptedProviders: AiProvider[] = [];
   let lastError: GeminiServiceResult | null = null;
 
-  for (const provider of getFallbackProviderOrder(input.preferredProvider)) {
-    if (!isProviderReady(provider)) {
+  for (const provider of await getFallbackProviderOrderForCall({
+    preferred: platformOverrides.preferredProvider,
+    callType: input.callType,
+  })) {
+    if (!isProviderReady(provider, platformOverrides.apiKey)) {
       continue;
     }
 
     attemptedProviders.push(provider);
     const result = await generateAssistantReply({
       ...input,
+      ...platformOverrides,
       provider,
     });
 
@@ -417,17 +492,28 @@ export async function generateAssistantReplyWithFallback(
 export async function generateTextWithFallback(
   input: LlmTextInput & { preferredProvider?: AiProvider },
 ): Promise<LlmFallbackResult> {
+  const platformOverrides = await resolveCallTypePlatformOverrides({
+    callType: input.callType,
+    preferredProvider: input.preferredProvider,
+    model: input.model,
+    apiKey: input.apiKey,
+  });
+
   const attemptedProviders: AiProvider[] = [];
   let lastError: GeminiServiceResult | null = null;
 
-  for (const provider of getFallbackProviderOrder(input.preferredProvider)) {
-    if (!isProviderReady(provider)) {
+  for (const provider of await getFallbackProviderOrderForCall({
+    preferred: platformOverrides.preferredProvider,
+    callType: input.callType,
+  })) {
+    if (!isProviderReady(provider, platformOverrides.apiKey)) {
       continue;
     }
 
     attemptedProviders.push(provider);
     const result = await generateText({
       ...input,
+      ...platformOverrides,
       provider,
     });
 

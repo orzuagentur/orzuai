@@ -1,5 +1,6 @@
 import { SUPPORT_EMAIL } from "@/constants/app-origin";
 import { ENV_KEYS } from "@/constants/env-keys";
+import { getCachedDeepgramApiKey, getCachedElevenLabsApiKey } from "@/lib/ai/platform-api-keys";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
 import { formatResendFromAddress } from "@/lib/resend/from-address";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
@@ -154,11 +155,19 @@ export function hasPushEnv(): boolean {
 }
 
 export function getElevenLabsApiKey(): string | undefined {
-  return readEnv(ENV_KEYS.ELEVENLABS_API_KEY);
+  return getCachedElevenLabsApiKey() ?? readEnv(ENV_KEYS.ELEVENLABS_API_KEY);
 }
 
 export function hasElevenLabsEnv(): boolean {
   return Boolean(getElevenLabsApiKey());
+}
+
+export function getDeepgramApiKey(): string | undefined {
+  return getCachedDeepgramApiKey() ?? readEnv(ENV_KEYS.DEEPGRAM_API_KEY);
+}
+
+export function hasDeepgramEnv(): boolean {
+  return Boolean(getDeepgramApiKey());
 }
 
 export {

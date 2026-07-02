@@ -75,7 +75,7 @@ export async function streamElevenLabsUlawToTwilio(input: {
       },
       body: JSON.stringify({
         text: input.text,
-        model_id: "eleven_turbo_v2_5",
+        model_id: "eleven_flash_v2_5",
         language_code: input.languageCode || undefined,
       }),
       signal: input.abortSignal,

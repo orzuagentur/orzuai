@@ -3,12 +3,13 @@ import type WebSocket from "ws";
 import {
   fetchVoiceStreamContext,
   notifyVoiceStreamLifecycle,
-  requestVoiceStreamReply,
+  requestVoiceStreamReplyStream,
   verifyStreamToken,
   appendVoiceStreamTurn,
   type VoiceStreamContext,
 } from "./config.js";
 import { startDeepgramLive } from "./deepgram.js";
+import { extractCompleteSentences } from "./sentences.js";
 import {
   sendTwilioClear,
   streamElevenLabsUlawToTwilio,
@@ -21,8 +22,8 @@ type VoiceStreamSessionOptions = {
   ws: WebSocket;
   appUrl: string;
   streamSecret: string;
-  elevenLabsApiKey: string;
-  deepgramApiKey: string;
+  getElevenLabsApiKey: () => string;
+  getDeepgramApiKey: () => string;
 };
 
 export class VoiceStreamSession {
@@ -36,9 +37,11 @@ export class VoiceStreamSession {
   private context: VoiceStreamContext | null = null;
   private deepgram: ReturnType<typeof startDeepgramLive> | null = null;
   private speechAbort: AbortController | null = null;
+  private replyAbort: AbortController | null = null;
   private isSpeaking = false;
   private isProcessing = false;
   private pendingTranscript = "";
+  private queuedUserMessage: string | null = null;
   private transcriptTimer: NodeJS.Timeout | null = null;
   private closed = false;
 
@@ -117,13 +120,13 @@ export class VoiceStreamSession {
       });
 
       this.deepgram = startDeepgramLive({
-        apiKey: this.options.deepgramApiKey,
+        apiKey: this.options.getDeepgramApiKey(),
         language: this.context.deepgramLanguage,
         onSpeechStarted: () => {
           void this.handleBargeIn();
         },
-        onFinalTranscript: (text) => {
-          this.queueTranscript(text);
+        onFinalTranscript: (text, options) => {
+          this.queueTranscript(text, options?.speechFinal ?? false);
         },
         onError: (message) => {
           console.error("[voice-stream] deepgram live failed", message);
@@ -159,14 +162,15 @@ export class VoiceStreamSession {
     this.deepgram.sendAudio(message.media.payload);
   }
 
-  private queueTranscript(text: string): void {
+  private queueTranscript(text: string, speechFinal = false): void {
     this.pendingTranscript = `${this.pendingTranscript} ${text}`.trim();
 
     if (this.transcriptTimer) {
       clearTimeout(this.transcriptTimer);
+      this.transcriptTimer = null;
     }
 
-    this.transcriptTimer = setTimeout(() => {
+    const flush = () => {
       const combined = this.pendingTranscript.trim();
       this.pendingTranscript = "";
       this.transcriptTimer = null;
@@ -174,7 +178,14 @@ export class VoiceStreamSession {
       if (combined) {
         void this.processUserMessage(combined);
       }
-    }, 350);
+    };
+
+    if (speechFinal) {
+      flush();
+      return;
+    }
+
+    this.transcriptTimer = setTimeout(flush, 120);
   }
 
   private async handleBargeIn(): Promise<void> {
@@ -184,19 +195,30 @@ export class VoiceStreamSession {
 
     this.speechAbort?.abort();
     this.speechAbort = null;
+    this.replyAbort?.abort();
     this.isSpeaking = false;
     sendTwilioClear(this.ws, this.streamSid);
   }
 
   private async processUserMessage(userMessage: string): Promise<void> {
-    if (this.isProcessing || !this.context || !this.businessId || !this.callSid) {
+    if (this.isProcessing) {
+      this.queuedUserMessage = userMessage;
+      return;
+    }
+
+    if (!this.context || !this.businessId || !this.callSid) {
       return;
     }
 
     this.isProcessing = true;
+    this.replyAbort = new AbortController();
+    const replyAbort = this.replyAbort;
 
     try {
-      const reply = await requestVoiceStreamReply({
+      let sentenceBuffer = "";
+      let endCall = false;
+
+      for await (const chunk of requestVoiceStreamReplyStream({
         appUrl: this.options.appUrl,
         secret: this.options.streamSecret,
         businessId: this.businessId,
@@ -204,14 +226,36 @@ export class VoiceStreamSession {
         direction: this.direction,
         userMessage,
         triggerReason: this.triggerReason,
-      });
+        abortSignal: replyAbort.signal,
+      })) {
+        if (chunk.type === "delta") {
+          sentenceBuffer += chunk.text;
+          const { sentences, remainder } =
+            extractCompleteSentences(sentenceBuffer);
+          sentenceBuffer = remainder;
 
-      await this.speak(reply.text);
+          for (const sentence of sentences) {
+            await this.speak(sentence);
+          }
+          continue;
+        }
 
-      if (reply.endCall) {
+        const trailing = sentenceBuffer.trim();
+        if (trailing) {
+          await this.speak(trailing);
+        }
+
+        endCall = Boolean(chunk.endCall);
+      }
+
+      if (endCall) {
         this.ws.close();
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+
       console.error(
         "[voice-stream] process message failed",
         error instanceof Error ? error.message : "unknown",
@@ -223,7 +267,16 @@ export class VoiceStreamSession {
 
       await this.speak(fallback);
     } finally {
+      if (this.replyAbort === replyAbort) {
+        this.replyAbort = null;
+      }
       this.isProcessing = false;
+
+      if (this.queuedUserMessage) {
+        const nextMessage = this.queuedUserMessage;
+        this.queuedUserMessage = null;
+        void this.processUserMessage(nextMessage);
+      }
     }
   }
 
@@ -240,7 +293,7 @@ export class VoiceStreamSession {
       await streamElevenLabsUlawToTwilio({
         ws: this.ws,
         streamSid: this.streamSid,
-        apiKey: this.options.elevenLabsApiKey,
+        apiKey: this.options.getElevenLabsApiKey(),
         voiceId: this.context.voiceId,
         text,
         languageCode: this.context.languageCode,

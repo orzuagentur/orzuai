@@ -37,7 +37,7 @@ type DeepgramTranscriptMessage = {
 export function startDeepgramLive(input: {
   apiKey: string;
   language: string;
-  onFinalTranscript: (text: string) => void;
+  onFinalTranscript: (text: string, options?: { speechFinal?: boolean }) => void;
   onSpeechStarted: () => void;
   onError?: (message: string) => void;
 }): DeepgramLiveSession {
@@ -124,7 +124,9 @@ export function startDeepgramLive(input: {
         }
 
         if (payload.is_final || payload.speech_final) {
-          input.onFinalTranscript(transcript);
+          input.onFinalTranscript(transcript, {
+            speechFinal: Boolean(payload.speech_final),
+          });
         }
       } catch (error) {
         reportError(

@@ -11,7 +11,6 @@ import {
   hasCrmIdempotencyKey,
   recordCrmIdempotencyKey,
 } from "@/lib/crm/executor-idempotency";
-import { getPrimaryPlatformLlmProvider } from "@/lib/ai/platform-llm-config";
 import { generateText } from "@/services/llm.service";
 import type {
   AgentExecutorResult,
@@ -899,7 +898,6 @@ export async function planAgentCrmActions(input: {
 }): Promise<ExecutorPlan | null> {
   const result = await generateText({
     businessId: input.businessId,
-    provider: getPrimaryPlatformLlmProvider(),
     callType: "crm_plan",
     systemInstruction:
       "You extract structured CRM data from customer messages. Reply with valid JSON only. Never invent contact details.",

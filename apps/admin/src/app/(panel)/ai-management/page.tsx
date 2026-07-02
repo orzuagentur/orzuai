@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function AiManagementIndexPage() {
-  redirect("/ai-management/queue");
+  redirect("/ai-management/credentials");
 }

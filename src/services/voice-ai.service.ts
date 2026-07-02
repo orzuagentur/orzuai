@@ -21,6 +21,13 @@ import {
   type VoiceCallSessionTurn,
 } from "@/repositories/voice.repository";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
+import { resolveVoiceStreamLlm } from "@/lib/ai/voice-stream-model";
+import { resolvePlatformAiForUseCase } from "@/services/platform-ai-config.service";
+import {
+  getDefaultModelForProvider,
+  isLlmProvider,
+  type LlmAiProvider,
+} from "@orzu/platform-ai";
 import { generateTextWithFallback } from "@/services/llm.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
@@ -43,6 +50,10 @@ import {
   loadPhoneVoiceSettings,
   synthesizePhoneSpeechAudio,
 } from "@/services/voice-phone-tts.service";
+import {
+  hasOpenAiEnv,
+  streamOpenAiText,
+} from "@/services/openai.service";
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
 
 const MAX_VOICE_TURNS = 8;
@@ -50,6 +61,8 @@ const MAX_VOICE_HISTORY_TURNS = 6;
 const MAX_VOICE_PROMPT_CHARS = 3500;
 const MAX_KNOWLEDGE_ENTRIES = 12;
 const MAX_KNOWLEDGE_CONTENT_CHARS = 400;
+const MAX_STREAM_KNOWLEDGE_ENTRIES = 3;
+const MAX_STREAM_KNOWLEDGE_CONTENT_CHARS = 180;
 
 type VoiceSessionState = {
   id: string;
@@ -60,8 +73,19 @@ type VoiceSessionState = {
   turn_count: number;
 };
 
-async function loadBusinessContext(businessId: string) {
+async function loadBusinessContext(
+  businessId: string,
+  options?: { streamMode?: boolean },
+) {
   const admin = getVoiceRepository().client;
+  const streamMode = options?.streamMode ?? false;
+  const knowledgeLimit = streamMode
+    ? MAX_STREAM_KNOWLEDGE_ENTRIES
+    : MAX_KNOWLEDGE_ENTRIES;
+  const knowledgeChars = streamMode
+    ? MAX_STREAM_KNOWLEDGE_CONTENT_CHARS
+    : MAX_KNOWLEDGE_CONTENT_CHARS;
+
   const [context, knowledgeEntries, profileResult] = await Promise.all([
     getVoiceAiBusinessContext(businessId),
     listKnowledgeEntriesForBusiness(admin, businessId),
@@ -85,10 +109,10 @@ async function loadBusinessContext(businessId: string) {
       systemPrompt: baseSystemPrompt,
       communicationStyle: profile?.communication_style,
     }),
-    knowledgeContext: knowledgeEntries.slice(0, MAX_KNOWLEDGE_ENTRIES).map((entry) => ({
+    knowledgeContext: knowledgeEntries.slice(0, knowledgeLimit).map((entry) => ({
       category: entry.category ?? "",
       title: entry.title,
-      content: entry.content.slice(0, MAX_KNOWLEDGE_CONTENT_CHARS),
+      content: entry.content.slice(0, knowledgeChars),
     })),
   };
 }
@@ -114,6 +138,145 @@ function buildVoiceConversationPrompt(input: {
   }
 
   return prompt.slice(-MAX_VOICE_PROMPT_CHARS);
+}
+
+async function resolveStreamVoiceLlm(
+  preferredProvider: string,
+  configuredModel?: string | null,
+): Promise<{
+  provider: LlmAiProvider;
+  model: string;
+  apiKey: string | null;
+}> {
+  const platform = await resolvePlatformAiForUseCase("ai_phone_call");
+
+  if (platform && isLlmProvider(platform.provider)) {
+    return {
+      provider: platform.provider,
+      model:
+        platform.model ??
+        configuredModel?.trim() ??
+        getDefaultModelForProvider(platform.provider),
+      apiKey: platform.apiKey,
+    };
+  }
+
+  const legacy = resolveVoiceStreamLlm(preferredProvider, configuredModel);
+  return { ...legacy, apiKey: null };
+}
+
+async function prepareVoiceAiReply(input: {
+  businessId: string;
+  userMessage: string;
+  conversationHistory: VoiceCallSessionTurn[];
+  direction: "inbound" | "outbound";
+  triggerReason?: string | null;
+  settings: VoiceAgentSettings;
+  callObjective?: string | null;
+  streamMode?: boolean;
+}) {
+  const context = await loadBusinessContext(input.businessId, {
+    streamMode: input.streamMode,
+  });
+  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
+  const language =
+    phoneVoice.language || input.settings.voiceLanguage || context.language;
+  const { provider, model, apiKey } = input.streamMode
+    ? await resolveStreamVoiceLlm(context.provider, context.model)
+    : {
+        provider: context.provider as LlmAiProvider,
+        model: context.model,
+        apiKey: null as string | null,
+      };
+
+  const systemPrompt = buildVoiceSystemPrompt({
+    businessName: context.businessName,
+    systemPrompt: context.systemPrompt,
+    language,
+    knowledgeContext: context.knowledgeContext,
+    customVoicePrompt: input.settings.voiceSystemPrompt,
+    callObjective: input.callObjective,
+    direction: input.direction,
+    triggerReason: input.triggerReason,
+    realtime: input.streamMode,
+  });
+
+  const conversationPrompt = buildVoiceConversationPrompt({
+    userMessage: input.userMessage,
+    conversationHistory: input.conversationHistory,
+  });
+
+  return {
+    context,
+    provider,
+    model,
+    apiKey,
+    systemPrompt,
+    conversationPrompt,
+  };
+}
+
+export type VoiceAiStreamChunk =
+  | { type: "delta"; text: string }
+  | { type: "done"; text: string };
+
+export async function* generateVoiceAiReplyStream(input: {
+  businessId: string;
+  userMessage: string;
+  conversationHistory: VoiceCallSessionTurn[];
+  direction: "inbound" | "outbound";
+  triggerReason?: string | null;
+  settings: VoiceAgentSettings;
+  callObjective?: string | null;
+}): AsyncGenerator<VoiceAiStreamChunk, void, void> {
+  const prepared = await prepareVoiceAiReply({
+    ...input,
+    streamMode: true,
+  });
+
+  if (prepared.provider === "openai" && (hasOpenAiEnv() || prepared.apiKey)) {
+    let fullText = "";
+
+    try {
+      for await (const delta of streamOpenAiText({
+        model: prepared.model,
+        systemInstruction: prepared.systemPrompt,
+        prompt: prepared.conversationPrompt,
+        maxTokens: 180,
+        temperature: 0.6,
+        apiKey: prepared.apiKey ?? undefined,
+      })) {
+        fullText += delta;
+        yield { type: "delta", text: delta };
+      }
+
+      yield { type: "done", text: sanitizeForSpeech(fullText) };
+      return;
+    } catch (error) {
+      console.warn(
+        "[voice-ai] OpenAI stream failed, falling back",
+        error instanceof Error ? error.message : "unknown",
+      );
+    }
+  }
+
+  const result = await generateTextWithFallback({
+    businessId: input.businessId,
+    preferredProvider: prepared.provider,
+    model: prepared.model,
+    systemInstruction: prepared.systemPrompt,
+    prompt: prepared.conversationPrompt,
+    callType: "voice",
+    apiKey: prepared.apiKey ?? undefined,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error.message);
+  }
+
+  const text = sanitizeForSpeech(result.data.text);
+  yield { type: "delta", text };
+  yield { type: "done", text };
 }
 
 async function getOrCreateSession(input: {
@@ -172,31 +335,14 @@ export async function generateVoiceAiReply(input: {
   settings: VoiceAgentSettings;
   callObjective?: string | null;
 }): Promise<{ success: true; text: string } | { success: false; message: string }> {
-  const context = await loadBusinessContext(input.businessId);
-  const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
-  const language =
-    phoneVoice.language || input.settings.voiceLanguage || context.language;
-
-  const systemPrompt = buildVoiceSystemPrompt({
-    businessName: context.businessName,
-    systemPrompt: context.systemPrompt,
-    language,
-    knowledgeContext: context.knowledgeContext,
-    customVoicePrompt: input.settings.voiceSystemPrompt,
-    callObjective: input.callObjective,
-    direction: input.direction,
-    triggerReason: input.triggerReason,
-  });
+  const prepared = await prepareVoiceAiReply(input);
 
   const result = await generateTextWithFallback({
     businessId: input.businessId,
-    preferredProvider: context.provider as "gemini" | "openai" | "claude",
-    model: context.model,
-    systemInstruction: systemPrompt,
-    prompt: buildVoiceConversationPrompt({
-      userMessage: input.userMessage,
-      conversationHistory: input.conversationHistory,
-    }),
+    preferredProvider: prepared.provider,
+    model: prepared.model,
+    systemInstruction: prepared.systemPrompt,
+    prompt: prepared.conversationPrompt,
     callType: "voice",
   });
 

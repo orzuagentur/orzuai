@@ -10,7 +10,8 @@ export default function AiManagementLayout({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Управление AI</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Платформенные настройки ИИ: очередь провайдеров и архитектура ответов.
+          Платформенные настройки ИИ: ключи API, модели по сценариям, очередь
+          fallback и архитектура ответов.
         </p>
       </div>
       <AiManagementNav />

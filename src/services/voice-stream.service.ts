@@ -12,7 +12,9 @@ import {
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import {
   generateVoiceAiReply,
+  generateVoiceAiReplyStream,
   generateVoiceOpeningLine,
+  type VoiceAiStreamChunk,
 } from "@/services/voice-ai.service";
 import {
   markInboundCallAiFallback,
@@ -148,18 +150,17 @@ export async function generateVoiceStreamReply(input: {
   userMessage: string;
   triggerReason?: string | null;
 }): Promise<{ text: string; endCall?: boolean }> {
-  const settings = await getVoiceAgentSettings(input.businessId);
-  const prompts = getVoicePhonePrompts(
-    (await loadPhoneVoiceSettings(input.businessId)).language,
-  );
-  const callLog = await getVoiceRepository().findCallLogByExternalCallId(
-    input.callSid,
-  );
-  const session = await getOrCreateStreamSession({
-    businessId: input.businessId,
-    callSid: input.callSid,
-    direction: input.direction,
-  });
+  const [settings, phoneVoice, callLog, session] = await Promise.all([
+    getVoiceAgentSettings(input.businessId),
+    loadPhoneVoiceSettings(input.businessId),
+    getVoiceRepository().findCallLogByExternalCallId(input.callSid),
+    getOrCreateStreamSession({
+      businessId: input.businessId,
+      callSid: input.callSid,
+      direction: input.direction,
+    }),
+  ]);
+  const prompts = getVoicePhonePrompts(phoneVoice.language);
 
   if (!session) {
     return { text: prompts.error, endCall: true };
@@ -208,6 +209,95 @@ export async function generateVoiceStreamReply(input: {
   });
 
   return {
+    text: assistantText,
+    endCall: session.turn_count + 1 >= MAX_STREAM_TURNS,
+  };
+}
+
+export type VoiceStreamReplyStreamEvent =
+  | VoiceAiStreamChunk
+  | { type: "done"; text: string; endCall?: boolean };
+
+export async function* generateVoiceStreamReplyStream(input: {
+  businessId: string;
+  callSid: string;
+  direction: "inbound" | "outbound";
+  userMessage: string;
+  triggerReason?: string | null;
+}): AsyncGenerator<VoiceStreamReplyStreamEvent, void, void> {
+  const [settings, phoneVoice, callLog, session] = await Promise.all([
+    getVoiceAgentSettings(input.businessId),
+    loadPhoneVoiceSettings(input.businessId),
+    getVoiceRepository().findCallLogByExternalCallId(input.callSid),
+    getOrCreateStreamSession({
+      businessId: input.businessId,
+      callSid: input.callSid,
+      direction: input.direction,
+    }),
+  ]);
+  const prompts = getVoicePhonePrompts(phoneVoice.language);
+
+  if (!session) {
+    yield { type: "delta", text: prompts.error };
+    yield { type: "done", text: prompts.error, endCall: true };
+    return;
+  }
+
+  if (session.turn_count >= MAX_STREAM_TURNS) {
+    yield { type: "delta", text: prompts.goodbye };
+    yield { type: "done", text: prompts.goodbye, endCall: true };
+    return;
+  }
+
+  let assistantText = "";
+
+  try {
+    for await (const chunk of generateVoiceAiReplyStream({
+      businessId: input.businessId,
+      userMessage: input.userMessage,
+      conversationHistory: session.turns,
+      direction: input.direction,
+      triggerReason: input.triggerReason,
+      settings,
+      callObjective: callLog?.custom_prompt,
+    })) {
+      if (chunk.type === "delta") {
+        yield chunk;
+      } else {
+        assistantText = chunk.text;
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[voice-stream] LLM stream failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        callSid: input.callSid,
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    assistantText = "Sorry, I could not process that right now.";
+    yield { type: "delta", text: assistantText };
+  }
+
+  if (!assistantText.trim()) {
+    assistantText = "Sorry, I could not process that right now.";
+  }
+
+  const updatedTurns: VoiceCallSessionTurn[] = [
+    ...session.turns,
+    { role: "user", content: input.userMessage.trim() },
+    { role: "assistant", content: assistantText },
+  ];
+
+  await getVoiceRepository().updateSessionTurns({
+    sessionId: session.id,
+    turns: updatedTurns,
+    turnCount: session.turn_count + 1,
+  });
+
+  yield {
+    type: "done",
     text: assistantText,
     endCall: session.turn_count + 1 >= MAX_STREAM_TURNS,
   };

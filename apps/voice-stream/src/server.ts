@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer } from "ws";
 
 import { getEnv, requireEnv } from "./config.js";
+import { RuntimeAiKeyProvider } from "./runtime-keys.js";
 import { VoiceStreamSession } from "./session.js";
 
 const port = Number.parseInt(
@@ -12,8 +13,8 @@ const port = Number.parseInt(
 const host = getEnv("HOST") ?? "0.0.0.0";
 const appUrl = requireEnv("NEXT_PUBLIC_APP_URL");
 const streamSecret = requireEnv("VOICE_STREAM_SECRET");
-const elevenLabsApiKey = requireEnv("ELEVENLABS_API_KEY");
-const deepgramApiKey = requireEnv("DEEPGRAM_API_KEY");
+
+const runtimeKeys = new RuntimeAiKeyProvider(appUrl, streamSecret);
 
 function isHealthCheckRequest(request: IncomingMessage): boolean {
   const pathname = new URL(
@@ -50,8 +51,8 @@ wss.on("connection", (ws) => {
     ws,
     appUrl,
     streamSecret,
-    elevenLabsApiKey,
-    deepgramApiKey,
+    getElevenLabsApiKey: () => runtimeKeys.elevenLabsApiKey,
+    getDeepgramApiKey: () => runtimeKeys.deepgramApiKey,
   });
 
   ws.on("message", (data) => {
@@ -83,6 +84,8 @@ function shutdown(signal: string): void {
   isShuttingDown = true;
   console.info(`[voice-stream] received ${signal}, shutting down`);
 
+  runtimeKeys.stop();
+
   wss.clients.forEach((client) => {
     client.close();
   });
@@ -110,10 +113,18 @@ function shutdown(signal: string): void {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
-server.listen(port, host, () => {
-  console.info(
-    `[voice-stream] listening on ${host}:${port} path=/voice/stream app=${appUrl}`,
+void runtimeKeys.start().then(() => {
+  server.listen(port, host, () => {
+    console.info(
+      `[voice-stream] listening on ${host}:${port} path=/voice/stream app=${appUrl}`,
+    );
+  });
+}).catch((error) => {
+  console.error(
+    "[voice-stream] failed to initialize runtime keys",
+    error instanceof Error ? error.message : "unknown",
   );
+  process.exit(1);
 });
 
 server.on("error", (error) => {

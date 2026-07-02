@@ -103,3 +103,36 @@ export async function testSecretAction(keyName: string) {
 
   return { success: true as const, tested: success, message };
 }
+
+export async function syncVercelSecretsAction() {
+  const { supabase, user } = await requirePlatformAdmin();
+
+  try {
+    const { syncVercelSecretsAndAiCredentials } = await import(
+      "@/features/secrets/vercel-sync.service"
+    );
+
+    const result = await syncVercelSecretsAndAiCredentials({
+      supabase,
+      actorUserId: user.id,
+      actorEmail: user.email ?? "",
+    });
+
+    revalidatePath("/settings/secrets");
+    revalidatePath("/ai-management/credentials");
+    revalidatePath("/ai-management/use-cases");
+
+    return {
+      success: true as const,
+      result,
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Не удалось выполнить синхронизацию.",
+    };
+  }
+}

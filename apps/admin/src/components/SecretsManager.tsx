@@ -8,6 +8,7 @@ import {
   Loader2Icon,
   MoreVerticalIcon,
   PlusIcon,
+  RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
   WrenchIcon,
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import {
   deleteSecretAction,
   revealSecretAction,
+  syncVercelSecretsAction,
   testSecretAction,
   upsertSecretAction,
 } from "@/features/secrets/actions";
@@ -190,23 +192,74 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
     });
   }
 
+  function handleVercelSync() {
+    startTransition(async () => {
+      const result = await syncVercelSecretsAction();
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      const { secrets, aiCredentials, useCasesLinked, sources, warnings, targetProject } =
+        result.result;
+
+      const aiCount =
+        aiCredentials.created.length + aiCredentials.updated.length;
+
+      toast.success(
+        `Синхронизация из «${targetProject.name}»: ${secrets.created.length} новых, ${secrets.updated.length} обновлено, ${aiCount} AI ключей в General API.`,
+      );
+
+      if (sources.length > 0) {
+        toast.message(`Источники: ${sources.join(", ")}`);
+      }
+
+      if (useCasesLinked.length > 0) {
+        toast.message(`Сценарии AI связаны: ${useCasesLinked.length}`);
+      }
+
+      for (const warning of warnings) {
+        toast.warning(warning);
+      }
+
+      window.location.reload();
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">API ключи</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Зашифрованные секреты платформы. Каждый ключ — отдельная карточка.
+            Зашифрованные секреты платформы. «Синхронизация с Vercel» загружает
+            ключи из основного проекта orzuaibot (orzux.com), не из админки.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={resetForm}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          <PlusIcon className="size-4" />
-          Новый ключ
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleVercelSync}
+            className="inline-flex items-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {isPending ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="size-4" />
+            )}
+            Синхронизация с Vercel
+          </button>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            <PlusIcon className="size-4" />
+            Новый ключ
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">

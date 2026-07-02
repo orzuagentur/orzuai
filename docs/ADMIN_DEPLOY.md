@@ -48,6 +48,21 @@ VALUES ('<auth.users uuid>', 'owner');
 - `RESEND_API_KEY` и `RESEND_FROM_EMAIL` — письма приглашения и уведомления о входе
 - Отдельный домен, например `admin.orzux.com`
 
+**Синхронизация с Vercel (кнопка в Admin → API ключи / General API AI):**
+
+Ключи берутся из **основного** Vercel-проекта `orzuaibot` (orzux.com), **не** из `orzuai-admin`.
+
+На проекте **orzuai-admin** добавьте:
+
+| Переменная | Значение |
+|------------|----------|
+| `VERCEL_ACCESS_TOKEN` | Personal/team token с доступом к env |
+| `VERCEL_SYNC_PROJECT_ID` | `prj_1pZTdfXPPP2hiY4uGAWjBtqwLzBa` |
+| `VERCEL_SYNC_PROJECT_NAME` | `orzuaibot` (опционально, для отображения) |
+| `VERCEL_TEAM_ID` | `team_rRA61vEP6JGZ9Ezty2ElzGy8` |
+
+Без `VERCEL_ACCESS_TOKEN` синхронизация не выполнится — runtime env админки намеренно не используется.
+
 ## 3. Миграция секретов из Vercel в БД
 
 На **web** проекте (локально с `.env.local`):
