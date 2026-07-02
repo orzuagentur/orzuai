@@ -42,7 +42,33 @@ export function resolveElevenLabsLanguageCode(
   return undefined;
 }
 
-export function resolveDeepgramLanguageCode(_language: string): string {
+export function resolveDeepgramLanguageCode(language: string): string {
+  const normalized = language.trim().toLowerCase();
+
+  if (
+    normalized.startsWith("uk") ||
+    normalized.includes("ukrain") ||
+    normalized === "українська"
+  ) {
+    return "uk";
+  }
+
+  if (
+    normalized.startsWith("ru") ||
+    normalized === "russian" ||
+    normalized === "русский"
+  ) {
+    return "ru";
+  }
+
+  if (normalized.startsWith("de") || normalized.includes("german")) {
+    return "de";
+  }
+
+  if (normalized.startsWith("es") || normalized.includes("spanish")) {
+    return "es";
+  }
+
   return "multi";
 }
 

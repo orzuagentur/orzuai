@@ -128,25 +128,6 @@ export class VoiceStreamSession {
         },
       });
 
-      this.deepgram = startDeepgramLive({
-        apiKey: this.options.getDeepgramApiKey(),
-        language: "multi",
-        onSpeechStarted: () => {
-          void this.handleBargeIn();
-        },
-        onUtteranceEnd: () => {
-          this.flushTranscript(true);
-        },
-        onFinalTranscript: (text, options) => {
-          this.queueTranscript(text, options?.speechFinal ?? false);
-        },
-        onError: (errorMessage) => {
-          console.error("[voice-stream] deepgram live failed", errorMessage);
-        },
-      });
-
-      this.flushPendingInboundAudio();
-
       const contextPromise = fetchVoiceStreamContext({
         appUrl: this.options.appUrl,
         secret: this.options.streamSecret,
@@ -169,9 +150,27 @@ export class VoiceStreamSession {
       this.context = await contextPromise;
       await lifecyclePromise;
 
-      if (this.context.deepgramLanguage && this.context.deepgramLanguage !== "multi") {
-        // Language is resolved at connect time; reconnect only if needed later.
-      }
+      this.deepgram = startDeepgramLive({
+        apiKey: this.options.getDeepgramApiKey(),
+        language:
+          this.context.deepgramLanguage?.trim() ||
+          this.context.language?.trim() ||
+          "multi",
+        onSpeechStarted: () => {
+          void this.handleBargeIn();
+        },
+        onUtteranceEnd: () => {
+          this.flushTranscript(true);
+        },
+        onFinalTranscript: (text, options) => {
+          this.queueTranscript(text, options?.speechFinal ?? false);
+        },
+        onError: (errorMessage) => {
+          console.error("[voice-stream] deepgram live failed", errorMessage);
+        },
+      });
+
+      this.flushPendingInboundAudio();
 
       await this.speak(this.context.openingLine);
 
@@ -290,6 +289,9 @@ export class VoiceStreamSession {
       clearTimeout(this.transcriptTimer);
       this.transcriptTimer = null;
     }
+
+    this.pendingTranscript = "";
+    this.lastFlushedTranscript = "";
   }
 
   private async processUserMessage(userMessage: string): Promise<void> {
@@ -354,7 +356,7 @@ export class VoiceStreamSession {
           const { phrases, remainder } = extractSpeakablePhrases(phraseBuffer);
           phraseBuffer = remainder;
 
-          if (phrases.length > 0) {
+          if (phrases.length > 0 && !replyAbort.signal.aborted) {
             await this.speak(phrases.join(" "), replyAbort.signal);
           }
         }

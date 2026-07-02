@@ -2,8 +2,22 @@ import type WebSocket from "ws";
 
 /** 8 kHz μ-law: 160 bytes = 20 ms of audio per Twilio telephony frame. */
 const FRAME_BYTES = 160;
+/** μ-law silence sample (8-bit). */
+const MULAW_SILENCE_BYTE = 0xff;
 const FRAME_INTERVAL_MS = 20;
 const MAX_WS_BUFFERED_BYTES = 64 * 1024;
+
+function padMulawFrame(slice: Uint8Array): Buffer {
+  if (slice.byteLength === FRAME_BYTES) {
+    return Buffer.from(slice);
+  }
+
+  const frame = Buffer.alloc(FRAME_BYTES, MULAW_SILENCE_BYTE);
+  slice.forEach((value, index) => {
+    frame[index] = value;
+  });
+  return frame;
+}
 
 export class TwilioOutboundAudioPacer {
   private readonly ws: WebSocket;
@@ -35,7 +49,7 @@ export class TwilioOutboundAudioPacer {
         offset,
         Math.min(offset + FRAME_BYTES, audio.byteLength),
       );
-      this.frameQueue.push(Buffer.from(slice));
+      this.frameQueue.push(padMulawFrame(slice));
     }
 
     this.ensureDraining();

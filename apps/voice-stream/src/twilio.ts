@@ -73,23 +73,35 @@ export async function streamElevenLabsUlawToTwilio(input: {
   abortSignal: AbortSignal;
   pacer: TwilioOutboundAudioPacer;
 }): Promise<void> {
-  const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(input.voiceId)}/stream?output_format=ulaw_8000`,
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": input.apiKey,
-        "Content-Type": "application/json",
-        Accept: "audio/x-mulaw",
-      },
-      body: JSON.stringify({
-        text: input.text,
-        model_id: "eleven_flash_v2_5",
-        language_code: input.languageCode || undefined,
-      }),
-      signal: input.abortSignal,
-    },
+  const streamUrl = new URL(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(input.voiceId)}/stream`,
   );
+  streamUrl.searchParams.set("output_format", "ulaw_8000");
+  streamUrl.searchParams.set("optimize_streaming_latency", "3");
+
+  const response = await fetch(streamUrl.toString(), {
+    method: "POST",
+    headers: {
+      "xi-api-key": input.apiKey,
+      "Content-Type": "application/json",
+      Accept: "audio/x-mulaw",
+    },
+    body: JSON.stringify({
+      text: input.text,
+      model_id: "eleven_flash_v2_5",
+      language_code: input.languageCode || undefined,
+      voice_settings: {
+        stability: 0.55,
+        similarity_boost: 0.8,
+        style: 0.15,
+        use_speaker_boost: true,
+      },
+      generation_config: {
+        chunk_length_schedule: [120, 160, 250, 290],
+      },
+    }),
+    signal: input.abortSignal,
+  });
 
   if (!response.ok || !response.body) {
     throw new Error(`ElevenLabs stream failed (${response.status})`);

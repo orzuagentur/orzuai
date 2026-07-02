@@ -7,14 +7,15 @@ export type DeepgramLiveSession = {
 
 const DEEPGRAM_LISTEN_CONFIG = {
   model: "nova-3",
-  endpointing: process.env.DEEPGRAM_ENDPOINTING_MS?.trim() || "400",
-  utteranceEndMs: "1000",
+  endpointing: process.env.DEEPGRAM_ENDPOINTING_MS?.trim() || "600",
+  utteranceEndMs: process.env.DEEPGRAM_UTTERANCE_END_MS?.trim() || "1500",
 } as const;
 
 /** Twilio μ-law 8 kHz: 160 bytes ≈ 20 ms per frame. */
 const AUDIO_FRAME_BYTES = 160;
+const MULAW_SILENCE_BYTE = 0xff;
 const AUDIO_FRAME_INTERVAL_MS = 20;
-const MAX_PENDING_AUDIO_BYTES = 8000 * 5;
+const MAX_PENDING_AUDIO_BYTES = 8000 * 8;
 
 function resolveDeepgramListenLanguage(language: string): string {
   const normalized = language.trim().toLowerCase();
@@ -95,6 +96,8 @@ export function startDeepgramLive(input: {
   let pendingAudioBytes = 0;
   let keepAliveTimer: NodeJS.Timeout | null = null;
   let flushTimer: NodeJS.Timeout | null = null;
+  let outboundFrames: Buffer[] = [];
+  let outboundFrameBytes = 0;
 
   const trimPendingAudio = () => {
     while (
@@ -108,12 +111,25 @@ export function startDeepgramLive(input: {
     }
   };
 
-  const flushPendingAudio = () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN || pendingAudio.length === 0) {
-      return;
+  const enqueueOutboundAudio = (chunk: Buffer) => {
+    for (let offset = 0; offset < chunk.byteLength; offset += AUDIO_FRAME_BYTES) {
+      const slice = chunk.subarray(
+        offset,
+        Math.min(offset + AUDIO_FRAME_BYTES, chunk.byteLength),
+      );
+      const frame = Buffer.alloc(AUDIO_FRAME_BYTES, MULAW_SILENCE_BYTE);
+      slice.forEach((value, index) => {
+        frame[index] = value;
+      });
+      outboundFrames.push(frame);
+      outboundFrameBytes += frame.byteLength;
     }
 
-    if (flushTimer) {
+    scheduleOutboundFlush();
+  };
+
+  const scheduleOutboundFlush = () => {
+    if (flushTimer || outboundFrames.length === 0) {
       return;
     }
 
@@ -123,36 +139,33 @@ export function startDeepgramLive(input: {
         return;
       }
 
-      if (pendingAudio.length === 0) {
+      const frame = outboundFrames.shift();
+      if (!frame) {
         flushTimer = null;
         return;
       }
 
-      const head = pendingAudio[0];
-      if (!head || head.byteLength === 0) {
-        pendingAudio.shift();
-        flushTimer = setTimeout(sendNextFrame, AUDIO_FRAME_INTERVAL_MS);
-        return;
-      }
-
-      const frame = head.subarray(
-        0,
-        Math.min(AUDIO_FRAME_BYTES, head.byteLength),
-      );
+      outboundFrameBytes -= frame.byteLength;
       socket.send(frame);
-
-      if (head.byteLength <= AUDIO_FRAME_BYTES) {
-        pendingAudio.shift();
-        pendingAudioBytes -= head.byteLength;
-      } else {
-        pendingAudio[0] = head.subarray(AUDIO_FRAME_BYTES);
-        pendingAudioBytes -= AUDIO_FRAME_BYTES;
-      }
-
       flushTimer = setTimeout(sendNextFrame, AUDIO_FRAME_INTERVAL_MS);
     };
 
     sendNextFrame();
+  };
+
+  const flushPendingAudio = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN || pendingAudio.length === 0) {
+      return;
+    }
+
+    while (pendingAudio.length > 0) {
+      const chunk = pendingAudio.shift();
+      if (!chunk) {
+        continue;
+      }
+      pendingAudioBytes -= chunk.byteLength;
+      enqueueOutboundAudio(chunk);
+    }
   };
 
   const clearKeepAlive = () => {
@@ -296,7 +309,7 @@ export function startDeepgramLive(input: {
         return;
       }
 
-      socket.send(chunk);
+      enqueueOutboundAudio(chunk);
     },
     close() {
       isClosed = true;
@@ -304,6 +317,8 @@ export function startDeepgramLive(input: {
       clearFlushTimer();
       pendingAudio.length = 0;
       pendingAudioBytes = 0;
+      outboundFrames = [];
+      outboundFrameBytes = 0;
 
       if (!socket) {
         return;
