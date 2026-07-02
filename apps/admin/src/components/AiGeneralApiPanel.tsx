@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import {
   KeyRoundIcon,
   Loader2Icon,
@@ -41,6 +42,7 @@ const PROVIDER_BADGE: Record<PlatformAiProvider, string> = {
 export function AiGeneralApiPanel({
   initialCredentials,
 }: AiGeneralApiPanelProps) {
+  const router = useRouter();
   const [credentials, setCredentials] = useState(initialCredentials);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
@@ -78,7 +80,7 @@ export function AiGeneralApiPanel({
 
       toast.success("API ключ добавлен в защищённое хранилище.");
       resetCreateForm();
-      window.location.reload();
+      router.refresh();
     });
   }
 
@@ -111,7 +113,7 @@ export function AiGeneralApiPanel({
 
       toast.success("Ключ обновлён.");
       setEditingId(null);
-      window.location.reload();
+      router.refresh();
     });
   }
 
@@ -149,7 +151,7 @@ export function AiGeneralApiPanel({
       toast.success(
         `Ключи синхронизированы из Vercel проекта «${targetProject.name}».`,
       );
-      window.location.reload();
+      router.refresh();
     });
   }
 

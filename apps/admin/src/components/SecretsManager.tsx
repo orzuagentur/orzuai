@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   CheckIcon,
@@ -26,6 +27,7 @@ import {
   getSecretKeyHint,
   getSecretPlaceholder,
 } from "@/lib/secret-placeholders";
+import { formatAdminDateTime } from "@/lib/format-datetime";
 import { cn } from "@/lib/utils";
 import type { AppSecretAuditRecord, AppSecretRecord } from "@orzu/secrets";
 
@@ -37,6 +39,7 @@ type SecretsManagerProps = {
 type SortKey = "key" | "updated";
 
 export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("key");
   const [isPending, startTransition] = useTransition();
@@ -120,7 +123,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
 
       toast.success(`Секрет ${result.secret.keyName} сохранён`);
       resetForm();
-      window.location.reload();
+      router.refresh();
     });
   }
 
@@ -134,7 +137,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
     startTransition(async () => {
       await deleteSecretAction(keyName);
       toast.success("Секрет удалён");
-      window.location.reload();
+      router.refresh();
     });
   }
 
@@ -223,7 +226,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
         toast.warning(warning);
       }
 
-      window.location.reload();
+      router.refresh();
     });
   }
 
@@ -364,12 +367,11 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
 
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                   <span>
-                    Обновлён {new Date(secret.updatedAt).toLocaleString("ru-RU")}
+                    Обновлён {formatAdminDateTime(secret.updatedAt)}
                   </span>
                   {secret.lastUsedAt ? (
                     <span>
-                      Использован{" "}
-                      {new Date(secret.lastUsedAt).toLocaleString("ru-RU")}
+                      Использован {formatAdminDateTime(secret.lastUsedAt)}
                     </span>
                   ) : (
                     <span>Ещё не использовался</span>
@@ -452,7 +454,7 @@ export function SecretsManager({ secrets, auditLog }: SecretsManagerProps) {
                   </p>
                   <p className="text-muted-foreground">
                     {entry.actorEmail || "system"} ·{" "}
-                    {new Date(entry.createdAt).toLocaleString("ru-RU")}
+                    {formatAdminDateTime(entry.createdAt)}
                   </p>
                 </li>
               ))}
