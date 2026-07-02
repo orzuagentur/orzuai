@@ -116,7 +116,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 void runtimeKeys.start().then(() => {
   server.listen(port, host, () => {
     console.info(
-      `[voice-stream] listening on ${host}:${port} path=/voice/stream app=${appUrl}`,
+      `[voice-stream] listening on ${host}:${port} path=/voice/stream app=${appUrl} (platform-ai keys via runtime refresh)`,
     );
   });
 }).catch((error) => {
