@@ -50,11 +50,13 @@ export async function endActiveVoiceCall(input: {
   businessId: string;
   callLogId?: string;
   parentCallSid?: string;
+  phoneNumber?: string;
 }): Promise<{ success: boolean; message?: string }> {
   return cancelOutboundVoiceCall({
     businessId: input.businessId,
     callLogId: input.callLogId,
     parentCallSid: input.parentCallSid,
+    phoneNumber: input.phoneNumber,
     reason: "manual_end",
   });
 }

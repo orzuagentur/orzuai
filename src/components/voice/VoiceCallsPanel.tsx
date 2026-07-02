@@ -17,14 +17,15 @@ import {
 } from "@/components/chats/inbox/inbox-layout-context";
 import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog";
 import {
-  findFirstActiveVoiceCall,
-  VoiceActiveCallBanner,
+  findFirstActiveAiVoiceCall,
+  VoiceActiveAiCallChip,
 } from "@/components/voice/VoiceActiveCallBanner";
 import { VoiceContactsDialog } from "@/components/voice/VoiceContactsDialog";
 import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPanel";
 import { VoiceInboxToolbar } from "@/components/voice/VoiceInboxToolbar";
 import { VoiceWorkspacePanel } from "@/components/voice/workspace/VoiceWorkspacePanel";
 import type { VoiceWorkspaceView } from "@/components/voice/workspace/voice-workspace.types";
+import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { VoiceCallFilters } from "@/components/voice/VoiceCallFilters";
 import { VoiceCallList } from "@/components/voice/VoiceCallList";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
+import { fetchVoiceCallsAction } from "@/features/voice/actions/fetch-voice-calls";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -100,7 +102,9 @@ function VoiceCallsPanelContent({
   const [workspaceView, setWorkspaceView] = useState<VoiceWorkspaceView>({ mode: "dialpad" });
   const [phonebookContacts, setPhonebookContacts] = useState<PhoneContactListItem[]>([]);
   const { detailsOpen } = useInboxLayout();
+  const softphone = useVoiceSoftphone();
   const notifiedInboundCallsRef = useRef(new Set<string>());
+  const prevSoftphoneStatusRef = useRef(softphone.status);
 
   useEffect(() => {
     setCalls(initialCalls);
@@ -200,8 +204,49 @@ function VoiceCallsPanelContent({
 
   const detailsConversationId = selectedCall?.conversationId ?? null;
   const showRightPanel = detailsOpen && Boolean(detailsConversationId);
-  const liveCall = useMemo(() => findFirstActiveVoiceCall(calls), [calls]);
+  const liveCall = useMemo(() => findFirstActiveAiVoiceCall(calls), [calls]);
+  const activeLiveCallIds = useMemo(
+    () =>
+      new Set(
+        calls
+          .filter((call) => isActiveVoiceCallStatus(call.status))
+          .map((call) => call.id),
+      ),
+    [calls],
+  );
   const hasNumberSelected = Boolean(activeCallId || phoneDraft);
+
+  useEffect(() => {
+    const previous = prevSoftphoneStatusRef.current;
+    prevSoftphoneStatusRef.current = softphone.status;
+
+    const wasOperatorSession =
+      previous === "connecting" || previous === "on-call";
+    const isIdle = softphone.status === "ready" || softphone.status === "offline";
+
+    if (!wasOperatorSession || !isIdle) {
+      return;
+    }
+
+    setCalls((current) =>
+      current.map((call) =>
+        isActiveVoiceCallStatus(call.status) && call.callMode === "human"
+          ? {
+              ...call,
+              status: "canceled",
+              endedAt: new Date().toISOString(),
+            }
+          : call,
+      ),
+    );
+
+    void fetchVoiceCallsAction().then((result) => {
+      if (result.success) {
+        setCalls(result.data);
+      }
+    });
+    router.refresh();
+  }, [router, softphone.status]);
 
   useEffect(() => {
     if (!activeCallId && !phoneDraft) {
@@ -439,12 +484,13 @@ function VoiceCallsPanelContent({
                 </Button>
               </div>
             </div>
-            {liveCall ? <VoiceActiveCallBanner call={liveCall} /> : null}
+            {liveCall ? <VoiceActiveAiCallChip call={liveCall} /> : null}
             <VoiceCallFilters value={callFilter} onChange={setCallFilter} />
             <VoiceCallList
               calls={listCalls}
               activeCallId={activeCallId}
               activeContactKey={activeContactKey}
+              activeLiveCallIds={activeLiveCallIds}
               onCallSelect={handleCallSelect}
             />
           </div>

@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { VoiceCallCard } from "@/components/voice/VoiceCallCard";
 import {
+  findFirstActiveAiVoiceCall,
   findFirstActiveVoiceCall,
-  VoiceActiveCallBanner,
+  VoiceActiveAiCallChip,
 } from "@/components/voice/VoiceActiveCallBanner";
 import { VoiceLiveCallCard } from "@/components/voice/VoiceLiveCallCard";
 import { VoiceLiveTranscriptPanel } from "@/components/voice/VoiceLiveTranscriptPanel";
@@ -115,6 +116,7 @@ export function VoiceInboxDialerPanel({
   const phoneToCall = dialedNumber.trim();
   const canAddContact = Boolean(phoneToCall) && !call?.contactId;
   const lineBusyCall = findFirstActiveVoiceCall(allCalls);
+  const activeAiCall = findFirstActiveAiVoiceCall(allCalls);
   const isLineBusy = Boolean(lineBusyCall);
   const isSelectedCallLive = Boolean(call && isActiveVoiceCallStatus(call.status));
   const showLiveCard =
@@ -228,8 +230,8 @@ export function VoiceInboxDialerPanel({
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
-      {lineBusyCall && !isSelectedCallLive ? (
-        <VoiceActiveCallBanner call={lineBusyCall} />
+      {activeAiCall && !isSelectedCallLive ? (
+        <VoiceActiveAiCallChip call={activeAiCall} />
       ) : null}
 
       <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">

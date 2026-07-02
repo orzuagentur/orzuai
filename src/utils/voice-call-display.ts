@@ -131,6 +131,14 @@ export function isMissedVoiceCallStatus(status: string): boolean {
   return ["missed", "no-answer", "failed", "busy", "canceled"].includes(status);
 }
 
+export function isAiVoiceCall(call: {
+  aiHandled?: boolean;
+  humanHandled?: boolean;
+  callMode?: string | null;
+}): boolean {
+  return call.callMode === "ai" || (Boolean(call.aiHandled) && !call.humanHandled);
+}
+
 export function getVoiceCallDirectionKind(
   call: { direction: "inbound" | "outbound"; status: string },
 ): "inbound" | "outbound" | "missed" {

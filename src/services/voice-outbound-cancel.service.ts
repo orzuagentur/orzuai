@@ -99,6 +99,8 @@ export async function cancelOutboundVoiceCall(input: {
   businessId: string;
   callLogId?: string;
   parentCallSid?: string;
+  customerCallSid?: string;
+  phoneNumber?: string;
   reason?: "operator_hangup" | "manual_end";
 }): Promise<{ success: boolean; message?: string }> {
   if (!hasSupabaseEnv()) {
@@ -107,8 +109,9 @@ export async function cancelOutboundVoiceCall(input: {
 
   const callLogId = input.callLogId?.trim();
   const parentCallSid = input.parentCallSid?.trim();
+  const phoneNumber = input.phoneNumber?.trim();
 
-  if (!callLogId && !parentCallSid) {
+  if (!callLogId && !parentCallSid && !phoneNumber) {
     return { success: false, message: "Missing call identifier." };
   }
 
@@ -121,6 +124,16 @@ export async function cancelOutboundVoiceCall(input: {
     const externalMatch = await repo.findCallLogByExternalCallId(parentCallSid);
     if (externalMatch) {
       callLog = await repo.findCallLogById(input.businessId, externalMatch.id);
+    }
+  }
+
+  if (!callLog && phoneNumber) {
+    const activeMatch = await repo.findActiveCallForBusiness(input.businessId, {
+      phoneNumber,
+    });
+
+    if (activeMatch) {
+      callLog = await repo.findCallLogById(input.businessId, activeMatch.id);
     }
   }
 
@@ -138,9 +151,10 @@ export async function cancelOutboundVoiceCall(input: {
   }
 
   const customerLegSid =
-    callLog?.id
+    input.customerCallSid?.trim()
+    ?? (callLog?.id
       ? await resolveCustomerLegCallSid(input.businessId, callLog.id)
-      : null;
+      : null);
 
   const callSids = new Set(
     [customerLegSid, resolvedParentSid].filter(
@@ -164,19 +178,21 @@ export async function cancelOutboundVoiceCall(input: {
         status: terminalStatus,
         endedAt: new Date().toISOString(),
       });
-
-      await repo.insertCallEvent({
-        businessId: input.businessId,
-        callLogId: callLog.id,
-        callSid: resolvedParentSid,
-        eventType: "call.ended_by_operator",
-        actorType: "operator",
-        payload: {
-          reason: input.reason ?? "operator_hangup",
-          customerLegSid,
-        },
-      });
     }
+
+    await repo.insertCallEvent({
+      businessId: input.businessId,
+      callLogId: callLog.id,
+      callSid: resolvedParentSid ?? customerLegSid,
+      eventType: "call.ended_by_operator",
+      actorType: "operator",
+      payload: {
+        reason: input.reason ?? "operator_hangup",
+        customerLegSid,
+        terminalStatus:
+          isActiveVoiceCallStatus(callLog.status) ? terminalStatus : callLog.status,
+      },
+    });
   }
 
   return { success: true, message: "Call ended." };

@@ -167,22 +167,37 @@ function useVoiceSoftphoneState(input: {
   const hasDeviceErrorRef = useRef(false);
 
   const endRequestedSidsRef = useRef(new Set<string>());
+  const activePhoneNumberRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activePhoneNumberRef.current = activePhoneNumber;
+  }, [activePhoneNumber]);
 
   const requestServerEnd = useCallback(
-    (parentCallSid: string | null | undefined) => {
-      const sid = parentCallSid?.trim();
-      if (!sid || !input.businessId || !input.enabled) {
+    (request: {
+      parentCallSid?: string | null;
+      phoneNumber?: string | null;
+    }) => {
+      const sid = request.parentCallSid?.trim();
+      const phone = request.phoneNumber?.trim();
+
+      if ((!sid && !phone) || !input.businessId || !input.enabled) {
         return;
       }
 
-      if (endRequestedSidsRef.current.has(sid)) {
+      const requestKey = sid ?? `phone:${phone}`;
+
+      if (endRequestedSidsRef.current.has(requestKey)) {
         return;
       }
 
-      endRequestedSidsRef.current.add(sid);
+      endRequestedSidsRef.current.add(requestKey);
 
-      void requestEndVoiceCall({ parentCallSid: sid }).finally(() => {
-        endRequestedSidsRef.current.delete(sid);
+      void requestEndVoiceCall({
+        parentCallSid: sid,
+        phoneNumber: phone,
+      }).finally(() => {
+        endRequestedSidsRef.current.delete(requestKey);
       });
     },
     [input.businessId, input.enabled],
@@ -302,7 +317,10 @@ function useVoiceSoftphoneState(input: {
         }
 
         if (mode === "outbound") {
-          requestServerEnd(parentCallSid ?? call.parameters?.CallSid);
+          requestServerEnd({
+            parentCallSid: parentCallSid ?? call.parameters?.CallSid,
+            phoneNumber: activePhoneNumberRef.current,
+          });
         }
 
         stopOutboundRingback();
@@ -328,7 +346,10 @@ function useVoiceSoftphoneState(input: {
         }
 
         if (mode === "outbound") {
-          requestServerEnd(parentCallSid ?? call.parameters?.CallSid);
+          requestServerEnd({
+            parentCallSid: parentCallSid ?? call.parameters?.CallSid,
+            phoneNumber: activePhoneNumberRef.current,
+          });
         }
 
         stopOutboundRingback();
@@ -533,10 +554,12 @@ function useVoiceSoftphoneState(input: {
   const hangUp = useCallback(() => {
     const call = activeCallRef.current;
     const parentCallSid = call?.parameters?.CallSid?.trim() ?? activeCallSid;
+    const phoneNumber = activePhoneNumber;
 
-    if (call) {
-      requestServerEnd(parentCallSid);
-    }
+    requestServerEnd({
+      parentCallSid,
+      phoneNumber,
+    });
 
     stopOutboundRingback();
     playCallDisconnectedTone();
@@ -552,7 +575,7 @@ function useVoiceSoftphoneState(input: {
     setCallStartedAt(null);
     remoteAudioRef.current = null;
     setStatus(isRegisteredRef.current ? "ready" : "offline");
-  }, [activeCallSid, cleanupCall, requestServerEnd]);
+  }, [activeCallSid, activePhoneNumber, cleanupCall, requestServerEnd]);
 
   const toggleMute = useCallback(() => {
     const call = activeCallRef.current ?? incomingCallRef.current;

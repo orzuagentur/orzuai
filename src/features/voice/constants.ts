@@ -111,6 +111,7 @@ export const VOICE_MESSAGES = {
   callFilterMissed: "Missed",
   callLiveBanner: "Live call in progress",
   callLiveBannerDescription: "AI is handling the conversation. Transcript updates automatically.",
+  callLiveAiChip: "AI live",
   callLiveBadge: "Live",
   callLiveMonitoringTitle: "Live monitoring",
   callLiveMonitoringDescription:

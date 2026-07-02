@@ -15,6 +15,7 @@ import {
   formatVoiceCallDateParts,
   formatVoiceCallDuration,
   getVoiceCallDirectionKind,
+  isActiveVoiceCallStatus,
 } from "@/utils/voice-call-display";
 import { getVoiceCallListKey } from "@/utils/voice-contact-calls";
 
@@ -22,6 +23,7 @@ type VoiceCallListProps = {
   calls: VoiceInboxCallListItem[];
   activeCallId: string | null;
   activeContactKey?: string | null;
+  activeLiveCallIds?: Set<string>;
   onCallSelect?: (callId: string) => void;
   className?: string;
 };
@@ -30,6 +32,7 @@ export function VoiceCallList({
   calls,
   activeCallId,
   activeContactKey = null,
+  activeLiveCallIds,
   onCallSelect,
   className,
 }: VoiceCallListProps) {
@@ -56,6 +59,9 @@ export function VoiceCallList({
           const rowKey = getVoiceCallListKey(call);
           const isActive =
             rowKey === activeContactKey || call.id === activeCallId;
+          const isLive =
+            activeLiveCallIds?.has(call.id)
+            ?? isActiveVoiceCallStatus(call.status);
           const directionKind = getVoiceCallDirectionKind(call);
           const DirectionIcon =
             directionKind === "missed"
@@ -86,6 +92,7 @@ export function VoiceCallList({
               directionLabel={directionLabel}
               useLocalTime={useLocalTime}
               isMissed={directionKind === "missed"}
+              isLive={isLive}
             />
           );
 
@@ -115,6 +122,7 @@ function CallListRowContent({
   directionLabel,
   useLocalTime,
   isMissed,
+  isLive,
 }: {
   call: VoiceInboxCallListItem;
   displayName: string;
@@ -122,6 +130,7 @@ function CallListRowContent({
   directionLabel: string;
   useLocalTime: boolean;
   isMissed: boolean;
+  isLive: boolean;
 }) {
   const { dateLabel, timeLabel } = formatVoiceCallDateParts(call.createdAt, {
     local: useLocalTime,
@@ -137,7 +146,21 @@ function CallListRowContent({
     <>
       <ContactAvatar name={displayName} className="size-11 shrink-0 text-sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{displayName}</p>
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium">{displayName}</p>
+          {isLive ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-950 dark:text-red-300"
+              title={VOICE_MESSAGES.callLiveBadge}
+            >
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-red-600" />
+              </span>
+              {VOICE_MESSAGES.callLiveBadge}
+            </span>
+          ) : null}
+        </div>
         <p
           className={cn(
             "mt-0.5 flex items-center gap-1.5 text-sm",

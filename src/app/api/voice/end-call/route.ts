@@ -26,12 +26,14 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     callLogId?: string;
     parentCallSid?: string;
+    phoneNumber?: string;
   } | null;
 
   const callLogId = body?.callLogId?.trim();
   const parentCallSid = body?.parentCallSid?.trim();
+  const phoneNumber = body?.phoneNumber?.trim();
 
-  if (!callLogId && !parentCallSid) {
+  if (!callLogId && !parentCallSid && !phoneNumber) {
     return NextResponse.json(
       { success: false, message: "Missing call identifier." },
       { status: 400 },
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
     businessId: business.id,
     callLogId,
     parentCallSid,
+    phoneNumber,
   });
 
   return NextResponse.json(result, {

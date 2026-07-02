@@ -48,7 +48,9 @@ import {
   getVoiceCallStatusLabel,
   isActiveVoiceCallStatus,
 } from "@/utils/voice-call-display";
-import { findFirstActiveVoiceCall } from "@/components/voice/VoiceActiveCallBanner";
+import {
+  findFirstActiveVoiceCall,
+} from "@/components/voice/VoiceActiveCallBanner";
 import {
   playCallDisconnectedTone,
   startOutboundRingback,
@@ -509,6 +511,7 @@ export function VoiceWorkspacePanel({
         const result = await requestEndVoiceCall({
           callLogId: isEphemeral ? undefined : callLogId,
           parentCallSid: parentCallSid ?? undefined,
+          phoneNumber: softphone.activePhoneNumber ?? (phoneToCall || undefined),
         });
 
         scheduleVoiceInboxRefresh(() => router.refresh());

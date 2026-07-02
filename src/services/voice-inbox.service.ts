@@ -451,6 +451,7 @@ export async function handleTwilioCustomerLegStatusUpdate(input: {
   await cancelOutboundVoiceCall({
     businessId: input.businessId,
     parentCallSid: input.parentCallSid,
+    customerCallSid: input.callSid,
     reason: "operator_hangup",
   });
 }
@@ -500,6 +501,14 @@ export async function handleTwilioConferenceEvent(input: {
   }
 
   const leaveEvents = new Set(["leave", "participant-leave"]);
+
+  if (leaveEvents.has(eventName) && input.participantLabel === "operator") {
+    await cancelOutboundVoiceCall({
+      businessId: input.businessId,
+      parentCallSid: input.parentCallSid,
+      reason: "operator_hangup",
+    });
+  }
 
   if (
     leaveEvents.has(eventName) &&

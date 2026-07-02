@@ -1,11 +1,13 @@
 export async function requestEndVoiceCall(input: {
   callLogId?: string;
   parentCallSid?: string;
+  phoneNumber?: string;
 }): Promise<{ success: boolean; message?: string }> {
   const callLogId = input.callLogId?.trim();
   const parentCallSid = input.parentCallSid?.trim();
+  const phoneNumber = input.phoneNumber?.trim();
 
-  if (!callLogId && !parentCallSid) {
+  if (!callLogId && !parentCallSid && !phoneNumber) {
     return { success: false, message: "Missing call identifier." };
   }
 
@@ -15,6 +17,7 @@ export async function requestEndVoiceCall(input: {
     body: JSON.stringify({
       ...(callLogId ? { callLogId } : {}),
       ...(parentCallSid ? { parentCallSid } : {}),
+      ...(phoneNumber ? { phoneNumber } : {}),
     }),
   });
 
