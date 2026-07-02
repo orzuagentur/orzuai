@@ -1,3 +1,5 @@
+"use server";
+
 import { PLATFORM_PLANS, resolvePlanId, type PlatformPlanId } from "@/features/dashboard/plans";
 import type {
   BillingAccountRow,
