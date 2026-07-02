@@ -1,21 +1,16 @@
 import type { IncomingMessage } from "http";
-import type { Server as HttpServer } from "http";
 import { WebSocketServer } from "ws";
 
 import { verifyMonitorToken } from "./config.js";
 import { voiceMonitorHub } from "./monitor-hub.js";
 
-export function attachVoiceMonitorWebSocket(input: {
-  server: HttpServer;
-  streamSecret: string;
-}): WebSocketServer {
-  const monitorWss = new WebSocketServer({
-    server: input.server,
-    path: "/voice/monitor",
-  });
+export function createVoiceMonitorWebSocketServer(
+  streamSecret: string,
+): WebSocketServer {
+  const monitorWss = new WebSocketServer({ noServer: true });
 
   monitorWss.on("connection", (ws, request) => {
-    const claims = parseMonitorClaims(request, input.streamSecret);
+    const claims = parseMonitorClaims(request, streamSecret);
 
     if (!claims) {
       ws.close(4401, "unauthorized");

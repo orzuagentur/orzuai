@@ -36,7 +36,9 @@ export function useVoiceMonitorAudio({
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextPlayTimeRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
   const intentionalCloseRef = useRef(false);
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const stop = useCallback(() => {
     intentionalCloseRef.current = true;
@@ -114,6 +116,7 @@ export function useVoiceMonitorAudio({
 
     stop();
     intentionalCloseRef.current = false;
+    reconnectAttemptsRef.current = 0;
     setStatus("connecting");
     setErrorMessage(null);
 
@@ -138,6 +141,7 @@ export function useVoiceMonitorAudio({
       socketRef.current = socket;
 
       socket.onopen = () => {
+        reconnectAttemptsRef.current = 0;
         setStatus("listening");
       };
 
@@ -184,10 +188,26 @@ export function useVoiceMonitorAudio({
           return;
         }
 
-        if (enabled && callLogId) {
+        if (
+          enabled &&
+          callLogId &&
+          reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS &&
+          event.code !== 4401 &&
+          event.code !== 4429
+        ) {
+          reconnectAttemptsRef.current += 1;
+          const delayMs = Math.min(2000 * reconnectAttemptsRef.current, 10_000);
           reconnectTimerRef.current = window.setTimeout(() => {
             void connect();
-          }, 2000);
+          }, delayMs);
+          return;
+        }
+
+        if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          setStatus("error");
+          setErrorMessage(
+            "Live audio monitor is unavailable. Redeploy voice-stream or try again later.",
+          );
         }
       };
     } catch (error) {

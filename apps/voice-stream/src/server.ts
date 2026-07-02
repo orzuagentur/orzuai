@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer } from "ws";
 
 import { getEnv, requireEnv } from "./config.js";
-import { attachVoiceMonitorWebSocket } from "./monitor-server.js";
+import { createVoiceMonitorWebSocketServer } from "./monitor-server.js";
 import { voiceMonitorHub } from "./monitor-hub.js";
 import { RuntimeAiKeyProvider } from "./runtime-keys.js";
 import { VoiceStreamSession } from "./session.js";
@@ -47,10 +47,30 @@ function handleHttpRequest(
 
 const server = http.createServer(handleHttpRequest);
 
-const wss = new WebSocketServer({ server, path: "/voice/stream" });
-const monitorWss = attachVoiceMonitorWebSocket({ server, streamSecret });
+const streamWss = new WebSocketServer({ noServer: true });
+const monitorWss = createVoiceMonitorWebSocketServer(streamSecret);
 
-wss.on("connection", (ws) => {
+server.on("upgrade", (request, socket, head) => {
+  const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+
+  if (pathname === "/voice/stream") {
+    streamWss.handleUpgrade(request, socket, head, (ws) => {
+      streamWss.emit("connection", ws, request);
+    });
+    return;
+  }
+
+  if (pathname === "/voice/monitor") {
+    monitorWss.handleUpgrade(request, socket, head, (ws) => {
+      monitorWss.emit("connection", ws, request);
+    });
+    return;
+  }
+
+  socket.destroy();
+});
+
+streamWss.on("connection", (ws) => {
   const session = new VoiceStreamSession({
     ws,
     appUrl,
@@ -96,7 +116,7 @@ function shutdown(signal: string): void {
     client.close();
   });
 
-  wss.clients.forEach((client) => {
+  streamWss.clients.forEach((client) => {
     client.close();
   });
 

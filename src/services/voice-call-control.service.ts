@@ -1,6 +1,10 @@
 import "server-only";
 
 import { completeTwilioCall } from "@/lib/twilio/client";
+import {
+  getTwilioPlatformAccountSid,
+  getTwilioPlatformAuthToken,
+} from "@/lib/twilio/connect";
 import { buildStaticSayTwiml, mapVoiceLanguageToTwilioLocale } from "@/lib/voice/twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
@@ -70,7 +74,14 @@ export async function endActiveVoiceCall(input: {
   }
 
   const connection = await getTwilioConnection(input.businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  const resolved = resolveTwilioCredentialsForBusiness(connection);
+  const platformAccountSid = getTwilioPlatformAccountSid();
+  const platformAuthToken = getTwilioPlatformAuthToken();
+  const credentials =
+    resolved ??
+    (platformAccountSid && platformAuthToken
+      ? { accountSid: platformAccountSid, authToken: platformAuthToken }
+      : null);
 
   if (!credentials?.accountSid || !credentials.authToken) {
     return { success: false, message: "Twilio credentials missing." };
@@ -82,12 +93,21 @@ export async function endActiveVoiceCall(input: {
       callSid: callLog.external_call_id,
     });
   } catch (error) {
+    const twilioMessage =
+      error instanceof Error ? error.message.slice(0, 200) : "Unable to end call.";
+
+    if (/not found|404|invalid/i.test(twilioMessage)) {
+      await repo.updateCallLog(callLog.id, {
+        status: "completed",
+        endedAt: new Date().toISOString(),
+      });
+
+      return { success: true, message: "Call already ended." };
+    }
+
     return {
       success: false,
-      message:
-        error instanceof Error
-          ? error.message.slice(0, 200)
-          : "Unable to end call.",
+      message: twilioMessage,
     };
   }
 
