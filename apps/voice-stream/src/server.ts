@@ -53,6 +53,7 @@ wss.on("connection", (ws) => {
     streamSecret,
     getElevenLabsApiKey: () => runtimeKeys.elevenLabsApiKey,
     getDeepgramApiKey: () => runtimeKeys.deepgramApiKey,
+    getOpenAiApiKey: () => runtimeKeys.openaiApiKey,
   });
 
   ws.on("message", (data) => {

@@ -12,7 +12,17 @@ import {
 export type ResolvedRuntimeAiKeys = {
   elevenlabsApiKey: string | null;
   deepgramApiKey: string | null;
+  openaiApiKey: string | null;
 };
+
+export async function resolveOpenAiApiKeyForVoice(): Promise<string | null> {
+  const fromUseCase = await resolvePlatformAiForUseCase("ai_phone_call");
+  if (fromUseCase?.provider === "openai" && fromUseCase.apiKey?.trim()) {
+    return fromUseCase.apiKey.trim();
+  }
+
+  return resolveSecretValue(ENV_KEYS.OPENAI_API_KEY)?.trim() ?? null;
+}
 
 export async function resolveElevenLabsApiKey(): Promise<string | null> {
   const fromUseCase = await resolvePlatformAiForUseCase("voice_message_tts");
@@ -33,12 +43,13 @@ export async function resolveDeepgramApiKey(): Promise<string | null> {
 }
 
 export async function resolveRuntimeAiKeys(): Promise<ResolvedRuntimeAiKeys> {
-  const [elevenlabsApiKey, deepgramApiKey] = await Promise.all([
+  const [elevenlabsApiKey, deepgramApiKey, openaiApiKey] = await Promise.all([
     resolveElevenLabsApiKey(),
     resolveDeepgramApiKey(),
+    resolveOpenAiApiKeyForVoice(),
   ]);
 
-  return { elevenlabsApiKey, deepgramApiKey };
+  return { elevenlabsApiKey, deepgramApiKey, openaiApiKey };
 }
 
 export async function hasElevenLabsConfiguredAsync(): Promise<boolean> {

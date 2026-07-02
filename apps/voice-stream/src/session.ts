@@ -9,7 +9,8 @@ import {
   type VoiceStreamContext,
 } from "./config.js";
 import { startDeepgramLive } from "./deepgram.js";
-import { extractCompleteSentences } from "./sentences.js";
+import { extractSpeakablePhrases } from "./phrases.js";
+import { buildConversationPrompt, streamOpenAiReply } from "./llm.js";
 import {
   sendTwilioClear,
   streamElevenLabsUlawToTwilio,
@@ -24,6 +25,7 @@ type VoiceStreamSessionOptions = {
   streamSecret: string;
   getElevenLabsApiKey: () => string;
   getDeepgramApiKey: () => string;
+  getOpenAiApiKey: () => string | null;
 };
 
 export class VoiceStreamSession {
@@ -44,6 +46,10 @@ export class VoiceStreamSession {
   private queuedUserMessage: string | null = null;
   private transcriptTimer: NodeJS.Timeout | null = null;
   private closed = false;
+  private conversationHistory: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }> = [];
 
   constructor(options: VoiceStreamSessionOptions) {
     this.options = options;
@@ -185,7 +191,7 @@ export class VoiceStreamSession {
       return;
     }
 
-    this.transcriptTimer = setTimeout(flush, 120);
+    this.transcriptTimer = setTimeout(flush, 50);
   }
 
   private async handleBargeIn(): Promise<void> {
@@ -214,38 +220,104 @@ export class VoiceStreamSession {
     this.replyAbort = new AbortController();
     const replyAbort = this.replyAbort;
 
+    this.conversationHistory.push({ role: "user", content: userMessage });
+
+    const openaiApiKey =
+      this.context.openaiApiKey?.trim() ||
+      this.options.getOpenAiApiKey()?.trim() ||
+      null;
+    const canUseLocalLlm =
+      openaiApiKey &&
+      this.context.systemPrompt?.trim() &&
+      (this.context.llmProvider === "openai" || !this.context.llmProvider);
+
     try {
-      let sentenceBuffer = "";
+      let assistantText = "";
       let endCall = false;
 
-      for await (const chunk of requestVoiceStreamReplyStream({
-        appUrl: this.options.appUrl,
-        secret: this.options.streamSecret,
-        businessId: this.businessId,
-        callSid: this.callSid,
-        direction: this.direction,
-        userMessage,
-        triggerReason: this.triggerReason,
-        abortSignal: replyAbort.signal,
-      })) {
-        if (chunk.type === "delta") {
-          sentenceBuffer += chunk.text;
-          const { sentences, remainder } =
-            extractCompleteSentences(sentenceBuffer);
-          sentenceBuffer = remainder;
+      if (canUseLocalLlm) {
+        void appendVoiceStreamTurn({
+          appUrl: this.options.appUrl,
+          secret: this.options.streamSecret,
+          businessId: this.businessId,
+          callSid: this.callSid,
+          role: "user",
+          content: userMessage,
+        });
 
-          for (const sentence of sentences) {
-            await this.speak(sentence);
+        let phraseBuffer = "";
+        const model = this.context.llmModel?.trim() || "gpt-4o-mini";
+        const userPrompt = buildConversationPrompt({
+          history: this.conversationHistory.slice(0, -1),
+          userMessage,
+        });
+
+        for await (const delta of streamOpenAiReply({
+          apiKey: openaiApiKey,
+          model,
+          systemPrompt: this.context.systemPrompt!,
+          userPrompt,
+          abortSignal: replyAbort.signal,
+        })) {
+          assistantText += delta;
+          phraseBuffer += delta;
+          const { phrases, remainder } = extractSpeakablePhrases(phraseBuffer);
+          phraseBuffer = remainder;
+
+          for (const phrase of phrases) {
+            await this.speak(phrase);
           }
-          continue;
         }
 
-        const trailing = sentenceBuffer.trim();
+        const trailing = phraseBuffer.trim();
         if (trailing) {
           await this.speak(trailing);
+          assistantText = assistantText.trim() || trailing;
         }
+      } else {
+        let phraseBuffer = "";
 
-        endCall = Boolean(chunk.endCall);
+        for await (const chunk of requestVoiceStreamReplyStream({
+          appUrl: this.options.appUrl,
+          secret: this.options.streamSecret,
+          businessId: this.businessId,
+          callSid: this.callSid,
+          direction: this.direction,
+          userMessage,
+          triggerReason: this.triggerReason,
+          abortSignal: replyAbort.signal,
+        })) {
+          if (chunk.type === "delta") {
+            phraseBuffer += chunk.text;
+            const { phrases, remainder } = extractSpeakablePhrases(phraseBuffer);
+            phraseBuffer = remainder;
+
+            for (const phrase of phrases) {
+              await this.speak(phrase);
+            }
+            continue;
+          }
+
+          assistantText = chunk.text;
+          endCall = Boolean(chunk.endCall);
+          const trailing = phraseBuffer.trim();
+          if (trailing) {
+            await this.speak(trailing);
+          }
+        }
+      }
+
+      const finalText = assistantText.trim();
+      if (finalText) {
+        this.conversationHistory.push({ role: "assistant", content: finalText });
+        void appendVoiceStreamTurn({
+          appUrl: this.options.appUrl,
+          secret: this.options.streamSecret,
+          businessId: this.businessId,
+          callSid: this.callSid,
+          role: "assistant",
+          content: finalText,
+        });
       }
 
       if (endCall) {

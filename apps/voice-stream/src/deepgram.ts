@@ -18,8 +18,8 @@ function buildDeepgramListenUrl(): string {
   url.searchParams.set("sample_rate", "8000");
   url.searchParams.set("channels", "1");
   url.searchParams.set("interim_results", "true");
-  url.searchParams.set("utterance_end_ms", "1000");
-  url.searchParams.set("endpointing", "100");
+  url.searchParams.set("utterance_end_ms", "350");
+  url.searchParams.set("endpointing", "50");
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("vad_events", "true");
   return url.toString();

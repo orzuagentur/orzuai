@@ -14,6 +14,7 @@ import {
   generateVoiceAiReply,
   generateVoiceAiReplyStream,
   generateVoiceOpeningLine,
+  buildVoiceStreamLlmConfig,
   type VoiceAiStreamChunk,
 } from "@/services/voice-ai.service";
 import {
@@ -127,6 +128,14 @@ export async function getVoiceStreamSessionContext(input: {
     }
   }
 
+  const llmConfig = await buildVoiceStreamLlmConfig({
+    businessId: input.businessId,
+    direction: input.direction,
+    triggerReason: input.triggerReason,
+    settings,
+    callObjective,
+  });
+
   return {
     businessId: input.businessId,
     businessName: businessContext.businessName,
@@ -140,6 +149,10 @@ export async function getVoiceStreamSessionContext(input: {
     triggerReason: input.triggerReason ?? null,
     deepgramLanguage: resolveDeepgramLanguageCode(phoneVoice.language),
     callObjective,
+    systemPrompt: llmConfig.systemPrompt,
+    llmModel: llmConfig.llmModel,
+    llmProvider: llmConfig.llmProvider,
+    openaiApiKey: llmConfig.openaiApiKey,
   };
 }
 

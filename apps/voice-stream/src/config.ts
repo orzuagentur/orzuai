@@ -62,6 +62,10 @@ export type VoiceStreamContext = {
   direction: "inbound" | "outbound";
   triggerReason: string | null;
   deepgramLanguage: string;
+  systemPrompt?: string;
+  llmModel?: string;
+  llmProvider?: string;
+  openaiApiKey?: string | null;
 };
 
 export type VoiceStreamReplyResult = {

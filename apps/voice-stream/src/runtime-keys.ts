@@ -3,6 +3,7 @@ import { getEnv } from "./config.js";
 export type RuntimeAiKeys = {
   elevenlabsApiKey: string;
   deepgramApiKey: string;
+  openaiApiKey: string | null;
 };
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -10,12 +11,13 @@ const REFRESH_INTERVAL_MS = 60_000;
 function readEnvFallback(): RuntimeAiKeys | null {
   const elevenlabsApiKey = getEnv("ELEVENLABS_API_KEY");
   const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
+  const openaiApiKey = getEnv("OPENAI_API_KEY") ?? null;
 
   if (!elevenlabsApiKey || !deepgramApiKey) {
     return null;
   }
 
-  return { elevenlabsApiKey, deepgramApiKey };
+  return { elevenlabsApiKey, deepgramApiKey, openaiApiKey };
 }
 
 export class RuntimeAiKeyProvider {
@@ -43,6 +45,10 @@ export class RuntimeAiKeyProvider {
     return key;
   }
 
+  get openaiApiKey(): string | null {
+    return this.keys?.openaiApiKey ?? readEnvFallback()?.openaiApiKey ?? null;
+  }
+
   async refresh(): Promise<void> {
     try {
       const response = await fetch(
@@ -62,13 +68,15 @@ export class RuntimeAiKeyProvider {
       const payload = (await response.json()) as {
         elevenlabsApiKey?: string | null;
         deepgramApiKey?: string | null;
+        openaiApiKey?: string | null;
       };
 
       const elevenlabsApiKey = payload.elevenlabsApiKey?.trim();
       const deepgramApiKey = payload.deepgramApiKey?.trim();
+      const openaiApiKey = payload.openaiApiKey?.trim() || null;
 
       if (elevenlabsApiKey && deepgramApiKey) {
-        this.keys = { elevenlabsApiKey, deepgramApiKey };
+        this.keys = { elevenlabsApiKey, deepgramApiKey, openaiApiKey };
         console.info("[voice-stream] runtime AI keys refreshed from platform vault");
         return;
       }

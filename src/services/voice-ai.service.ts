@@ -22,6 +22,7 @@ import {
 } from "@/repositories/voice.repository";
 import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication-styles";
 import { resolveVoiceStreamLlm } from "@/lib/ai/voice-stream-model";
+import { resolveOpenAiApiKeyForVoice } from "@/lib/ai/platform-api-keys";
 import { resolvePlatformAiForUseCase } from "@/services/platform-ai-config.service";
 import {
   getDefaultModelForProvider,
@@ -219,6 +220,44 @@ async function prepareVoiceAiReply(input: {
 export type VoiceAiStreamChunk =
   | { type: "delta"; text: string }
   | { type: "done"; text: string };
+
+export type VoiceStreamLlmConfig = {
+  systemPrompt: string;
+  llmModel: string;
+  llmProvider: LlmAiProvider;
+  openaiApiKey: string | null;
+};
+
+export async function buildVoiceStreamLlmConfig(input: {
+  businessId: string;
+  direction: "inbound" | "outbound";
+  triggerReason?: string | null;
+  settings: VoiceAgentSettings;
+  callObjective?: string | null;
+}): Promise<VoiceStreamLlmConfig> {
+  const prepared = await prepareVoiceAiReply({
+    businessId: input.businessId,
+    userMessage: "",
+    conversationHistory: [],
+    direction: input.direction,
+    triggerReason: input.triggerReason,
+    settings: input.settings,
+    callObjective: input.callObjective,
+    streamMode: true,
+  });
+
+  const openaiApiKey =
+    prepared.provider === "openai"
+      ? prepared.apiKey?.trim() || (await resolveOpenAiApiKeyForVoice())
+      : null;
+
+  return {
+    systemPrompt: prepared.systemPrompt,
+    llmModel: prepared.model,
+    llmProvider: prepared.provider,
+    openaiApiKey,
+  };
+}
 
 export async function* generateVoiceAiReplyStream(input: {
   businessId: string;

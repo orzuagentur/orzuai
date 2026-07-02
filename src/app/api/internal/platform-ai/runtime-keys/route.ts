@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     elevenlabsApiKey: keys.elevenlabsApiKey,
     deepgramApiKey: keys.deepgramApiKey,
+    openaiApiKey: keys.openaiApiKey,
     refreshedAt: new Date().toISOString(),
   });
 }
