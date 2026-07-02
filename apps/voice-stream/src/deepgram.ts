@@ -7,19 +7,51 @@ export type DeepgramLiveSession = {
 
 const DEEPGRAM_LISTEN_CONFIG = {
   model: "nova-3",
-  language: "multi",
+  endpointing: "300",
 } as const;
 
-function buildDeepgramListenUrl(): string {
+function resolveDeepgramListenLanguage(language: string): string {
+  const normalized = language.trim().toLowerCase();
+
+  if (normalized.startsWith("uk") || normalized.includes("ukrain")) {
+    return "uk";
+  }
+
+  if (normalized.startsWith("ru") || normalized.includes("russ")) {
+    return "ru";
+  }
+
+  if (normalized.startsWith("de") || normalized.includes("german")) {
+    return "de";
+  }
+
+  if (normalized.startsWith("es") || normalized.includes("spanish")) {
+    return "es";
+  }
+
+  if (
+    normalized.startsWith("en") ||
+    normalized === "english" ||
+    normalized === "multi" ||
+    !normalized
+  ) {
+    return "multi";
+  }
+
+  return "multi";
+}
+
+function buildDeepgramListenUrl(language: string): string {
+  const listenLanguage = resolveDeepgramListenLanguage(language);
   const url = new URL("wss://api.deepgram.com/v1/listen");
   url.searchParams.set("model", DEEPGRAM_LISTEN_CONFIG.model);
-  url.searchParams.set("language", DEEPGRAM_LISTEN_CONFIG.language);
+  url.searchParams.set("language", listenLanguage);
   url.searchParams.set("encoding", "mulaw");
   url.searchParams.set("sample_rate", "8000");
   url.searchParams.set("channels", "1");
   url.searchParams.set("interim_results", "true");
-  url.searchParams.set("utterance_end_ms", "350");
-  url.searchParams.set("endpointing", "50");
+  // endpointing triggers speech_final on silence; utterance_end_ms requires >=1000ms
+  url.searchParams.set("endpointing", DEEPGRAM_LISTEN_CONFIG.endpointing);
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("vad_events", "true");
   return url.toString();
@@ -41,9 +73,9 @@ export function startDeepgramLive(input: {
   onSpeechStarted: () => void;
   onError?: (message: string) => void;
 }): DeepgramLiveSession {
-  void input.language;
   const apiKey = input.apiKey.trim();
-  const listenUrl = buildDeepgramListenUrl();
+  const listenLanguage = resolveDeepgramListenLanguage(input.language);
+  const listenUrl = buildDeepgramListenUrl(input.language);
 
   let socket: WebSocket | null = new WebSocket(listenUrl, {
     headers: {
@@ -83,7 +115,9 @@ export function startDeepgramLive(input: {
       "[voice-stream] deepgram error",
       message,
       JSON.stringify({
-        ...DEEPGRAM_LISTEN_CONFIG,
+        model: DEEPGRAM_LISTEN_CONFIG.model,
+        language: listenLanguage,
+        endpointing: DEEPGRAM_LISTEN_CONFIG.endpointing,
         detail: detail ?? null,
       }),
     );
@@ -94,7 +128,11 @@ export function startDeepgramLive(input: {
     ws.on("open", () => {
       console.info(
         "[voice-stream] deepgram connected",
-        JSON.stringify(DEEPGRAM_LISTEN_CONFIG),
+        JSON.stringify({
+          model: DEEPGRAM_LISTEN_CONFIG.model,
+          language: listenLanguage,
+          endpointing: DEEPGRAM_LISTEN_CONFIG.endpointing,
+        }),
       );
       flushPendingAudio();
 
