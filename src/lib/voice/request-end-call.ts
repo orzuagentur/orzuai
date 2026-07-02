@@ -35,3 +35,37 @@ export async function requestEndVoiceCall(input: {
 
   return { success: true, message: result.message };
 }
+
+export async function requestReleaseOperatorVoiceLine(input?: {
+  phoneNumber?: string;
+}): Promise<{ success: boolean; message?: string; released: number }> {
+  const response = await fetch("/api/voice/release-line", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...(input?.phoneNumber?.trim()
+        ? { phoneNumber: input.phoneNumber.trim() }
+        : {}),
+    }),
+  });
+
+  const result = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    message?: string;
+    released?: number;
+  } | null;
+
+  if (!response.ok || !result?.success) {
+    return {
+      success: false,
+      message: result?.message ?? "Unable to release line.",
+      released: result?.released ?? 0,
+    };
+  }
+
+  return {
+    success: true,
+    message: result.message,
+    released: result.released ?? 0,
+  };
+}

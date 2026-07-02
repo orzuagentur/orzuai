@@ -17,7 +17,7 @@ import {
   startOutboundRingback,
   stopOutboundRingback,
 } from "@/lib/voice/call-sounds";
-import { requestEndVoiceCall } from "@/lib/voice/request-end-call";
+import { requestEndVoiceCall, requestReleaseOperatorVoiceLine } from "@/lib/voice/request-end-call";
 
 export type SoftphoneStatus =
   | "offline"
@@ -198,6 +198,7 @@ function useVoiceSoftphoneState(input: {
         phoneNumber: phone,
       }).finally(() => {
         endRequestedSidsRef.current.delete(requestKey);
+        void requestReleaseOperatorVoiceLine({ phoneNumber: phone });
       });
     },
     [input.businessId, input.enabled],

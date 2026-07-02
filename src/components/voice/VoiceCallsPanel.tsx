@@ -41,6 +41,7 @@ import { CHAT_MESSAGES } from "@/features/chats";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
 import { fetchVoiceCallsAction } from "@/features/voice/actions/fetch-voice-calls";
+import { requestReleaseOperatorVoiceLine } from "@/lib/voice/request-end-call";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -48,6 +49,7 @@ import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
   filterVoiceCalls,
   isActiveVoiceCallStatus,
+  sanitizeCallsForOperatorSession,
   type VoiceCallFilter,
 } from "@/utils/voice-call-display";
 import {
@@ -161,10 +163,20 @@ function VoiceCallsPanelContent({
   }, [refreshPhonebookContacts, voiceInboxEnabled]);
 
   const filteredCalls = useMemo(() => filterVoiceCalls(calls, callFilter), [callFilter, calls]);
+  const sanitizedCalls = useMemo(
+    () => sanitizeCallsForOperatorSession(calls, softphone.status),
+    [calls, softphone.status],
+  );
   const listCalls = useMemo(() => {
     const deduped = dedupeVoiceCallsByContact(filteredCalls);
     return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
   }, [filteredCalls, phonebookContacts]);
+  const workspaceCalls = useMemo(() => {
+    const deduped = dedupeVoiceCallsByContact(
+      filterVoiceCalls(sanitizedCalls, callFilter),
+    );
+    return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
+  }, [callFilter, phonebookContacts, sanitizedCalls]);
   const activeContactKey = useMemo(() => {
     const active = calls.find((call) => call.id === activeCallId);
     return active ? getVoiceCallListKey(active) : null;
@@ -179,23 +191,26 @@ function VoiceCallsPanelContent({
       const listItem = calls.find((call) => call.id === activeCallId);
 
       if (!listItem) {
-        return activeCallDetail;
+        return activeCallDetail?.id === activeCallId ? activeCallDetail : null;
       }
 
       const phonebookMatch = phonebookContacts.find((contact) =>
         phonesMatch(contact.phoneNumber, listItem.phoneNumber),
       );
 
+      const sameDetail = activeCallDetail?.id === listItem.id;
+
       return {
         ...listItem,
         contactName: listItem.contactName ?? phonebookMatch?.name ?? null,
         contactId: listItem.contactId ?? phonebookMatch?.id ?? null,
-        turns: activeCallDetail?.turns ?? [],
-        turnCount: activeCallDetail?.turnCount ?? 0,
+        turns: sameDetail ? (activeCallDetail?.turns ?? []) : [],
+        turnCount: sameDetail ? (activeCallDetail?.turnCount ?? 0) : 0,
         hasRecording: Boolean(
-          listItem.recordingUrl?.trim() || activeCallDetail?.hasRecording,
+          listItem.recordingUrl?.trim()
+          || (sameDetail && activeCallDetail?.hasRecording),
         ),
-        events: activeCallDetail?.events ?? [],
+        events: sameDetail ? (activeCallDetail?.events ?? []) : [],
       };
     }
 
@@ -204,15 +219,15 @@ function VoiceCallsPanelContent({
 
   const detailsConversationId = selectedCall?.conversationId ?? null;
   const showRightPanel = detailsOpen && Boolean(detailsConversationId);
-  const liveCall = useMemo(() => findFirstActiveAiVoiceCall(calls), [calls]);
+  const liveCall = useMemo(() => findFirstActiveAiVoiceCall(sanitizedCalls), [sanitizedCalls]);
   const activeLiveCallIds = useMemo(
     () =>
       new Set(
-        calls
+        sanitizedCalls
           .filter((call) => isActiveVoiceCallStatus(call.status))
           .map((call) => call.id),
       ),
-    [calls],
+    [sanitizedCalls],
   );
   const hasNumberSelected = Boolean(activeCallId || phoneDraft);
 
@@ -229,24 +244,45 @@ function VoiceCallsPanelContent({
     }
 
     setCalls((current) =>
-      current.map((call) =>
-        isActiveVoiceCallStatus(call.status) && call.callMode === "human"
-          ? {
-              ...call,
-              status: "canceled",
-              endedAt: new Date().toISOString(),
-            }
-          : call,
-      ),
+      sanitizeCallsForOperatorSession(current, softphone.status),
     );
+
+    setActiveCallDetail((current) => {
+      if (!current) {
+        return null;
+      }
+
+      if (
+        isActiveVoiceCallStatus(current.status)
+        && current.callMode === "human"
+      ) {
+        return {
+          ...current,
+          status: "canceled",
+          endedAt: current.endedAt ?? new Date().toISOString(),
+        };
+      }
+
+      return current;
+    });
+
+    if (workspaceView.mode === "live") {
+      setWorkspaceView(
+        activeCallId || phoneDraft ? { mode: "home" } : { mode: "dialpad" },
+      );
+    }
+
+    void requestReleaseOperatorVoiceLine();
 
     void fetchVoiceCallsAction().then((result) => {
       if (result.success) {
-        setCalls(result.data);
+        setCalls(
+          sanitizeCallsForOperatorSession(result.data, softphone.status),
+        );
       }
     });
     router.refresh();
-  }, [router, softphone.status]);
+  }, [activeCallId, phoneDraft, router, softphone.status, workspaceView.mode]);
 
   useEffect(() => {
     if (!activeCallId && !phoneDraft) {
@@ -297,6 +333,21 @@ function VoiceCallsPanelContent({
       return { mode: "home" };
     });
   }, [activeCallId, calls, phoneDraft]);
+
+  const handlePrepareNewCall = useCallback(() => {
+    setActiveCallDetail((current) => {
+      if (!current) {
+        return null;
+      }
+
+      return {
+        ...current,
+        turns: [],
+        turnCount: 0,
+        events: [],
+      };
+    });
+  }, []);
 
   const handleOpenDialpad = useCallback(() => {
     setWorkspaceView({ mode: "dialpad" });
@@ -509,11 +560,12 @@ function VoiceCallsPanelContent({
               view={workspaceView}
               onViewChange={handleWorkspaceViewChange}
               call={selectedCall}
-              allCalls={calls}
+              allCalls={workspaceCalls}
               activeCallId={activeCallId}
               initialPhone={phoneDraft}
               phonebookContacts={phonebookContacts}
               onSelectCall={handleCallSelect}
+              onPrepareNewCall={handlePrepareNewCall}
               onOpenSms={handleOpenSms}
               onAddContact={handleAddContact}
               onContactUpdated={handleContactUpdated}

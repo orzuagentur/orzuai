@@ -486,6 +486,69 @@ export class VoiceRepository {
     return (data as VoiceCallLogInboxRow | null) ?? null;
   }
 
+  async listActiveHumanCallsForBusiness(
+    businessId: string,
+    options?: { phoneNumber?: string; limit?: number },
+  ): Promise<VoiceCallLogInboxRow[]> {
+    const activeStatuses = [
+      "active",
+      "answered",
+      "in-progress",
+      "ringing",
+      "initiated",
+      "queued",
+    ];
+
+    let query = this.db
+      .from("voice_call_logs")
+      .select(
+        `
+        id,
+        direction,
+        phone_number,
+        status,
+        provider,
+        trigger_reason,
+        created_at,
+        contact_id,
+        call_mode,
+        operator_user_id,
+        ended_at,
+        duration_seconds,
+        ai_handled,
+        external_call_id,
+        recording_url,
+        recording_sid,
+        conversation_id,
+        handoff_at,
+        human_handled,
+        contacts (
+          id,
+          name,
+          phone_number
+        )
+      `,
+      )
+      .eq("business_id", businessId)
+      .eq("call_mode", "human")
+      .in("status", activeStatuses)
+      .order("created_at", { ascending: false })
+      .limit(options?.limit ?? 5);
+
+    const phoneNumber = options?.phoneNumber?.trim();
+    if (phoneNumber) {
+      query = query.eq("phone_number", phoneNumber);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data as VoiceCallLogInboxRow[]) ?? [];
+  }
+
   async updateCallLog(
     callLogId: string,
     patch: VoiceCallLogUpdate,

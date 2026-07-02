@@ -56,7 +56,7 @@ import {
   startOutboundRingback,
   stopOutboundRingback,
 } from "@/lib/voice/call-sounds";
-import { requestEndVoiceCall } from "@/lib/voice/request-end-call";
+import { requestEndVoiceCall, requestReleaseOperatorVoiceLine } from "@/lib/voice/request-end-call";
 import { scheduleVoiceInboxRefresh } from "@/utils/voice-inbox-refresh";
 import {
   getCallsForContact,
@@ -70,14 +70,16 @@ function mergeListItemToDetail(
   listItem: VoiceInboxCallListItem,
   detail: VoiceCallDetail | null,
 ): VoiceCallDetail {
+  const sameCall = detail?.id === listItem.id;
+
   return {
     ...listItem,
     contactName: listItem.contactName ?? detail?.contactName ?? null,
     contactId: listItem.contactId ?? detail?.contactId ?? null,
-    turns: detail?.turns ?? [],
-    turnCount: detail?.turnCount ?? 0,
-    hasRecording: Boolean(listItem.recordingUrl?.trim() || detail?.hasRecording),
-    events: detail?.events ?? [],
+    turns: sameCall ? (detail?.turns ?? []) : [],
+    turnCount: sameCall ? (detail?.turnCount ?? 0) : 0,
+    hasRecording: Boolean(listItem.recordingUrl?.trim() || (sameCall && detail?.hasRecording)),
+    events: sameCall ? (detail?.events ?? []) : [],
   };
 }
 
@@ -103,6 +105,7 @@ type VoiceWorkspacePanelProps = {
   onContactDeleted?: (contactId: string) => void;
   onPhoneHistoryDeleted?: (phoneNumber: string) => void;
   onRecordingDeleted?: (callId: string) => void;
+  onPrepareNewCall?: () => void;
   phonebookContacts?: PhoneContactListItem[];
   className?: string;
 };
@@ -121,6 +124,7 @@ export function VoiceWorkspacePanel({
   onContactDeleted,
   onPhoneHistoryDeleted,
   onRecordingDeleted,
+  onPrepareNewCall,
   phonebookContacts = [],
   className,
 }: VoiceWorkspacePanelProps) {
@@ -411,6 +415,7 @@ export function VoiceWorkspacePanel({
       if (!phoneToCall) {
         return;
       }
+      onPrepareNewCall?.();
       const mode = selection.mode;
 
       if (mode === "human") {
@@ -483,6 +488,7 @@ export function VoiceWorkspacePanel({
       resolveBackView,
       router,
       softphone,
+      onPrepareNewCall,
     ],
   );
 
@@ -511,6 +517,10 @@ export function VoiceWorkspacePanel({
         const result = await requestEndVoiceCall({
           callLogId: isEphemeral ? undefined : callLogId,
           parentCallSid: parentCallSid ?? undefined,
+          phoneNumber: softphone.activePhoneNumber ?? (phoneToCall || undefined),
+        });
+
+        void requestReleaseOperatorVoiceLine({
           phoneNumber: softphone.activePhoneNumber ?? (phoneToCall || undefined),
         });
 
@@ -1085,7 +1095,7 @@ function WorkspaceLiveView({
           </div>
         ) : null}
 
-        {isAiOnlyLiveCall(call) ? (
+        {isAiOnlyLiveCall(call) && !isEphemeralLiveCallId(call.id) ? (
           <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border p-4">
             <VoiceTranscriptTurns
               turns={call.turns}

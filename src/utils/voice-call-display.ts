@@ -139,6 +139,34 @@ export function isAiVoiceCall(call: {
   return call.callMode === "ai" || (Boolean(call.aiHandled) && !call.humanHandled);
 }
 
+export function sanitizeCallsForOperatorSession<
+  T extends { status: string; callMode?: string | null; endedAt?: string | null },
+>(calls: T[], softphoneStatus: string): T[] {
+  const isOperatorIdle =
+    softphoneStatus === "ready" || softphoneStatus === "offline";
+
+  if (!isOperatorIdle) {
+    return calls;
+  }
+
+  const endedAt = new Date().toISOString();
+
+  return calls.map((call) => {
+    if (
+      isActiveVoiceCallStatus(call.status)
+      && call.callMode === "human"
+    ) {
+      return {
+        ...call,
+        status: "canceled",
+        endedAt: call.endedAt ?? endedAt,
+      };
+    }
+
+    return call;
+  });
+}
+
 export function getVoiceCallDirectionKind(
   call: { direction: "inbound" | "outbound"; status: string },
 ): "inbound" | "outbound" | "missed" {

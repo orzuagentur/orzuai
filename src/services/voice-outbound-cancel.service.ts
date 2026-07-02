@@ -197,3 +197,42 @@ export async function cancelOutboundVoiceCall(input: {
 
   return { success: true, message: "Call ended." };
 }
+
+export async function releaseOperatorVoiceLine(input: {
+  businessId: string;
+  phoneNumber?: string;
+}): Promise<{ success: boolean; message?: string; released: number }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing.", released: 0 };
+  }
+
+  const repo = getVoiceRepository();
+  const activeCalls = await repo.listActiveHumanCallsForBusiness(input.businessId, {
+    phoneNumber: input.phoneNumber,
+    limit: 5,
+  });
+
+  let released = 0;
+
+  for (const active of activeCalls) {
+    const result = await cancelOutboundVoiceCall({
+      businessId: input.businessId,
+      callLogId: active.id,
+      parentCallSid: active.external_call_id ?? undefined,
+      phoneNumber: active.phone_number,
+      reason: "operator_hangup",
+    });
+
+    if (!result.success) {
+      return { ...result, released };
+    }
+
+    released += 1;
+  }
+
+  return {
+    success: true,
+    message: released > 0 ? "Line released." : "No active operator call.",
+    released,
+  };
+}

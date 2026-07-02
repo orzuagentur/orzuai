@@ -7,6 +7,7 @@ import { fetchVoiceCallDetailAction } from "@/features/voice/actions/fetch-voice
 import { createClientIfConfigured } from "@/lib/supabase/client";
 import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
+import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 
 type VoiceCallSessionTurn = {
   role: "user" | "assistant";
@@ -226,6 +227,10 @@ export function useVoiceCallsRealtime({
     const handleSessionUpdate = (row: VoiceCallSessionRealtimeRow) => {
       onActiveCallChangeRef.current((current) => {
         if (!current || current.externalCallId !== row.call_sid) {
+          return current;
+        }
+
+        if (!isActiveVoiceCallStatus(current.status)) {
           return current;
         }
 
