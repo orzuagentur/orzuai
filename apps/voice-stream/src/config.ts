@@ -50,6 +50,93 @@ export function verifyStreamToken(input: {
   return timingSafeEqual(left, right);
 }
 
+const MONITOR_TOKEN_TTL_SECONDS = 300;
+
+export type MonitorTokenClaims = {
+  businessId: string;
+  callSid: string;
+  callLogId: string;
+  exp: number;
+};
+
+export function signMonitorToken(input: {
+  businessId: string;
+  callSid: string;
+  callLogId: string;
+  secret: string;
+  ttlSeconds?: number;
+}): string {
+  const exp =
+    Math.floor(Date.now() / 1000) +
+    (input.ttlSeconds ?? MONITOR_TOKEN_TTL_SECONDS);
+  const payload = [
+    input.businessId.trim(),
+    input.callSid.trim(),
+    input.callLogId.trim(),
+    String(exp),
+  ].join(":");
+
+  const signature = createHmac("sha256", input.secret)
+    .update(payload)
+    .digest("base64url");
+
+  return `${Buffer.from(payload, "utf8").toString("base64url")}.${signature}`;
+}
+
+export function verifyMonitorToken(
+  token: string | null | undefined,
+  secret: string,
+): MonitorTokenClaims | null {
+  const raw = token?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const separator = raw.lastIndexOf(".");
+  if (separator <= 0) {
+    return null;
+  }
+
+  const payloadB64 = raw.slice(0, separator);
+  const signature = raw.slice(separator + 1);
+
+  let payload: string;
+  try {
+    payload = Buffer.from(payloadB64, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+
+  const left = Buffer.from(signature);
+  const right = Buffer.from(expectedSignature);
+
+  if (left.length !== right.length || !timingSafeEqual(left, right)) {
+    return null;
+  }
+
+  const parts = payload.split(":");
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  const [businessId, callSid, callLogId, expRaw] = parts;
+  const exp = Number.parseInt(expRaw ?? "", 10);
+
+  if (!businessId || !callSid || !callLogId || !Number.isFinite(exp)) {
+    return null;
+  }
+
+  if (exp < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+
+  return { businessId, callSid, callLogId, exp };
+}
+
 export type VoiceStreamContext = {
   businessId: string;
   businessName: string;

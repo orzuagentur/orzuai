@@ -17,6 +17,7 @@ import {
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { hasTwilioVoiceClientEnv } from "@/lib/twilio/access-token";
+import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 
 export async function buildHandoffAgentTwiml(
   businessId: string,
@@ -60,7 +61,7 @@ export async function handoffActiveVoiceCallToAgent(input: {
     return { success: false, message: "Call not found or not active." };
   }
 
-  if (callLog.status !== "active" && callLog.status !== "ringing") {
+  if (!isActiveVoiceCallStatus(callLog.status)) {
     return { success: false, message: "Call is no longer active." };
   }
 

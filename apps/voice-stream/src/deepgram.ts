@@ -7,8 +7,14 @@ export type DeepgramLiveSession = {
 
 const DEEPGRAM_LISTEN_CONFIG = {
   model: "nova-3",
-  endpointing: "300",
+  endpointing: process.env.DEEPGRAM_ENDPOINTING_MS?.trim() || "400",
+  utteranceEndMs: "1000",
 } as const;
+
+/** Twilio μ-law 8 kHz: 160 bytes ≈ 20 ms per frame. */
+const AUDIO_FRAME_BYTES = 160;
+const AUDIO_FRAME_INTERVAL_MS = 20;
+const MAX_PENDING_AUDIO_BYTES = 8000 * 5;
 
 function resolveDeepgramListenLanguage(language: string): string {
   const normalized = language.trim().toLowerCase();
@@ -50,8 +56,8 @@ function buildDeepgramListenUrl(language: string): string {
   url.searchParams.set("sample_rate", "8000");
   url.searchParams.set("channels", "1");
   url.searchParams.set("interim_results", "true");
-  // endpointing triggers speech_final on silence; utterance_end_ms requires >=1000ms
   url.searchParams.set("endpointing", DEEPGRAM_LISTEN_CONFIG.endpointing);
+  url.searchParams.set("utterance_end_ms", DEEPGRAM_LISTEN_CONFIG.utteranceEndMs);
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("vad_events", "true");
   return url.toString();
@@ -70,6 +76,7 @@ export function startDeepgramLive(input: {
   apiKey: string;
   language: string;
   onFinalTranscript: (text: string, options?: { speechFinal?: boolean }) => void;
+  onUtteranceEnd?: () => void;
   onSpeechStarted: () => void;
   onError?: (message: string) => void;
 }): DeepgramLiveSession {
@@ -85,24 +92,80 @@ export function startDeepgramLive(input: {
 
   let isClosed = false;
   const pendingAudio: Buffer[] = [];
+  let pendingAudioBytes = 0;
   let keepAliveTimer: NodeJS.Timeout | null = null;
+  let flushTimer: NodeJS.Timeout | null = null;
+
+  const trimPendingAudio = () => {
+    while (
+      pendingAudioBytes > MAX_PENDING_AUDIO_BYTES &&
+      pendingAudio.length > 0
+    ) {
+      const removed = pendingAudio.shift();
+      if (removed) {
+        pendingAudioBytes -= removed.byteLength;
+      }
+    }
+  };
 
   const flushPendingAudio = () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || pendingAudio.length === 0) {
       return;
     }
 
-    for (const chunk of pendingAudio) {
-      socket.send(chunk);
+    if (flushTimer) {
+      return;
     }
 
-    pendingAudio.length = 0;
+    const sendNextFrame = () => {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        flushTimer = null;
+        return;
+      }
+
+      if (pendingAudio.length === 0) {
+        flushTimer = null;
+        return;
+      }
+
+      const head = pendingAudio[0];
+      if (!head || head.byteLength === 0) {
+        pendingAudio.shift();
+        flushTimer = setTimeout(sendNextFrame, AUDIO_FRAME_INTERVAL_MS);
+        return;
+      }
+
+      const frame = head.subarray(
+        0,
+        Math.min(AUDIO_FRAME_BYTES, head.byteLength),
+      );
+      socket.send(frame);
+
+      if (head.byteLength <= AUDIO_FRAME_BYTES) {
+        pendingAudio.shift();
+        pendingAudioBytes -= head.byteLength;
+      } else {
+        pendingAudio[0] = head.subarray(AUDIO_FRAME_BYTES);
+        pendingAudioBytes -= AUDIO_FRAME_BYTES;
+      }
+
+      flushTimer = setTimeout(sendNextFrame, AUDIO_FRAME_INTERVAL_MS);
+    };
+
+    sendNextFrame();
   };
 
   const clearKeepAlive = () => {
     if (keepAliveTimer) {
       clearInterval(keepAliveTimer);
       keepAliveTimer = null;
+    }
+  };
+
+  const clearFlushTimer = () => {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
     }
   };
 
@@ -118,6 +181,7 @@ export function startDeepgramLive(input: {
         model: DEEPGRAM_LISTEN_CONFIG.model,
         language: listenLanguage,
         endpointing: DEEPGRAM_LISTEN_CONFIG.endpointing,
+        utteranceEndMs: DEEPGRAM_LISTEN_CONFIG.utteranceEndMs,
         detail: detail ?? null,
       }),
     );
@@ -132,6 +196,7 @@ export function startDeepgramLive(input: {
           model: DEEPGRAM_LISTEN_CONFIG.model,
           language: listenLanguage,
           endpointing: DEEPGRAM_LISTEN_CONFIG.endpointing,
+          utteranceEndMs: DEEPGRAM_LISTEN_CONFIG.utteranceEndMs,
         }),
       );
       flushPendingAudio();
@@ -152,6 +217,11 @@ export function startDeepgramLive(input: {
           return;
         }
 
+        if (payload.type === "UtteranceEnd") {
+          input.onUtteranceEnd?.();
+          return;
+        }
+
         if (payload.type !== "Results") {
           return;
         }
@@ -161,10 +231,13 @@ export function startDeepgramLive(input: {
           return;
         }
 
-        if (payload.is_final || payload.speech_final) {
-          input.onFinalTranscript(transcript, {
-            speechFinal: Boolean(payload.speech_final),
-          });
+        if (payload.speech_final) {
+          input.onFinalTranscript(transcript, { speechFinal: true });
+          return;
+        }
+
+        if (payload.is_final) {
+          input.onFinalTranscript(transcript, { speechFinal: false });
         }
       } catch (error) {
         reportError(
@@ -199,6 +272,7 @@ export function startDeepgramLive(input: {
 
     ws.on("close", (code, reason) => {
       clearKeepAlive();
+      clearFlushTimer();
 
       if (!isClosed && code !== 1000) {
         reportError(
@@ -217,6 +291,8 @@ export function startDeepgramLive(input: {
 
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         pendingAudio.push(chunk);
+        pendingAudioBytes += chunk.byteLength;
+        trimPendingAudio();
         return;
       }
 
@@ -225,7 +301,9 @@ export function startDeepgramLive(input: {
     close() {
       isClosed = true;
       clearKeepAlive();
+      clearFlushTimer();
       pendingAudio.length = 0;
+      pendingAudioBytes = 0;
 
       if (!socket) {
         return;

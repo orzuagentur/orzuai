@@ -20,6 +20,57 @@ export function getVoiceStreamWsUrl(): string | undefined {
   return process.env[ENV_KEYS.VOICE_STREAM_WS_URL]?.trim() || undefined;
 }
 
+export function getVoiceMonitorWsUrl(): string | null {
+  const streamUrl = getVoiceStreamWsUrl();
+  if (!streamUrl) {
+    return null;
+  }
+
+  const normalized = streamUrl.replace(/\/$/, "");
+  if (normalized.endsWith("/voice/stream")) {
+    return `${normalized.slice(0, -"/voice/stream".length)}/voice/monitor`;
+  }
+
+  return `${normalized}/voice/monitor`;
+}
+
+const MONITOR_TOKEN_TTL_SECONDS = 300;
+
+export type MonitorTokenClaims = {
+  businessId: string;
+  callSid: string;
+  callLogId: string;
+  exp: number;
+};
+
+export function signMonitorToken(input: {
+  businessId: string;
+  callSid: string;
+  callLogId: string;
+  ttlSeconds?: number;
+}): string | null {
+  const secret = getVoiceStreamSecret();
+  if (!secret) {
+    return null;
+  }
+
+  const exp =
+    Math.floor(Date.now() / 1000) +
+    (input.ttlSeconds ?? MONITOR_TOKEN_TTL_SECONDS);
+  const payload = [
+    input.businessId.trim(),
+    input.callSid.trim(),
+    input.callLogId.trim(),
+    String(exp),
+  ].join(":");
+
+  const signature = createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64url");
+
+  return `${Buffer.from(payload, "utf8").toString("base64url")}.${signature}`;
+}
+
 function hasLegacyVoiceStreamKeys(): boolean {
   return Boolean(
     resolveSecretValue(ENV_KEYS.DEEPGRAM_API_KEY)?.trim() &&

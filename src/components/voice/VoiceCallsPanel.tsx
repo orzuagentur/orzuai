@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
+  HeadphonesIcon,
   UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +17,10 @@ import {
   useInboxLayout,
 } from "@/components/chats/inbox/inbox-layout-context";
 import { VoiceAddContactDialog } from "@/components/voice/VoiceAddContactDialog";
+import {
+  findFirstActiveVoiceCall,
+  VoiceActiveCallBanner,
+} from "@/components/voice/VoiceActiveCallBanner";
 import { VoiceContactsDialog } from "@/components/voice/VoiceContactsDialog";
 import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPanel";
 import { VoiceInboxDialerPanel } from "@/components/voice/VoiceInboxDialerPanel";
@@ -173,6 +178,7 @@ function VoiceCallsPanelContent({
 
   const detailsConversationId = selectedCall?.conversationId ?? null;
   const showRightPanel = detailsOpen && Boolean(detailsConversationId);
+  const liveCall = useMemo(() => findFirstActiveVoiceCall(calls), [calls]);
 
   const handleCallSelect = useCallback(
     (callId: string) => {
@@ -297,16 +303,27 @@ function VoiceCallsPanelContent({
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
               <h1 className="text-xl font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setContactsOpen(true)}
-              >
-                <UserIcon className="mr-2 size-4" />
-                {VOICE_MESSAGES.contactsButton}
-              </Button>
+              <div className="flex items-center gap-2">
+                {liveCall ? (
+                  <Button type="button" size="sm" variant="outline" asChild>
+                    <Link href={DASHBOARD_ROUTES.chatsVoiceMonitor}>
+                      <HeadphonesIcon className="mr-2 size-4" />
+                      {VOICE_MESSAGES.callMonitorOpen}
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setContactsOpen(true)}
+                >
+                  <UserIcon className="mr-2 size-4" />
+                  {VOICE_MESSAGES.contactsButton}
+                </Button>
+              </div>
             </div>
+            {liveCall ? <VoiceActiveCallBanner call={liveCall} /> : null}
             <VoiceCallFilters value={callFilter} onChange={setCallFilter} />
             <VoiceCallList
               calls={filteredCalls}

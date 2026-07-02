@@ -1,5 +1,7 @@
 import type WebSocket from "ws";
 
+import { TwilioOutboundAudioPacer } from "./audio-pacer.js";
+
 export type TwilioStreamStart = {
   event: "start";
   sequenceNumber: string;
@@ -45,12 +47,18 @@ export function sendTwilioMedia(
   ws: WebSocket,
   streamSid: string,
   payloadBase64: string,
+  timestampMs?: number,
 ): void {
   ws.send(
     JSON.stringify({
       event: "media",
       streamSid,
-      media: { payload: payloadBase64 },
+      media: {
+        payload: payloadBase64,
+        ...(timestampMs !== undefined
+          ? { timestamp: String(timestampMs) }
+          : {}),
+      },
     }),
   );
 }
@@ -63,6 +71,7 @@ export async function streamElevenLabsUlawToTwilio(input: {
   text: string;
   languageCode?: string;
   abortSignal: AbortSignal;
+  pacer: TwilioOutboundAudioPacer;
 }): Promise<void> {
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(input.voiceId)}/stream?output_format=ulaw_8000`,
@@ -87,7 +96,6 @@ export async function streamElevenLabsUlawToTwilio(input: {
   }
 
   const reader = response.body.getReader();
-  const chunkSize = 640;
 
   while (!input.abortSignal.aborted) {
     const { done, value } = await reader.read();
@@ -95,20 +103,10 @@ export async function streamElevenLabsUlawToTwilio(input: {
       break;
     }
 
-    for (let offset = 0; offset < value.byteLength; offset += chunkSize) {
-      if (input.abortSignal.aborted) {
-        break;
-      }
+    input.pacer.enqueue(value);
+  }
 
-      const slice = value.subarray(
-        offset,
-        Math.min(offset + chunkSize, value.byteLength),
-      );
-      sendTwilioMedia(
-        input.ws,
-        input.streamSid,
-        Buffer.from(slice).toString("base64"),
-      );
-    }
+  if (!input.abortSignal.aborted) {
+    await input.pacer.drain();
   }
 }

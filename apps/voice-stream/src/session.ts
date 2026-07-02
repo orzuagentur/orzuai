@@ -1,5 +1,6 @@
 import type WebSocket from "ws";
 
+import { TwilioOutboundAudioPacer } from "./audio-pacer.js";
 import {
   fetchVoiceStreamContext,
   notifyVoiceStreamLifecycle,
@@ -9,10 +10,14 @@ import {
   type VoiceStreamContext,
 } from "./config.js";
 import { startDeepgramLive } from "./deepgram.js";
+import {
+  MONITOR_TRACK_INBOUND,
+  MONITOR_TRACK_OUTBOUND,
+  voiceMonitorHub,
+} from "./monitor-hub.js";
 import { extractSpeakablePhrases } from "./phrases.js";
 import { buildConversationPrompt, streamOpenAiReply } from "./llm.js";
 import {
-  sendTwilioClear,
   streamElevenLabsUlawToTwilio,
   type TwilioStreamMedia,
   type TwilioStreamStart,
@@ -28,6 +33,8 @@ type VoiceStreamSessionOptions = {
   getOpenAiApiKey: () => string | null;
 };
 
+const TRANSCRIPT_INTERIM_DEBOUNCE_MS = 400;
+
 export class VoiceStreamSession {
   private readonly ws: WebSocket;
   private readonly options: VoiceStreamSessionOptions;
@@ -38,12 +45,15 @@ export class VoiceStreamSession {
   private triggerReason: string | null = null;
   private context: VoiceStreamContext | null = null;
   private deepgram: ReturnType<typeof startDeepgramLive> | null = null;
+  private audioPacer: TwilioOutboundAudioPacer | null = null;
   private speechAbort: AbortController | null = null;
   private replyAbort: AbortController | null = null;
   private isSpeaking = false;
   private isProcessing = false;
   private pendingTranscript = "";
-  private queuedUserMessage: string | null = null;
+  private lastFlushedTranscript = "";
+  private queuedUserMessages: string[] = [];
+  private pendingInboundAudio: string[] = [];
   private transcriptTimer: NodeJS.Timeout | null = null;
   private closed = false;
   private conversationHistory: Array<{
@@ -106,7 +116,38 @@ export class VoiceStreamSession {
         return;
       }
 
-      this.context = await fetchVoiceStreamContext({
+      this.audioPacer = new TwilioOutboundAudioPacer(this.ws, this.streamSid, {
+        onOutboundFrame: (frame) => {
+          if (this.callSid) {
+            voiceMonitorHub.publish(
+              this.callSid,
+              MONITOR_TRACK_OUTBOUND,
+              frame,
+            );
+          }
+        },
+      });
+
+      this.deepgram = startDeepgramLive({
+        apiKey: this.options.getDeepgramApiKey(),
+        language: "multi",
+        onSpeechStarted: () => {
+          void this.handleBargeIn();
+        },
+        onUtteranceEnd: () => {
+          this.flushTranscript(true);
+        },
+        onFinalTranscript: (text, options) => {
+          this.queueTranscript(text, options?.speechFinal ?? false);
+        },
+        onError: (errorMessage) => {
+          console.error("[voice-stream] deepgram live failed", errorMessage);
+        },
+      });
+
+      this.flushPendingInboundAudio();
+
+      const contextPromise = fetchVoiceStreamContext({
         appUrl: this.options.appUrl,
         secret: this.options.streamSecret,
         businessId: this.businessId,
@@ -115,7 +156,7 @@ export class VoiceStreamSession {
         triggerReason: this.triggerReason,
       });
 
-      await notifyVoiceStreamLifecycle({
+      const lifecyclePromise = notifyVoiceStreamLifecycle({
         appUrl: this.options.appUrl,
         secret: this.options.streamSecret,
         businessId: this.businessId,
@@ -125,19 +166,12 @@ export class VoiceStreamSession {
         triggerReason: this.triggerReason,
       });
 
-      this.deepgram = startDeepgramLive({
-        apiKey: this.options.getDeepgramApiKey(),
-        language: this.context.deepgramLanguage,
-        onSpeechStarted: () => {
-          void this.handleBargeIn();
-        },
-        onFinalTranscript: (text, options) => {
-          this.queueTranscript(text, options?.speechFinal ?? false);
-        },
-        onError: (message) => {
-          console.error("[voice-stream] deepgram live failed", message);
-        },
-      });
+      this.context = await contextPromise;
+      await lifecyclePromise;
+
+      if (this.context.deepgramLanguage && this.context.deepgramLanguage !== "multi") {
+        // Language is resolved at connect time; reconnect only if needed later.
+      }
 
       await this.speak(this.context.openingLine);
 
@@ -161,11 +195,44 @@ export class VoiceStreamSession {
   }
 
   private handleMedia(message: TwilioStreamMedia): void {
-    if (!this.deepgram || message.media.track !== "inbound") {
+    if (message.media.track !== "inbound") {
       return;
     }
 
+    if (!this.deepgram) {
+      this.pendingInboundAudio.push(message.media.payload);
+      return;
+    }
+
+    if (this.callSid) {
+      voiceMonitorHub.publish(
+        this.callSid,
+        MONITOR_TRACK_INBOUND,
+        Buffer.from(message.media.payload, "base64"),
+      );
+    }
+
     this.deepgram.sendAudio(message.media.payload);
+  }
+
+  private flushPendingInboundAudio(): void {
+    if (!this.deepgram || this.pendingInboundAudio.length === 0) {
+      return;
+    }
+
+    const buffered = this.pendingInboundAudio;
+    this.pendingInboundAudio = [];
+
+    for (const payload of buffered) {
+      if (this.callSid) {
+        voiceMonitorHub.publish(
+          this.callSid,
+          MONITOR_TRACK_INBOUND,
+          Buffer.from(payload, "base64"),
+        );
+      }
+      this.deepgram.sendAudio(payload);
+    }
   }
 
   private queueTranscript(text: string, speechFinal = false): void {
@@ -176,22 +243,35 @@ export class VoiceStreamSession {
       this.transcriptTimer = null;
     }
 
-    const flush = () => {
-      const combined = this.pendingTranscript.trim();
-      this.pendingTranscript = "";
-      this.transcriptTimer = null;
-
-      if (combined) {
-        void this.processUserMessage(combined);
-      }
-    };
-
     if (speechFinal) {
-      flush();
+      this.flushTranscript(true);
       return;
     }
 
-    this.transcriptTimer = setTimeout(flush, 50);
+    this.transcriptTimer = setTimeout(() => {
+      this.flushTranscript(false);
+    }, TRANSCRIPT_INTERIM_DEBOUNCE_MS);
+  }
+
+  private flushTranscript(force: boolean): void {
+    if (this.transcriptTimer) {
+      clearTimeout(this.transcriptTimer);
+      this.transcriptTimer = null;
+    }
+
+    const combined = this.pendingTranscript.trim();
+    this.pendingTranscript = "";
+
+    if (!combined) {
+      return;
+    }
+
+    if (!force && combined === this.lastFlushedTranscript) {
+      return;
+    }
+
+    this.lastFlushedTranscript = combined;
+    void this.processUserMessage(combined);
   }
 
   private async handleBargeIn(): Promise<void> {
@@ -203,12 +283,18 @@ export class VoiceStreamSession {
     this.speechAbort = null;
     this.replyAbort?.abort();
     this.isSpeaking = false;
-    sendTwilioClear(this.ws, this.streamSid);
+    this.audioPacer?.clear();
+    this.audioPacer?.reset();
+
+    if (this.transcriptTimer) {
+      clearTimeout(this.transcriptTimer);
+      this.transcriptTimer = null;
+    }
   }
 
   private async processUserMessage(userMessage: string): Promise<void> {
     if (this.isProcessing) {
-      this.queuedUserMessage = userMessage;
+      this.queuedUserMessages.push(userMessage);
       return;
     }
 
@@ -259,19 +345,23 @@ export class VoiceStreamSession {
           userPrompt,
           abortSignal: replyAbort.signal,
         })) {
+          if (replyAbort.signal.aborted) {
+            break;
+          }
+
           assistantText += delta;
           phraseBuffer += delta;
           const { phrases, remainder } = extractSpeakablePhrases(phraseBuffer);
           phraseBuffer = remainder;
 
-          for (const phrase of phrases) {
-            await this.speak(phrase);
+          if (phrases.length > 0) {
+            await this.speak(phrases.join(" "), replyAbort.signal);
           }
         }
 
         const trailing = phraseBuffer.trim();
-        if (trailing) {
-          await this.speak(trailing);
+        if (trailing && !replyAbort.signal.aborted) {
+          await this.speak(trailing, replyAbort.signal);
           assistantText = assistantText.trim() || trailing;
         }
       } else {
@@ -287,13 +377,17 @@ export class VoiceStreamSession {
           triggerReason: this.triggerReason,
           abortSignal: replyAbort.signal,
         })) {
+          if (replyAbort.signal.aborted) {
+            break;
+          }
+
           if (chunk.type === "delta") {
             phraseBuffer += chunk.text;
             const { phrases, remainder } = extractSpeakablePhrases(phraseBuffer);
             phraseBuffer = remainder;
 
-            for (const phrase of phrases) {
-              await this.speak(phrase);
+            if (phrases.length > 0) {
+              await this.speak(phrases.join(" "), replyAbort.signal);
             }
             continue;
           }
@@ -301,8 +395,8 @@ export class VoiceStreamSession {
           assistantText = chunk.text;
           endCall = Boolean(chunk.endCall);
           const trailing = phraseBuffer.trim();
-          if (trailing) {
-            await this.speak(trailing);
+          if (trailing && !replyAbort.signal.aborted) {
+            await this.speak(trailing, replyAbort.signal);
           }
         }
       }
@@ -344,21 +438,28 @@ export class VoiceStreamSession {
       }
       this.isProcessing = false;
 
-      if (this.queuedUserMessage) {
-        const nextMessage = this.queuedUserMessage;
-        this.queuedUserMessage = null;
-        void this.processUserMessage(nextMessage);
+      if (this.queuedUserMessages.length > 0) {
+        const nextMessage = this.queuedUserMessages.shift();
+        if (nextMessage) {
+          void this.processUserMessage(nextMessage);
+        }
       }
     }
   }
 
-  private async speak(text: string): Promise<void> {
-    if (!this.streamSid || !this.context || this.closed) {
+  private async speak(text: string, abortSignal?: AbortSignal): Promise<void> {
+    const trimmed = text.trim();
+
+    if (!trimmed || !this.streamSid || !this.context || this.closed || !this.audioPacer) {
       return;
     }
 
-    this.speechAbort?.abort();
-    this.speechAbort = new AbortController();
+    if (!abortSignal) {
+      this.speechAbort?.abort();
+      this.speechAbort = new AbortController();
+      abortSignal = this.speechAbort.signal;
+    }
+
     this.isSpeaking = true;
 
     try {
@@ -367,9 +468,10 @@ export class VoiceStreamSession {
         streamSid: this.streamSid,
         apiKey: this.options.getElevenLabsApiKey(),
         voiceId: this.context.voiceId,
-        text,
+        text: trimmed,
         languageCode: this.context.languageCode,
-        abortSignal: this.speechAbort.signal,
+        abortSignal,
+        pacer: this.audioPacer,
       });
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError")) {
@@ -379,7 +481,9 @@ export class VoiceStreamSession {
         );
       }
     } finally {
-      this.isSpeaking = false;
+      if (!abortSignal.aborted) {
+        this.isSpeaking = false;
+      }
     }
   }
 
@@ -404,6 +508,7 @@ export class VoiceStreamSession {
 
     this.deepgram?.close();
     this.speechAbort?.abort();
+    this.audioPacer?.clear();
   }
 
   close(): void {

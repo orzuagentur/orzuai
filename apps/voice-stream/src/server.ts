@@ -1,8 +1,11 @@
+// Voice stream worker — paced TTS playback + early STT connect (v2).
 import http from "http";
 import type { IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer } from "ws";
 
 import { getEnv, requireEnv } from "./config.js";
+import { attachVoiceMonitorWebSocket } from "./monitor-server.js";
+import { voiceMonitorHub } from "./monitor-hub.js";
 import { RuntimeAiKeyProvider } from "./runtime-keys.js";
 import { VoiceStreamSession } from "./session.js";
 
@@ -45,6 +48,7 @@ function handleHttpRequest(
 const server = http.createServer(handleHttpRequest);
 
 const wss = new WebSocketServer({ server, path: "/voice/stream" });
+const monitorWss = attachVoiceMonitorWebSocket({ server, streamSecret });
 
 wss.on("connection", (ws) => {
   const session = new VoiceStreamSession({
@@ -86,6 +90,11 @@ function shutdown(signal: string): void {
   console.info(`[voice-stream] received ${signal}, shutting down`);
 
   runtimeKeys.stop();
+  voiceMonitorHub.closeAll();
+
+  monitorWss.clients.forEach((client) => {
+    client.close();
+  });
 
   wss.clients.forEach((client) => {
     client.close();
@@ -117,7 +126,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 void runtimeKeys.start().then(() => {
   server.listen(port, host, () => {
     console.info(
-      `[voice-stream] listening on ${host}:${port} path=/voice/stream app=${appUrl} (platform-ai keys via runtime refresh)`,
+      `[voice-stream] listening on ${host}:${port} paths=/voice/stream,/voice/monitor app=${appUrl} (platform-ai keys via runtime refresh)`,
     );
   });
 }).catch((error) => {

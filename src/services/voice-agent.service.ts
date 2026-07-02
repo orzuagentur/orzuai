@@ -20,6 +20,10 @@ import {
   buildVoiceConversationTwiml,
 } from "@/services/voice-ai.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
+import {
+  buildBusinessLineBusyTwiml,
+  findBusinessLineBusyCall,
+} from "@/services/voice-call-control.service";
 import { applyCallRecordingToTwiml } from "@/services/voice-recording.service";
 import { isWithinBusinessHours } from "@/lib/voice/business-hours";
 import { buildStaticSayTwiml, mapVoiceLanguageToTwilioLocale } from "@/lib/voice/twiml";
@@ -445,6 +449,18 @@ export async function placeOutboundVoiceCall(input: {
     return { success: false, message: "Configure a business phone number first." };
   }
 
+  const lineBusy = await findBusinessLineBusyCall({
+    businessId: input.businessId,
+    phoneNumber: input.phoneNumber,
+  });
+
+  if (lineBusy.busy) {
+    return {
+      success: false,
+      message: VOICE_MESSAGES.callLineBusy,
+    };
+  }
+
   const twilioConnection = await getTwilioConnection(input.businessId);
   const twilioCredentials = resolveTwilioCredentialsForBusiness(twilioConnection);
 
@@ -686,6 +702,15 @@ export async function getInboundVoiceTwiml(
         speech: settings.afterHoursMessage,
         speechLocale,
       }),
+    );
+  }
+
+  const lineBusy = await findBusinessLineBusyCall({ businessId });
+
+  if (lineBusy.busy) {
+    return applyCallRecordingToTwiml(
+      businessId,
+      await buildBusinessLineBusyTwiml(businessId),
     );
   }
 

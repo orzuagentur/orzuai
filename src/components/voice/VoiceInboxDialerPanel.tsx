@@ -12,6 +12,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { VoiceCallCard } from "@/components/voice/VoiceCallCard";
 import {
+  findFirstActiveVoiceCall,
+  VoiceActiveCallBanner,
+} from "@/components/voice/VoiceActiveCallBanner";
+import { VoiceLiveCallCard } from "@/components/voice/VoiceLiveCallCard";
+import { VoiceLiveTranscriptPanel } from "@/components/voice/VoiceLiveTranscriptPanel";
+import { VoiceMonitorAudioPlayer } from "@/components/voice/VoiceMonitorAudioPlayer";
+import {
   VoiceCallModeDialog,
   type VoiceCallMode,
   type VoiceCallModeSelection,
@@ -25,6 +32,7 @@ import { cn } from "@/lib/utils";
 import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbox.types";
 import { scheduleVoiceInboxRefresh } from "@/utils/voice-inbox-refresh";
 import { phoneDigits } from "@/utils/voice-contact-calls";
+import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 
 type VoiceInboxDialerPanelProps = {
   call: VoiceCallDetail | null;
@@ -106,9 +114,29 @@ export function VoiceInboxDialerPanel({
 
   const phoneToCall = dialedNumber.trim();
   const canAddContact = Boolean(phoneToCall) && !call?.contactId;
+  const lineBusyCall = findFirstActiveVoiceCall(allCalls);
+  const isLineBusy = Boolean(lineBusyCall);
+  const isSelectedCallLive = Boolean(call && isActiveVoiceCallStatus(call.status));
+  const showLiveCard =
+    isSelectedCallLive && call
+      ? call
+      : lineBusyCall && lineBusyCall.id !== call?.id
+        ? ({
+            ...lineBusyCall,
+            turns: call?.turns ?? [],
+            turnCount: call?.turnCount ?? 0,
+            hasRecording: Boolean(lineBusyCall.recordingUrl),
+            events: call?.events ?? [],
+          } as VoiceCallDetail)
+        : null;
 
   function handleCall() {
     if (!phoneToCall) {
+      return;
+    }
+
+    if (isLineBusy) {
+      toast.error(VOICE_MESSAGES.callLineBusy);
       return;
     }
 
@@ -200,6 +228,10 @@ export function VoiceInboxDialerPanel({
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
+      {lineBusyCall && !isSelectedCallLive ? (
+        <VoiceActiveCallBanner call={lineBusyCall} />
+      ) : null}
+
       <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
         <input
           type="search"
@@ -226,6 +258,18 @@ export function VoiceInboxDialerPanel({
         ) : null}
       </div>
 
+      {showLiveCard ? <VoiceLiveCallCard call={showLiveCard} /> : null}
+
+      {showLiveCard ? (
+        <div className="shrink-0 border-b px-4 py-3">
+          <VoiceMonitorAudioPlayer
+            callLogId={showLiveCard.id}
+            callStatus={showLiveCard.status}
+            autoStart={false}
+          />
+        </div>
+      ) : null}
+
       <VoiceCallCard
         call={call}
         dialedNumber={dialedNumber}
@@ -242,7 +286,9 @@ export function VoiceInboxDialerPanel({
         onChange={handleDialedNumberChange}
         onCall={handleCall}
         onDigitPress={handleDigitPress}
-        callDisabled={isCalling || Boolean(pendingCallMode) || isOnCall}
+        callDisabled={
+          isCalling || Boolean(pendingCallMode) || isOnCall || isLineBusy
+        }
       />
 
       <VoiceCallModeDialog
@@ -268,59 +314,24 @@ export function VoiceInboxDialerPanel({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto border-t px-4 py-4">
-        {call ? (
-          <>
-            {call.hasRecording ? (
-              <div className="mb-4">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  {VOICE_MESSAGES.callRecordingTitle}
-                </p>
-                <audio
-                  controls
-                  preload="none"
-                  className="h-10 w-full"
-                  src={`/api/voice/recording?callLogId=${call.id}`}
-                />
-              </div>
-            ) : null}
-
-            <h3 className="mb-2 text-sm font-medium">{VOICE_MESSAGES.callDetailTitle}</h3>
-            {call.turns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {VOICE_MESSAGES.callNoTranscript}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {call.turns.map((turn, index) => (
-                  <div
-                    key={`${turn.role}-${index}`}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
-                      turn.role === "assistant"
-                        ? "border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/30"
-                        : "bg-muted/40",
-                    )}
-                  >
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">
-                      {turn.role === "assistant"
-                        ? VOICE_MESSAGES.callTranscriptAssistant
-                        : VOICE_MESSAGES.callTranscriptUser}
-                    </p>
-                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                      {turn.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-center text-sm text-muted-foreground">
-            {VOICE_MESSAGES.callDetailEmpty}
+      {call?.hasRecording && !isSelectedCallLive ? (
+        <div className="shrink-0 border-b px-4 py-3">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            {VOICE_MESSAGES.callRecordingTitle}
           </p>
-        )}
-      </div>
+          <audio
+            controls
+            preload="none"
+            className="h-10 w-full"
+            src={`/api/voice/recording?callLogId=${call.id}`}
+          />
+        </div>
+      ) : null}
+
+      <VoiceLiveTranscriptPanel
+        turns={call?.turns ?? []}
+        isLive={isSelectedCallLive}
+      />
     </div>
   );
 }
