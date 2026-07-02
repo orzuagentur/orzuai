@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { APP_ROUTES } from "@/constants/routes";
 import { VERIFICATION_MESSAGES } from "@/features/auth/constants";
-import { getSafeRedirectPath } from "@/utils/auth";
+import { getSafeRedirectPath } from "@/utils/auth-redirect";
 
 export function VerifySuccessContent() {
   const router = useRouter();

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { signInWithEmailAction } from "@/features/auth/actions/sign-in-with-email";
 import type { LoginResult, SignInWithEmailInput } from "@/types/auth.types";
-import { getSafeRedirectPath } from "@/utils/auth";
+import { getSafeRedirectPath } from "@/utils/auth-redirect";
 
 type UseEmailLoginOptions = {
   nextPath?: string;
