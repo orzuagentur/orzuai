@@ -1,4 +1,4 @@
-import type { SubscriptionPlanId } from "@/features/subscription/plans";
+import type { SubscriptionPlanId } from "./plans";
 
 /** Sentinel for unlimited quotas. */
 export const UNLIMITED_QUOTA = -1;

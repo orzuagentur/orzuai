@@ -3,7 +3,7 @@ import {
   isUnlimitedQuota,
   PLAN_ENTITLEMENTS,
   UNLIMITED_QUOTA,
-} from "@/features/subscription/entitlements";
+} from "./entitlements";
 
 export const UNLIMITED_AI_REPLIES = UNLIMITED_QUOTA;
 
