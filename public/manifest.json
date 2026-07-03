@@ -10,13 +10,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-light.png",
+      "src": "/platform-icon-light.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/platform-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

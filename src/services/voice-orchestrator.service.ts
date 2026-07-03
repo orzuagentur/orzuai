@@ -13,6 +13,7 @@ import {
 import { formatAvailabilityForAiPrompt } from "@/services/calendar-availability.service";
 import { listPublishedBookingPagesForBusinessAdmin } from "@/services/booking-pages.service";
 import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
+import { assertVoiceAiAllowed } from "@/services/entitlement.service";
 import { runAutoReplyOrchestrator } from "@/services/ai-orchestrator.service";
 import {
   applyPreparedExecutorPlan,
@@ -51,6 +52,11 @@ async function runVoiceTurnOrchestration(input: {
   conversationHistory: VoiceCallSessionTurn[];
 }): Promise<void> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "voice"))) {
+    return;
+  }
+
+  const voiceEntitlement = await assertVoiceAiAllowed(input.businessId);
+  if (!voiceEntitlement.allowed) {
     return;
   }
 

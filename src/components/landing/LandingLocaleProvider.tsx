@@ -3,37 +3,39 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { useDocumentLang } from "@/features/landing/hooks";
+import { getLandingArchitecture } from "@/features/landing/live-copy";
 import {
-  LANDING_I18N,
+  getLandingCopy,
   resolveLandingLocale,
   type LandingLocale,
 } from "@/features/landing/i18n";
 
 type LandingLocaleContextValue = {
   locale: LandingLocale;
-  copy: (typeof LANDING_I18N)[LandingLocale];
+  copy: ReturnType<typeof getLandingCopy>;
+  architecture: ReturnType<typeof getLandingArchitecture>;
 };
 
-const LandingLocaleContext = createContext<LandingLocaleContextValue | null>(
-  null,
-);
+const LandingLocaleContext = createContext<LandingLocaleContextValue | null>(null);
 
 export function LandingLocaleProvider({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const locale = resolveLandingLocale(searchParams.get("lang"));
 
+  useDocumentLang(searchParams.get("lang"));
+
   const value = useMemo(
     () => ({
       locale,
-      copy: LANDING_I18N[locale],
+      copy: getLandingCopy(locale),
+      architecture: getLandingArchitecture(locale),
     }),
     [locale],
   );
 
   return (
-    <LandingLocaleContext.Provider value={value}>
-      {children}
-    </LandingLocaleContext.Provider>
+    <LandingLocaleContext.Provider value={value}>{children}</LandingLocaleContext.Provider>
   );
 }
 
@@ -43,7 +45,8 @@ export function useLandingLocale(): LandingLocaleContextValue {
   if (!context) {
     return {
       locale: "en",
-      copy: LANDING_I18N.en,
+      copy: getLandingCopy("en"),
+      architecture: getLandingArchitecture("en"),
     };
   }
 

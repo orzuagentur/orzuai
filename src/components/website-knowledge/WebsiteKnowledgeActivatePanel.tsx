@@ -297,7 +297,7 @@ export function WebsiteKnowledgeActivatePanel({
                   : WEBSITE_KNOWLEDGE_MESSAGES.never}
               </p>
               <p>
-                {WEBSITE_KNOWLEDGE_MESSAGES.pagesIndexed}: {sync.pagesIndexed} ·{" "}
+                {WEBSITE_KNOWLEDGE_MESSAGES.pagesIndexed}: {sync.pagesIndexed} -{" "}
                 {WEBSITE_KNOWLEDGE_MESSAGES.entriesSynced}: {sync.entriesSynced}
               </p>
               {sync.lastSyncError ? (

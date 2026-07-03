@@ -18,6 +18,7 @@ import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.servi
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { scheduleContactAvatarSync } from "@/services/contact-avatar-sync.service";
 import {
   insertInboundChannelMessage,
@@ -225,6 +226,17 @@ export async function connectTelegramBot(
       error: {
         code: "NO_BUSINESS",
         message: TELEGRAM_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const channelEntitlement = await assertCanConnectIntegration(businessId, "telegram");
+  if (!channelEntitlement.allowed) {
+    return {
+      success: false,
+      error: {
+        code: "PLAN_LIMIT",
+        message: channelEntitlement.message,
       },
     };
   }

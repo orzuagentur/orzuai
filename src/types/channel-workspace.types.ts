@@ -122,6 +122,7 @@ export type AiAssistantPageData = {
   connectedChannelCount: number;
   assistantProfile: AiAssistantProfileData | null;
   knowledgeEntries: KnowledgeEntryData[];
+  knowledgeAllEntries: KnowledgeEntryData[];
   knowledgeHasActiveFilters: boolean;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
   recentAgentRuns: AgentRunListItem[];

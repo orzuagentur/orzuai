@@ -4,7 +4,7 @@ import { getGeminiModel } from "@/lib/gemini";
 import { GEMINI_SAFETY_SETTINGS } from "@/lib/gemini/prompts";
 import { getGeminiDefaultModel, hasGeminiEnv } from "@/lib/env";
 import type { KnowledgeCategory } from "@/types/database.types";
-import { KNOWLEDGE_CATEGORIES } from "@/types/knowledge.types";
+import { KNOWLEDGE_CATEGORIES, resolveKnowledgeCategory } from "@/features/knowledge-base/categories";
 import type { CrawledPage } from "@/lib/website-knowledge/crawler";
 import { truncateText } from "@/lib/website-knowledge/html-text";
 
@@ -19,25 +19,7 @@ const MAX_ENTRIES_PER_PAGE = 6;
 const MAX_TOTAL_ENTRIES = 80;
 
 function parseCategory(value: string): KnowledgeCategory {
-  const normalized = value.trim();
-
-  if (KNOWLEDGE_CATEGORIES.includes(normalized as KnowledgeCategory)) {
-    return normalized as KnowledgeCategory;
-  }
-
-  if (/price|pricing|cost/i.test(normalized)) {
-    return "Pricing";
-  }
-
-  if (/faq|question/i.test(normalized)) {
-    return "FAQ";
-  }
-
-  if (/hour|schedule|open/i.test(normalized)) {
-    return "Business Hours";
-  }
-
-  return "Services";
+  return resolveKnowledgeCategory(value);
 }
 
 function parseGeminiJsonPayload(raw: string): ExtractedKnowledgeEntry[] {
@@ -93,12 +75,12 @@ export async function extractKnowledgeEntriesFromPages(
       `Page title: ${page.title}`,
       "",
       "Return ONLY valid JSON (no markdown) in this shape:",
-      '{"entries":[{"title":"short title","content":"factual details for AI","category":"Services|Pricing|FAQ|Business Hours"}]}',
+      '{"entries":[{"title":"short title","content":"factual details for AI","category":"Services|Pricing|Address|Contact|FAQ|Business Hours|Policies|Additional"}]}',
       "Rules:",
       `- Up to ${MAX_ENTRIES_PER_PAGE} entries per page.`,
-      "- Include company info, services, products, prices (if present), FAQ, articles, contacts.",
+      "- Include company info, services, products, prices (if present), FAQ, articles, contacts, address, policies.",
       "- Use only facts from the page text; do not invent data.",
-      "- category must be one of: Services, Pricing, FAQ, Business Hours.",
+      `- category must be one of: ${KNOWLEDGE_CATEGORIES.join(", ")}.`,
       "",
       "Page text:",
       truncateText(page.text, 9000),

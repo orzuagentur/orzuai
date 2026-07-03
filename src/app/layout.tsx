@@ -37,21 +37,12 @@ export const metadata: Metadata = {
     title: "OrzuX | AI Business Communication Platform",
     description:
       "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
-    images: [
-      {
-        url: "/platform-icon.png",
-        width: 512,
-        height: 512,
-        alt: "OrzuX",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "OrzuX | AI Business Communication Platform",
     description:
       "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
-    images: ["/platform-icon.png"],
   },
   robots: {
     index: true,
@@ -75,9 +66,8 @@ export const metadata: Metadata = {
         type: "image/png",
         media: "(prefers-color-scheme: dark)",
       },
-      { url: "/icon.png", type: "image/png" },
     ],
-    apple: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/platform-icon-light.png", type: "image/png" }],
   },
 };
 

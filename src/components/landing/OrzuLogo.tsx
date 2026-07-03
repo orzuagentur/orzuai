@@ -7,6 +7,7 @@ type OrzuLogoProps = {
   showWordmark?: boolean;
   size?: "default" | "lg";
   align?: "left" | "center";
+  tone?: "auto" | "on-dark" | "on-light";
 };
 
 export function OrzuLogo({
@@ -14,6 +15,7 @@ export function OrzuLogo({
   showWordmark = true,
   size = "default",
   align = "left",
+  tone = "on-dark",
 }: OrzuLogoProps) {
   const markSize = size === "lg" ? 56 : 44;
 
@@ -25,7 +27,7 @@ export function OrzuLogo({
         className,
       )}
     >
-      <BrandMark size={markSize} priority tone="on-dark" />
+      <BrandMark size={markSize} priority tone={tone} />
       {showWordmark ? (
         <BrandWordmark size={size === "lg" ? "lg" : "md"} />
       ) : null}

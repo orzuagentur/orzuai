@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useKnowledgeSearch } from "@/hooks/use-knowledge-search";
-import { cn } from "@/lib/utils";
 import type { KnowledgeCategory } from "@/types/database.types";
+import { cn } from "@/lib/utils";
+import { KNOWLEDGE_CATEGORY_META } from "@/features/knowledge-base/categories";
 import { KNOWLEDGE_CATEGORIES } from "@/types/knowledge.types";
 
 type KnowledgeSearchBarProps = {
@@ -69,7 +70,7 @@ export function KnowledgeSearchBar({ className }: KnowledgeSearchBarProps) {
           <option value="">All categories</option>
           {KNOWLEDGE_CATEGORIES.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {KNOWLEDGE_CATEGORY_META[item].label}
             </option>
           ))}
         </select>

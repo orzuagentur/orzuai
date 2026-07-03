@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
+import { assertAutomationsAllowed } from "@/services/entitlement.service";
 import { notifyInboundMessagePush } from "@/services/push-notifications.service";
 import type {
   AutomationActionType,
@@ -195,6 +196,11 @@ export async function runAutomationsForTrigger(
   }
 
   if (!(await isPlatformFeatureAllowed(context.businessId, "automations"))) {
+    return;
+  }
+
+  const automationEntitlement = await assertAutomationsAllowed(context.businessId);
+  if (!automationEntitlement.allowed) {
     return;
   }
 

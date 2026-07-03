@@ -32,6 +32,7 @@ import { createClient } from "@/lib/supabase/server";
 import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { applyWhatsAppDeliveryStatusUpdates } from "@/services/message-delivery-status.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
 import {
@@ -225,6 +226,17 @@ export async function connectManualWhatsApp(
       error: {
         code: "NO_BUSINESS",
         message: WHATSAPP_MESSAGES.noBusinessDescription,
+      },
+    };
+  }
+
+  const channelEntitlement = await assertCanConnectIntegration(businessId, "whatsapp");
+  if (!channelEntitlement.allowed) {
+    return {
+      success: false,
+      error: {
+        code: "PLAN_LIMIT",
+        message: channelEntitlement.message,
       },
     };
   }

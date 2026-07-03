@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
 import { createClient } from "@/lib/supabase/server";
 import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
+import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
@@ -127,6 +128,17 @@ export async function enableWebsiteForms(): Promise<EnableWebsiteFormsResult> {
     return {
       success: false,
       error: { code: "NO_BUSINESS", message: WEBSITE_FORMS_MESSAGES.noBusinessDescription },
+    };
+  }
+
+  const channelEntitlement = await assertCanConnectIntegration(
+    businessId,
+    "website_forms",
+  );
+  if (!channelEntitlement.allowed) {
+    return {
+      success: false,
+      error: { code: "PLAN_LIMIT", message: channelEntitlement.message },
     };
   }
 

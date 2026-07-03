@@ -25,6 +25,7 @@ import {
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { generateText } from "@/services/llm.service";
+import { assertAnalyticsAiAskAllowed } from "@/services/entitlement.service";
 
 export async function askAnalyticsAssistant(input: {
   question: string;
@@ -44,6 +45,11 @@ export async function askAnalyticsAssistant(input: {
 
   if (!business || !hasSupabaseEnv()) {
     return { success: false, message: "Business not found." };
+  }
+
+  const analyticsAccess = await assertAnalyticsAiAskAllowed(business.id);
+  if (!analyticsAccess.allowed) {
+    return { success: false, message: analyticsAccess.message };
   }
 
   const plan = await getBusinessSubscriptionPlan(business.id);

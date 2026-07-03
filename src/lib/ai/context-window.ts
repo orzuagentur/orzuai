@@ -17,12 +17,12 @@ export const AI_CONTEXT_LIMITS = {
   maxPromptTokens: 12_000,
 } as const;
 
-const PRO_PLANS = new Set(["pro", "enterprise", "business"]);
+const EXTENDED_CONTEXT_PLANS = new Set(["pro", "agency", "enterprise", "business"]);
 
 export function resolveHistoryMessageLimit(subscriptionPlan?: string | null): number {
   const normalized = subscriptionPlan?.trim().toLowerCase() ?? "";
 
-  if (PRO_PLANS.has(normalized)) {
+  if (EXTENDED_CONTEXT_PLANS.has(normalized)) {
     return AI_CONTEXT_LIMITS.proHistoryMessages;
   }
 

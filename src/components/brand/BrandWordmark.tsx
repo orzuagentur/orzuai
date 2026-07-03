@@ -21,7 +21,7 @@ export function BrandWordmark({ className, size = "md" }: BrandWordmarkProps) {
       <span
         className={cn(
           "relative -ml-0.5 inline-block font-black leading-none",
-          "bg-gradient-to-br from-sky-400 to-indigo-500 bg-clip-text text-transparent",
+          "bg-gradient-to-br from-emerald-500 via-cyan-500 to-sky-500 bg-clip-text text-transparent",
           size === "lg"
             ? "text-[1.55em] -translate-y-[0.06em]"
             : size === "sm"

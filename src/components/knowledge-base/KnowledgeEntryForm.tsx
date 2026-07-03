@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useKnowledgeEntryForm } from "@/hooks/use-knowledge-entry-form";
 import { cn } from "@/lib/utils";
 import type { KnowledgeEntryData } from "@/types/knowledge.types";
+import { KNOWLEDGE_CATEGORY_META } from "@/features/knowledge-base/categories";
 import { KNOWLEDGE_CATEGORIES } from "@/types/knowledge.types";
 
 type KnowledgeEntryFormProps = {
@@ -96,7 +97,7 @@ export function KnowledgeEntryForm({
         >
           {KNOWLEDGE_CATEGORIES.map((category) => (
             <option key={category} value={category}>
-              {category}
+              {KNOWLEDGE_CATEGORY_META[category].label}
             </option>
           ))}
         </select>

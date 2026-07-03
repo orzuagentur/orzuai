@@ -25,7 +25,8 @@ export type TelegramErrorCode =
   | "ALREADY_CONNECTED"
   | "CONNECT_FAILED"
   | "INVALID_TOKEN"
-  | "WEBHOOK_FAILED";
+  | "WEBHOOK_FAILED"
+  | "PLAN_LIMIT";
 
 export type TelegramActionError = {
   code: TelegramErrorCode;

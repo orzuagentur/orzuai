@@ -1,53 +1,129 @@
-/** Sentinel: no monthly AI reply cap (testing / unlimited tier). */
-export const UNLIMITED_AI_REPLIES = -1;
+import {
+  getPlanEntitlements,
+  isUnlimitedQuota,
+  PLAN_ENTITLEMENTS,
+  UNLIMITED_QUOTA,
+} from "@/features/subscription/entitlements";
+
+export const UNLIMITED_AI_REPLIES = UNLIMITED_QUOTA;
 
 export const SUBSCRIPTION_PLAN_IDS = ["free", "starter", "pro", "agency"] as const;
 
 export type SubscriptionPlanId = (typeof SUBSCRIPTION_PLAN_IDS)[number];
 
+function formatChannelLimit(maxMessagingChannels: number): string {
+  return isUnlimitedQuota(maxMessagingChannels)
+    ? "Unlimited messaging channels"
+    : `${maxMessagingChannels} messaging channel${maxMessagingChannels === 1 ? "" : "s"}`;
+}
+
+function formatAutomationLimit(maxAutomationRules: number): string {
+  if (maxAutomationRules === 0) return "Automations not included";
+  if (isUnlimitedQuota(maxAutomationRules)) return "Unlimited automations";
+  return `Up to ${maxAutomationRules} automation rules`;
+}
+
+function buildPlanFeatures(planId: SubscriptionPlanId): string[] {
+  const entitlements = getPlanEntitlements(planId);
+
+  const features = [
+    isUnlimitedQuota(entitlements.monthlyAiReplies)
+      ? "Unlimited AI replies"
+      : `${entitlements.monthlyAiReplies.toLocaleString("en-US")} AI replies / month`,
+    formatChannelLimit(entitlements.maxMessagingChannels),
+    `${entitlements.maxTeamSeats} team seat${entitlements.maxTeamSeats === 1 ? "" : "s"}`,
+    "Unified inbox + CRM + calendar",
+    formatAutomationLimit(entitlements.maxAutomationRules),
+  ];
+
+  if (entitlements.websiteKnowledgeSync) {
+    features.push("Website knowledge sync");
+  }
+
+  if (entitlements.gmailIntegration) {
+    features.push("Gmail inbox integration");
+  }
+
+  if (entitlements.voiceAi) {
+    features.push(
+      entitlements.monthlyVoiceMinutes > 0
+        ? `Voice AI - ${entitlements.monthlyVoiceMinutes} min / month`
+        : "Voice AI agent",
+    );
+  } else {
+    features.push("Voice AI - upgrade to Pro");
+  }
+
+  if (entitlements.followUpAgent) {
+    features.push("Follow-up AI agent");
+  }
+
+  if (entitlements.analyticsAiAsk) {
+    features.push("Analytics + AI insights");
+  } else {
+    features.push("Analytics dashboard");
+  }
+
+  if (entitlements.extendedAiContext) {
+    features.push("Extended AI conversation memory");
+  }
+
+  if (entitlements.prioritySupport) {
+    features.push("Priority support");
+  }
+
+  return features;
+}
+
 export const SUBSCRIPTION_PLANS: Record<
   SubscriptionPlanId,
   {
     label: string;
+    tagline: string;
     monthlyAiReplies: number;
     priceMonthly: number;
     features: string[];
     highlighted?: boolean;
+    entitlements: (typeof PLAN_ENTITLEMENTS)[SubscriptionPlanId];
   }
 > = {
   free: {
-    label: "Free Plan",
-    monthlyAiReplies: UNLIMITED_AI_REPLIES,
+    label: "Free",
+    tagline: "Launch your first AI inbox",
+    monthlyAiReplies: PLAN_ENTITLEMENTS.free.monthlyAiReplies,
     priceMonthly: 0,
-    features: ["Unlimited AI replies (testing)", "1 channel", "Basic CRM"],
+    features: buildPlanFeatures("free"),
+    entitlements: PLAN_ENTITLEMENTS.free,
   },
   starter: {
     label: "Starter",
-    monthlyAiReplies: 500,
-    priceMonthly: 29,
-    features: ["500 AI replies / month", "3 channels", "CRM + pipeline"],
+    tagline: "For growing local businesses",
+    monthlyAiReplies: PLAN_ENTITLEMENTS.starter.monthlyAiReplies,
+    priceMonthly: 49,
+    features: buildPlanFeatures("starter"),
+    entitlements: PLAN_ENTITLEMENTS.starter,
   },
   pro: {
     label: "Pro",
-    monthlyAiReplies: 5000,
-    priceMonthly: 99,
+    tagline: "Voice AI + full automation stack",
+    monthlyAiReplies: PLAN_ENTITLEMENTS.pro.monthlyAiReplies,
+    priceMonthly: 129,
     highlighted: true,
-    features: [
-      "5,000 AI replies / month",
-      "Voice agent",
-      "Analytics + AI assistant",
-    ],
+    features: buildPlanFeatures("pro"),
+    entitlements: PLAN_ENTITLEMENTS.pro,
   },
   agency: {
     label: "Agency",
-    monthlyAiReplies: 50000,
-    priceMonthly: 299,
-    features: ["50,000 AI replies / month", "Multi-brand", "Priority support"],
+    tagline: "High-volume teams & partners",
+    monthlyAiReplies: PLAN_ENTITLEMENTS.agency.monthlyAiReplies,
+    priceMonthly: 349,
+    features: buildPlanFeatures("agency"),
+    entitlements: PLAN_ENTITLEMENTS.agency,
   },
 };
 
 export function isUnlimitedAiReplies(monthlyLimit: number): boolean {
-  return monthlyLimit < 0;
+  return isUnlimitedQuota(monthlyLimit);
 }
 
 export function resolveSubscriptionPlan(

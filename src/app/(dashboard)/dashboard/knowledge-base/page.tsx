@@ -9,9 +9,20 @@ type KnowledgeBasePageProps = {
   }>;
 };
 
-export default function KnowledgeBasePage({
+export default async function KnowledgeBasePage({
   searchParams,
 }: KnowledgeBasePageProps) {
-  void searchParams;
-  redirect(DASHBOARD_ROUTES.aiAssistant);
+  const params = await searchParams;
+  const query = new URLSearchParams();
+  query.set("tab", "knowledge");
+
+  if (params.q) {
+    query.set("q", params.q);
+  }
+
+  if (params.category) {
+    query.set("category", params.category);
+  }
+
+  redirect(`${DASHBOARD_ROUTES.aiAssistant}?${query.toString()}`);
 }

@@ -12,7 +12,11 @@ export type KnowledgeCategory =
   | "Services"
   | "Pricing"
   | "FAQ"
-  | "Business Hours";
+  | "Business Hours"
+  | "Address"
+  | "Contact"
+  | "Policies"
+  | "Additional";
 
 export type WhatsappStatus = "connected" | "disconnected" | "pending";
 

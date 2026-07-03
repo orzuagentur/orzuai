@@ -29,4 +29,34 @@ export const KNOWLEDGE_MESSAGES = {
   notFound: "Knowledge entry not found.",
   missingConfig:
     "Knowledge base services are not configured. Missing required environment variables.",
+  aiStudioTitle: "AI Knowledge Studio",
+  aiStudioDescription:
+    "Generate a categorized knowledge base from your business profile with one click.",
+  aiStudioHintsLabel: "Optional instructions",
+  aiStudioHintsPlaceholder:
+    "e.g. We are a dental clinic with 3 locations. Focus on implant pricing.",
+  aiStudioGenerate: "Generate knowledge base",
+  aiStudioReplace: "Replace manual entries before generating",
+  aiStudioSuccess: "Knowledge base generated successfully.",
+  importTitle: "Import & categorize",
+  importDescription:
+    "Paste text or upload a file. AI splits it into categorized entries.",
+  importPlaceholder:
+    "Paste services, prices, FAQ, policies, or any business information...",
+  importUploadLabel: "Upload file (.txt, .md, .csv)",
+  importAction: "Import with AI",
+  importSuccess: "Imported and categorized successfully.",
+  websiteSyncCardTitle: "Website synchronization",
+  websiteSyncCardDescription:
+    "Crawl your public site and keep pricing, services, and FAQ in sync.",
+  overviewTitle: "Knowledge overview",
+  tableTitle: "All entries",
+  tableEmpty: "No entries match your filters.",
+  sortUpdated: "Last updated",
+  sortTitle: "Title",
+  sortCategory: "Category",
+  viewTable: "Table",
+  viewCards: "Cards",
+  sourceManual: "Manual",
+  sourceWebsite: "Website",
 } as const;

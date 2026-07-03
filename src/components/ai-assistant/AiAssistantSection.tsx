@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import {
   BotIcon,
   CheckCircle2Icon,
@@ -19,8 +19,7 @@ import { useAiAssistantChromeRegistration } from "@/components/ai-assistant/ai-a
 import { AiAssistantEditPanel } from "@/components/ai-assistant/AiAssistantEditPanel";
 import { AiAssistantHubPanel } from "@/components/ai-assistant/AiAssistantHubPanel";
 import { AiVoiceAgentPanel } from "@/components/ai-assistant/AiVoiceAgentPanel";
-import { WebsiteKnowledgeSection } from "@/components/knowledge-base/WebsiteKnowledgeSection";
-import { KnowledgeBasePanel } from "@/components/knowledge-base/KnowledgeBasePanel";
+import { KnowledgeHubPanel } from "@/components/knowledge-base/KnowledgeHubPanel";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -144,36 +143,35 @@ function KnowledgeTab({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AgentSectionBackButton onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
-          <WebsiteKnowledgeSection
-            sync={data.websiteKnowledgeSync}
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
+          <KnowledgeHubPanel
+            entries={data.knowledgeEntries}
+            allEntries={data.knowledgeAllEntries}
+            hasActiveFilters={data.knowledgeHasActiveFilters}
             hasBusiness={data.hasBusiness}
             geminiConfigured={data.geminiConfigured}
+            websiteKnowledgeSync={data.websiteKnowledgeSync}
           />
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle>Agent Knowledge Base</CardTitle>
-              <CardDescription>
-                Add services, pricing, policies, FAQs, and website knowledge.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <KnowledgeBasePanel
-                entries={data.knowledgeEntries}
-                hasActiveFilters={data.knowledgeHasActiveFilters}
-                hasBusiness={data.hasBusiness}
-              />
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
   );
 }
 
+function resolveKnowledgeTabFromParams(searchParams: URLSearchParams): boolean {
+  if (searchParams.get("tab") === "knowledge") {
+    return true;
+  }
+
+  return Boolean(searchParams.get("q") || searchParams.get("category"));
+}
+
 export function AiAssistantSection({ data }: AiAssistantSectionProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AiAgentTab>("dashboard");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AiAgentTab>(() =>
+    resolveKnowledgeTabFromParams(searchParams) ? "knowledge" : "dashboard",
+  );
   const isAgentActive = data.assistantProfile?.canReply ?? false;
   const [activated, setActivated] = useState(
     isAgentActive || data.enabledChannelCount > 0,
@@ -183,6 +181,12 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
   const handleTabChange = useCallback((tab: AiAgentTab) => {
     setActiveTab(tab);
   }, []);
+
+  useEffect(() => {
+    if (resolveKnowledgeTabFromParams(searchParams)) {
+      setActiveTab("knowledge");
+    }
+  }, [searchParams]);
 
   useAiAssistantChromeRegistration(
     shouldShowActivation

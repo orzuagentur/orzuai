@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { assertCanCreateAutomation } from "@/services/entitlement.service";
 
 function mapWorkflowRow(row: {
   id: string;
@@ -95,6 +96,11 @@ export async function createCustomAutomation(
 
   if (!business || !hasSupabaseEnv()) {
     return { success: false, message: AUTOMATIONS_MESSAGES.noBusiness };
+  }
+
+  const automationLimit = await assertCanCreateAutomation(business.id);
+  if (!automationLimit.allowed) {
+    return { success: false, message: automationLimit.message };
   }
 
   const supabase = await createClient();

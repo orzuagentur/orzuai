@@ -10,6 +10,7 @@ import {
 } from "@/services/messaging.service";
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
+import { assertFollowUpAgentAllowed } from "@/services/entitlement.service";
 import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -321,8 +322,21 @@ export async function runDueConversationFollowUps(): Promise<{
   const admin = createAdminClient();
   const candidates = await listFollowUpCandidates(admin);
   let sent = 0;
+  const followUpAllowedByBusiness = new Map<string, boolean>();
 
   for (const candidate of candidates) {
+    let allowed = followUpAllowedByBusiness.get(candidate.businessId);
+
+    if (allowed === undefined) {
+      const check = await assertFollowUpAgentAllowed(candidate.businessId);
+      allowed = check.allowed;
+      followUpAllowedByBusiness.set(candidate.businessId, allowed);
+    }
+
+    if (!allowed) {
+      continue;
+    }
+
     const generated = await generateFollowUpMessage({
       admin,
       businessId: candidate.businessId,

@@ -1,13 +1,11 @@
 import { z } from "zod";
 
 import type { KnowledgeCategory } from "./database.types";
+import {
+  KNOWLEDGE_CATEGORIES,
+} from "@/features/knowledge-base/categories";
 
-export const KNOWLEDGE_CATEGORIES = [
-  "Services",
-  "Pricing",
-  "FAQ",
-  "Business Hours",
-] as const satisfies readonly KnowledgeCategory[];
+export { KNOWLEDGE_CATEGORIES };
 
 export const knowledgeCategorySchema = z.enum(KNOWLEDGE_CATEGORIES);
 
@@ -75,3 +73,17 @@ export type CreateKnowledgeEntryResult =
 export type UpdateKnowledgeEntryResult =
   KnowledgeActionResult<KnowledgeEntryData>;
 export type DeleteKnowledgeEntryResult = KnowledgeActionResult<{ id: string }>;
+export type BulkCreateKnowledgeEntriesResult = KnowledgeActionResult<{
+  entries: KnowledgeEntryData[];
+  created: number;
+}>;
+
+export type KnowledgeAiGenerateResult = KnowledgeActionResult<{
+  entries: KnowledgeEntryInput[];
+  created: number;
+}>;
+
+export type KnowledgeImportParseResult = KnowledgeActionResult<{
+  entries: KnowledgeEntryInput[];
+  created: number;
+}>;

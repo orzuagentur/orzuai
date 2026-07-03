@@ -5,24 +5,24 @@ import {
   estimateWhisperCostUsd,
 } from "@/lib/ai/cost";
 import type { AiCallType } from "@/lib/ai/call-types";
-import type { AiProvider } from "@/lib/ai/constants";
+import {
+  isUnlimitedQuota,
+  UNLIMITED_QUOTA,
+} from "@/features/subscription/entitlements";
+import {
+  resolveSubscriptionPlan,
+  SUBSCRIPTION_PLANS,
+  type SubscriptionPlanId,
+} from "@/features/subscription/plans";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  isUnlimitedAiReplies,
-  resolveSubscriptionPlan,
-  SUBSCRIPTION_PLANS,
-  UNLIMITED_AI_REPLIES,
-  type SubscriptionPlanId,
-} from "@/features/subscription/plans";
+  assertAiReplyQuota,
+  countCustomerFacingAiRepliesThisMonth,
+} from "@/services/entitlement.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import type { AiCostMetrics, AiUsageSummary } from "@/types/ai-usage.types";
-
-function getMonthStartIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-}
 
 async function getBusinessPlan(
   businessId: string,
@@ -44,29 +44,13 @@ export async function assertAiUsageAllowed(
     return { allowed: true };
   }
 
-  const plan = await getBusinessPlan(businessId);
-  const limit = SUBSCRIPTION_PLANS[plan].monthlyAiReplies;
-
-  if (isUnlimitedAiReplies(limit)) {
-    return { allowed: true };
-  }
-
-  const summary = await getAiUsageSummaryForBusiness(businessId, plan);
-
-  if (summary.usedReplies >= limit) {
-    return {
-      allowed: false,
-      message: `Monthly AI reply limit reached (${limit} on ${summary.planLabel}). Upgrade your plan to continue.`,
-    };
-  }
-
-  return { allowed: true };
+  return assertAiReplyQuota(businessId);
 }
 
 export async function logAiUsage(input: {
   businessId: string;
   conversationId?: string | null;
-  provider: AiProvider | string;
+  provider: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -106,7 +90,6 @@ export async function getAiUsageSummaryForBusiness(
 ): Promise<AiUsageSummary> {
   const resolvedPlan = plan ?? (await getBusinessPlan(businessId));
   const planConfig = SUBSCRIPTION_PLANS[resolvedPlan];
-  const monthStart = getMonthStartIso();
 
   if (!hasSupabaseEnv()) {
     return {
@@ -119,18 +102,10 @@ export async function getAiUsageSummaryForBusiness(
     };
   }
 
-  const admin = createAdminClient();
-  const { count } = await admin
-    .from("ai_usage_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", businessId)
-    .eq("billing_source", "platform")
-    .gte("created_at", monthStart);
-
-  const usedReplies = count ?? 0;
-  const unlimited = isUnlimitedAiReplies(planConfig.monthlyAiReplies);
+  const usedReplies = await countCustomerFacingAiRepliesThisMonth(businessId);
+  const unlimited = isUnlimitedQuota(planConfig.monthlyAiReplies);
   const remainingReplies = unlimited
-    ? UNLIMITED_AI_REPLIES
+    ? UNLIMITED_QUOTA
     : Math.max(0, planConfig.monthlyAiReplies - usedReplies);
   const usagePercent =
     unlimited || planConfig.monthlyAiReplies <= 0
@@ -178,7 +153,11 @@ export async function getAiCostMetrics(
   }
 
   const admin = createAdminClient();
-  const monthStart = getMonthStartIso();
+  const monthStart = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1,
+  ).toISOString();
 
   const { data: allLogs } = await admin
     .from("ai_usage_logs")

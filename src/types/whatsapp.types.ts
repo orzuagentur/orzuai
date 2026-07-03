@@ -48,7 +48,8 @@ export type WhatsAppErrorCode =
   | "INVALID_CREDENTIALS"
   | "WEBHOOK_SETUP_FAILED"
   | "CHANNEL_NOT_READY"
-  | "PARTNER_NOT_CONFIGURED";
+  | "PARTNER_NOT_CONFIGURED"
+  | "PLAN_LIMIT";
 
 export type WhatsAppActionError = {
   code: WhatsAppErrorCode;

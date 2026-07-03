@@ -24,18 +24,24 @@ export function LandingLanguageSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-sm">
+    <div
+      className="flex items-center gap-1 rounded-full border border-[#d9e3dc] bg-white p-1"
+      role="group"
+      aria-label="Language"
+    >
       {LANDING_LOCALES.map((locale) => (
         <Button
           key={locale}
           type="button"
           size="sm"
           variant="ghost"
+          aria-current={activeLocale === locale ? "true" : undefined}
+          lang={locale}
           className={cn(
             "h-7 min-w-9 rounded-full px-2 text-xs",
             activeLocale === locale
-              ? "bg-primary/20 text-foreground"
-              : "text-muted-foreground hover:text-foreground",
+              ? "bg-[#101815] text-white"
+              : "text-[#66746d] hover:bg-[#edf3ef] hover:text-[#101815]",
           )}
           onClick={() => setLocale(locale)}
         >
