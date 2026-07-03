@@ -21,12 +21,30 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_ORIGIN),
+  applicationName: "OrzuX",
   title: {
     default: "OrzuX | AI Business Communication Platform",
     template: "%s | OrzuX",
   },
   description:
     "OrzuX helps businesses reply to customers, manage CRM, automate follow-ups, and run an autonomous AI agent across messaging channels.",
+  keywords: [
+    "OrzuX",
+    "OrzuAI",
+    "AI communication platform",
+    "AI inbox",
+    "customer service automation",
+    "WhatsApp Business CRM",
+    "Instagram DM automation",
+    "Telegram CRM",
+    "AI voice agent",
+    "CRM automation",
+    "calendar booking automation",
+  ],
+  authors: [{ name: "OrzuX" }],
+  creator: "OrzuX",
+  publisher: "OrzuX",
+  category: "business software",
   alternates: {
     canonical: "/",
   },
@@ -47,6 +65,13 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
   manifest: "/manifest.json",
   appleWebApp: {

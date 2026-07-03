@@ -1,4 +1,4 @@
-import { PLATFORM_PLANS, resolvePlanId } from "@/features/dashboard/plans";
+import { PLATFORM_PLANS, resolvePlanId } from "@/features/dashboard/plan-catalog";
 
 export type BillingOverviewStats = {
   estimatedMrrUsd: number;
@@ -61,13 +61,23 @@ export function subscriptionStatusTone(
   return "default";
 }
 
-export function estimateBusinessMrr(plan: string, status: string): number {
+export function estimateBusinessMrr(
+  plan: string,
+  status: string,
+  planPrices?: Record<string, { priceMonthly: number }>,
+): number {
   const normalizedStatus = status.trim().toLowerCase();
 
   if (normalizedStatus !== "active" && normalizedStatus !== "trialing") {
     return 0;
   }
 
-  const planId = resolvePlanId(plan);
-  return PLATFORM_PLANS[planId].priceMonthly;
+  const planId = plan.trim().toLowerCase() || "free";
+  const fromDb = planPrices?.[planId]?.priceMonthly;
+  if (typeof fromDb === "number") {
+    return fromDb;
+  }
+
+  const fallbackId = resolvePlanId(plan);
+  return PLATFORM_PLANS[fallbackId]?.priceMonthly ?? 0;
 }

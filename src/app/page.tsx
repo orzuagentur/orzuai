@@ -28,6 +28,19 @@ export async function generateMetadata({
   return {
     title: copy.meta.title,
     description: copy.meta.description,
+    keywords: [
+      "OrzuX",
+      "OrzuAI",
+      "AI business communication platform",
+      "AI customer support",
+      "unified AI inbox",
+      "WhatsApp Business automation",
+      "Instagram DM CRM",
+      "Telegram customer service",
+      "AI voice agent",
+      "CRM and calendar automation",
+      "customer channel integrations",
+    ],
     alternates: {
       canonical: pageUrl,
       languages: buildLandingHreflangAlternates(),

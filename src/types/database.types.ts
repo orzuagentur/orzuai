@@ -124,6 +124,7 @@ export type Database = {
           subscription_status: string;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
+          subscription_addons: Json;
           created_at: string;
           updated_at: string;
         };
@@ -141,6 +142,7 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          subscription_addons?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -158,6 +160,7 @@ export type Database = {
           subscription_status?: string;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          subscription_addons?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -1817,6 +1820,99 @@ export type Database = {
           starts_at?: string | null;
           ends_at?: string | null;
           created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_subscription_plans: {
+        Row: {
+          id: string;
+          label: string;
+          tagline: string;
+          price_monthly_cents: number;
+          sort_order: number;
+          is_active: boolean;
+          is_public: boolean;
+          highlighted: boolean;
+          stripe_product_id: string | null;
+          stripe_price_id: string | null;
+          entitlements: Json;
+          features: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          label: string;
+          tagline?: string;
+          price_monthly_cents?: number;
+          sort_order?: number;
+          is_active?: boolean;
+          is_public?: boolean;
+          highlighted?: boolean;
+          stripe_product_id?: string | null;
+          stripe_price_id?: string | null;
+          entitlements: Json;
+          features?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          tagline?: string;
+          price_monthly_cents?: number;
+          sort_order?: number;
+          is_active?: boolean;
+          is_public?: boolean;
+          highlighted?: boolean;
+          stripe_product_id?: string | null;
+          stripe_price_id?: string | null;
+          entitlements?: Json;
+          features?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      platform_subscription_addons: {
+        Row: {
+          id: string;
+          label: string;
+          description: string;
+          price_monthly_cents: number;
+          sort_order: number;
+          is_active: boolean;
+          stripe_product_id: string | null;
+          stripe_price_id: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          label: string;
+          description?: string;
+          price_monthly_cents?: number;
+          sort_order?: number;
+          is_active?: boolean;
+          stripe_product_id?: string | null;
+          stripe_price_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          description?: string;
+          price_monthly_cents?: number;
+          sort_order?: number;
+          is_active?: boolean;
+          stripe_product_id?: string | null;
+          stripe_price_id?: string | null;
+          metadata?: Json;
           created_at?: string;
           updated_at?: string;
         };

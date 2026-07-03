@@ -75,6 +75,7 @@ export const DEFAULT_INTEGRATION_SECTION: IntegrationSectionId = "activate";
 export type IntegrationChannelConfig = {
   id: IntegrationChannelId;
   label: string;
+  category: string;
   description: string;
   icon: ChannelIconComponent;
   available: boolean;
@@ -84,6 +85,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "whatsapp",
     label: "WhatsApp",
+    category: "Messaging",
     description: "WhatsApp Business via 360dialog",
     icon: WhatsAppIcon,
     available: true,
@@ -91,6 +93,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "telegram",
     label: "Telegram",
+    category: "Messaging",
     description: "Telegram Bot API",
     icon: TelegramIcon,
     available: true,
@@ -98,6 +101,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "instagram",
     label: "Instagram",
+    category: "Messaging",
     description: "Instagram Direct messaging",
     icon: InstagramIcon,
     available: false,
@@ -105,6 +109,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "website_forms",
     label: "Website Forms",
+    category: "Lead capture",
     description: "Leads from any website or CMS",
     icon: WebsiteFormsIcon,
     available: true,
@@ -112,6 +117,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "voice",
     label: "Twilio Voice",
+    category: "Voice",
     description: "Подключите Twilio для AI-звонков и SMS",
     icon: VoiceIcon,
     available: true,
@@ -119,6 +125,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "email",
     label: "Gmail",
+    category: "Email",
     description: "Email inbox and AI replies",
     icon: GmailIcon,
     available: true,
@@ -126,6 +133,7 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "google_calendar",
     label: "Google Calendar",
+    category: "Calendar",
     description: "AI booking and calendar sync",
     icon: GoogleCalendarIcon,
     available: true,

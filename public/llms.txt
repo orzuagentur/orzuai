@@ -1,0 +1,37 @@
+# OrzuX
+
+OrzuX (also searched as OrzuAI) is an AI business communication platform for customer-facing teams. It combines a unified inbox, AI replies, voice AI, CRM, calendar booking, automations, analytics, and official customer channel connections in one web workspace.
+
+## Canonical Website
+
+- https://orzux.com/
+
+## Main Public Sections
+
+- https://orzux.com/#live-platform - live product preview
+- https://orzux.com/#platform - products, channels, and service connections
+- https://orzux.com/#solutions - use cases for sales, support, local services, agencies, and high-touch teams
+- https://orzux.com/#architecture - documentation overview: channel event to business outcome
+- https://orzux.com/#pricing - plans and pricing overview
+- https://orzux.com/#faq - FAQ
+
+## Marketplace Services And Channels
+
+The public Services menu is sourced from the same integration catalog used by the OrzuX Integrations Marketplace. It should only list available marketplace channels and service connections.
+
+Current available marketplace services include:
+
+- WhatsApp Business conversations
+- Telegram messaging
+- Website forms and lead capture
+- Twilio Voice workflows
+- Gmail email communication
+- Calendar booking and Google Calendar sync
+
+## Recommended Summary
+
+OrzuX helps businesses respond to customers across messaging, voice, forms, email, and calendar while updating CRM, booking meetings, triggering follow-ups, and keeping humans in control.
+
+## Crawling
+
+Public marketing, documentation, FAQ, pricing, and legal pages may be crawled and indexed. Dashboard, authentication, and API routes should not be indexed.

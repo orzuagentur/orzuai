@@ -1,6 +1,6 @@
 "use server";
 
-import { PLATFORM_PLANS, resolvePlanId, type PlatformPlanId } from "@/features/dashboard/plans";
+import { loadPlatformPlansForAdmin } from "@/features/dashboard/plans";
 import type {
   BillingAccountRow,
   BillingOverviewStats,
@@ -53,6 +53,7 @@ export async function fetchBillingOverviewAction(input?: {
   try {
     await requirePlatformAdmin();
     const service = createServiceRoleClient();
+    const planPrices = await loadPlatformPlansForAdmin();
 
     let query = service
       .from("businesses")
@@ -98,19 +99,19 @@ export async function fetchBillingOverviewAction(input?: {
         subscriptionStatus: status,
         stripeCustomerId: (row.stripe_customer_id as string | null) ?? null,
         stripeSubscriptionId: (row.stripe_subscription_id as string | null) ?? null,
-        estimatedMrrUsd: estimateBusinessMrr(plan, status),
+        estimatedMrrUsd: estimateBusinessMrr(plan, status, planPrices),
         createdAt: row.created_at as string,
       };
     });
 
-    const planCounts = new Map<PlatformPlanId, number>();
+    const planCounts = new Map<string, number>();
     for (const account of accounts) {
-      const planId = resolvePlanId(account.subscriptionPlan);
+      const planId = account.subscriptionPlan.trim().toLowerCase() || "free";
       planCounts.set(planId, (planCounts.get(planId) ?? 0) + 1);
     }
 
-    const byPlan = Object.entries(PLATFORM_PLANS).map(([plan, config]) => {
-      const count = planCounts.get(plan as PlatformPlanId) ?? 0;
+    const byPlan = Object.entries(planPrices).map(([plan, config]) => {
+      const count = planCounts.get(plan) ?? 0;
       return {
         plan,
         label: config.label,
@@ -118,6 +119,16 @@ export async function fetchBillingOverviewAction(input?: {
         revenueUsd: count * config.priceMonthly,
       };
     });
+
+    for (const [plan, count] of planCounts.entries()) {
+      if (plan in planPrices) continue;
+      byPlan.push({
+        plan,
+        label: plan,
+        count,
+        revenueUsd: 0,
+      });
+    }
 
     return {
       success: true,

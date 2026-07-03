@@ -24,7 +24,7 @@ export function LandingFaq() {
         {copy.faq.items.map((item) => (
           <details
             key={item.question}
-            className="group rounded-lg border border-[#d9e3dc] bg-white px-4 py-3"
+            className="group rounded-lg border border-[#d9e3dc] bg-white px-4 py-3 transition open:border-[#b9cbc2] open:shadow-[0_10px_32px_rgba(24,36,30,0.06)]"
           >
             <summary className="cursor-pointer list-none text-base font-semibold text-[#101815] marker:content-none [&::-webkit-details-marker]:hidden">
               <span className="flex items-center justify-between gap-4">
@@ -35,7 +35,9 @@ export function LandingFaq() {
                 />
               </span>
             </summary>
-            <p className="mt-3 text-sm leading-7 text-[#52625a]">{item.answer}</p>
+            <p className="-mx-4 mt-3 border-t border-[#edf1ee] px-4 pt-3 text-sm leading-7 text-[#52625a]">
+              {item.answer}
+            </p>
           </details>
         ))}
       </div>

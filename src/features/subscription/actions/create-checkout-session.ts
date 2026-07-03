@@ -2,11 +2,10 @@
 
 import { z } from "zod";
 
-import { SUBSCRIPTION_PLAN_IDS } from "@/features/subscription/plans";
 import { createCheckoutSession } from "@/services/stripe.service";
 
 const schema = z.object({
-  planId: z.enum(SUBSCRIPTION_PLAN_IDS),
+  planId: z.string().trim().min(1, "Plan is required."),
 });
 
 export async function createCheckoutSessionAction(

@@ -16,4 +16,9 @@ export const SUBSCRIPTION_MESSAGES = {
   successDescription: "Your plan changes may take a moment to appear.",
   canceledTitle: "Checkout canceled",
   canceledDescription: "No charges were made.",
+  addonFailed: "Unable to add this add-on. Please try again.",
+  addonRequiresPaidPlan: "Upgrade to a paid plan before adding add-ons.",
+  addonAddedTitle: "Add-on added",
+  addonAddedDescription: "Your subscription was updated. Limits refresh shortly.",
+  addonActiveLabel: "Active",
 } as const;

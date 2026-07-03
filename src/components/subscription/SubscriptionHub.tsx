@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CreditCardIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -15,13 +15,10 @@ import {
 } from "@/components/ui/card";
 import { createBillingPortalAction } from "@/features/subscription/actions/create-billing-portal";
 import { createCheckoutSessionAction } from "@/features/subscription/actions/create-checkout-session";
-import {
-  PASS_THROUGH_SERVICES,
-  SUBSCRIPTION_ADD_ONS,
-} from "@/features/subscription/add-ons";
+import { purchaseSubscriptionAddonAction } from "@/features/subscription/actions/purchase-subscription-addon";
+import { PASS_THROUGH_SERVICES } from "@/features/subscription/add-ons";
 import { isUnlimitedQuota } from "@/features/subscription/entitlements";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
-import type { SubscriptionPlanId } from "@/features/subscription/plans";
 import { isUnlimitedAiReplies } from "@/features/subscription/plans";
 import type { SubscriptionPageData } from "@/types/subscription.types";
 
@@ -42,10 +39,10 @@ function formatQuota(used: number, limit: number, unit: string): string {
 }
 
 export function SubscriptionHub({ data }: SubscriptionHubProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlanId | null>(
-    null,
-  );
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [loadingAddon, setLoadingAddon] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
 
   useEffect(() => {
@@ -62,7 +59,7 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
     }
   }, [searchParams]);
 
-  async function handleUpgrade(planId: SubscriptionPlanId) {
+  async function handleUpgrade(planId: string) {
     if (planId === "free" || planId === data.currentPlanId) {
       return;
     }
@@ -80,6 +77,31 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
       window.location.href = result.url;
     } finally {
       setLoadingPlan(null);
+    }
+  }
+
+  async function handlePurchaseAddon(addonId: string) {
+    if (!data.hasActivePaidSubscription) {
+      toast.message(SUBSCRIPTION_MESSAGES.addonRequiresPaidPlan);
+      return;
+    }
+
+    setLoadingAddon(addonId);
+
+    try {
+      const result = await purchaseSubscriptionAddonAction({ addonId });
+
+      if (!result.success) {
+        toast.error(result.message ?? SUBSCRIPTION_MESSAGES.addonFailed);
+        return;
+      }
+
+      toast.success(SUBSCRIPTION_MESSAGES.addonAddedTitle, {
+        description: SUBSCRIPTION_MESSAGES.addonAddedDescription,
+      });
+      router.refresh();
+    } finally {
+      setLoadingAddon(null);
     }
   }
 
@@ -262,23 +284,56 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {SUBSCRIPTION_ADD_ONS.map((addOn) => (
+            {data.addOns.map((addOn) => (
               <div
                 key={addOn.id}
                 className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5"
               >
-                <div>
-                  <p className="text-sm font-medium">{addOn.label}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{addOn.label}</p>
+                    {addOn.activeQuantity > 0 ? (
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        {SUBSCRIPTION_MESSAGES.addonActiveLabel} ×{addOn.activeQuantity}
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="text-xs text-muted-foreground">{addOn.description}</p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums">
-                  ${addOn.priceMonthly}/mo
-                </p>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <p className="text-sm font-semibold tabular-nums">
+                    ${addOn.priceMonthly}/mo
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      !addOn.purchasable ||
+                      loadingAddon === addOn.id ||
+                      !data.stripeConfigured
+                    }
+                    onClick={() => {
+                      void handlePurchaseAddon(addOn.id);
+                    }}
+                  >
+                    {loadingAddon === addOn.id ? (
+                      <>
+                        <Loader2Icon className="size-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                </div>
               </div>
             ))}
-            <p className="text-xs text-muted-foreground">
-              Contact support to attach add-ons to your subscription.
-            </p>
+            {!data.hasActivePaidSubscription ? (
+              <p className="text-xs text-muted-foreground">
+                {SUBSCRIPTION_MESSAGES.addonRequiresPaidPlan}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

@@ -110,6 +110,7 @@ export type LandingCopy = {
     closeMenu: string;
     nav: {
       products: string;
+      services: string;
       solutions: string;
       enterprise: string;
       developers: string;
@@ -118,7 +119,10 @@ export type LandingCopy = {
       documentation: string;
       company: string;
     };
-    mega: Record<"products" | "solutions" | "developers" | "resources", LandingMegaPanel>;
+    mega: Record<
+      "products" | "solutions" | "developers" | "resources",
+      LandingMegaPanel
+    >;
   };
   hero: {
     eyebrow: string;
@@ -264,6 +268,7 @@ const EN: LandingCopy = {
     closeMenu: "Close navigation",
     nav: {
       products: "Products",
+      services: "Services",
       solutions: "Solutions",
       enterprise: "Enterprise",
       developers: "Developers",
@@ -720,32 +725,33 @@ const EN: LandingCopy = {
   },
   faq: {
     title: "Questions teams ask before switching",
-    subtitle: "Straight answers for the welcome page. The product can go deeper after sign-in.",
+    subtitle:
+      "Clear answers on channels, AI control, setup, handoff, and provider billing before you connect your first workspace.",
     items: [
       {
         question: "Which channels does OrzuX support?",
         answer:
-          "WhatsApp through 360dialog, Instagram, Telegram, website forms, voice telephony, SMS, email, and Google Calendar workflows.",
+          "OrzuX is built as a multi-channel platform, not a single messenger tool. Today it can bring WhatsApp Business through 360dialog, Instagram, Telegram, website forms, voice telephony, SMS, email, and Google Calendar workflows into one operating workspace.",
       },
       {
         question: "Is OrzuX only a chatbot?",
         answer:
-          "No. The AI can reply, but it also updates CRM, books time, triggers automations, summarizes calls, and hands off to humans.",
+          "No. The assistant can answer customers, but the platform also updates CRM records, books time, triggers automations, summarizes calls, creates follow-up tasks, and hands sensitive conversations to a human operator.",
       },
       {
         question: "How does the AI learn my business?",
         answer:
-          "Teams add knowledge entries, sync website knowledge, and configure agent behavior by channel so replies stay grounded in business context.",
+          "Teams can add verified knowledge, sync website content, define service rules, and tune agent behavior per channel. This keeps replies grounded in your business context instead of generic chatbot output.",
       },
       {
         question: "Can humans take over?",
         answer:
-          "Yes. Operators can reply manually, disable AI by channel, use internal notes, and handle escalations from the same inbox.",
+          "Yes. Operators can reply manually, pause AI for a channel or conversation, leave internal notes, review context, and continue escalations from the same inbox without losing the customer history.",
       },
       {
         question: "How does provider billing work?",
         answer:
-          "The OrzuX subscription covers platform usage. WhatsApp, Twilio, and similar providers remain billed through your own provider accounts.",
+          "The OrzuX subscription covers the platform workspace, AI features, automation, and product usage. External providers such as WhatsApp, Twilio, telephony, or messaging gateways may still bill usage directly through your connected provider accounts.",
       },
     ],
   },
@@ -839,6 +845,7 @@ const RU: LandingCopy = {
     openMenu: "Открыть навигацию",
     closeMenu: "Закрыть навигацию",
     nav: {
+      services: "Сервисы",
       products: "Продукты",
       solutions: "Решения",
       enterprise: "Enterprise",
@@ -1129,6 +1136,7 @@ const UZ: LandingCopy = {
     openMenu: "Navigatsiyani ochish",
     closeMenu: "Navigatsiyani yopish",
     nav: {
+      services: "Servislar",
       products: "Mahsulotlar",
       solutions: "Yechimlar",
       enterprise: "Enterprise",

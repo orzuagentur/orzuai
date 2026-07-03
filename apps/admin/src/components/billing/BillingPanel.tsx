@@ -86,6 +86,12 @@ export function BillingPanel({
         description="Подписки, Stripe customer/subscription и оценка MRR по аккаунтам"
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/billing/plans"
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+            >
+              Тарифы и Stripe
+            </Link>
             <button
               type="button"
               disabled={accounts.length === 0 || isPending}

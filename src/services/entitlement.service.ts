@@ -1,11 +1,15 @@
 import "server-only";
 
 import { CUSTOMER_FACING_AI_CALL_TYPES } from "@/lib/ai/call-types";
+import type { PlanEntitlements } from "@/features/subscription/entitlements";
+import { isUnlimitedQuota } from "@/features/subscription/entitlements";
 import {
-  getPlanEntitlements,
-  isUnlimitedQuota,
-  type PlanEntitlements,
-} from "@/features/subscription/entitlements";
+  applyAddonEntitlementBoosts,
+  getPlanEntitlementsForBusiness,
+  getPlatformPlan,
+  listPlatformAddons,
+  parseBusinessSubscriptionAddons,
+} from "@/services/platform-plans.service";
 import {
   resolveSubscriptionPlan,
   SUBSCRIPTION_PLANS,
@@ -34,6 +38,7 @@ export type EntitlementResult = EntitlementAllow | EntitlementDenial;
 type BusinessSubscriptionRow = {
   subscription_plan: string | null;
   subscription_status: string | null;
+  subscription_addons: unknown;
 };
 
 async function getBusinessSubscription(
@@ -44,25 +49,32 @@ async function getBusinessSubscription(
     return {
       planId,
       status: "active",
-      entitlements: getPlanEntitlements(planId),
+      entitlements: await getPlanEntitlementsForBusiness(planId),
     };
   }
 
   const admin = createAdminClient();
   const { data } = await admin
     .from("businesses")
-    .select("subscription_plan, subscription_status")
+    .select("subscription_plan, subscription_status, subscription_addons")
     .eq("id", businessId)
     .maybeSingle();
 
   const row = data as BusinessSubscriptionRow | null;
   const planId = resolveSubscriptionPlan(row?.subscription_plan);
   const status = row?.subscription_status?.trim().toLowerCase() || "active";
+  const baseEntitlements = await getPlanEntitlementsForBusiness(planId);
+  const activeAddons = parseBusinessSubscriptionAddons(row?.subscription_addons);
+  const addonCatalog = await listPlatformAddons({ activeOnly: true });
 
   return {
     planId,
     status,
-    entitlements: getPlanEntitlements(planId),
+    entitlements: applyAddonEntitlementBoosts(
+      baseEntitlements,
+      activeAddons,
+      addonCatalog,
+    ),
   };
 }
 
@@ -75,10 +87,11 @@ export async function getBusinessEntitlements(
   entitlements: PlanEntitlements;
 }> {
   const subscription = await getBusinessSubscription(businessId);
+  const planRecord = await getPlatformPlan(subscription.planId);
 
   return {
     planId: subscription.planId,
-    planLabel: SUBSCRIPTION_PLANS[subscription.planId].label,
+    planLabel: planRecord?.label ?? SUBSCRIPTION_PLANS[subscription.planId]?.label ?? subscription.planId,
     status: subscription.status,
     entitlements: subscription.entitlements,
   };

@@ -1,7 +1,5 @@
-import type { SubscriptionPlanId } from "@/features/subscription/plans";
-
 export type SubscriptionPlanCard = {
-  id: SubscriptionPlanId;
+  id: string;
   label: string;
   tagline: string;
   priceMonthly: number;
@@ -21,15 +19,26 @@ export type SubscriptionUsageSnapshot = {
   maxAutomations: number;
 };
 
+export type SubscriptionAddOnCard = {
+  id: string;
+  label: string;
+  description: string;
+  priceMonthly: number;
+  activeQuantity: number;
+  purchasable: boolean;
+};
+
 export type SubscriptionPageData = {
   hasBusiness: boolean;
   stripeConfigured: boolean;
-  currentPlanId: SubscriptionPlanId;
+  currentPlanId: string;
   currentPlanLabel: string;
   currentPlanTagline: string;
   subscriptionStatus: string;
   hasStripeCustomer: boolean;
+  hasActivePaidSubscription: boolean;
   plans: SubscriptionPlanCard[];
+  addOns: SubscriptionAddOnCard[];
   usagePercent: number;
   usedReplies: number;
   monthlyLimit: number;

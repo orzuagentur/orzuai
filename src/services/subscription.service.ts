@@ -1,51 +1,98 @@
 import "server-only";
 
-import {
-  SUBSCRIPTION_PLAN_IDS,
-  SUBSCRIPTION_PLANS,
-  resolveSubscriptionPlan,
-} from "@/features/subscription/plans";
-import { PASS_THROUGH_SERVICES, SUBSCRIPTION_ADD_ONS } from "@/features/subscription/add-ons";
+import { PASS_THROUGH_SERVICES } from "@/features/subscription/add-ons";
+import { SUBSCRIPTION_PLANS, resolveSubscriptionPlan } from "@/features/subscription/plans";
 import { hasStripeEnv } from "@/lib/stripe/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getAiUsageSummaryForBusiness } from "@/services/ai-usage.service";
 import { getUsageSnapshot } from "@/services/entitlement.service";
+import {
+  getPlatformPlan,
+  listPlatformAddons,
+  listPlatformPlans,
+  parseBusinessSubscriptionAddons,
+} from "@/services/platform-plans.service";
 import type { SubscriptionPageData } from "@/types/subscription.types";
 
+const ACTIVE_BILLING_STATUSES = new Set(["active", "trialing"]);
+
+function mapPlansToPageData(
+  plans: Awaited<ReturnType<typeof listPlatformPlans>>,
+): SubscriptionPageData["plans"] {
+  return plans.map((plan) => ({
+    id: plan.id,
+    label: plan.label,
+    tagline: plan.tagline,
+    priceMonthly: plan.priceMonthly,
+    monthlyAiReplies: plan.monthlyAiReplies,
+    features: [...plan.features],
+    highlighted: plan.highlighted,
+  }));
+}
+
+function mapAddonsToPageData(
+  addons: Awaited<ReturnType<typeof listPlatformAddons>>,
+  activeAddons: ReturnType<typeof parseBusinessSubscriptionAddons>,
+  hasActivePaidSubscription: boolean,
+  stripeConfigured: boolean,
+): SubscriptionPageData["addOns"] {
+  return addons.map((addon) => {
+    const active = activeAddons.find((entry) => entry.id === addon.id);
+
+    return {
+      id: addon.id,
+      label: addon.label,
+      description: addon.description,
+      priceMonthly: addon.priceMonthly,
+      activeQuantity: active?.quantity ?? 0,
+      purchasable:
+        stripeConfigured &&
+        hasActivePaidSubscription &&
+        Boolean(addon.stripePriceId) &&
+        addon.priceMonthlyCents > 0,
+    };
+  });
+}
+
 export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
+  const [publicPlans, publicAddons] = await Promise.all([
+    listPlatformPlans({ activeOnly: true, publicOnly: true }),
+    listPlatformAddons({ activeOnly: true }),
+  ]);
+  const freePlan =
+    publicPlans.find((plan) => plan.id === "free") ??
+    (await getPlatformPlan("free"));
+  const freeEntitlements = freePlan?.entitlements ?? SUBSCRIPTION_PLANS.free.entitlements;
+
   const emptyUsage = {
     usedAiReplies: 0,
-    monthlyAiLimit: SUBSCRIPTION_PLANS.free.monthlyAiReplies,
+    monthlyAiLimit: freeEntitlements.monthlyAiReplies,
     usedVoiceMinutes: 0,
     monthlyVoiceLimit: 0,
     connectedChannels: 0,
-    maxChannels: SUBSCRIPTION_PLANS.free.entitlements.maxMessagingChannels,
+    maxChannels: freeEntitlements.maxMessagingChannels,
     automationCount: 0,
     maxAutomations: 0,
   };
 
+  const stripeConfigured = hasStripeEnv();
+
   const empty: SubscriptionPageData = {
     hasBusiness: false,
-    stripeConfigured: hasStripeEnv(),
+    stripeConfigured,
     currentPlanId: "free",
-    currentPlanLabel: SUBSCRIPTION_PLANS.free.label,
-    currentPlanTagline: SUBSCRIPTION_PLANS.free.tagline,
+    currentPlanLabel: freePlan?.label ?? SUBSCRIPTION_PLANS.free.label,
+    currentPlanTagline: freePlan?.tagline ?? SUBSCRIPTION_PLANS.free.tagline,
     subscriptionStatus: "active",
     hasStripeCustomer: false,
-    plans: SUBSCRIPTION_PLAN_IDS.map((id) => ({
-      id,
-      label: SUBSCRIPTION_PLANS[id].label,
-      tagline: SUBSCRIPTION_PLANS[id].tagline,
-      priceMonthly: SUBSCRIPTION_PLANS[id].priceMonthly,
-      monthlyAiReplies: SUBSCRIPTION_PLANS[id].monthlyAiReplies,
-      features: [...SUBSCRIPTION_PLANS[id].features],
-      highlighted: SUBSCRIPTION_PLANS[id].highlighted,
-    })),
+    hasActivePaidSubscription: false,
+    plans: mapPlansToPageData(publicPlans),
+    addOns: mapAddonsToPageData(publicAddons, [], false, stripeConfigured),
     usagePercent: 0,
     usedReplies: 0,
-    monthlyLimit: SUBSCRIPTION_PLANS.free.monthlyAiReplies,
+    monthlyLimit: freeEntitlements.monthlyAiReplies,
     usage: emptyUsage,
   };
 
@@ -57,6 +104,13 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   }
 
   const planId = resolveSubscriptionPlan(business.subscription_plan);
+  const currentPlan = (await getPlatformPlan(planId)) ?? freePlan;
+  const subscriptionStatus = business.subscription_status ?? "active";
+  const hasActivePaidSubscription =
+    planId !== "free" &&
+    Boolean(business.stripe_subscription_id) &&
+    ACTIVE_BILLING_STATUSES.has(subscriptionStatus.trim().toLowerCase());
+  const activeAddons = parseBusinessSubscriptionAddons(business.subscription_addons);
   const [usage, snapshot] = await Promise.all([
     getAiUsageSummaryForBusiness(business.id, planId),
     getUsageSnapshot(business.id),
@@ -64,21 +118,21 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
 
   return {
     hasBusiness: true,
-    stripeConfigured: hasStripeEnv(),
+    stripeConfigured,
     currentPlanId: planId,
-    currentPlanLabel: SUBSCRIPTION_PLANS[planId].label,
-    currentPlanTagline: SUBSCRIPTION_PLANS[planId].tagline,
-    subscriptionStatus: business.subscription_status ?? "active",
+    currentPlanLabel: currentPlan?.label ?? SUBSCRIPTION_PLANS[planId]?.label ?? planId,
+    currentPlanTagline:
+      currentPlan?.tagline ?? SUBSCRIPTION_PLANS[planId]?.tagline ?? "",
+    subscriptionStatus,
     hasStripeCustomer: Boolean(business.stripe_customer_id),
-    plans: SUBSCRIPTION_PLAN_IDS.map((id) => ({
-      id,
-      label: SUBSCRIPTION_PLANS[id].label,
-      tagline: SUBSCRIPTION_PLANS[id].tagline,
-      priceMonthly: SUBSCRIPTION_PLANS[id].priceMonthly,
-      monthlyAiReplies: SUBSCRIPTION_PLANS[id].monthlyAiReplies,
-      features: [...SUBSCRIPTION_PLANS[id].features],
-      highlighted: SUBSCRIPTION_PLANS[id].highlighted,
-    })),
+    hasActivePaidSubscription,
+    plans: mapPlansToPageData(publicPlans),
+    addOns: mapAddonsToPageData(
+      publicAddons,
+      activeAddons,
+      hasActivePaidSubscription,
+      stripeConfigured,
+    ),
     usagePercent: usage.usagePercent,
     usedReplies: usage.usedReplies,
     monthlyLimit: usage.monthlyLimit,
@@ -86,4 +140,4 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   };
 }
 
-export { SUBSCRIPTION_ADD_ONS, PASS_THROUGH_SERVICES };
+export { PASS_THROUGH_SERVICES };

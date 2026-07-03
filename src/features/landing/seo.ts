@@ -1,4 +1,5 @@
 import { APP_ORIGIN } from "@/constants/app-origin";
+import { getMarketplaceIntegrationChannels } from "@/features/integrations/channel-lists";
 import {
   getLandingCopy,
   LANDING_LOCALES,
@@ -9,6 +10,25 @@ import {
 export function buildLandingPageUrl(locale: LandingLocale): string {
   if (locale === "en") return APP_ORIGIN;
   return `${APP_ORIGIN}/?lang=${locale}`;
+}
+
+export function buildWebsiteSchema(locale: LandingLocale) {
+  const copy = getLandingCopy(locale);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "OrzuX",
+    alternateName: "OrzuAI",
+    url: buildLandingPageUrl(locale),
+    inLanguage: locale,
+    description: copy.meta.description,
+    publisher: {
+      "@type": "Organization",
+      name: "OrzuX",
+      url: APP_ORIGIN,
+    },
+  };
 }
 
 export function buildOrganizationSchema() {
@@ -47,6 +67,36 @@ export function buildSoftwareApplicationSchema(locale: LandingLocale) {
   };
 }
 
+export function buildServiceItemListSchema(locale: LandingLocale) {
+  const services = getMarketplaceIntegrationChannels();
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "OrzuX marketplace channels and service connections",
+    description:
+      "Available customer channels and service connections from the OrzuX Integrations Marketplace.",
+    inLanguage: locale,
+    itemListElement: services.map((service, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "Service",
+        name: service.label,
+        description: service.description,
+        serviceType: service.label,
+        category: service.category,
+        provider: {
+          "@type": "Organization",
+          name: "OrzuX",
+          url: APP_ORIGIN,
+        },
+        areaServed: "Global",
+      },
+    })),
+  };
+}
+
 export function buildFaqPageSchema(locale: LandingLocale) {
   const faq = getLandingCopy(locale).faq;
 
@@ -65,11 +115,39 @@ export function buildFaqPageSchema(locale: LandingLocale) {
   };
 }
 
+export function buildArchitectureArticleSchema(locale: LandingLocale) {
+  const copy = getLandingCopy(locale);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: copy.architecture.title,
+    description: copy.architecture.subtitle,
+    inLanguage: locale,
+    mainEntityOfPage: `${buildLandingPageUrl(locale)}#architecture`,
+    about: [
+      "AI communication platform",
+      "customer channel routing",
+      "CRM automation",
+      "AI voice agent",
+      "service integrations",
+    ],
+    publisher: {
+      "@type": "Organization",
+      name: "OrzuX",
+      url: APP_ORIGIN,
+    },
+  };
+}
+
 export function buildLandingStructuredData(locale: LandingLocale) {
   return [
+    buildWebsiteSchema(locale),
     buildOrganizationSchema(),
     buildSoftwareApplicationSchema(locale),
+    buildServiceItemListSchema(locale),
     buildFaqPageSchema(locale),
+    buildArchitectureArticleSchema(locale),
   ];
 }
 

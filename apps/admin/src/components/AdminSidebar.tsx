@@ -29,6 +29,7 @@ const NAV_SECTIONS = [
       { href: "/support", label: "Поддержка", icon: HeadphonesIcon },
       { href: "/announcements", label: "Уведомления", icon: MegaphoneIcon },
       { href: "/billing", label: "Биллинг", icon: CreditCardIcon },
+      { href: "/billing/plans", label: "Тарифы", icon: CreditCardIcon },
       { href: "/audit", label: "Аудит", icon: ScrollTextIcon },
       { href: "/ai-expenses", label: "AI расходы", icon: BotIcon },
     ],
