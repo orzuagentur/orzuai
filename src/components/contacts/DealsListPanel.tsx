@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { StarIcon } from "lucide-react";
+import { ArrowUpRightIcon, StarIcon } from "lucide-react";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import {
@@ -13,6 +13,8 @@ import {
   ContactCrmTableRow,
 } from "@/components/contacts/ContactCrmDataTable";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import {
@@ -24,6 +26,7 @@ import { cn } from "@/lib/utils";
 import type { PipelineStage } from "@/types/contact.types";
 import type { CrmDealListItem, CrmDealsPageData, CrmDealStatus } from "@/types/crm-deal.types";
 import { buildContactsHref } from "@/utils/contacts-url";
+import { formatContactIdentifier } from "@/utils/contact-display";
 
 type DealsListPanelProps = {
   dealsData: CrmDealsPageData;
@@ -41,6 +44,22 @@ const STATUS_LABELS: Record<CrmDealStatus, string> = {
   open: CONTACTS_MESSAGES.dealStatusOpen,
   won: CONTACTS_MESSAGES.dealStatusWon,
   lost: CONTACTS_MESSAGES.dealStatusLost,
+};
+
+const STAGE_BADGE_CLASSNAMES: Record<PipelineStage, string> = {
+  new: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+  qualified:
+    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+  proposal:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+  won: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  lost: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
+};
+
+const STATUS_BADGE_CLASSNAMES: Record<CrmDealStatus, string> = {
+  open: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200",
+  won: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  lost: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
 function buildDealHref(dealsData: CrmDealsPageData, deal: CrmDealListItem) {
@@ -69,14 +88,24 @@ export function DealsListPanel({ dealsData }: DealsListPanelProps) {
   }
 
   return (
-    <ContactCrmDataTable title={CONTACTS_MESSAGES.dealsTitle} className="border-0">
+    <ContactCrmDataTable
+      title={CONTACTS_MESSAGES.dealsTitle}
+      count={dealsData.total}
+      className="p-4"
+    >
       <ContactCrmTableHead>
         <ContactCrmTableRow>
           <ContactCrmTableHeadCell>{CONTACTS_MESSAGES.columnDeal}</ContactCrmTableHeadCell>
           <ContactCrmTableHeadCell>Contact</ContactCrmTableHeadCell>
-          <ContactCrmTableHeadCell>{CONTACTS_MESSAGES.columnValue}</ContactCrmTableHeadCell>
           <ContactCrmTableHeadCell>{CONTACTS_MESSAGES.columnStage}</ContactCrmTableHeadCell>
+          <ContactCrmTableHeadCell>{CONTACTS_MESSAGES.columnClose}</ContactCrmTableHeadCell>
+          <ContactCrmTableHeadCell className="text-right">
+            {CONTACTS_MESSAGES.columnValue}
+          </ContactCrmTableHeadCell>
           <ContactCrmTableHeadCell>{CONTACTS_MESSAGES.columnDealStatus}</ContactCrmTableHeadCell>
+          <ContactCrmTableHeadCell className="text-right">
+            {CONTACTS_MESSAGES.columnActions}
+          </ContactCrmTableHeadCell>
         </ContactCrmTableRow>
       </ContactCrmTableHead>
       <ContactCrmTableBody>
@@ -86,23 +115,33 @@ export function DealsListPanel({ dealsData }: DealsListPanelProps) {
           return (
             <ContactCrmTableRow
               key={deal.id}
-              className={cn(isSelected && "bg-primary/5")}
+              className={cn(
+                "group",
+                isSelected && "bg-primary/5 hover:bg-primary/10",
+              )}
             >
               <ContactCrmTableCell>
                 <Link
                   href={buildDealHref(dealsData, deal)}
-                  className="inline-flex items-center gap-1 font-medium hover:underline"
+                  className="block min-w-44"
                 >
-                  {deal.title}
-                  {deal.isPrimary ? (
-                    <StarIcon className="size-3 fill-amber-400 text-amber-400" />
+                  <span className="flex items-center gap-1.5 font-medium text-foreground group-hover:text-primary">
+                    <span className="truncate">{deal.title}</span>
+                    {deal.isPrimary ? (
+                      <StarIcon className="size-3.5 shrink-0 fill-amber-400 text-amber-400" />
+                    ) : null}
+                  </span>
+                  {deal.notes ? (
+                    <span className="mt-1 block max-w-64 truncate text-xs text-muted-foreground">
+                      {deal.notes}
+                    </span>
                   ) : null}
                 </Link>
               </ContactCrmTableCell>
               <ContactCrmTableCell>
                 <Link
                   href={buildDealHref(dealsData, deal)}
-                  className="flex items-center gap-2 hover:underline"
+                  className="flex min-w-52 items-center gap-2"
                 >
                   <ContactAvatar
                     name={deal.contactName}
@@ -110,26 +149,59 @@ export function DealsListPanel({ dealsData }: DealsListPanelProps) {
                     className="size-7 shrink-0"
                     size="sm"
                   />
-                  <span className="min-w-0 truncate">{deal.contactName}</span>
-                  <span
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {deal.contactName}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {formatContactIdentifier(deal.contactPhone)}
+                    </span>
+                  </span>
+                  <Badge
+                    variant="outline"
                     className={cn(
-                      "inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px]",
+                      "shrink-0 gap-1 px-1.5 py-0 text-[10px]",
                       getChannelBadgeClassName(deal.contactChannel),
                     )}
                   >
                     <ChannelBrandIcon
                       channel={deal.contactChannel}
-                      className="size-2.5"
+                      className="size-3"
                     />
                     {getChannelBadgeLabel(deal.contactChannel)}
-                  </span>
+                  </Badge>
                 </Link>
               </ContactCrmTableCell>
               <ContactCrmTableCell>
+                <Badge
+                  variant="outline"
+                  className={cn("text-xs", STAGE_BADGE_CLASSNAMES[deal.stage])}
+                >
+                  {STAGE_LABELS[deal.stage]}
+                </Badge>
+              </ContactCrmTableCell>
+              <ContactCrmTableCell className="text-muted-foreground">
+                {deal.expectedCloseDate ?? "No date"}
+              </ContactCrmTableCell>
+              <ContactCrmTableCell className="text-right font-semibold tabular-nums">
                 {formatDealMoney(deal.value, deal.currency)}
               </ContactCrmTableCell>
-              <ContactCrmTableCell>{STAGE_LABELS[deal.stage]}</ContactCrmTableCell>
-              <ContactCrmTableCell>{STATUS_LABELS[deal.status]}</ContactCrmTableCell>
+              <ContactCrmTableCell>
+                <Badge
+                  variant="outline"
+                  className={cn("text-xs", STATUS_BADGE_CLASSNAMES[deal.status])}
+                >
+                  {STATUS_LABELS[deal.status]}
+                </Badge>
+              </ContactCrmTableCell>
+              <ContactCrmTableCell className="text-right">
+                <Button type="button" variant="ghost" size="sm" asChild>
+                  <Link href={buildDealHref(dealsData, deal)}>
+                    {CONTACTS_MESSAGES.editDeal}
+                    <ArrowUpRightIcon className="size-3.5" />
+                  </Link>
+                </Button>
+              </ContactCrmTableCell>
             </ContactCrmTableRow>
           );
         })}

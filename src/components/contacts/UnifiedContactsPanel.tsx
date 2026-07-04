@@ -13,8 +13,12 @@ import {
   getChannelBadgeLabel,
 } from "@/features/chats/channel-ui";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
+import { formatDealMoney } from "@/lib/deal-currency";
 import { cn } from "@/lib/utils";
-import type { LeadsPageData, UnifiedContactsPageData } from "@/types/contact.types";
+import type {
+  LeadsPageData,
+  UnifiedContactsPageData,
+} from "@/types/contact.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { formatRelativeTime } from "@/utils/dashboard";
@@ -22,7 +26,6 @@ import {
   getLeadScoreBadgeClassName,
   getLeadScoreLabel,
 } from "@/utils/lead-score";
-import { formatDealMoney } from "@/lib/deal-currency";
 
 type UnifiedContactsPanelProps = (UnifiedContactsPageData | LeadsPageData) & {
   embedded?: boolean;
@@ -35,6 +38,16 @@ const STAGE_LABELS = {
   proposal: CONTACTS_MESSAGES.pipelineProposal,
   won: CONTACTS_MESSAGES.pipelineWon,
   lost: CONTACTS_MESSAGES.pipelineLost,
+} as const;
+
+const LEAD_STAGE_BADGE_CLASSNAMES = {
+  new: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+  qualified:
+    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+  proposal:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+  won: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  lost: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
 } as const;
 
 function buildContactHref(
@@ -108,11 +121,99 @@ export function UnifiedContactsPanel({
     <ul className={cn("divide-y", embedded && "bg-card")}>
       {contacts.map((contact) => {
         const isSelected = contact.id === activeContactId;
+        const href = buildContactHref(listData, contact.id, variant);
+
+        if (variant === "leads") {
+          return (
+            <li key={contact.id}>
+              <Link
+                href={href}
+                className={cn(
+                  "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40",
+                  isSelected && "bg-muted/70",
+                )}
+              >
+                <ContactAvatar
+                  name={contact.name}
+                  avatarUrl={contact.avatarUrl}
+                  className="size-10 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {contact.isFavorite ? (
+                      <StarIcon className="size-3 shrink-0 fill-amber-400 text-amber-400" />
+                    ) : null}
+                    <p className="min-w-0 truncate font-medium">
+                      {contact.name}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "shrink-0 px-1.5 py-0 text-[10px]",
+                        LEAD_STAGE_BADGE_CLASSNAMES[contact.pipelineStage],
+                      )}
+                    >
+                      {STAGE_LABELS[contact.pipelineStage]}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {contact.leadScore !== null ? (
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                          getLeadScoreBadgeClassName(contact.leadScore),
+                        )}
+                      >
+                        {contact.leadScore}{" "}
+                        {getLeadScoreLabel(contact.leadScore)}
+                      </span>
+                    ) : null}
+                    {contact.dealValue !== null ? (
+                      <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium tabular-nums text-foreground">
+                        {formatDealMoney(contact.dealValue, "USD")}
+                      </span>
+                    ) : null}
+                    {contact.expectedCloseDate ? (
+                      <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {CONTACTS_MESSAGES.columnClose}:{" "}
+                        {contact.expectedCloseDate}
+                      </span>
+                    ) : null}
+                    {contact.lastMessageAt ? (
+                      <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {formatRelativeTime(contact.lastMessageAt)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="mt-1.5 truncate text-caption text-muted-foreground">
+                    {contact.lastMessagePreview ??
+                      formatContactIdentifier(contact.identifier)}
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "shrink-0 gap-1 px-1.5 py-0 text-[10px]",
+                    getChannelBadgeClassName(contact.channel),
+                  )}
+                >
+                  <ChannelBrandIcon
+                    channel={contact.channel}
+                    className="size-3"
+                  />
+                  {getChannelBadgeLabel(contact.channel)}
+                </Badge>
+              </Link>
+            </li>
+          );
+        }
 
         return (
           <li key={contact.id}>
             <Link
-              href={buildContactHref(listData, contact.id, variant)}
+              href={href}
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
                 isSelected && "bg-muted/70",
@@ -130,29 +231,10 @@ export function UnifiedContactsPanel({
                   ) : null}
                   <p className="truncate font-medium">{contact.name}</p>
                 </div>
-                <p className="text-caption truncate text-muted-foreground">
-                  {variant === "leads" ? (
-                    <>
-                      {STAGE_LABELS[contact.pipelineStage]}
-                      {contact.dealValue !== null
-                        ? ` · ${formatDealMoney(contact.dealValue, "USD")}`
-                        : ""}
-                    </>
-                  ) : (
-                    contact.lastMessagePreview ??
-                    formatContactIdentifier(contact.identifier)
-                  )}
+                <p className="truncate text-caption text-muted-foreground">
+                  {contact.lastMessagePreview ??
+                    formatContactIdentifier(contact.identifier)}
                 </p>
-                {variant === "leads" && contact.leadScore !== null ? (
-                  <span
-                    className={cn(
-                      "mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      getLeadScoreBadgeClassName(contact.leadScore),
-                    )}
-                  >
-                    {contact.leadScore} · {getLeadScoreLabel(contact.leadScore)}
-                  </span>
-                ) : null}
                 {contact.lastMessageAt ? (
                   <p className="text-caption text-muted-foreground/80">
                     {formatRelativeTime(contact.lastMessageAt)}
@@ -161,7 +243,10 @@ export function UnifiedContactsPanel({
               </div>
               <Badge
                 variant="outline"
-                className={`shrink-0 gap-1 px-1.5 py-0 text-[10px] ${getChannelBadgeClassName(contact.channel)}`}
+                className={cn(
+                  "shrink-0 gap-1 px-1.5 py-0 text-[10px]",
+                  getChannelBadgeClassName(contact.channel),
+                )}
               >
                 <ChannelBrandIcon
                   channel={contact.channel}
