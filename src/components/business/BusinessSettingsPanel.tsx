@@ -1,18 +1,11 @@
-import { DeleteAccountSection } from "@/components/settings/DeleteAccountSection";
-import { BusinessLogoUpload } from "@/components/business/BusinessLogoUpload";
-import { BusinessProfileForm } from "@/components/business/BusinessProfileForm";
+import { BusinessProfilePanel } from "@/components/business/BusinessProfilePanel";
 import type { BusinessProfileData } from "@/types/business.types";
 
 type BusinessSettingsPanelProps = {
   business: BusinessProfileData | null;
 };
 
+/** @deprecated Use BusinessProfilePanel directly. */
 export function BusinessSettingsPanel({ business }: BusinessSettingsPanelProps) {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <BusinessLogoUpload businessId={business?.id} logoUrl={business?.logoUrl} />
-      <BusinessProfileForm business={business} />
-      <DeleteAccountSection />
-    </div>
-  );
+  return <BusinessProfilePanel business={business} />;
 }

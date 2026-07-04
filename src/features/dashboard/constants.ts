@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Plug,
   Settings,
+  UserCog,
   Users,
 } from "lucide-react";
 
@@ -62,6 +63,12 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "Analytics",
     href: DASHBOARD_ROUTES.analytics,
     icon: BarChart3,
+  },
+  {
+    id: "team",
+    label: "Team",
+    href: DASHBOARD_ROUTES.team,
+    icon: UserCog,
   },
   {
     id: "integrations",

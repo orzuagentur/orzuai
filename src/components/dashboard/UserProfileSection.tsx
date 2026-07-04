@@ -1,7 +1,15 @@
 "use client";
 
-import { ChevronsUpDownIcon, Loader2Icon, LogOutIcon } from "lucide-react";
+import Link from "next/link";
 import { useTransition } from "react";
+import {
+  Building2Icon,
+  ChevronsUpDownIcon,
+  Loader2Icon,
+  LogOutIcon,
+  Trash2Icon,
+  UserIcon,
+} from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,12 +20,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { signOutAction } from "@/features/auth/actions/sign-out";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { signOutAction } from "@/features/auth/actions/sign-out";
+import { ACCOUNT_SETTINGS_MESSAGES } from "@/features/settings/constants";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 import { getUserDisplayName, getUserInitials } from "@/utils/dashboard";
 
@@ -64,7 +74,10 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
             sideOffset={4}
           >
             <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+              <Link
+                href={DASHBOARD_ROUTES.settingsAccount}
+                className="flex items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+              >
                 <Avatar className="size-8 rounded-lg">
                   {userProfile.avatarUrl ? (
                     <AvatarImage
@@ -82,11 +95,33 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
                     {userProfile.email}
                   </span>
                 </div>
-              </div>
+              </Link>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled className="text-muted-foreground">
               Current plan: {userProfile.plan}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={DASHBOARD_ROUTES.settingsProfile}>
+                <Building2Icon className="size-4" />
+                {ACCOUNT_SETTINGS_MESSAGES.profileNav}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={DASHBOARD_ROUTES.settingsAccount}>
+                <UserIcon className="size-4" />
+                {ACCOUNT_SETTINGS_MESSAGES.accountNav}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={`${DASHBOARD_ROUTES.settingsAccount}#delete-account`}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2Icon className="size-4" />
+                {ACCOUNT_SETTINGS_MESSAGES.deleteAccount}
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

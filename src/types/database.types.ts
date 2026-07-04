@@ -2941,6 +2941,9 @@ export type Database = {
           invited_email: string;
           role: string;
           status: string;
+          permissions: unknown;
+          access_starts_at: string | null;
+          access_ends_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -2951,6 +2954,9 @@ export type Database = {
           invited_email: string;
           role?: string;
           status?: string;
+          permissions?: unknown;
+          access_starts_at?: string | null;
+          access_ends_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2961,6 +2967,9 @@ export type Database = {
           invited_email?: string;
           role?: string;
           status?: string;
+          permissions?: unknown;
+          access_starts_at?: string | null;
+          access_ends_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -13,6 +13,11 @@ import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
 import { GOOGLE_CALENDAR_MESSAGES } from "@/features/google-calendar/constants";
 import { ONBOARDING_MESSAGES } from "@/features/onboarding/constants";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
+import {
+  ACCOUNT_SETTINGS_MESSAGES,
+  BUSINESS_PROFILE_MESSAGES,
+} from "@/features/settings/constants";
+import { TEAM_MESSAGES } from "@/features/team/constants";
 
 export type DashboardPageHeaderMeta = {
   title: string;
@@ -64,6 +69,13 @@ export function getDashboardPageHeaderMeta(
     return {
       title: ANALYTICS_MESSAGES.pageTitle,
       description: ANALYTICS_MESSAGES.pageDescription,
+    };
+  }
+
+  if (pathname === DASHBOARD_ROUTES.team) {
+    return {
+      title: TEAM_MESSAGES.pageTitle,
+      description: TEAM_MESSAGES.pageDescription,
     };
   }
 
@@ -119,6 +131,20 @@ export function getDashboardPageHeaderMeta(
     return {
       title: SETTINGS_MESSAGES.pageTitle,
       description: SETTINGS_MESSAGES.pageDescription,
+    };
+  }
+
+  if (pathname === DASHBOARD_ROUTES.settingsAccount) {
+    return {
+      title: ACCOUNT_SETTINGS_MESSAGES.pageTitle,
+      description: ACCOUNT_SETTINGS_MESSAGES.pageDescription,
+    };
+  }
+
+  if (pathname === DASHBOARD_ROUTES.settingsProfile) {
+    return {
+      title: BUSINESS_PROFILE_MESSAGES.pageTitle,
+      description: BUSINESS_PROFILE_MESSAGES.pageDescription,
     };
   }
 

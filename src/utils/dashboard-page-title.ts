@@ -36,6 +36,16 @@ export function resolveDashboardPageTitle(pathname: string): string {
       return item.label;
     }
 
+    if (item.id === "settings") {
+      if (segment === "account") {
+        return "Account";
+      }
+
+      if (segment === "profile") {
+        return "Profile";
+      }
+    }
+
     if (item.id === "chats" || item.id === "integrations") {
       return getChannelLabel(segment);
     }

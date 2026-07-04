@@ -26,7 +26,7 @@ export function DeleteAccountSection() {
   const canDelete = confirmation.trim() === CONFIRMATION_VALUE;
 
   return (
-    <Card className="border-destructive/30 shadow-none">
+    <Card id="delete-account" className="border-destructive/30 shadow-none scroll-mt-24">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-destructive">
           <Trash2Icon className="size-4" />
