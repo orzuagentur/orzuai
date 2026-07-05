@@ -3,6 +3,10 @@ import "server-only";
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/services/llm.service";
+import {
+  ensurePlatformPromptsLoaded,
+  getPlatformPromptContent,
+} from "@/services/platform-prompts.service";
 import { getAiAssistantProfileForBusiness } from "@/services/ai-assistant-profile.service";
 import {
   incrementMessagingAnalytics,
@@ -81,9 +85,11 @@ async function generateFollowUpMessage(input: {
     };
   }
 
+  await ensurePlatformPromptsLoaded();
+
   const systemInstruction = [
     profile.systemPrompt,
-    "Write a short follow-up message as the single AI Agent. Keep replies under 280 characters. No markdown.",
+    getPlatformPromptContent("follow_up"),
   ].join("\n\n");
 
   const result = await generateText({

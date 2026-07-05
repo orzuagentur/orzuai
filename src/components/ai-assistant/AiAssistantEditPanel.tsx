@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveAiAssistantProfileAction } from "@/features/ai-assistant/actions/save-ai-assistant-profile";
+import { saveFollowUpAgentSettingsAction } from "@/features/ai-assistant/actions/save-follow-up-agent-settings";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import {
   DEFAULT_COMMUNICATION_STYLE,
@@ -29,9 +30,11 @@ import {
 } from "@/features/ai-assistant/communication-styles";
 import type { AiAssistantProfileData } from "@/types/ai-assistant-profile.types";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
+import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
 type AiAssistantEditPanelProps = {
   profile: AiAssistantProfileData;
+  followUpAgent: FollowUpAgentSettings;
   onBack: () => void;
 };
 
@@ -116,6 +119,7 @@ const ALERT_PERMISSION_ROWS: Array<{
 
 export function AiAssistantEditPanel({
   profile,
+  followUpAgent,
   onBack,
 }: AiAssistantEditPanelProps) {
   const router = useRouter();
@@ -149,6 +153,7 @@ export function AiAssistantEditPanel({
     canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
   const [deactivateStep, setDeactivateStep] = useState(0);
 
   async function handleSave() {
@@ -175,6 +180,26 @@ export function AiAssistantEditPanel({
       toast.success(AI_ASSISTANT_MESSAGES.assistantEditSaved);
       router.refresh();
       onBack();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleFollowUpToggle(enabled: boolean) {
+    setFollowUpEnabled(enabled);
+    setIsSaving(true);
+
+    try {
+      const result = await saveFollowUpAgentSettingsAction({ enabled });
+
+      if (!result.success) {
+        toast.error(result.message ?? "Unable to save follow-up settings.");
+        setFollowUpEnabled(followUpAgent.enabled);
+        return;
+      }
+
+      toast.success(AI_ASSISTANT_MESSAGES.followUpAgentSaved);
+      router.refresh();
     } finally {
       setIsSaving(false);
     }
@@ -350,6 +375,30 @@ export function AiAssistantEditPanel({
               onTimezoneChange={setScheduleTimezone}
               onSlotsChange={setScheduleSlots}
             />
+
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <Label>{AI_ASSISTANT_MESSAGES.followUpAgentTitle}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {AI_ASSISTANT_MESSAGES.followUpAgentDescription}
+                </p>
+              </div>
+              <label className="flex items-start justify-between gap-3 text-sm">
+                <span>{AI_ASSISTANT_MESSAGES.followUpAgentEnabled}</span>
+                <input
+                  type="checkbox"
+                  className="mt-1 shrink-0"
+                  checked={followUpEnabled}
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    void handleFollowUpToggle(event.target.checked)
+                  }
+                />
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {AI_ASSISTANT_MESSAGES.followUpAgentStats(followUpAgent.sentCount)}
+              </p>
+            </div>
 
             <div className="space-y-4">
               <div>

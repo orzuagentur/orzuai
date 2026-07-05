@@ -112,6 +112,20 @@ export function AnalyticsAgentRunsPanel({
 
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           <span>
+            Blocked: {metrics.blockedActionsLast30Days}
+          </span>
+          <span>·</span>
+          <span>
+            Duplicate skips: {metrics.skippedDuplicatesLast30Days}
+          </span>
+          <span>·</span>
+          <span>
+            Booking failures: {metrics.bookingFailuresLast30Days}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span>
             {ANALYTICS_MESSAGES.aiOpsAgentRunsIntentCount(
               metrics.intentRoutesLast30Days,
             )}

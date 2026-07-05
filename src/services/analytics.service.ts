@@ -744,6 +744,9 @@ const EMPTY_AGENT_RUNS = {
   keywordRoutesLast30Days: 0,
   assistantOnlyLast30Days: 0,
   actionsAppliedLast30Days: 0,
+  blockedActionsLast30Days: 0,
+  skippedDuplicatesLast30Days: 0,
+  bookingFailuresLast30Days: 0,
 };
 
 export async function getAnalyticsPageData(input?: {

@@ -1,0 +1,15 @@
+---
+description: Apply Supabase migrations to remote project automatically
+alwaysApply: true
+---
+
+# Supabase migrations
+
+When adding or changing files under `supabase/migrations/`:
+
+1. Apply the migration to the linked remote Supabase project immediately via MCP `apply_migration` (user-supabase), using the migration file SQL and snake_case name.
+2. Do not wait for the user to ask — remote schema must stay in sync with the repo.
+3. After applying, verify with `list_migrations` or a quick `execute_sql` schema check when useful.
+4. Keep local migration files as the source of truth; do not edit applied migrations in place — add a new migration for fixes.
+
+Project: orzuit (`fqumdvpqgxfheszlsmlm`).

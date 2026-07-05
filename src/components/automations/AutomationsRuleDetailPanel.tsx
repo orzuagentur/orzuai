@@ -2,31 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { AutomationsChannelBadgeRow } from "@/components/automations/AutomationsChannelBadgeRow";
 import { AutomationOnOffControl } from "@/components/automations/AutomationOnOffControl";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { saveFollowUpAgentSettingsAction } from "@/features/ai-assistant/actions/save-follow-up-agent-settings";
-import { saveSalesAgentSettingsAction } from "@/features/ai-assistant/actions/save-sales-agent-settings";
 import {
   getAutomationRule,
   type AutomationRuleId,
 } from "@/features/automations/rule-catalog";
 import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
-import type { SalesAgentSettings } from "@/types/ai-usage.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
 type AutomationsRuleDetailPanelProps = {
   ruleId: AutomationRuleId;
-  salesAgent: SalesAgentSettings;
   followUpAgent: FollowUpAgentSettings;
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
@@ -35,7 +30,6 @@ type AutomationsRuleDetailPanelProps = {
 
 export function AutomationsRuleDetailPanel({
   ruleId,
-  salesAgent,
   followUpAgent,
   channelStatuses,
   visibleChannelIds,
@@ -45,46 +39,18 @@ export function AutomationsRuleDetailPanel({
   const rule = getAutomationRule(ruleId);
   const Icon = rule.icon;
 
-  const [salesSettings, setSalesSettings] = useState(salesAgent);
   const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
   const [isSaving, setIsSaving] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setSalesSettings(salesAgent);
     setFollowUpEnabled(followUpAgent.enabled);
-  }, [salesAgent, followUpAgent]);
+  }, [followUpAgent]);
 
-  async function persistSalesSettings(next: SalesAgentSettings) {
+  async function persistFollowUp(enabled: boolean) {
     setIsSaving(true);
 
     try {
-      const result = await saveSalesAgentSettingsAction(next);
-
-      if (!result.success) {
-        toast.error(result.message ?? AUTOMATIONS_MESSAGES.ruleSaveFailed);
-        setSalesSettings(salesAgent);
-        return;
-      }
-
-      toast.success(AUTOMATIONS_MESSAGES.ruleSaved);
-      router.refresh();
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function persistFollowUp(input: {
-    enabled?: boolean;
-  }) {
-    setIsSaving(true);
-
-    const nextEnabled = input.enabled ?? followUpEnabled;
-
-    try {
-      const result = await saveFollowUpAgentSettingsAction({
-        enabled: nextEnabled,
-      });
+      const result = await saveFollowUpAgentSettingsAction({ enabled });
 
       if (!result.success) {
         toast.error(result.message ?? AUTOMATIONS_MESSAGES.ruleSaveFailed);
@@ -97,62 +63,6 @@ export function AutomationsRuleDetailPanel({
     } finally {
       setIsSaving(false);
     }
-  }
-
-  function scheduleSalesSave(next: SalesAgentSettings) {
-    setSalesSettings(next);
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      void persistSalesSettings(next);
-    }, 500);
-  }
-
-  function handleSalesToggle(field: keyof SalesAgentSettings, value: boolean) {
-    const next = { ...salesSettings, [field]: value };
-    void persistSalesSettings(next);
-  }
-
-  function handleNumberChange(
-    field: "bantThreshold" | "autoTaskThreshold",
-    value: string,
-  ) {
-    const parsed = Number(value);
-
-    if (Number.isNaN(parsed)) {
-      return;
-    }
-
-    scheduleSalesSave({
-      ...salesSettings,
-      [field]: Math.min(100, Math.max(0, parsed)),
-    });
-  }
-
-  function renderToggleRow(
-    enabled: boolean,
-    onChange: (value: boolean) => void,
-    label: string,
-    hint?: string,
-  ) {
-    return (
-      <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-        <div className="space-y-1">
-          <p className="text-sm font-medium">{label}</p>
-          {hint ? (
-            <p className="text-xs text-muted-foreground">{hint}</p>
-          ) : null}
-        </div>
-        <AutomationOnOffControl
-          enabled={enabled}
-          disabled={isSaving}
-          onChange={onChange}
-        />
-      </div>
-    );
   }
 
   return (
@@ -199,110 +109,35 @@ export function AutomationsRuleDetailPanel({
           </p>
         </div>
 
-        {ruleId === "follow_up" ? (
-          <>
-            {renderToggleRow(followUpEnabled, (value) => {
+        <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Enable follow-up agent</p>
+            <p className="text-xs text-muted-foreground">
+              {AUTOMATIONS_MESSAGES.followUpChannelsHint}
+            </p>
+          </div>
+          <AutomationOnOffControl
+            enabled={followUpEnabled}
+            disabled={isSaving}
+            onChange={(value) => {
               setFollowUpEnabled(value);
-              void persistFollowUp({ enabled: value });
-            }, "Enable follow-up agent", AUTOMATIONS_MESSAGES.followUpChannelsHint)}
-            <p className="text-sm text-muted-foreground">
-              Follow-ups use the same AI Agent profile and permissions.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {AUTOMATIONS_MESSAGES.followUpSentStat(followUpAgent.sentCount)}
-            </p>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href={DASHBOARD_ROUTES.chats}>
-                <ExternalLinkIcon className="size-3.5" />
-                {AUTOMATIONS_MESSAGES.viewInboxLink}
-              </Link>
-            </Button>
-          </>
-        ) : null}
+              void persistFollowUp(value);
+            }}
+          />
+        </div>
 
-        {ruleId === "lead_scoring" ? (
-          <>
-            {renderToggleRow(
-              salesSettings.salesAgentEnabled,
-              (value) => handleSalesToggle("salesAgentEnabled", value),
-              "Enable lead scoring",
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="bant-threshold">
-                {AUTOMATIONS_MESSAGES.bantThresholdLabel}
-              </Label>
-              <Input
-                id="bant-threshold"
-                type="number"
-                min={0}
-                max={100}
-                value={salesSettings.bantThreshold}
-                disabled={!salesSettings.salesAgentEnabled || isSaving}
-                onChange={(event) =>
-                  handleNumberChange("bantThreshold", event.target.value)
-                }
-              />
-            </div>
-            {renderToggleRow(
-              salesSettings.sentimentAnalysisEnabled,
-              (value) => handleSalesToggle("sentimentAnalysisEnabled", value),
-              AUTOMATIONS_MESSAGES.sentimentLabel,
-              AUTOMATIONS_MESSAGES.sentimentHint,
-            )}
-          </>
-        ) : null}
-
-        {ruleId === "auto_qualify" ? (
-          <>
-            {renderToggleRow(
-              salesSettings.autoQualifyPipeline,
-              (value) => handleSalesToggle("autoQualifyPipeline", value),
-              AUTOMATIONS_MESSAGES.autoQualifyLabel,
-              AUTOMATIONS_MESSAGES.autoQualifyRequiresScoring,
-            )}
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href={DASHBOARD_ROUTES.contacts}>
-                <ExternalLinkIcon className="size-3.5" />
-                {AUTOMATIONS_MESSAGES.viewCrmLink}
-              </Link>
-            </Button>
-          </>
-        ) : null}
-
-        {ruleId === "crm_auto_task" ? (
-          <>
-            {renderToggleRow(
-              salesSettings.autoTaskEnabled,
-              (value) => handleSalesToggle("autoTaskEnabled", value),
-              AUTOMATIONS_MESSAGES.autoTaskEnabled,
-              AUTOMATIONS_MESSAGES.crmTaskRequiresScoring,
-            )}
-            {salesSettings.autoTaskEnabled ? (
-              <div className="space-y-2">
-                <Label htmlFor="auto-task-threshold">
-                  {AUTOMATIONS_MESSAGES.autoTaskThresholdLabel}
-                </Label>
-                <Input
-                  id="auto-task-threshold"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={salesSettings.autoTaskThreshold}
-                  disabled={isSaving}
-                  onChange={(event) =>
-                    handleNumberChange("autoTaskThreshold", event.target.value)
-                  }
-                />
-              </div>
-            ) : null}
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href={DASHBOARD_ROUTES.contacts}>
-                <ExternalLinkIcon className="size-3.5" />
-                {AUTOMATIONS_MESSAGES.viewCrmLink}
-              </Link>
-            </Button>
-          </>
-        ) : null}
+        <p className="text-sm text-muted-foreground">
+          Follow-ups use the same AI Agent profile and permissions.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {AUTOMATIONS_MESSAGES.followUpSentStat(followUpAgent.sentCount)}
+        </p>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link href={DASHBOARD_ROUTES.chats}>
+            <ExternalLinkIcon className="size-3.5" />
+            {AUTOMATIONS_MESSAGES.viewInboxLink}
+          </Link>
+        </Button>
 
         <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           {AUTOMATIONS_MESSAGES.selectRuleHint}{" "}

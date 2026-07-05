@@ -6,7 +6,7 @@ type ConversationTurn = {
 };
 
 const EXPLICIT_HUMAN_REQUEST_PATTERN =
-  /\b(manager|менеджер|human|person|owner|владелец|оператор|живой человек|real person|speak to someone|talk to someone|connect me|позовите|позвать|человек)\b/i;
+  /\b(connect me to (a )?(manager|human|person)|talk to (a )?(manager|human|person)|speak to (a )?(manager|human|person)|call the manager|get me a manager|позовите менеджера|позвать менеджера|подключите к менеджеру|переключите на менеджера|menejerni chaqiring)\b/i;
 
 const STRONG_HANDOFF_CONFIRMATION_PATTERN =
   /\b(yes|yeah|yep|ok|okay|sure|please|connect me|do it|давай|да|конечно|хорошо|ага|подключ|позов|переключ|menejer|ha|bo'pti)\b/i;

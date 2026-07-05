@@ -260,6 +260,7 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <AiAssistantEditPanel
               profile={data.assistantProfile}
+              followUpAgent={data.followUpAgent}
               onBack={() => setActiveTab("dashboard")}
             />
           </div>

@@ -2,6 +2,7 @@ export * from "./providers";
 export * from "./models";
 export * from "./use-cases";
 export * from "./vercel-ai-sync";
+export * from "./prompts";
 
 export type PlatformAiCredentialRecord = {
   id: string;

@@ -6,6 +6,7 @@ export function buildVoiceSystemPrompt(input: {
   language: string;
   knowledgeContext: GeminiKnowledgeContext[];
   customVoicePrompt?: string | null;
+  voiceRules?: string | null;
   callObjective?: string | null;
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
@@ -30,18 +31,16 @@ export function buildVoiceSystemPrompt(input: {
 
   const custom = input.customVoicePrompt?.trim();
   const objective = input.callObjective?.trim();
+  const voiceRules =
+    input.voiceRules?.trim() ||
+    "- Speak naturally in short sentences (1-3 sentences per reply).";
 
   return [
     `You are the AI voice assistant for ${input.businessName}.`,
     callContext,
     "Rules for phone conversation:",
-    input.realtime
-      ? "- This is a live phone call: reply in 1-2 short spoken sentences only."
-      : "- Speak naturally in short sentences (1-3 sentences per reply).",
-    "- No markdown, lists, emojis, or URLs.",
+    voiceRules,
     `- Always respond in ${input.language}.`,
-    "- Use only the business knowledge below.",
-    "- If you cannot help, offer to have a human follow up.",
     custom ? `\nVoice instructions:\n${custom}` : "",
     objective
       ? `\nCall objective for this conversation:\n${objective}\nTurn this into a professional, helpful phone conversation.`

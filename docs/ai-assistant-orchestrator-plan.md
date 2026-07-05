@@ -1,5 +1,7 @@
 # План: AI Assistant (лидер) + AI Agents (исполнители)
 
+> **2026-07 update:** В продакшене один **AI Agent** (`ai_assistant_profile`) — Phase 1 reply + Phase 2 orchestrator + code executor. Отдельные AI Agents и keyword routing **удалены**. BANT/lead scoring — post-step orchestrator, не inbound automations. Промпты — Admin CMS (`platform_prompts`) + tenant `system_prompt`. Observability — `agent_runs` (planned / executed / blocked / skipped).
+
 Цель: **один системный Gemini-ассистент** общается с клиентами 24/7. Специализированные агенты **не заменяют** его в чате — они **выполняют задачи** в CRM по его поручению.
 
 ---

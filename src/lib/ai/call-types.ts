@@ -20,6 +20,7 @@ export type AiCallType = (typeof AI_CALL_TYPES)[number];
 /** Customer-facing calls enforce monthly plan limits. */
 export const CUSTOMER_FACING_AI_CALL_TYPES = new Set<AiCallType>([
   "auto_reply",
+  "orchestrator",
   "follow_up",
 ]);
 

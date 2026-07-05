@@ -2,6 +2,14 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  AGENT_TOOL_BY_NAME,
+  AGENT_TOOL_NAMES,
+  formatAllowedExecutorActionTypes,
+  formatExecutorToolCatalog,
+  logAgentToolAudit,
+} from "@/lib/ai/tools";
+import { getPlatformPromptContent } from "@/services/platform-prompts.service";
 import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
 
 import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
@@ -11,6 +19,7 @@ import {
   hasCrmIdempotencyKey,
   recordCrmIdempotencyKey,
 } from "@/lib/crm/executor-idempotency";
+import { formatSkippedDuplicate } from "@/lib/ai/agent-run-actions";
 import { generateText } from "@/services/llm.service";
 import type {
   AgentExecutorResult,
@@ -177,14 +186,21 @@ function mapDealStatus(stage: PipelineStage): string {
 }
 
 function getAllowedActionTypes(): Set<ExecutorAction["type"]> {
-  return new Set([
-    "create_deal",
-    "create_task",
-    "add_note",
-    "add_internal_note",
-    "create_calendar_event",
-  ]);
+  return new Set(
+    AGENT_TOOL_NAMES.filter(
+      (name) => !AGENT_TOOL_BY_NAME.get(name)?.runsWithoutContact,
+    ),
+  );
 }
+
+const GENERIC_DEAL_TITLES = new Set([
+  "deal",
+  "new deal",
+  "sale",
+  "order",
+  "quote",
+  "inquiry",
+]);
 
 function buildExecutorPrompt(input: {
   contact: ContactSnapshot;
@@ -203,7 +219,7 @@ function buildExecutorPrompt(input: {
           .join("\n")
       : "No prior messages.";
 
-  const allowed = [...getAllowedActionTypes(), "contactUpdates"];
+  const allowed = formatAllowedExecutorActionTypes();
 
   return [
     "Extract customer data and plan CRM updates from the latest message.",
@@ -237,19 +253,13 @@ function buildExecutorPrompt(input: {
     "Latest customer message:",
     input.message,
     "",
-    `Allowed action types: ${allowed.join(", ")}`,
+    `Allowed action types: ${allowed}`,
+    "",
+    "Tool guide:",
+    formatExecutorToolCatalog(),
     "",
     "Rules:",
-    "- Put name, email, phone, company, location, tags, pipelineStage, dealValue, expectedCloseDate in contactUpdates only when clearly stated in the message.",
-    "- Put alternate phone numbers in contactUpdates.phone when the customer shares a number different from their channel/WhatsApp number.",
-    "- Do not invent data. Omit fields you are unsure about.",
-    "- create_task: for appointments, follow-ups, callbacks (booking/support).",
-    "- create_deal: for sales interest, quotes, orders (sales goal).",
-    "- add_note: short CRM note on the contact profile summarizing new facts.",
-    "- add_internal_note: short team-only note for managers in the chat sidebar (not visible to customer). Put owner requests, impatience, or internal observations here — never in clientSummary.",
-    "- create_calendar_event: when booking intent and clear date/time — book instantly in OrzuX calendar (never defer to a manager).",
-    "- For hotel stays: startDateTime = check-in, endDateTime = check-out. Fill guestCount and all booking form fields from contact + message.",
-    "- clientSummary: confirm the booking to the customer with exact date/time/resource. Never say a manager will contact them or that booking is queued.",
+    getPlatformPromptContent("executor"),
     "",
     "Return JSON only:",
     '{"contactUpdates":{"name":"...","email":"...","phone":"...","company":"..."},"actions":[{"type":"create_task","title":"...","dueAt":"2025-06-03T10:00:00Z"}],"clientSummary":"..."}',
@@ -553,6 +563,11 @@ async function applyCreateDeal(
   },
 ): Promise<string | null> {
   const title = action.title.trim();
+
+  if (GENERIC_DEAL_TITLES.has(title.toLowerCase())) {
+    return null;
+  }
+
   const idempotencyKey = buildCrmActionIdempotencyKey({
     conversationId: idempotencyContext.conversationId,
     clientMessage: idempotencyContext.clientMessage,
@@ -789,8 +804,9 @@ async function applyExecutorPlan(
     contactId?: string;
     contactName?: string;
   },
-): Promise<string[]> {
+): Promise<{ applied: string[]; skipped: string[] }> {
   const applied: string[] = [];
+  const skipped: string[] = [];
   const allowed = getAllowedActionTypes();
 
   if (plan.contactUpdates && Object.keys(plan.contactUpdates).length > 0) {
@@ -856,10 +872,31 @@ async function applyExecutorPlan(
 
     if (result) {
       applied.push(result);
+      logAgentToolAudit({
+        tool: action.type,
+        businessId,
+        conversationId: idempotencyContext.conversationId,
+        contactId: contact.id,
+        success: true,
+        label: result,
+      });
+    } else {
+      skipped.push(formatSkippedDuplicate(action.type));
     }
   }
 
-  return applied;
+  if (plan.contactUpdates && Object.keys(plan.contactUpdates).length > 0) {
+    logAgentToolAudit({
+      tool: "contact_updates",
+      businessId,
+      conversationId: idempotencyContext.conversationId,
+      contactId: contact.id,
+      success: true,
+      label: applied.filter((entry) => entry.startsWith("Contact")).join("; ") || "contact updated",
+    });
+  }
+
+  return { applied, skipped };
 }
 
 async function logAgentRun(
@@ -930,6 +967,7 @@ async function executePlanOnContact(input: {
   agent: RoutableAiAgent | null;
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
+  suppressRunLog?: boolean;
 }): Promise<AgentExecutorResult> {
   const planIdempotencyKey = buildExecutorPlanIdempotencyKey({
     conversationId: input.conversationId,
@@ -942,13 +980,16 @@ async function executePlanOnContact(input: {
     return {
       success: true,
       actionsApplied: [],
+      skippedDuplicates: [formatSkippedDuplicate("executor_plan")],
       clientSummary: "",
       rawPlan: input.plan,
+      planDuplicateSkipped: true,
     };
   }
 
   try {
-    const actionsApplied = await applyExecutorPlan(
+    const { applied: actionsApplied, skipped: skippedDuplicates } =
+      await applyExecutorPlan(
       input.admin,
       input.businessId,
       input.contact,
@@ -966,16 +1007,18 @@ async function executePlanOnContact(input: {
       input.plan.clientSummary,
     ) ?? "";
 
-    await logAgentRun(input.admin, {
-      businessId: input.businessId,
-      conversationId: input.conversationId ?? null,
-      contactId: input.contactId,
-      channel: input.channel,
-      clientMessage: input.clientMessage,
-      routingMethod: input.routingMethod ?? null,
-      actionsApplied,
-      success: true,
-    });
+    if (!input.suppressRunLog) {
+      await logAgentRun(input.admin, {
+        businessId: input.businessId,
+        conversationId: input.conversationId ?? null,
+        contactId: input.contactId,
+        channel: input.channel,
+        clientMessage: input.clientMessage,
+        routingMethod: input.routingMethod ?? null,
+        actionsApplied,
+        success: true,
+      });
+    }
 
     await recordCrmIdempotencyKey(input.admin, {
       businessId: input.businessId,
@@ -988,12 +1031,14 @@ async function executePlanOnContact(input: {
       JSON.stringify({
         contactId: input.contactId,
         actionsApplied,
+        skippedDuplicates,
       }),
     );
 
     return {
       success: true,
       actionsApplied,
+      skippedDuplicates,
       clientSummary,
       rawPlan: input.plan,
     };
@@ -1001,26 +1046,102 @@ async function executePlanOnContact(input: {
     const errorMessage =
       error instanceof Error ? error.message : "CRM action failed";
 
-    await logAgentRun(input.admin, {
-      businessId: input.businessId,
-      conversationId: input.conversationId ?? null,
-      contactId: input.contactId,
-      channel: input.channel,
-      clientMessage: input.clientMessage,
-      routingMethod: input.routingMethod ?? null,
-      actionsApplied: [],
-      success: false,
-      errorMessage,
-    });
+    if (!input.suppressRunLog) {
+      await logAgentRun(input.admin, {
+        businessId: input.businessId,
+        conversationId: input.conversationId ?? null,
+        contactId: input.contactId,
+        channel: input.channel,
+        clientMessage: input.clientMessage,
+        routingMethod: input.routingMethod ?? null,
+        actionsApplied: [],
+        success: false,
+        errorMessage,
+      });
+    }
 
     return {
       success: false,
       actionsApplied: [],
+      skippedDuplicates: [],
       clientSummary: "",
       rawPlan: null,
       errorMessage,
     };
   }
+}
+
+async function applyCreateContact(
+  admin: MessagingDbClient,
+  businessId: string,
+  conversationId: string,
+  channel: MessagingChannel,
+  action: Extract<ExecutorAction, { type: "create_contact" }>,
+): Promise<{ contactId: string; label: string } | null> {
+  const name = action.name.trim();
+
+  if (!name) {
+    return null;
+  }
+
+  const phone =
+    action.phone?.trim() ||
+    `pending:${conversationId.slice(0, 8)}`;
+
+  const customFields: ContactCustomFields = {};
+
+  if (action.company?.trim()) {
+    customFields.company = action.company.trim();
+  }
+
+  const { data, error } = await admin
+    .from("contacts")
+    .insert({
+      business_id: businessId,
+      name,
+      phone_number: phone,
+      email: action.email?.trim() || null,
+      channel,
+      pipeline_stage: action.pipelineStage ?? "new",
+      custom_fields: customFields as unknown as Record<string, string>,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create contact");
+  }
+
+  const { error: linkError } = await admin
+    .from("conversations")
+    .update({ contact_id: data.id })
+    .eq("id", conversationId)
+    .eq("business_id", businessId);
+
+  if (linkError) {
+    throw new Error(linkError.message);
+  }
+
+  return {
+    contactId: data.id,
+    label: `Contact created: ${name}`,
+  };
+}
+
+export async function applyCreateContactFromPlan(input: {
+  admin: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  action: Extract<ExecutorAction, { type: "create_contact" }>;
+}): Promise<{ contactId: string; label: string } | null> {
+  return applyCreateContact(
+    input.admin,
+    input.businessId,
+    input.conversationId,
+    input.channel,
+    input.action,
+  );
 }
 
 export async function applyPreparedExecutorPlan(input: {
@@ -1033,6 +1154,7 @@ export async function applyPreparedExecutorPlan(input: {
   agent: RoutableAiAgent | null;
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
+  suppressRunLog?: boolean;
 }): Promise<AgentExecutorResult> {
   const contact = await loadContactSnapshot(
     input.admin,
@@ -1044,6 +1166,7 @@ export async function applyPreparedExecutorPlan(input: {
     return {
       success: false,
       actionsApplied: [],
+      skippedDuplicates: [],
       clientSummary: "",
       rawPlan: null,
       errorMessage: "Contact not found",
@@ -1061,5 +1184,6 @@ export async function applyPreparedExecutorPlan(input: {
     agent: input.agent,
     routingMethod: input.routingMethod,
     plan: input.plan,
+    suppressRunLog: input.suppressRunLog,
   });
 }

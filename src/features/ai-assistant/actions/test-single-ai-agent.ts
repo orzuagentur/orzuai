@@ -5,16 +5,34 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
-import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
+import type { AgentCrmPreview } from "@/types/ai-agent-test.types";
+import type { AssistantAgentTestResult } from "@/types/ai-agent-test.types";
+import { runAssistantAgentTest } from "@/services/ai-agent-test.service";
 
 const testSingleAiAgentSchema = z.object({
   message: z.string().trim().min(1).max(2000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().trim().min(1).max(4000),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 export async function testSingleAiAgentAction(input: {
   message: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
 }): Promise<
-  | { success: true; reply: string; model: string; provider: string }
+  | {
+      success: true;
+      reply: string;
+      model: string;
+      provider: string;
+      crmPreview: AgentCrmPreview | null;
+    }
   | { success: false; message: string }
 > {
   const parsed = testSingleAiAgentSchema.safeParse(input);
@@ -33,27 +51,22 @@ export async function testSingleAiAgentAction(input: {
     return { success: false, message: "Business not found." };
   }
 
-  const reply = await generateFastAssistantReply({
+  const result: AssistantAgentTestResult = await runAssistantAgentTest({
     admin: createAdminClient(),
     businessId: business.id,
-    channel: "whatsapp",
     clientMessage: parsed.data.message,
-    requireAiEnabled: false,
+    conversationHistory: parsed.data.history ?? [],
   });
 
-  if (!reply.success) {
-    return {
-      success: false,
-      message:
-        reply.message ??
-        "AI Agent could not generate a reply. Check provider configuration.",
-    };
+  if (!result.success) {
+    return { success: false, message: result.message };
   }
 
   return {
     success: true,
-    reply: reply.text,
-    model: reply.model,
-    provider: reply.provider,
+    reply: result.reply,
+    model: result.model,
+    provider: result.provider,
+    crmPreview: result.crmPreview,
   };
 }

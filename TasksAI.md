@@ -1237,4 +1237,13 @@
 
 ---
 
-*Последнее обновление: 2026-06-02 · источник: CTO AI Architecture Audit · commit baseline: `1280974`*
+*Последнее обновление: 2026-07-06 · источник: CTO AI Architecture Audit + P0–P4 worker rollout*
+
+## Changelog (2026-07)
+
+- **Single AI Agent** — multi-agent routing removed; one `ai_assistant_profile` drives Inbox, voice, and CRM executor.
+- **Tool registry** — `lib/ai/tools/*` filters orchestrator plans by profile permissions before execution.
+- **Admin Prompt CMS** — platform prompts in `platform_prompts` (assistant, orchestrator, executor, follow_up, voice, guard_fallback); tenant override via profile `system_prompt`.
+- **Automations UI** — `/dashboard/automations` redirects to AI Agent; only follow-up rule remains; BANT/lead scoring moved to orchestrator post-step (`processSalesAgentRules`).
+- **AI Ops** — `agent_runs` logs planned / executed / blocked / skipped / booking-failed actions; dashboard panel on AI Agent + Analytics → AI & Ops.
+- **Entitlements** — `orchestrator` LLM calls count toward monthly AI reply quota (`CUSTOMER_FACING_AI_CALL_TYPES`).

@@ -2116,6 +2116,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      platform_prompts: {
+        Row: {
+          id: string;
+          prompt_key: string;
+          version: number;
+          content: string;
+          is_active: boolean;
+          usage_count: number;
+          last_used_at: string | null;
+          change_note: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          prompt_key: string;
+          version: number;
+          content: string;
+          is_active?: boolean;
+          usage_count?: number;
+          last_used_at?: string | null;
+          change_note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          prompt_key?: string;
+          version?: number;
+          content?: string;
+          is_active?: boolean;
+          usage_count?: number;
+          last_used_at?: string | null;
+          change_note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       calendar_events: {
         Row: {
           id: string;
@@ -3432,6 +3471,13 @@ export type Database = {
           business_uuid: string;
         };
         Returns: boolean;
+      };
+      increment_platform_prompt_usage: {
+        Args: {
+          p_prompt_key: string;
+          p_version: number;
+        };
+        Returns: undefined;
       };
       claim_inbound_webhook_jobs: {
         Args: {

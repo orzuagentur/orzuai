@@ -42,7 +42,6 @@ import { buildAutomationsHref } from "@/utils/automations-url";
 
 type AutomationsOverviewPanelProps = {
   stats: AutomationStats;
-  salesAgent: AutomationsPageData["salesAgent"];
   followUpAgent: AutomationsPageData["followUpAgent"];
   channelStatuses: IntegrationChannelStatusMap;
   visibleChannelIds: MessagingIntegrationChannelId[];
@@ -67,7 +66,6 @@ function StatCard({
 
 export function AutomationsOverviewPanel({
   stats,
-  salesAgent,
   followUpAgent,
   channelStatuses,
   visibleChannelIds,
@@ -114,7 +112,7 @@ export function AutomationsOverviewPanel({
   }
 
   const activeRules = AUTOMATION_RULES.filter((rule) =>
-    isRuleEnabled(rule.id, salesAgent, followUpAgent),
+    isRuleEnabled(rule.id, followUpAgent),
   );
 
   return (
@@ -162,7 +160,7 @@ export function AutomationsOverviewPanel({
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-1 lg:max-w-md">
           {AUTOMATION_RECIPES.map((recipe) => (
             <Card key={recipe.id} className="shadow-none">
               <CardHeader className="pb-2">
@@ -171,11 +169,7 @@ export function AutomationsOverviewPanel({
               </CardHeader>
               <CardContent>
                 <AutomationOnOffControl
-                  enabled={isRecipeEnabled(
-                    recipe.id,
-                    salesAgent,
-                    followUpAgent,
-                  )}
+                  enabled={isRecipeEnabled(recipe.id, followUpAgent)}
                   disabled={pendingRecipeId === recipe.id}
                   onChange={(enabled) =>
                     void handleRecipeToggle(recipe.id, enabled)

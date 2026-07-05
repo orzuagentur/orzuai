@@ -1,6 +1,10 @@
 import "server-only";
 
 import { buildVoiceSystemPrompt } from "@/lib/voice/prompts";
+import {
+  ensurePlatformPromptsLoaded,
+  getPlatformPromptContent,
+} from "@/services/platform-prompts.service";
 import { getVoicePhonePrompts } from "@/lib/voice/language";
 import {
   buildGatherActionUrl,
@@ -176,6 +180,8 @@ async function prepareVoiceAiReply(input: {
   callObjective?: string | null;
   streamMode?: boolean;
 }) {
+  await ensurePlatformPromptsLoaded();
+
   const context = await loadBusinessContext(input.businessId, {
     streamMode: input.streamMode,
   });
@@ -196,6 +202,7 @@ async function prepareVoiceAiReply(input: {
     language,
     knowledgeContext: context.knowledgeContext,
     customVoicePrompt: input.settings.voiceSystemPrompt,
+    voiceRules: getPlatformPromptContent("voice"),
     callObjective: input.callObjective,
     direction: input.direction,
     triggerReason: input.triggerReason,
@@ -420,6 +427,7 @@ export async function generateVoiceOpeningLine(input: {
   }
 
   const context = await loadBusinessContext(input.businessId);
+  await ensurePlatformPromptsLoaded();
   const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
   const language =
     phoneVoice.language || input.settings.voiceLanguage || context.language;
@@ -430,6 +438,7 @@ export async function generateVoiceOpeningLine(input: {
     language,
     knowledgeContext: context.knowledgeContext,
     customVoicePrompt: input.settings.voiceSystemPrompt,
+    voiceRules: getPlatformPromptContent("voice"),
     callObjective: objective,
     direction: input.direction,
     triggerReason: input.triggerReason,

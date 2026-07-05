@@ -82,7 +82,7 @@ export async function getAutomationsPageData(input?: {
   ]);
 
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
-  const builtinActive = countActiveRules(salesAgent, followUpAgent);
+  const builtinActive = countActiveRules(followUpAgent);
   const customActive = workflows.filter((workflow) => workflow.enabled).length;
 
   return {

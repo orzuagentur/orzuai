@@ -30,8 +30,8 @@ const CUSTOMER_VISIBLE_ACTION_PATTERNS = [
   /task created:/i,
   /deal created:/i,
   /appointment/i,
-  /booking request saved/i,
-  /manager will confirm/i,
+  /booking confirmed/i,
+  /contact created:/i,
 ];
 
 function normalizeText(value: string): string {

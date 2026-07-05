@@ -1,6 +1,13 @@
 import "server-only";
 
+import { formatOrchestratorToolCatalog } from "@/lib/ai/tools";
+import { WORKER_ORCHESTRATOR_RULES } from "@/lib/ai/worker-behavior-prompt";
 import { generateTextWithFallback } from "@/services/llm.service";
+import {
+  ensurePlatformPromptsLoaded,
+  getPlatformPromptContent,
+  touchPlatformPromptUsage,
+} from "@/services/platform-prompts.service";
 import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import type { ContactSnapshot } from "@/services/agent-task-executor.service";
 import {
@@ -93,6 +100,8 @@ function buildOrchestratorPrompt(input: {
     : null;
 
   return [
+    getPlatformPromptContent("orchestrator") || WORKER_ORCHESTRATOR_RULES,
+    "",
     "Analyze the customer's latest message for agent routing and CRM actions.",
     "",
     "Recent conversation:",
@@ -103,7 +112,12 @@ function buildOrchestratorPrompt(input: {
     "",
     contactSection
       ? ["Current CRM contact:", contactSection, ""].join("\n")
-      : "No CRM contact linked to this conversation — return empty actions.",
+      : [
+          "No CRM contact linked to this conversation.",
+          "If the customer shares a name (and ideally phone or email), plan create_contact with those fields.",
+          "Otherwise return empty actions.",
+          "",
+        ].join("\n"),
     "",
     input.calendarBookingEnabled
       ? [
@@ -152,11 +166,15 @@ function buildOrchestratorPrompt(input: {
     "- Prefer solving the request yourself. Escalation is a last resort.",
     "",
     "CRM rules (only when contact is present):",
+    "Available tools:",
+    formatOrchestratorToolCatalog(),
+    "",
     "- booking intent: when calendar booking is enabled and the customer gives a clear date/time, ALWAYS use create_calendar_event plus add_note — book immediately, never create_task instead",
     "- booking intent when customer asks for open times: answer in clientSummary using the availability list; do not invent slots",
     "- booking intent without calendar configured: create_task only to capture the request until calendar is set up",
     "- booking/support intent: create_task and add_note only when calendar booking is not configured or time is completely unknown",
     "- sales intent: prefer create_deal, create_task, add_note",
+    "- registration intent: create_contact when no contact exists, plus contactUpdates.pipelineStage=new",
     "- general/none: add_note, add_internal_note, and contactUpdates only when customer shares new details",
     "- add_internal_note: team-only context for managers (not sent to customer). Use for impatience, owner requests, or internal observations.",
     "- Do not invent contact data. Omit uncertain fields.",
@@ -186,7 +204,7 @@ async function requestOrchestratorJson(input: {
     callType: "orchestrator",
     preferredProvider: "gemini",
     systemInstruction:
-      "You route customer messages and plan CRM updates for a business inbox. Reply with valid JSON only. confidence is 0 to 1. Never invent contact details. Use managerAlert for silent owner alerts; use handoffConfirmed only when the customer clearly wants a human.",
+      "You route customer messages and plan CRM updates for a business inbox. Reply with valid JSON only. confidence is 0 to 1. Never invent contact details. Act autonomously — never plan manager callbacks. Use managerAlert for silent owner alerts; use handoffConfirmed only when the customer clearly wants a human.",
     prompt,
   });
 
@@ -278,6 +296,8 @@ export async function runAutoReplyOrchestrator(input: {
   const bookingPagesText = input.bookingPagesText ?? "";
   const availabilityText = input.availabilityText ?? "";
 
+  await ensurePlatformPromptsLoaded();
+
   const firstAttempt = await requestOrchestratorJson({
     businessId: input.businessId,
     message: input.message,
@@ -310,6 +330,7 @@ export async function runAutoReplyOrchestrator(input: {
   const validated = validateOrchestratorResponse(firstAttempt.text);
 
   if (validated?.success) {
+    void touchPlatformPromptUsage(["orchestrator"]);
     return {
       ...validated,
       usedProvider: firstAttempt.usedProvider,
@@ -341,6 +362,7 @@ export async function runAutoReplyOrchestrator(input: {
 
   if (retryValidated) {
     if (retryValidated.success) {
+      void touchPlatformPromptUsage(["orchestrator"]);
       return {
         ...retryValidated,
         usedProvider: retryAttempt.usedProvider,

@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner";
 
 import { AgentAiActivityChart } from "@/components/ai-assistant/AgentAiActivityChart";
+import { AiWorkerReadinessPanel } from "@/components/ai-assistant/AiWorkerReadinessPanel";
+import { AiAgentOpsPanel } from "@/components/ai-assistant/AiAgentOpsPanel";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { testSingleAiAgentAction } from "@/features/ai-assistant/actions/test-single-ai-agent";
+import type { AgentCrmPreview } from "@/types/ai-agent-test.types";
 import { INTEGRATION_CHANNEL_LIST } from "@/features/integrations";
 import { cn } from "@/lib/utils";
 import type {
@@ -81,6 +84,7 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  crmPreview?: AgentCrmPreview | null;
 };
 
 const ACTION_CARD_MIN_HEIGHT = "min-h-[260px]";
@@ -170,6 +174,38 @@ function DashboardActionCard({
   );
 }
 
+function CrmPreviewPanel({ preview }: { preview: AgentCrmPreview }) {
+  return (
+    <div className="mt-2 rounded-xl border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
+      <p className="font-medium text-foreground">
+        CRM preview · {preview.intent} ({Math.round(preview.confidence * 100)}%)
+      </p>
+      {preview.plannedActions.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-4">
+          {preview.plannedActions.map((action) => (
+            <li key={action}>{action}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2">No CRM actions planned.</p>
+      )}
+      {preview.contactUpdates.length > 0 ? (
+        <p className="mt-2">
+          Contact updates: {preview.contactUpdates.join("; ")}
+        </p>
+      ) : null}
+      {preview.blockedActions.length > 0 ? (
+        <p className="mt-2 text-amber-700">
+          Blocked by permissions: {preview.blockedActions.join(", ")}
+        </p>
+      ) : null}
+      {preview.clientSummary ? (
+        <p className="mt-2">Follow-up: {preview.clientSummary}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function AgentTestChatCard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -193,7 +229,11 @@ function AgentTestChatCard() {
     setIsTesting(true);
 
     try {
-      const result = await testSingleAiAgentAction({ message: text });
+      const history = messages.map((entry) => ({
+        role: entry.role,
+        content: entry.content,
+      }));
+      const result = await testSingleAiAgentAction({ message: text, history });
 
       if (!result.success) {
         toast.error(result.message);
@@ -206,6 +246,7 @@ function AgentTestChatCard() {
           id: `assistant-${Date.now()}`,
           role: "assistant",
           content: result.reply,
+          crmPreview: result.crmPreview,
         },
       ]);
     } finally {
@@ -218,7 +259,7 @@ function AgentTestChatCard() {
       <CardHeader className="shrink-0 pb-3">
         <CardTitle className="text-lg">Test Agent</CardTitle>
         <CardDescription>
-          Chat with your agent before going live.
+          Chat with your agent — same Phase 1 reply plus Phase 2 CRM preview.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex min-h-[460px] flex-1 flex-col gap-4 pb-6">
@@ -246,15 +287,20 @@ function AgentTestChatCard() {
                     <BotIcon className="size-4" />
                   </div>
                 ) : null}
-                <div
-                  className={cn(
-                    "max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6",
-                    message.role === "user"
-                      ? "bg-sky-100 text-sky-950"
-                      : "bg-background ring-1 ring-foreground/10",
-                  )}
-                >
-                  {message.content}
+                <div className="max-w-[88%] space-y-2">
+                  <div
+                    className={cn(
+                      "rounded-2xl px-4 py-3 text-sm leading-6",
+                      message.role === "user"
+                        ? "bg-sky-100 text-sky-950"
+                        : "bg-background ring-1 ring-foreground/10",
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                  {message.role === "assistant" && message.crmPreview ? (
+                    <CrmPreviewPanel preview={message.crmPreview} />
+                  ) : null}
                 </div>
               </div>
             ))
@@ -443,6 +489,16 @@ export function AgentDashboardPanel({
           </div>
         </DashboardActionCard>
       </div>
+
+      <AiWorkerReadinessPanel
+        readiness={data.workerReadiness}
+        summarizeActionsEnabled={profile?.canSummarizeActionsInChat ?? true}
+      />
+
+      <AiAgentOpsPanel
+        metrics={data.agentRuns}
+        recentRuns={data.recentAgentRuns}
+      />
 
       <AgentAiActivityChart initialPoints={aiActivity} initialDays={1} />
 

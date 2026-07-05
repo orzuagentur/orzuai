@@ -128,7 +128,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
       {data.activeTab === "overview" ? (
         <AutomationsOverviewPanel
           stats={data.stats}
-          salesAgent={data.salesAgent}
           followUpAgent={data.followUpAgent}
           channelStatuses={data.channelStatuses}
           visibleChannelIds={data.visibleChannelIds}
@@ -158,7 +157,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
                   activeRuleId={data.activeRuleId}
                   activeWorkflowId={data.activeWorkflowId}
                   activeTab={data.activeTab}
-                  salesAgent={data.salesAgent}
                   followUpAgent={data.followUpAgent}
                   workflows={data.workflows}
                   channelStatuses={data.channelStatuses}
@@ -176,7 +174,6 @@ export function AutomationsCommandCenter({ data }: AutomationsCommandCenterProps
               {data.activeRuleId ? (
                 <AutomationsRuleDetailPanel
                   ruleId={data.activeRuleId}
-                  salesAgent={data.salesAgent}
                   followUpAgent={data.followUpAgent}
                   channelStatuses={data.channelStatuses}
                   visibleChannelIds={data.visibleChannelIds}

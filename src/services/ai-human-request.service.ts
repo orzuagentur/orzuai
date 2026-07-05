@@ -17,7 +17,6 @@ import type { AiHumanRequest } from "@/types/ai-human-request.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMessagePreviewText } from "@/utils/chat-media";
-import { customerExplicitlyRequestedHuman } from "@/utils/human-handoff-policy";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -75,32 +74,10 @@ export async function maybeQueueImmediateHumanRequest(input: {
   contactId?: string | null;
   contactName?: string | null;
 }): Promise<void> {
-  const trimmed = input.clientMessage.trim();
-
-  if (!trimmed || !customerExplicitlyRequestedHuman(trimmed)) {
-    return;
-  }
-
-  const { data: profile } = await input.admin
-    .from("ai_assistant_profile")
-    .select("can_request_human, can_notify_owner")
-    .eq("business_id", input.businessId)
-    .maybeSingle();
-
-  if (profile?.can_request_human === false || profile?.can_notify_owner === false) {
-    return;
-  }
-
-  await createAiHumanRequest({
-    admin: input.admin,
-    businessId: input.businessId,
-    conversationId: input.conversationId,
-    channel: input.channel,
-    contactId: input.contactId,
-    contactName: input.contactName ?? undefined,
-    reason: "Customer asked to speak with a manager",
-    messagePreview: trimmed,
-  });
+  // Handoff is handled only by the background orchestrator after explicit confirmation.
+  // Immediate keyword alerts caused false manager escalations before the AI could help.
+  void input;
+  return;
 }
 
 export async function createAiHumanRequest(input: {

@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createAiActionNotification } from "@/services/business-notifications.service";
+import { sanitizeWorkerFacingReply } from "@/lib/ai/worker-reply-safety";
 import {
   scheduleAgentActionPush,
   type AgentActionPushInput,
@@ -164,6 +165,14 @@ export async function reportAgentActions(input: {
     return;
   }
 
+  const safeSummary = sanitizeWorkerFacingReply(customerSummary, {
+    fallback: null,
+  });
+
+  if (!safeSummary.text) {
+    return;
+  }
+
   const { data: recentAiMessage } = await input.admin
     .from("messages")
     .select("content, created_at")
@@ -180,13 +189,13 @@ export async function reportAgentActions(input: {
 
     if (
       ageMs < 2 * 60 * 1000 &&
-      messagesAreLikelyDuplicates(recentAiMessage.content, customerSummary)
+      messagesAreLikelyDuplicates(recentAiMessage.content, safeSummary.text)
     ) {
       return;
     }
   }
 
-  const followUpResult = await input.sendFollowUp(customerSummary);
+  const followUpResult = await input.sendFollowUp(safeSummary.text);
 
   if (!followUpResult.success) {
     console.warn(

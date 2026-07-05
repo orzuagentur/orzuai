@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/ai-management/credentials", label: "General API AI" },
   { href: "/ai-management/use-cases", label: "Сценарии AI" },
+  { href: "/ai-management/prompts", label: "Prompt CMS" },
   { href: "/ai-management/structure", label: "Структура AI" },
 ] as const;
 

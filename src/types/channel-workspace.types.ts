@@ -103,6 +103,9 @@ export type AiAssistantChannelEntry = {
   settings: ChannelAiSettingsData;
 };
 
+import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
+import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
+
 export type AiAssistantPageData = {
   hasBusiness: boolean;
   geminiConfigured: boolean;
@@ -129,6 +132,9 @@ export type AiAssistantPageData = {
   agentDashboardStats: AgentDashboardStats;
   recentDialogues: AgentRecentDialogue[];
   aiActivity: AgentActivityPoint[];
+  workerReadiness: AiWorkerReadiness;
+  followUpAgent: FollowUpAgentSettings;
+  agentRuns: AgentRunsMetrics;
 };
 
 export type ChannelAnalyticsActivityPoint = {

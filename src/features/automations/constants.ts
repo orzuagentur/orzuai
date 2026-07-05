@@ -21,18 +21,6 @@ export const AUTOMATION_RECIPES = [
     description: "Turn on 24h and 48h AI follow-ups when customers go quiet.",
     ruleIds: ["follow_up"] as AutomationRuleId[],
   },
-  {
-    id: "auto_qualify_buyers",
-    name: "Auto-qualify buyers",
-    description: "Score inbound messages and move hot leads to Qualified.",
-    ruleIds: ["lead_scoring", "auto_qualify"] as AutomationRuleId[],
-  },
-  {
-    id: "hot_lead_task",
-    name: "Hot lead → CRM task",
-    description: "Create a team task when high-intent keywords appear.",
-    ruleIds: ["crm_auto_task"] as AutomationRuleId[],
-  },
 ] as const;
 
 export const AUTOMATIONS_MESSAGES = {
@@ -45,7 +33,7 @@ export const AUTOMATIONS_MESSAGES = {
   usageChip: (used: number, limit: number) => `${used}/${limit} AI replies`,
   enableRecommended: "Enable recommended",
   enableRecipe: "Enable",
-  enableAllRecipes: "Enable all 3",
+  enableAllRecipes: "Enable follow-ups",
   recommendedTitle: "Recommended for your business",
   recommendedIntro:
     "One-click presets that turn on proven rules using your existing AI setup.",

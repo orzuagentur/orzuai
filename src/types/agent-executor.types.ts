@@ -16,6 +16,15 @@ export const executorContactUpdatesSchema = z
   })
   .strict();
 
+export const executorCreateContactActionSchema = z.object({
+  type: z.literal("create_contact"),
+  name: z.string().trim().min(1).max(200),
+  phone: z.string().trim().max(40).optional(),
+  email: z.string().trim().max(320).optional(),
+  company: z.string().trim().max(200).optional(),
+  pipelineStage: z.enum(PIPELINE_STAGES).optional(),
+});
+
 export const executorCreateTaskActionSchema = z.object({
   type: z.literal("create_task"),
   title: z.string().trim().min(1).max(200),
@@ -54,6 +63,7 @@ export const executorCreateCalendarEventActionSchema = z.object({
 });
 
 export const executorActionSchema = z.discriminatedUnion("type", [
+  executorCreateContactActionSchema,
   executorCreateTaskActionSchema,
   executorCreateDealActionSchema,
   executorAddNoteActionSchema,
@@ -74,7 +84,9 @@ export type ExecutorPlan = z.infer<typeof executorPlanSchema>;
 export type AgentExecutorResult = {
   success: boolean;
   actionsApplied: string[];
+  skippedDuplicates: string[];
   clientSummary: string;
   rawPlan: ExecutorPlan | null;
   errorMessage?: string;
+  planDuplicateSkipped?: boolean;
 };

@@ -36,20 +36,31 @@ import {
 } from "@/services/ai-human-request.service";
 import {
   applyPreparedExecutorPlan,
+  applyCreateContactFromPlan,
   loadContactSnapshot,
 } from "@/services/agent-task-executor.service";
 import { reportAgentActions } from "@/services/agent-action-reporting.service";
 import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
-import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
+import { sanitizeWorkerFacingReply } from "@/lib/ai/worker-reply-safety";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
 import { resolveLlmModel, type AiProvider } from "@/lib/ai/constants";
 import { getPrimaryPlatformLlmProvider } from "@/lib/ai/platform-llm-config";
 import { generateAssistantReplyWithFallback } from "@/services/llm.service";
-import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
+import {
+  buildAgentOpsActions,
+  logAgentOpsRun,
+  logOrchestratorAgentRun,
+} from "@/services/agent-run-log.service";
 import { getDefaultAiAssistantProfile } from "@/services/ai-assistant-profile.service";
-import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
+import {
+  ensurePlatformPromptsLoaded,
+  touchPlatformPromptUsage,
+} from "@/services/platform-prompts.service";
+import { filterExecutorPlanByProfile } from "@/lib/ai/tools";
 import type { ExecutorPlan } from "@/types/agent-executor.types";
+import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
+import { processSalesAgentRules } from "@/services/sales-agent.service";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
 import {
   formatConversationSummaryForSystemPrompt,
@@ -187,7 +198,7 @@ export async function resolveAssistantProfile(
       canRequestHuman: data.can_request_human ?? true,
       canNotifyOwner: data.can_notify_owner ?? true,
       canNotifyOnActions: data.can_notify_on_actions ?? true,
-      canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? false,
+      canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? true,
     };
   }
 
@@ -279,33 +290,7 @@ export function applyAgentPermissionsToPlan(
   plan: ExecutorPlan,
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>,
 ): ExecutorPlan {
-  return {
-    clientSummary: plan.clientSummary,
-    contactUpdates: profile.canUpdateContact ? plan.contactUpdates : undefined,
-    actions: plan.actions.filter((action) => {
-      if (action.type === "create_task") {
-        return profile.canCreateTask;
-      }
-
-      if (action.type === "create_deal") {
-        return profile.canCreateDeal;
-      }
-
-      if (action.type === "create_calendar_event") {
-        return profile.canCreateCalendarEvent;
-      }
-
-      if (action.type === "add_note") {
-        return profile.canAddNote;
-      }
-
-      if (action.type === "add_internal_note") {
-        return profile.canAddInternalNote;
-      }
-
-      return false;
-    }),
-  };
+  return filterExecutorPlanByProfile(plan, profile).plan;
 }
 
 function assembleAutoReplySystemPrompt(input: {
@@ -412,6 +397,8 @@ async function prepareAutoReplyContext(input: {
     resolveAssistantProfile(input.admin, input.businessId),
     fetchBusinessSubscriptionPlan(input.admin, input.businessId),
   ]);
+
+  await ensurePlatformPromptsLoaded(input.admin);
 
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
   const contactId =
@@ -561,11 +548,11 @@ export async function generateFastAssistantReply(input: {
     language: voice.language,
     customMessage: prep.fallbackReplyMessage,
   });
-  const safeReply = sanitizeCustomerFacingReply(reply.data.text, {
+  const safeReply = sanitizeWorkerFacingReply(reply.data.text, {
     fallback: fallbackText,
   });
 
-  if (safeReply.blocked) {
+  if (safeReply.rewritten) {
     console.warn(
       "[auto-reply-pipeline] blocked unsafe LLM reply",
       JSON.stringify({
@@ -577,6 +564,11 @@ export async function generateFastAssistantReply(input: {
     );
   }
 
+  void touchPlatformPromptUsage(
+    ["assistant_system", "guard_fallback"],
+    prep.admin,
+  );
+
   return {
     success: true,
     text: safeReply.text ?? fallbackText,
@@ -585,7 +577,7 @@ export async function generateFastAssistantReply(input: {
     provider: reply.usedProvider ?? voice.provider,
     model: reply.data.model,
     language: voice.language,
-    isFallback: safeReply.blocked,
+    isFallback: safeReply.rewritten,
   };
 }
 
@@ -610,6 +602,8 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
   const profile = await resolveAssistantProfile(input.admin, input.businessId);
 
+  await ensurePlatformPromptsLoaded(input.admin);
+
   const conversationHistory = await fetchConversationHistory(
     input.admin,
     input.conversationId,
@@ -621,7 +615,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     input.conversationId,
   );
 
-  const contact =
+  let contact =
     contactId != null
       ? await loadContactSnapshot(input.admin, input.businessId, contactId)
       : null;
@@ -684,28 +678,126 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   }
 
   const orchestration = orchestrationResult.data;
+  const rawPlan = orchestratorResponseToExecutorPlan(orchestration);
+  const filteredPlan = filterExecutorPlanByProfile(rawPlan, profile);
+
+  if (
+    filteredPlan.blockedActions.length > 0 ||
+    filteredPlan.contactUpdatesBlocked
+  ) {
+    console.info(
+      "[auto-reply-pipeline]",
+      JSON.stringify({
+        action: "tools_blocked_by_permissions",
+        blockedActions: filteredPlan.blockedActions,
+        contactUpdatesBlocked: filteredPlan.contactUpdatesBlocked,
+      }),
+    );
+  }
+
+  const permittedPlan = filteredPlan.plan;
+
+  let resolvedContactId = contactId;
+  let contactCreationLabel: string | null = null;
+
+  if (!resolvedContactId) {
+    const createContactAction = permittedPlan.actions.find(
+      (action) => action.type === "create_contact",
+    );
+
+    if (createContactAction?.type === "create_contact") {
+      const created = await applyCreateContactFromPlan({
+        admin: input.admin,
+        businessId: input.businessId,
+        conversationId: input.conversationId,
+        channel: input.channel,
+        action: createContactAction,
+      });
+
+      if (created) {
+        resolvedContactId = created.contactId;
+        contactCreationLabel = created.label;
+        contact = await loadContactSnapshot(
+          input.admin,
+          input.businessId,
+          created.contactId,
+        );
+      }
+    }
+  }
+
+  const executorPlan = {
+    ...permittedPlan,
+    actions: permittedPlan.actions.filter((action) => action.type !== "create_contact"),
+  };
 
   let executorResult: Awaited<ReturnType<typeof applyPreparedExecutorPlan>> | null =
     null;
 
-  if (contactId != null) {
+  if (resolvedContactId != null) {
     executorResult = await applyPreparedExecutorPlan({
       admin: input.admin,
       businessId: input.businessId,
-      contactId,
+      contactId: resolvedContactId,
       conversationId: input.conversationId,
       channel: input.channel,
       clientMessage: input.clientMessage,
       agent: null,
       routingMethod: "none",
-      plan: applyAgentPermissionsToPlan(
-        orchestratorResponseToExecutorPlan(orchestration),
-        profile,
-      ),
+      plan: executorPlan,
+      suppressRunLog: true,
+    });
+
+    if (contactCreationLabel && executorResult) {
+      executorResult = {
+        ...executorResult,
+        actionsApplied: [contactCreationLabel, ...executorResult.actionsApplied],
+      };
+    }
+  }
+
+  const opsActions = buildAgentOpsActions({
+    intent: orchestration.intent,
+    rawPlan,
+    filtered: filteredPlan,
+    executed: executorResult?.actionsApplied,
+    skipped: executorResult?.skippedDuplicates,
+  });
+
+  await logAgentOpsRun(input.admin, {
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    contactId: resolvedContactId ?? contactId,
+    channel: input.channel,
+    clientMessage: input.clientMessage,
+    routingMethod: "none",
+    actions: opsActions,
+    success: executorResult?.success !== false,
+    errorMessage: executorResult?.errorMessage ?? null,
+  });
+
+  if (
+    resolvedContactId &&
+    (orchestration.intent === "sales" || orchestration.intent === "registration")
+  ) {
+    void processSalesAgentRules({
+      admin: input.admin,
+      businessId: input.businessId,
+      contactId: resolvedContactId,
+      message: input.clientMessage,
+    }).catch((error) => {
+      console.warn(
+        "[auto-reply-pipeline]",
+        JSON.stringify({
+          action: "bant_post_step_failed",
+          error: error instanceof Error ? error.message : "unknown",
+        }),
+      );
     });
   }
 
   if (executorResult?.actionsApplied.length) {
+    void touchPlatformPromptUsage(["executor"], input.admin);
     await reportAgentActions({
       admin: input.admin,
       businessId: input.businessId,
@@ -758,7 +850,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     businessId: input.businessId,
     conversationId: input.conversationId,
     channel: input.channel,
-    contactId,
+    contactId: resolvedContactId ?? contactId,
     contactName: contact?.name,
     reason: handoffPlan.reason,
     messagePreview: input.clientMessage,

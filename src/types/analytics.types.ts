@@ -70,6 +70,9 @@ export type AgentRunsMetrics = {
   keywordRoutesLast30Days: number;
   assistantOnlyLast30Days: number;
   actionsAppliedLast30Days: number;
+  blockedActionsLast30Days: number;
+  skippedDuplicatesLast30Days: number;
+  bookingFailuresLast30Days: number;
 };
 
 export type AgentRunListItem = {

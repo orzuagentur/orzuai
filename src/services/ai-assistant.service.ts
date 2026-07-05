@@ -21,12 +21,20 @@ import {
 } from "@/services/channel-workspace.service";
 import { listKnowledgeEntries, parseKnowledgeCategory } from "@/services/knowledge.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
-import { listRecentAgentRuns } from "@/services/analytics-ai-ops.service";
+import { listRecentAgentRuns, getAgentRunsMetrics } from "@/services/analytics-ai-ops.service";
 import {
   getAgentAiActivity,
   getAgentDashboardStats,
   listAgentRecentDialogues,
 } from "@/services/agent-dashboard.service";
+import { isCalendarBookingEnabled } from "@/services/ai-calendar-booking.service";
+import { listPublishedBookingPagesForBusinessAdmin } from "@/services/booking-pages.service";
+import {
+  listBusinessCalendarResources,
+} from "@/services/business-calendar-setup.service";
+import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
+import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
 
 const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
@@ -35,6 +43,23 @@ async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
   return business?.id ?? null;
+}
+
+async function getAiWorkerReadiness(businessId: string): Promise<AiWorkerReadiness> {
+  const [resources, pages, calendarBookingEnabled, googleCalendarConnected] =
+    await Promise.all([
+      listBusinessCalendarResources(businessId),
+      listPublishedBookingPagesForBusinessAdmin(businessId),
+      isCalendarBookingEnabled(businessId),
+      isGoogleCalendarConnected(businessId),
+    ]);
+
+  return {
+    calendarBookingEnabled,
+    googleCalendarConnected,
+    resourceCount: resources.length,
+    bookingPageCount: pages.length,
+  };
 }
 
 export async function getAiAssistantPageData(
@@ -91,6 +116,26 @@ export async function getAiAssistantPageData(
       },
       recentDialogues: [],
       aiActivity: [],
+      workerReadiness: {
+        calendarBookingEnabled: false,
+        googleCalendarConnected: false,
+        resourceCount: 0,
+        bookingPageCount: 0,
+      },
+      followUpAgent: { enabled: false, sentCount: 0 },
+      agentRuns: {
+        runsToday: 0,
+        runsLast30Days: 0,
+        successRatePercent: 0,
+        failedRunsLast30Days: 0,
+        intentRoutesLast30Days: 0,
+        keywordRoutesLast30Days: 0,
+        assistantOnlyLast30Days: 0,
+        actionsAppliedLast30Days: 0,
+        blockedActionsLast30Days: 0,
+        skippedDuplicatesLast30Days: 0,
+        bookingFailuresLast30Days: 0,
+      },
     };
   }
 
@@ -108,6 +153,9 @@ export async function getAiAssistantPageData(
     agentDashboardStats,
     recentDialogues,
     aiActivity,
+    workerReadiness,
+    followUpAgent,
+    agentRuns,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
     getAiAssistantProfileForBusiness(businessId),
@@ -121,6 +169,9 @@ export async function getAiAssistantPageData(
     getAgentDashboardStats(businessId),
     listAgentRecentDialogues(businessId, 12),
     getAgentAiActivity(businessId, 1),
+    getAiWorkerReadiness(businessId),
+    getFollowUpAgentSettings(businessId),
+    getAgentRunsMetrics(businessId),
   ]);
 
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
@@ -173,5 +224,8 @@ export async function getAiAssistantPageData(
     agentDashboardStats,
     recentDialogues,
     aiActivity,
+    workerReadiness,
+    followUpAgent,
+    agentRuns,
   };
 }

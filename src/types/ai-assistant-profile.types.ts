@@ -40,7 +40,7 @@ export const saveAiAssistantProfileSchema = z.object({
   canRequestHuman: z.boolean().default(true),
   canNotifyOwner: z.boolean().default(true),
   canNotifyOnActions: z.boolean().default(true),
-  canSummarizeActionsInChat: z.boolean().default(false),
+  canSummarizeActionsInChat: z.boolean().default(true),
 }).refine((data) => !data.scheduleEnabled || data.scheduleSlots.length > 0, {
   message: "Add at least one time range when schedule is enabled.",
   path: ["scheduleSlots"],

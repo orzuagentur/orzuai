@@ -8,6 +8,7 @@ import type {
   AgentRunsMetrics,
   AutomationOpsMetrics,
 } from "@/types/analytics.types";
+import { classifyAgentRunActions } from "@/lib/ai/agent-run-actions";
 
 const EMPTY_AUTOMATION_OPS: AutomationOpsMetrics = {
   runsToday: 0,
@@ -26,6 +27,9 @@ const EMPTY_AGENT_RUNS: AgentRunsMetrics = {
   keywordRoutesLast30Days: 0,
   assistantOnlyLast30Days: 0,
   actionsAppliedLast30Days: 0,
+  blockedActionsLast30Days: 0,
+  skippedDuplicatesLast30Days: 0,
+  bookingFailuresLast30Days: 0,
 };
 
 function startOfDaysAgo(days: number): Date {
@@ -140,6 +144,9 @@ export async function getAgentRunsMetrics(
   let keywordRoutesLast30Days = 0;
   let assistantOnlyLast30Days = 0;
   let actionsAppliedLast30Days = 0;
+  let blockedActionsLast30Days = 0;
+  let skippedDuplicatesLast30Days = 0;
+  let bookingFailuresLast30Days = 0;
 
   for (const row of rows) {
     const createdAt = new Date(row.created_at);
@@ -162,7 +169,12 @@ export async function getAgentRunsMetrics(
       assistantOnlyLast30Days += 1;
     }
 
-    actionsAppliedLast30Days += parseAgentRunActions(row.actions).length;
+    const actionEntries = parseAgentRunActions(row.actions);
+    const classified = classifyAgentRunActions(actionEntries);
+    actionsAppliedLast30Days += classified.executed.length;
+    blockedActionsLast30Days += classified.blocked.length;
+    skippedDuplicatesLast30Days += classified.skipped.length;
+    bookingFailuresLast30Days += classified.failed.length;
   }
 
   const measured = successCount + failedCount;
@@ -178,6 +190,9 @@ export async function getAgentRunsMetrics(
     keywordRoutesLast30Days,
     assistantOnlyLast30Days,
     actionsAppliedLast30Days,
+    blockedActionsLast30Days,
+    skippedDuplicatesLast30Days,
+    bookingFailuresLast30Days,
   };
 }
 

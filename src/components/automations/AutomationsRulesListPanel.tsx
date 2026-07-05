@@ -18,7 +18,6 @@ import {
 } from "@/features/automations/workflow-types";
 import type { IntegrationChannelStatusMap } from "@/features/integrations";
 import { cn } from "@/lib/utils";
-import type { SalesAgentSettings } from "@/types/ai-usage.types";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 import type { AutomationsTab } from "@/utils/automations-url";
@@ -28,7 +27,6 @@ type AutomationsRulesListPanelProps = {
   activeRuleId: AutomationRuleId | null;
   activeWorkflowId: string | null;
   activeTab: AutomationsTab;
-  salesAgent: SalesAgentSettings;
   followUpAgent: FollowUpAgentSettings;
   workflows: AutomationWorkflowItem[];
   channelStatuses: IntegrationChannelStatusMap;
@@ -39,7 +37,6 @@ export function AutomationsRulesListPanel({
   activeRuleId,
   activeWorkflowId,
   activeTab,
-  salesAgent,
   followUpAgent,
   workflows,
   channelStatuses,
@@ -49,7 +46,7 @@ export function AutomationsRulesListPanel({
     <div>
       <ul className="divide-y">
         {AUTOMATION_RULES.map((rule) => {
-          const enabled = isRuleEnabled(rule.id, salesAgent, followUpAgent);
+          const enabled = isRuleEnabled(rule.id, followUpAgent);
           const isActive = activeRuleId === rule.id;
           const Icon = rule.icon;
 
