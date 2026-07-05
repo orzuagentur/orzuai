@@ -14,6 +14,14 @@ export function resolveDashboardPageTitle(pathname: string): string {
     return "Setup";
   }
 
+  if (pathname === DASHBOARD_ROUTES.account) {
+    return "Account";
+  }
+
+  if (pathname === DASHBOARD_ROUTES.profile) {
+    return "Profile";
+  }
+
   for (const item of DASHBOARD_AI_NAV_ITEMS) {
     if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
       return item.label;
@@ -34,16 +42,6 @@ export function resolveDashboardPageTitle(pathname: string): string {
 
     if (!segment) {
       return item.label;
-    }
-
-    if (item.id === "settings") {
-      if (segment === "account") {
-        return "Account";
-      }
-
-      if (segment === "profile") {
-        return "Profile";
-      }
     }
 
     if (item.id === "chats" || item.id === "integrations") {

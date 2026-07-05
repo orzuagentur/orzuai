@@ -134,14 +134,14 @@ export function getDashboardPageHeaderMeta(
     };
   }
 
-  if (pathname === DASHBOARD_ROUTES.settingsAccount) {
+  if (pathname === DASHBOARD_ROUTES.account) {
     return {
       title: ACCOUNT_SETTINGS_MESSAGES.pageTitle,
       description: ACCOUNT_SETTINGS_MESSAGES.pageDescription,
     };
   }
 
-  if (pathname === DASHBOARD_ROUTES.settingsProfile) {
+  if (pathname === DASHBOARD_ROUTES.profile) {
     return {
       title: BUSINESS_PROFILE_MESSAGES.pageTitle,
       description: BUSINESS_PROFILE_MESSAGES.pageDescription,

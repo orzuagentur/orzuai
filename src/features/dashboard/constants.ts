@@ -120,7 +120,7 @@ export function buildDashboardNavItems(
 export const SETTINGS_MESSAGES = {
   pageTitle: "Settings",
   pageDescription:
-    "Manage your business profile, logo, contact information, and account.",
+    "Manage push notifications and saved quick replies for your inbox.",
 } as const;
 
 export const OVERVIEW_MESSAGES = {
