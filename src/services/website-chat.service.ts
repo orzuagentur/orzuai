@@ -23,6 +23,10 @@ import {
   resolveInboundMessageContext,
 } from "@/services/inbound-ingest.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
+import {
+  findContactForChannel,
+  resolveInboundConversation,
+} from "@/services/messaging.service";
 import { WEBSITE_CHAT_DEFAULT_APPEARANCE } from "@/features/website-chat/widget-appearance";
 import type {
   EnableWebsiteChatInput,
@@ -32,6 +36,7 @@ import type {
   WebsiteChatConnectConfig,
   WebsiteChatConnectionData,
   WebsiteChatMessageInput,
+  WebsiteChatWidgetMessage,
 } from "@/types/website-chat.types";
 import { extractRequestWebsiteOrigin } from "@/utils/website-origin";
 import {
@@ -342,6 +347,124 @@ export async function disconnectWebsiteChat(): Promise<{
   return { success: true };
 }
 
+async function verifyWebsiteChatWidgetAccess(
+  widgetToken: string,
+  apiKey: string | null,
+): Promise<{
+  id: string;
+  business_id: string;
+  connection_status: string;
+  api_key_hash: string | null;
+  site_url: string | null;
+  connected_at: string | null;
+} | null> {
+  if (!hasSupabaseEnv() || !widgetToken) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("website_chat_connections")
+    .select("id, business_id, connection_status, api_key_hash, site_url, connected_at")
+    .eq("widget_token", widgetToken)
+    .maybeSingle();
+
+  if (!connection || connection.connection_status !== "connected") {
+    return null;
+  }
+
+  if (
+    !apiKey ||
+    !connection.api_key_hash ||
+    !verifyWebsiteFormApiKey(apiKey, connection.api_key_hash)
+  ) {
+    return null;
+  }
+
+  return connection;
+}
+
+async function resolveWebsiteChatConversationId(
+  admin: ReturnType<typeof createAdminClient>,
+  businessId: string,
+  visitorId: string,
+): Promise<string | null> {
+  const identifier = visitorId.trim();
+  const contactPhone = `webchat:${identifier}`;
+
+  const contact =
+    (await findContactForChannel(admin, businessId, "website_chat", contactPhone)) ??
+    (await findContactForChannel(admin, businessId, "website_chat", identifier));
+
+  if (!contact?.id) {
+    return null;
+  }
+
+  return resolveInboundConversation(admin, businessId, contact.id, "website_chat");
+}
+
+function mapWebsiteChatWidgetMessage(row: {
+  id: string;
+  content: string;
+  sender_type: string;
+  created_at: string;
+  sent_at: string | null;
+}): WebsiteChatWidgetMessage {
+  const senderType =
+    row.sender_type === "client"
+      ? "client"
+      : row.sender_type === "ai"
+        ? "ai"
+        : "user";
+
+  return {
+    id: row.id,
+    content: row.content,
+    senderType,
+    createdAt: row.sent_at ?? row.created_at,
+  };
+}
+
+export async function listWebsiteChatMessages(
+  widgetToken: string,
+  apiKey: string | null,
+  visitorId: string,
+  after?: string,
+): Promise<WebsiteChatWidgetMessage[] | null> {
+  const connection = await verifyWebsiteChatWidgetAccess(widgetToken, apiKey);
+
+  if (!connection) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const conversationId = await resolveWebsiteChatConversationId(
+    admin,
+    connection.business_id,
+    visitorId,
+  );
+
+  if (!conversationId) {
+    return [];
+  }
+
+  let query = admin
+    .from("messages")
+    .select("id, content, sender_type, created_at, sent_at")
+    .eq("conversation_id", conversationId)
+    .eq("channel", "website_chat")
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (after) {
+    query = query.gt("created_at", after);
+  }
+
+  const { data } = await query;
+
+  return (data ?? []).map(mapWebsiteChatWidgetMessage);
+}
+
 async function registerWebsiteChatSite(
   admin: ReturnType<typeof createAdminClient>,
   connectionId: string,
@@ -380,31 +503,22 @@ export async function processWebsiteChatMessage(
   apiKey: string | null,
   request: Request,
   input: WebsiteChatMessageInput,
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{
+  success: boolean;
+  message?: string;
+  data?: WebsiteChatWidgetMessage;
+}> {
   if (!hasSupabaseEnv()) {
     return { success: false, message: "Not configured" };
   }
 
+  const connection = await verifyWebsiteChatWidgetAccess(widgetToken, apiKey);
+
+  if (!connection) {
+    return { success: false, message: "Unauthorized" };
+  }
+
   const admin = createAdminClient();
-  const { data: connection } = await admin
-    .from("website_chat_connections")
-    .select(
-      "id, business_id, connection_status, welcome_message, api_key_hash, site_url, connected_at",
-    )
-    .eq("widget_token", widgetToken)
-    .maybeSingle();
-
-  if (!connection || connection.connection_status !== "connected") {
-    return { success: false, message: "Unauthorized" };
-  }
-
-  if (
-    !apiKey ||
-    !connection.api_key_hash ||
-    !verifyWebsiteFormApiKey(apiKey, connection.api_key_hash)
-  ) {
-    return { success: false, message: "Unauthorized" };
-  }
 
   await registerWebsiteChatSite(
     admin,
@@ -439,7 +553,10 @@ export async function processWebsiteChatMessage(
   });
 
   if (insertResult?.isDuplicate) {
-    return { success: true };
+    return {
+      success: true,
+      data: mapWebsiteChatWidgetMessage(insertResult.message),
+    };
   }
 
   if (!insertResult) {
@@ -454,7 +571,10 @@ export async function processWebsiteChatMessage(
     clientMessage: input.message.trim(),
   });
 
-  return { success: true };
+  return {
+    success: true,
+    data: mapWebsiteChatWidgetMessage(insertResult.message),
+  };
 }
 
 export async function getWebsiteChatConfigByToken(

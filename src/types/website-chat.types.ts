@@ -60,3 +60,15 @@ export const websiteChatMessageSchema = z.object({
 });
 
 export type WebsiteChatMessageInput = z.infer<typeof websiteChatMessageSchema>;
+
+export const websiteChatMessagesQuerySchema = z.object({
+  visitorId: z.string().min(8).max(128),
+  after: z.string().datetime().optional(),
+});
+
+export type WebsiteChatWidgetMessage = {
+  id: string;
+  content: string;
+  senderType: "client" | "ai" | "user";
+  createdAt: string;
+};

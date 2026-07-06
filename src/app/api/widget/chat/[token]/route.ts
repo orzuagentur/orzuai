@@ -77,5 +77,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
+  return NextResponse.json(
+    {
+      success: true,
+      message: result.data,
+    },
+    { headers: CORS_HEADERS },
+  );
 }
