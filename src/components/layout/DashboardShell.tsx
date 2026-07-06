@@ -17,6 +17,7 @@ import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
 import { PlatformCopilotProvider } from "@/contexts/platform-copilot-context";
 import { PlatformSupportProvider } from "@/contexts/platform-support-context";
 import { PlatformAnnouncementsBanner } from "@/components/dashboard/PlatformAnnouncementsBanner";
+import type { OnboardingProgress } from "@/services/onboarding.service";
 import type { PlatformAnnouncement } from "@/services/platform-announcements.service";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
@@ -64,6 +65,14 @@ const PlatformSupportWidget = dynamic(
   { ssr: false },
 );
 
+const SetupProgressCard = dynamic(
+  () =>
+    import("@/components/onboarding/SetupProgressCard").then(
+      (mod) => mod.SetupProgressCard,
+    ),
+  { ssr: false },
+);
+
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
   googleCalendarConnected?: boolean;
@@ -71,6 +80,7 @@ type DashboardShellProps = {
   voiceClientEnabled?: boolean;
   announcements?: PlatformAnnouncement[];
   supportUnreadCount?: number;
+  onboardingProgress?: OnboardingProgress | null;
   children: React.ReactNode;
 };
 
@@ -81,6 +91,7 @@ export function DashboardShell({
   voiceClientEnabled = false,
   announcements = [],
   supportUnreadCount = 0,
+  onboardingProgress = null,
   children,
 }: DashboardShellProps) {
   useSupabaseRealtimeBootstrap();
@@ -124,6 +135,9 @@ export function DashboardShell({
                               </SidebarProvider>
                               <PlatformCopilotWidget />
                               <PlatformSupportWidget />
+                              {onboardingProgress && !onboardingProgress.isComplete ? (
+                                <SetupProgressCard progress={onboardingProgress} />
+                              ) : null}
                               <AiHumanRequestOverlay />
                             </PlatformSupportProvider>
                           </PlatformCopilotProvider>

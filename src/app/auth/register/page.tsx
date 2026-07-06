@@ -9,15 +9,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth.service";
-import { getPrimaryBusiness } from "@/services/business.service";
-import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
+import { resolveAuthenticatedLandingPathForUser } from "@/utils/post-auth-redirect";
 
 export default async function RegisterPage() {
   const user = await getCurrentUser();
 
   if (user) {
-    const business = await getPrimaryBusiness(user.id);
-    redirect(resolveAuthenticatedLandingPath(Boolean(business)));
+    redirect(await resolveAuthenticatedLandingPathForUser(user.id));
   }
 
   return (

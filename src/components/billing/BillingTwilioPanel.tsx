@@ -7,7 +7,6 @@ import { ExternalLinkIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
-import { BillingInvoicesTable } from "@/components/billing/BillingInvoicesTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,18 +20,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BILLING_MESSAGES } from "@/features/billing/constants";
+import { createTwilioTopUpAction } from "@/features/billing/actions/create-twilio-topup";
 import { purchaseTwilioPhoneNumberAction } from "@/features/twilio/actions/purchase-phone-number";
 import { searchTwilioPhoneNumbersAction } from "@/features/twilio/actions/search-phone-numbers";
 import {
   formatMonthlyPrice,
   TWILIO_COUNTRY_PRICING,
 } from "@/features/twilio/country-pricing";
-import type { BillingInvoiceItem, TwilioBillingData } from "@/types/billing.types";
+import type { TwilioBillingData } from "@/types/billing.types";
 import type { TwilioAvailablePhoneNumber } from "@/types/twilio-integration.types";
 
 type BillingTwilioPanelProps = {
   data: TwilioBillingData;
-  invoices: BillingInvoiceItem[];
   hasActivePaidSubscription: boolean;
 };
 
@@ -45,7 +44,6 @@ function formatCents(cents: number): string {
 
 export function BillingTwilioPanel({
   data,
-  invoices,
   hasActivePaidSubscription,
 }: BillingTwilioPanelProps) {
   const router = useRouter();
@@ -56,6 +54,8 @@ export function BillingTwilioPanel({
   >([]);
   const [isSearching, setIsSearching] = useState(false);
   const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
+  const [topUpAmount, setTopUpAmount] = useState("25");
+  const [isToppingUp, setIsToppingUp] = useState(false);
 
   const selectedPricing =
     TWILIO_COUNTRY_PRICING.find((entry) => entry.code === countryCode) ??
@@ -124,6 +124,53 @@ export function BillingTwilioPanel({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="shadow-none">
           <CardHeader className="pb-2">
+            <CardDescription>{BILLING_MESSAGES.twilioBalance}</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {data.balanceCents !== null
+                ? formatCents(data.balanceCents)
+                : "—"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground">
+            {data.isConnected ? "Live from Twilio API" : "Connect Twilio to view balance"}
+          </CardContent>
+        </Card>
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardDescription>{BILLING_MESSAGES.twilioVoiceRate}</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {data.voiceRateCentsPerMinute
+                ? formatCents(data.voiceRateCentsPerMinute)
+                : "—"}
+              <span className="text-sm font-normal text-muted-foreground"> / min</span>
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardDescription>{BILLING_MESSAGES.twilioSmsRate}</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {data.smsRateCents ? formatCents(data.smsRateCents) : "—"}
+              <span className="text-sm font-normal text-muted-foreground"> / SMS</span>
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardDescription>{BILLING_MESSAGES.monthlyNumbers}</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {formatCents(data.monthlyNumberSpendCents)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground">
+            {data.numbers.length} active number{data.numbers.length === 1 ? "" : "s"}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
             <CardDescription>Status</CardDescription>
             <CardTitle className="text-lg">
               <Badge variant={data.isConnected ? "default" : "secondary"}>
@@ -135,17 +182,6 @@ export function BillingTwilioPanel({
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {data.activePhoneNumber ?? data.accountFriendlyName ?? "Not connected"}
-          </CardContent>
-        </Card>
-        <Card className="shadow-none">
-          <CardHeader className="pb-2">
-            <CardDescription>{BILLING_MESSAGES.monthlyNumbers}</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
-              {formatCents(data.monthlyNumberSpendCents)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            {data.numbers.length} active number{data.numbers.length === 1 ? "" : "s"}
           </CardContent>
         </Card>
         <Card className="shadow-none">
@@ -165,6 +201,63 @@ export function BillingTwilioPanel({
           </CardHeader>
         </Card>
       </div>
+
+      {data.isConnected ? (
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">{BILLING_MESSAGES.twilioTopUp}</CardTitle>
+            <CardDescription>
+              Add funds to your connected Twilio account via OrzuAI billing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="space-y-1">
+              <Label htmlFor="twilio-topup-amount">Amount (USD)</Label>
+              <Input
+                id="twilio-topup-amount"
+                type="number"
+                min={5}
+                step={5}
+                value={topUpAmount}
+                onChange={(event) => setTopUpAmount(event.target.value)}
+                className="w-32"
+              />
+            </div>
+            <Button
+              type="button"
+              disabled={isToppingUp}
+              onClick={async () => {
+                const dollars = Number.parseFloat(topUpAmount);
+
+                if (Number.isNaN(dollars) || dollars < 5) {
+                  toast.error("Minimum top-up is $5.");
+                  return;
+                }
+
+                setIsToppingUp(true);
+
+                try {
+                  const result = await createTwilioTopUpAction({
+                    amountCents: Math.round(dollars * 100),
+                  });
+
+                  if (!result.success) {
+                    toast.error(result.message ?? "Top-up failed.");
+                    return;
+                  }
+
+                  window.location.href = result.url;
+                } finally {
+                  setIsToppingUp(false);
+                }
+              }}
+            >
+              {isToppingUp ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              {BILLING_MESSAGES.twilioTopUp}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!data.isConnected ? (
         <Card className="shadow-none">
@@ -316,7 +409,31 @@ export function BillingTwilioPanel({
         </CardContent>
       </Card>
 
-      <BillingInvoicesTable invoices={invoices} />
+      {data.topUpHistory.length > 0 ? (
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Top-up history</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.topUpHistory.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {new Date(entry.createdAt).toLocaleDateString()}
+                </span>
+                <span className="font-medium tabular-nums">
+                  {formatCents(entry.amountCents)}
+                </span>
+                <Badge variant="outline" className="capitalize">
+                  {entry.status}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

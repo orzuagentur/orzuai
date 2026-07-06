@@ -87,6 +87,7 @@ export function TeamMemberDialog({
   );
   const [accessStartsAt, setAccessStartsAt] = useState("");
   const [accessEndsAt, setAccessEndsAt] = useState("");
+  const [inviteExpiryDays, setInviteExpiryDays] = useState(7);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function TeamMemberDialog({
     setPermissions(ROLE_DEFAULT_PERMISSIONS.manager);
     setAccessStartsAt("");
     setAccessEndsAt("");
+    setInviteExpiryDays(7);
   }, [member, open]);
 
   function handleRoleChange(nextRole: TeamRole) {
@@ -157,6 +159,7 @@ export function TeamMemberDialog({
         permissions,
         accessStartsAt: fromDateInputValue(accessStartsAt),
         accessEndsAt: fromDateInputValue(accessEndsAt),
+        inviteExpiryDays,
       });
 
       if (!result.success) {
@@ -284,6 +287,33 @@ export function TeamMemberDialog({
               })}
             </div>
           </div>
+
+          {!isEditing ? (
+            <div className="space-y-2">
+              <Label htmlFor="team-invite-expiry">{TEAM_MESSAGES.inviteExpiryLabel}</Label>
+              <p className="text-xs text-muted-foreground">
+                {TEAM_MESSAGES.inviteExpiryDescription}
+              </p>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="team-invite-expiry"
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={inviteExpiryDays}
+                  onChange={(event) =>
+                    setInviteExpiryDays(
+                      Math.min(7, Math.max(1, Number(event.target.value) || 1)),
+                    )
+                  }
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">
+                  {TEAM_MESSAGES.inviteExpiryDays}
+                </span>
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             <div>

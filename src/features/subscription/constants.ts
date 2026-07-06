@@ -1,19 +1,24 @@
 export const SUBSCRIPTION_MESSAGES = {
   pageTitle: "Subscription & Billing",
   pageDescription:
-    "Choose a plan, add a payment method, and manage invoices through Stripe.",
+    "Choose a plan, add a payment method, and manage invoices in one place.",
   currentPlan: "Current plan",
   status: "Status",
   usage: "AI usage this month",
   upgrade: "Upgrade plan",
-  manageBilling: "Manage payment method & invoices",
-  stripeMissing:
-    "Stripe is not configured yet. Add STRIPE_SECRET_KEY and price IDs to enable billing.",
+  downgrade: "Change plan",
+  cancelToFree: "Cancel subscription",
+  manageBilling: "Manage billing",
+  billingMissing:
+    "Billing is not configured yet. Contact support to enable paid plans.",
   checkoutFailed: "Unable to start checkout. Please try again.",
-  portalFailed: "Unable to open billing portal. Please try again.",
+  planChangeFailed: "Unable to change plan. Please try again.",
+  portalFailed: "Unable to open billing settings. Please try again.",
   freePlanNote: "Free plan — no payment method required.",
   successTitle: "Subscription updated",
-  successDescription: "Your plan changes may take a moment to appear.",
+  successDescription: "Your new plan is active.",
+  planChangedTitle: "Plan changed",
+  planChangedDescription: "Proration was applied to your current billing period.",
   canceledTitle: "Checkout canceled",
   canceledDescription: "No charges were made.",
   addonFailed: "Unable to add this add-on. Please try again.",
@@ -21,4 +26,6 @@ export const SUBSCRIPTION_MESSAGES = {
   addonAddedTitle: "Add-on added",
   addonAddedDescription: "Your subscription was updated. Limits refresh shortly.",
   addonActiveLabel: "Active",
+  paymentUpdatedTitle: "Payment method updated",
+  paymentUpdatedDescription: "Your default card has been saved.",
 } as const;

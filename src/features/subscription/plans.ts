@@ -126,17 +126,19 @@ export function isUnlimitedAiReplies(monthlyLimit: number): boolean {
   return isUnlimitedQuota(monthlyLimit);
 }
 
+/** Resolves stored plan slug; unknown values are preserved for DB-driven plans. */
 export function resolveSubscriptionPlan(
   plan: string | null | undefined,
 ): SubscriptionPlanId {
   const normalized = plan?.trim().toLowerCase();
 
-  if (
-    normalized &&
-    (SUBSCRIPTION_PLAN_IDS as readonly string[]).includes(normalized)
-  ) {
+  if (!normalized) {
+    return "free";
+  }
+
+  if ((SUBSCRIPTION_PLAN_IDS as readonly string[]).includes(normalized)) {
     return normalized as SubscriptionPlanId;
   }
 
-  return "free";
+  return normalized as SubscriptionPlanId;
 }

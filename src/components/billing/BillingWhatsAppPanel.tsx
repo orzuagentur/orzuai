@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ExternalLinkIcon } from "lucide-react";
 
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
-import { BillingInvoicesTable } from "@/components/billing/BillingInvoicesTable";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -16,11 +15,9 @@ import {
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BILLING_MESSAGES } from "@/features/billing/constants";
 import type { WhatsAppBillingData } from "@/types/billing.types";
-import type { BillingInvoiceItem } from "@/types/billing.types";
 
 type BillingWhatsAppPanelProps = {
   data: WhatsAppBillingData;
-  invoices: BillingInvoiceItem[];
 };
 
 function formatCents(cents: number | null): string {
@@ -34,10 +31,7 @@ function formatCents(cents: number | null): string {
   }).format(cents / 100);
 }
 
-export function BillingWhatsAppPanel({
-  data,
-  invoices,
-}: BillingWhatsAppPanelProps) {
+export function BillingWhatsAppPanel({ data }: BillingWhatsAppPanelProps) {
   const chartData = data.messagesLast30Days.map((point) => ({
     label: point.label,
     value: point.value,
@@ -112,7 +106,6 @@ export function BillingWhatsAppPanel({
         description="Messages per day over the last 30 days."
       />
 
-      <BillingInvoicesTable invoices={invoices} />
     </div>
   );
 }

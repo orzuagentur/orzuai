@@ -28,7 +28,11 @@ export const TEAM_MESSAGES = {
   roleLabel: "Role",
   inviteButton: "Invite member",
   inviteMember: "Invite member",
-  invited: "Invitation saved.",
+  invited: "Invitation sent.",
+  inviteExpiryLabel: "Invitation link expires in",
+  inviteExpiryDescription:
+    "Choose how long the invite link stays valid (1–7 days).",
+  inviteExpiryDays: "days",
   inviteFailed: "Unable to invite member.",
   seatLimitReached: "Your plan has no available team seats. Upgrade billing to add more members.",
   empty: "Only you on the team so far.",

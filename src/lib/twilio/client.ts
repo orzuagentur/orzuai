@@ -201,6 +201,36 @@ export async function fetchTwilioAccount(
   );
 }
 
+type TwilioBalanceResource = {
+  account_sid: string;
+  balance: string;
+  currency: string;
+};
+
+export async function fetchTwilioBalance(
+  credentials: TwilioApiCredentials,
+): Promise<{ balance: number; currency: string } | null> {
+  try {
+    const data = await twilioRequest<TwilioBalanceResource>(
+      credentials,
+      `/Accounts/${credentials.accountSid}/Balance.json`,
+    );
+
+    const balance = Number.parseFloat(data.balance);
+
+    if (Number.isNaN(balance)) {
+      return null;
+    }
+
+    return {
+      balance,
+      currency: data.currency ?? "USD",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTwilioIncomingPhoneNumber(
   credentials: TwilioApiCredentials,
   phoneSid: string,

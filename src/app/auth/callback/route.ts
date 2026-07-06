@@ -1,14 +1,81 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { AUTH_ROUTES } from "@/constants/routes";
+import { APP_ROUTES, AUTH_ROUTES } from "@/constants/routes";
 import { createClient } from "@/lib/supabase/server";
-import { getPrimaryBusiness } from "@/services/business.service";
+import {
+  hasOnboardingDripAnchor,
+  triggerGoogleWelcomeEmail,
+} from "@/services/onboarding-drip.service";
 import { authCallbackQuerySchema } from "@/types/auth.types";
 import {
   getSafeRedirectPath,
   shouldUseVerifySuccessRedirect,
 } from "@/utils/auth";
-import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
+import { resolveAuthenticatedLandingPathForUser } from "@/utils/post-auth-redirect";
+
+const NEW_USER_WINDOW_MS = 10 * 60 * 1000;
+
+function isGoogleProvider(user: {
+  app_metadata?: Record<string, unknown>;
+  identities?: Array<{ provider?: string }>;
+}): boolean {
+  const provider = user.app_metadata?.provider;
+
+  if (provider === "google") {
+    return true;
+  }
+
+  return user.identities?.some((identity) => identity.provider === "google") ?? false;
+}
+
+function isRecentlyCreated(createdAt: string | undefined): boolean {
+  if (!createdAt) {
+    return false;
+  }
+
+  return Date.now() - new Date(createdAt).getTime() <= NEW_USER_WINDOW_MS;
+}
+
+function extractFirstName(user: {
+  user_metadata?: Record<string, unknown>;
+}): string | null {
+  const metadata = user.user_metadata ?? {};
+  const fullName =
+    (typeof metadata.full_name === "string" && metadata.full_name) ||
+    (typeof metadata.name === "string" && metadata.name) ||
+    null;
+
+  if (!fullName) {
+    return null;
+  }
+
+  return fullName.trim().split(/\s+/)[0] ?? null;
+}
+
+async function maybeSendGoogleWelcomeEmail(user: {
+  id: string;
+  email?: string | null;
+  created_at?: string;
+  app_metadata?: Record<string, unknown>;
+  identities?: Array<{ provider?: string }>;
+  user_metadata?: Record<string, unknown>;
+}): Promise<void> {
+  if (!user.email || !isGoogleProvider(user) || !isRecentlyCreated(user.created_at)) {
+    return;
+  }
+
+  const alreadyWelcomed = await hasOnboardingDripAnchor(user.id);
+
+  if (alreadyWelcomed) {
+    return;
+  }
+
+  void triggerGoogleWelcomeEmail({
+    userId: user.id,
+    email: user.email,
+    firstName: extractFirstName(user),
+  });
+}
 
 export async function GET(request: NextRequest) {
   const query = authCallbackQuerySchema.safeParse(
@@ -54,8 +121,14 @@ export async function GET(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const business = user ? await getPrimaryBusiness(user.id) : null;
-  const redirectPath = resolveAuthenticatedLandingPath(Boolean(business), next);
+
+  if (user) {
+    await maybeSendGoogleWelcomeEmail(user);
+  }
+
+  const redirectPath = user
+    ? await resolveAuthenticatedLandingPathForUser(user.id, next)
+    : APP_ROUTES.dashboard;
 
   if (!shouldUseVerifySuccessRedirect(redirectPath)) {
     return NextResponse.redirect(new URL(redirectPath, request.url));

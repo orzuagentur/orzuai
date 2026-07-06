@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { ArrowUpRightIcon, MessageCircleIcon, PhoneIcon } from "lucide-react";
 
-import { BillingInvoicesTable } from "@/components/billing/BillingInvoicesTable";
 import { BillingPaymentMethodCard } from "@/components/billing/BillingPaymentMethodCard";
 import { SubscriptionHub } from "@/components/subscription/SubscriptionHub";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BILLING_MESSAGES } from "@/features/billing/constants";
-import { createBillingPortalAction } from "@/features/subscription/actions/create-billing-portal";
+import { updatePaymentMethodAction } from "@/features/subscription/actions/update-payment-method";
 import type { SubscriptionPageData } from "@/types/subscription.types";
 import {
   Card,
@@ -31,7 +30,7 @@ export function BillingOverviewPanel({ data }: BillingOverviewPanelProps) {
           onManage={
             data.hasStripeCustomer
               ? async () => {
-                  const result = await createBillingPortalAction();
+                  const result = await updatePaymentMethodAction();
 
                   if (result.success) {
                     window.location.href = result.url;
@@ -50,6 +49,18 @@ export function BillingOverviewPanel({ data }: BillingOverviewPanelProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <Link
+              href={DASHBOARD_ROUTES.subscriptionUsage}
+              className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
+            >
+              <div>
+                <p className="font-medium">Usage & Spending</p>
+                <p className="text-sm text-muted-foreground">
+                  Limits, forecasts, and service breakdown
+                </p>
+              </div>
+              <ArrowUpRightIcon className="size-4 text-muted-foreground" />
+            </Link>
             <Link
               href={DASHBOARD_ROUTES.subscriptionWhatsApp}
               className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
@@ -83,8 +94,6 @@ export function BillingOverviewPanel({ data }: BillingOverviewPanelProps) {
           </CardContent>
         </Card>
       </div>
-
-      <BillingInvoicesTable invoices={data.recentInvoices} />
 
       <SubscriptionHub data={data} embedded />
     </div>

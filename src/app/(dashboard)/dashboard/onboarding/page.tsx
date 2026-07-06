@@ -39,7 +39,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
   }
 
   const step = Number.isFinite(requestedStep)
-    ? Math.min(5, Math.max(1, requestedStep))
+    ? Math.min(3, Math.max(1, requestedStep))
     : progress.recommendedStep;
 
   const [whatsappConnectConfig, aiSettings] = await Promise.all([

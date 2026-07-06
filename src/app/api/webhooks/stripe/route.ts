@@ -23,16 +23,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
-  let event: Stripe.Event;
-
   try {
     const stripe = getStripeClient();
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    await handleStripeWebhookEvent(event);
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+
+    console.error("[stripe-webhook]", error);
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
-
-  await handleStripeWebhookEvent(event);
-
-  return NextResponse.json({ received: true });
 }

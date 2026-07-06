@@ -4,6 +4,8 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { AUTH_ROUTES } from "@/constants/routes";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/services/auth.service";
+import { getAccessibleBusiness } from "@/services/business-access.service";
+import { getOnboardingProgress } from "@/services/onboarding.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
 import { getActivePlatformAnnouncements } from "@/services/platform-announcements.service";
@@ -29,7 +31,12 @@ export default async function DashboardLayout({
   }
 
   const userProfile = await getUserProfile(user);
-  const business = await getPrimaryBusiness(user.id);
+  const ownedBusiness = await getPrimaryBusiness(user.id);
+  const business =
+    (await getAccessibleBusiness(user.id)) ?? ownedBusiness;
+  const onboardingProgress = ownedBusiness
+    ? await getOnboardingProgress(ownedBusiness.id)
+    : null;
   const googleCalendarConnected = business
     ? await isGoogleCalendarConnected(business.id)
     : false;
@@ -57,6 +64,7 @@ export default async function DashboardLayout({
       voiceClientEnabled={voiceClientConfig.enabled}
       announcements={announcements}
       supportUnreadCount={supportUnreadCount}
+      onboardingProgress={onboardingProgress}
     >
       {children}
     </DashboardShell>

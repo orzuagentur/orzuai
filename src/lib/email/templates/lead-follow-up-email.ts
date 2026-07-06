@@ -1,3 +1,11 @@
+import {
+  renderBusinessSignature,
+  renderEmailHeading,
+  renderEmailParagraph,
+} from "@/lib/email/components";
+import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
+import { escapeHtml } from "@/utils/email";
+
 type LeadFollowUpEmailParams = {
   businessName: string;
   recipientName: string;
@@ -9,16 +17,22 @@ export function renderLeadFollowUpEmail({
   recipientName,
   message,
 }: LeadFollowUpEmailParams): { subject: string; html: string } {
-  const safeMessage = message.replace(/\n/g, "<br />");
+  const safeMessage = escapeHtml(message).replace(/\n/g, "<br />");
+
+  const bodyHtml = `
+    ${renderEmailHeading(`Thank you for contacting ${escapeHtml(businessName)}`)}
+    ${renderEmailParagraph(`Hi ${escapeHtml(recipientName)},`)}
+    ${renderEmailParagraph(safeMessage)}
+    ${renderBusinessSignature(businessName)}
+  `;
 
   return {
     subject: `Thank you for contacting ${businessName}`,
-    html: `
-      <div style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
-        <p>Hi ${recipientName},</p>
-        <p>${safeMessage}</p>
-        <p style="color: #666; font-size: 14px;">— ${businessName}</p>
-      </div>
-    `,
+    html: renderBaseEmailLayout({
+      previewText: `A message from ${businessName}.`,
+      title: `Message from ${businessName}`,
+      bodyHtml,
+      footerNote: `Sent on behalf of ${businessName} via OrzuX.`,
+    }),
   };
 }

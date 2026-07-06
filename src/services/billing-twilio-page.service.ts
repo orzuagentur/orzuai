@@ -11,7 +11,10 @@ import {
   buildTwilioConnectUrlForBusiness,
   getTwilioConnectConfig,
   getTwilioConnection,
+  resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
+import { fetchTwilioBalance } from "@/lib/twilio/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { TwilioBillingData } from "@/types/billing.types";
 
 export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
@@ -28,6 +31,11 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
     monthlyNumberSpendCents: 0,
     connectUrl: "/api/integrations/twilio/connect",
     isConnectConfigured: getTwilioConnectConfig().isConfigured,
+    balanceCents: null,
+    balanceCurrency: null,
+    voiceRateCentsPerMinute: 13,
+    smsRateCents: 75,
+    topUpHistory: [],
   };
 
   const ctx = await getOwnedBusinessBillingContext();
@@ -98,6 +106,37 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
   );
 
   let connectUrl = empty.connectUrl;
+  let balanceCents: number | null = null;
+  let balanceCurrency: string | null = null;
+  let topUpHistory: TwilioBillingData["topUpHistory"] = [];
+
+  if (connection?.status === "connected") {
+    const credentials = resolveTwilioCredentialsForBusiness(connection);
+
+    if (credentials) {
+      const balance = await fetchTwilioBalance(credentials);
+
+      if (balance) {
+        balanceCents = Math.round(balance.balance * 100);
+        balanceCurrency = balance.currency;
+      }
+    }
+  }
+
+  const admin = createAdminClient();
+  const { data: topUps } = await admin
+    .from("twilio_balance_topups")
+    .select("id, amount_cents, status, created_at")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  topUpHistory = (topUps ?? []).map((row) => ({
+    id: row.id as string,
+    amountCents: row.amount_cents as number,
+    status: row.status as string,
+    createdAt: row.created_at as string,
+  }));
 
   try {
     connectUrl = await buildTwilioConnectUrlForBusiness(businessId);
@@ -118,5 +157,10 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
     monthlyNumberSpendCents,
     connectUrl,
     isConnectConfigured: getTwilioConnectConfig().isConfigured,
+    balanceCents,
+    balanceCurrency,
+    voiceRateCentsPerMinute: 13,
+    smsRateCents: 75,
+    topUpHistory,
   };
 }

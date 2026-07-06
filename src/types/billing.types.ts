@@ -20,6 +20,23 @@ export type BillingInvoiceItem = {
   pdfUrl: string | null;
 };
 
+export type BillingInvoiceLineItem = {
+  id: string;
+  description: string;
+  amountCents: number;
+  quantity: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+};
+
+export type BillingInvoiceDetail = BillingInvoiceItem & {
+  lineItems: BillingInvoiceLineItem[];
+  subtotalCents: number;
+  taxCents: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+};
+
 export type BillingUsagePoint = {
   date: string;
   label: string;
@@ -62,6 +79,16 @@ export type TwilioBillingData = {
   monthlyNumberSpendCents: number;
   connectUrl: string;
   isConnectConfigured: boolean;
+  balanceCents: number | null;
+  balanceCurrency: string | null;
+  voiceRateCentsPerMinute: number | null;
+  smsRateCents: number | null;
+  topUpHistory: Array<{
+    id: string;
+    amountCents: number;
+    status: string;
+    createdAt: string;
+  }>;
 };
 
 export type BillingOverviewData = {

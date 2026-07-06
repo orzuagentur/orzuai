@@ -54,6 +54,7 @@ type PlanFormState = {
   isActive: boolean;
   isPublic: boolean;
   highlighted: boolean;
+  features: string[];
   entitlements: PlanEntitlements;
 };
 
@@ -67,6 +68,7 @@ function planToForm(plan: PlatformPlanRecord): PlanFormState {
     isActive: plan.isActive,
     isPublic: plan.isPublic,
     highlighted: plan.highlighted,
+    features: [...plan.features],
     entitlements: { ...plan.entitlements },
   };
 }
@@ -81,6 +83,7 @@ function emptyPlanForm(): PlanFormState {
     isActive: true,
     isPublic: true,
     highlighted: false,
+    features: [],
     entitlements: { ...DEFAULT_ENTITLEMENTS },
   };
 }
@@ -125,7 +128,11 @@ function NumberField({
   );
 }
 
-export function PlansManagerPanel() {
+export function PlansManagerPanel({
+  section = "all",
+}: {
+  section?: "all" | "products";
+}) {
   const [plans, setPlans] = useState<PlatformPlanRecord[]>([]);
   const [addons, setAddons] = useState<PlatformSubscriptionAddonRow[]>([]);
   const [editing, setEditing] = useState<PlanFormState | null>(null);
@@ -191,6 +198,7 @@ export function PlansManagerPanel() {
         isPublic: editing.isPublic,
         highlighted: editing.highlighted,
         entitlements: editing.entitlements,
+        features: editing.features.filter((feature) => feature.trim().length > 0),
       });
 
       if (!result.success) {
@@ -207,9 +215,22 @@ export function PlansManagerPanel() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Тарифы и Stripe"
-        description="Управляйте ценами, лимитами и услугами только из админки. Stripe синхронизируется отсюда."
+        title={section === "products" ? "Продукты (add-ons)" : "Тарифы"}
+        description={
+          section === "products"
+            ? "Создание, цены, доступность и отображение дополнительных продуктов."
+            : "Управляйте ценами, лимитами и услугами только из админки."
+        }
         actions={
+          section === "products" ? (
+            <Link
+              href="/billing/plans"
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+            >
+              <ArrowLeftIcon className="size-4" />
+              К тарифам
+            </Link>
+          ) : (
           <div className="flex flex-wrap gap-2">
             <Link
               href="/billing"
@@ -254,9 +275,11 @@ export function PlansManagerPanel() {
               Sync все тарифы → Stripe
             </button>
           </div>
+          )
         }
       />
 
+      {section !== "products" ? (
       <SectionCard title="Тарифные планы" description="Цена, лимиты и Stripe Price ID">
         {sortedPlans.length === 0 ? (
           <EmptyState
@@ -347,6 +370,7 @@ export function PlansManagerPanel() {
           </div>
         )}
       </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Add-ons"
@@ -534,6 +558,80 @@ export function PlansManagerPanel() {
                 checked={editing.highlighted}
                 onChange={(value) => setEditing({ ...editing, highlighted: value })}
               />
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold">Features & benefits</h4>
+                <button
+                  type="button"
+                  className="rounded-lg border px-2 py-1 text-xs hover:bg-muted"
+                  onClick={() =>
+                    setEditing({
+                      ...editing,
+                      features: [...editing.features, ""],
+                    })
+                  }
+                >
+                  Add feature
+                </button>
+              </div>
+              {editing.features.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No custom features — entitlements will generate defaults on save.
+                </p>
+              ) : (
+                editing.features.map((feature, index) => (
+                  <div key={`feature-${index}`} className="flex items-center gap-2">
+                    <input
+                      value={feature}
+                      onChange={(event) => {
+                        const next = [...editing.features];
+                        next[index] = event.target.value;
+                        setEditing({ ...editing, features: next });
+                      }}
+                      className="flex h-9 flex-1 rounded-lg border bg-background px-3 text-sm"
+                      placeholder="e.g. Unlimited AI replies"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-lg border px-2 py-1 text-xs hover:bg-muted"
+                      disabled={index === 0}
+                      onClick={() => {
+                        const next = [...editing.features];
+                        [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
+                        setEditing({ ...editing, features: next });
+                      }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border px-2 py-1 text-xs hover:bg-muted"
+                      disabled={index === editing.features.length - 1}
+                      onClick={() => {
+                        const next = [...editing.features];
+                        [next[index], next[index + 1]] = [next[index + 1]!, next[index]!];
+                        setEditing({ ...editing, features: next });
+                      }}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border px-2 py-1 text-xs text-destructive hover:bg-muted"
+                      onClick={() => {
+                        setEditing({
+                          ...editing,
+                          features: editing.features.filter((_, i) => i !== index),
+                        });
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

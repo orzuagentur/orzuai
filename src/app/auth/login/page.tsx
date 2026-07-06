@@ -9,9 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth.service";
-import { getPrimaryBusiness } from "@/services/business.service";
 import { getSafeRedirectPath } from "@/utils/auth";
-import { resolveAuthenticatedLandingPath } from "@/utils/post-auth-redirect";
+import { resolveAuthenticatedLandingPathForUser } from "@/utils/post-auth-redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -24,8 +23,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await getCurrentUser();
 
   if (user) {
-    const business = await getPrimaryBusiness(user.id);
-    redirect(resolveAuthenticatedLandingPath(Boolean(business), params.next));
+    redirect(
+      await resolveAuthenticatedLandingPathForUser(user.id, params.next),
+    );
   }
 
   const nextPath = getSafeRedirectPath(params.next);

@@ -33,7 +33,6 @@ async function BillingTwilioPageContent() {
   return (
     <BillingTwilioPanel
       data={twilioData}
-      invoices={subscriptionData.recentInvoices}
       hasActivePaidSubscription={subscriptionData.hasActivePaidSubscription}
     />
   );

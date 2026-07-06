@@ -23,6 +23,7 @@ export const AUTH_ROUTES = {
   magicLinkConfirmation: "/auth/magic-link/confirmation",
   resetPassword: "/auth/reset-password",
   resetPasswordSuccess: "/auth/reset-password/success",
+  teamInviteAccept: "/auth/team-invite",
 } as const;
 
 export const DASHBOARD_ROUTES = {
@@ -54,6 +55,9 @@ export const DASHBOARD_ROUTES = {
   account: "/dashboard/account",
   profile: "/dashboard/profile",
   subscription: "/dashboard/subscription",
+  subscriptionUsage: "/dashboard/subscription/usage",
+  subscriptionInvoices: "/dashboard/subscription/invoices",
+  subscriptionPayments: "/dashboard/subscription/payments",
   subscriptionWhatsApp: "/dashboard/subscription/whatsapp",
   subscriptionTwilio: "/dashboard/subscription/twilio",
   settingsPush: "/dashboard/settings/push",
@@ -63,6 +67,7 @@ export const DASHBOARD_ROUTES = {
   marketplace: "/dashboard/integrations/marketplace",
   calendar: "/dashboard/calendar",
   team: "/dashboard/team",
+  teamOnboarding: "/dashboard/team-onboarding",
   calendarBooking: "/dashboard/calendar/booking",
   calendarBookingNew: "/dashboard/calendar/booking/new",
   googleCalendarIntegration: "/dashboard/integrations/google_calendar",

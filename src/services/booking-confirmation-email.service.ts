@@ -20,7 +20,7 @@ export async function sendBookingConfirmationEmail(input: {
     return { success: false, error: "Customer email is invalid." };
   }
 
-  const { subject, text } = renderBookingConfirmationEmail({
+  const { subject, text, html } = renderBookingConfirmationEmail({
     businessName: input.businessName,
     pageTitle: input.pageTitle,
     customerName: input.customerName,
@@ -34,6 +34,7 @@ export async function sendBookingConfirmationEmail(input: {
     to: recipient,
     subject,
     text,
+    html,
   });
 }
 
@@ -54,7 +55,7 @@ export async function sendBookingActionEmail(input: {
     return { success: false, error: "Customer email is invalid." };
   }
 
-  const { subject, text } = renderBookingActionEmail({
+  const { subject, text, html } = renderBookingActionEmail({
     businessName: input.businessName,
     action: input.action,
     customerName: input.customerName,
@@ -69,5 +70,6 @@ export async function sendBookingActionEmail(input: {
     to: recipient,
     subject,
     text,
+    html,
   });
 }

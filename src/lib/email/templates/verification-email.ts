@@ -1,46 +1,53 @@
 import { EMAIL_SUBJECTS } from "@/lib/email/constants";
 import {
-  renderBaseEmailLayout,
+  renderEmailHeading,
+  renderEmailParagraph,
+  renderFallbackLink,
+  renderInfoBox,
+  renderOtpCode,
   renderPrimaryButton,
-} from "@/lib/email/templates/base-layout";
-import { escapeHtml } from "@/utils/email";
+} from "@/lib/email/components";
+import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
 
 type VerificationEmailTemplateParams = {
   verificationUrl: string;
+  verificationCode?: string | null;
 };
 
 export function renderVerificationEmail({
   verificationUrl,
+  verificationCode,
 }: VerificationEmailTemplateParams): {
   subject: string;
   html: string;
 } {
-  const safeUrl = escapeHtml(verificationUrl);
+  const codeBlock =
+    verificationCode && verificationCode.trim().length > 0
+      ? `
+        ${renderEmailParagraph("Or enter this one-time verification code:", { muted: true })}
+        ${renderOtpCode(verificationCode)}
+      `
+      : "";
 
   const bodyHtml = `
-    <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;font-weight:700;color:${"#18181b"};">
-      Verify your email address
-    </h1>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${"#71717a"};">
-      Thanks for signing up for OrzuX. Please confirm your email address to activate your account and access the dashboard.
-    </p>
-    ${renderPrimaryButton(verificationUrl, "Verify Email")}
-    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${"#71717a"};">
-      If the button does not work, copy and paste this link into your browser:
-    </p>
-    <p style="margin:8px 0 0;font-size:13px;line-height:1.6;word-break:break-all;">
-      <a href="${safeUrl}" style="color:#7c3aed;text-decoration:underline;">${safeUrl}</a>
-    </p>
-    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${"#71717a"};">
-      If you did not create an OrzuX account, you can safely ignore this email.
-    </p>
+    ${renderEmailHeading("Confirm your email address")}
+    ${renderEmailParagraph("Thanks for signing up for OrzuX. Confirm your email to activate your account and open your dashboard.")}
+    ${renderPrimaryButton(verificationUrl, "Confirm email")}
+    ${codeBlock}
+    ${renderFallbackLink(verificationUrl)}
+    ${renderInfoBox("If you did not create an OrzuX account, you can safely ignore this email.")}
   `;
 
+  const subject =
+    verificationCode && verificationCode.trim().length > 0
+      ? EMAIL_SUBJECTS.verificationCode
+      : EMAIL_SUBJECTS.verification;
+
   return {
-    subject: EMAIL_SUBJECTS.verification,
+    subject,
     html: renderBaseEmailLayout({
-      previewText: "Verify your OrzuX account to get started.",
-      title: EMAIL_SUBJECTS.verification,
+      previewText: "Confirm your OrzuX email to get started.",
+      title: subject,
       bodyHtml,
     }),
   };

@@ -19,5 +19,6 @@ export async function GET(request: NextRequest) {
     success: true,
     processed: result.processed,
     sent: result.sent,
+    paused: result.paused,
   });
 }

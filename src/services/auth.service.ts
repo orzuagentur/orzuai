@@ -18,6 +18,7 @@ import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  sendMagicLinkEmail,
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from "@/services/email.service";
@@ -174,6 +175,7 @@ export async function registerWithEmail(
   }
 
   const verificationUrl = data.properties.action_link;
+  const verificationCode = data.properties.email_otp;
 
   if (!verificationUrl) {
     return {
@@ -188,6 +190,7 @@ export async function registerWithEmail(
   const emailResult = await sendVerificationEmail({
     to: parsed.data.email,
     verificationUrl,
+    verificationCode,
   });
 
   if (!emailResult.success) {
@@ -308,6 +311,7 @@ export async function resendVerificationEmail(
   }
 
   const verificationUrl = data.properties.action_link;
+  const verificationCode = data.properties.email_otp;
 
   if (!verificationUrl) {
     return {
@@ -322,6 +326,7 @@ export async function resendVerificationEmail(
   const emailResult = await sendVerificationEmail({
     to: parsed.data.email,
     verificationUrl,
+    verificationCode,
   });
 
   if (!emailResult.success) {
@@ -432,13 +437,42 @@ export async function signInWithMagicLink(
     };
   }
 
-  const supabase = await createClient();
+  if (!hasResendEnv()) {
+    const supabase = await createClient();
+    const redirectTo = buildAuthCallbackUrl(nextPath ?? APP_ROUTES.dashboard);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: parsed.data.email,
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: {
+          code: "MAGIC_LINK_FAILED",
+          message: error.message || MAGIC_LINK_MESSAGES.genericError,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        email: parsed.data.email,
+      },
+    };
+  }
+
+  const admin = createAdminClient();
   const redirectTo = buildAuthCallbackUrl(nextPath ?? APP_ROUTES.dashboard);
-  const { error } = await supabase.auth.signInWithOtp({
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
     email: parsed.data.email,
     options: {
-      emailRedirectTo: redirectTo,
-      shouldCreateUser: false,
+      redirectTo,
     },
   });
 
@@ -448,6 +482,34 @@ export async function signInWithMagicLink(
       error: {
         code: "MAGIC_LINK_FAILED",
         message: error.message || MAGIC_LINK_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const signInUrl = data.properties.action_link;
+
+  if (!signInUrl) {
+    return {
+      success: false,
+      error: {
+        code: "MAGIC_LINK_FAILED",
+        message: MAGIC_LINK_MESSAGES.genericError,
+      },
+    };
+  }
+
+  const emailResult = await sendMagicLinkEmail({
+    to: parsed.data.email,
+    signInUrl,
+    signInCode: data.properties.email_otp,
+  });
+
+  if (!emailResult.success) {
+    return {
+      success: false,
+      error: {
+        code: "EMAIL_FAILED",
+        message: emailResult.error.message,
       },
     };
   }

@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +30,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createBillingPortalAction } from "@/features/subscription/actions/create-billing-portal";
-import { createCheckoutSessionAction } from "@/features/subscription/actions/create-checkout-session";
+import { changeSubscriptionPlanAction } from "@/features/subscription/actions/change-subscription-plan";
+import { syncSubscriptionAction } from "@/features/subscription/actions/sync-subscription";
 import { purchaseSubscriptionAddonAction } from "@/features/subscription/actions/purchase-subscription-addon";
 import { PASS_THROUGH_SERVICES } from "@/features/subscription/add-ons";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { isUnlimitedQuota } from "@/features/subscription/entitlements";
 import { isUnlimitedAiReplies } from "@/features/subscription/plans";
 import { cn } from "@/lib/utils";
@@ -206,6 +208,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingAddon, setLoadingAddon] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [, startTransition] = useTransition();
 
   const aiUsageLabel = isUnlimitedAiReplies(data.monthlyLimit)
     ? `${formatNumber(data.usedReplies)} used`
@@ -219,34 +222,59 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
+    const payment = searchParams.get("payment");
 
-    if (checkout === "success") {
-      toast.success(SUBSCRIPTION_MESSAGES.successTitle, {
-        description: SUBSCRIPTION_MESSAGES.successDescription,
+    if (checkout === "success" || payment === "updated") {
+      startTransition(async () => {
+        if (checkout === "success") {
+          await syncSubscriptionAction();
+        }
+
+        toast.success(
+          payment === "updated"
+            ? SUBSCRIPTION_MESSAGES.paymentUpdatedTitle
+            : SUBSCRIPTION_MESSAGES.successTitle,
+          {
+            description:
+              payment === "updated"
+                ? SUBSCRIPTION_MESSAGES.paymentUpdatedDescription
+                : SUBSCRIPTION_MESSAGES.successDescription,
+          },
+        );
+        router.replace(DASHBOARD_ROUTES.subscription);
+        router.refresh();
       });
     } else if (checkout === "canceled") {
       toast.message(SUBSCRIPTION_MESSAGES.canceledTitle, {
         description: SUBSCRIPTION_MESSAGES.canceledDescription,
       });
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   async function handleUpgrade(planId: string) {
-    if (planId === "free" || planId === data.currentPlanId) {
+    if (planId === data.currentPlanId) {
       return;
     }
 
     setLoadingPlan(planId);
 
     try {
-      const result = await createCheckoutSessionAction({ planId });
+      const result = await changeSubscriptionPlanAction({ planId });
 
       if (!result.success) {
-        toast.error(result.message ?? SUBSCRIPTION_MESSAGES.checkoutFailed);
+        toast.error(result.message ?? SUBSCRIPTION_MESSAGES.planChangeFailed);
         return;
       }
 
-      window.location.href = result.url;
+      if (!result.immediate && result.url) {
+        window.location.href = result.url;
+        return;
+      }
+
+      toast.success(SUBSCRIPTION_MESSAGES.planChangedTitle, {
+        description: SUBSCRIPTION_MESSAGES.planChangedDescription,
+      });
+      router.refresh();
     } finally {
       setLoadingPlan(null);
     }
@@ -298,7 +326,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
     <div className={embedded ? "space-y-6" : "flex flex-1 flex-col gap-6 p-4 md:p-6"}>
       {!embedded && !data.stripeConfigured ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-          {SUBSCRIPTION_MESSAGES.stripeMissing}
+          {SUBSCRIPTION_MESSAGES.billingMissing}
         </div>
       ) : null}
 
@@ -326,8 +354,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
               </Badge>
             </div>
             <CardDescription className="max-w-2xl">
-              Review plan usage, compare packages, and manage Stripe billing in
-              one place.
+              Review plan usage, compare packages, and manage billing in one place.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -411,7 +438,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
 
             <div className="space-y-2 border-t pt-4 text-sm text-muted-foreground">
               <div className="flex items-center justify-between gap-3">
-                <span>Stripe customer</span>
+                <span>Billing account</span>
                 <span className="font-medium text-foreground">
                   {data.hasStripeCustomer ? "Ready" : "Not created"}
                 </span>

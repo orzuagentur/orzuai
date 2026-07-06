@@ -16,10 +16,8 @@ export default function BillingWhatsAppPage() {
 }
 
 async function BillingWhatsAppPageContent() {
-  const [whatsappData, subscriptionData] = await Promise.all([
-    getWhatsAppBillingPageData(),
-    getSubscriptionPageData(),
-  ]);
+  const whatsappData = await getWhatsAppBillingPageData();
+  const subscriptionData = await getSubscriptionPageData();
 
   if (!subscriptionData.hasBusiness) {
     return (
@@ -30,10 +28,5 @@ async function BillingWhatsAppPageContent() {
     );
   }
 
-  return (
-    <BillingWhatsAppPanel
-      data={whatsappData}
-      invoices={subscriptionData.recentInvoices}
-    />
-  );
+  return <BillingWhatsAppPanel data={whatsappData} />;
 }

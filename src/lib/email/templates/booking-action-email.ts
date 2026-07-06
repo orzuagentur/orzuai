@@ -1,3 +1,13 @@
+import {
+  renderBusinessSignature,
+  renderDetailsTable,
+  renderEmailHeading,
+  renderEmailParagraph,
+  renderInfoBox,
+} from "@/lib/email/components";
+import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
+import { escapeHtml } from "@/utils/email";
+
 type BookingActionEmailParams = {
   businessName: string;
   action: "updated" | "cancelled" | "confirmed";
@@ -16,7 +26,7 @@ export function renderBookingActionEmail({
   resourceName,
   pageTitle,
   note,
-}: BookingActionEmailParams): { subject: string; text: string } {
+}: BookingActionEmailParams): { subject: string; text: string; html: string } {
   const actionLabel =
     action === "cancelled"
       ? "cancelled"
@@ -46,5 +56,29 @@ export function renderBookingActionEmail({
     `— ${businessName}`,
   ].filter(Boolean);
 
-  return { subject, text: lines.join("\n") };
+  const text = lines.join("\n");
+
+  const details = [
+    ...(pageTitle ? [{ label: "Service", value: pageTitle }] : []),
+    ...(resourceName ? [{ label: "Resource", value: resourceName }] : []),
+    { label: "When", value: slotLabel },
+    ...(note ? [{ label: "Note", value: note }] : []),
+  ];
+
+  const bodyHtml = `
+    ${renderEmailHeading(`Booking ${actionLabel}`)}
+    ${renderEmailParagraph(`Hi ${escapeHtml(customerName)}, your booking with <strong>${escapeHtml(businessName)}</strong> has been ${actionLabel}.`)}
+    ${renderDetailsTable(details)}
+    ${renderInfoBox("If you have questions, reply to this email.")}
+    ${renderBusinessSignature(businessName)}
+  `;
+
+  const html = renderBaseEmailLayout({
+    previewText: `Your booking with ${businessName} was ${actionLabel}.`,
+    title: subject,
+    bodyHtml,
+    footerNote: `Sent on behalf of ${businessName} via OrzuX.`,
+  });
+
+  return { subject, text, html };
 }

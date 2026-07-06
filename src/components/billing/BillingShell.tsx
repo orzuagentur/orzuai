@@ -11,6 +11,21 @@ import { cn } from "@/lib/utils";
 const BILLING_TABS = [
   { id: "overview", href: DASHBOARD_ROUTES.subscription, label: BILLING_MESSAGES.tabOverview },
   {
+    id: "usage",
+    href: DASHBOARD_ROUTES.subscriptionUsage,
+    label: BILLING_MESSAGES.tabUsage,
+  },
+  {
+    id: "invoices",
+    href: DASHBOARD_ROUTES.subscriptionInvoices,
+    label: BILLING_MESSAGES.tabInvoices,
+  },
+  {
+    id: "payments",
+    href: DASHBOARD_ROUTES.subscriptionPayments,
+    label: BILLING_MESSAGES.tabPayments,
+  },
+  {
     id: "whatsapp",
     href: DASHBOARD_ROUTES.subscriptionWhatsApp,
     label: BILLING_MESSAGES.tabWhatsApp,
@@ -40,7 +55,7 @@ export function BillingShell({ children }: { children: React.ReactNode }) {
               const isActive =
                 tab.href === DASHBOARD_ROUTES.subscription
                   ? pathname === tab.href
-                  : pathname.startsWith(tab.href);
+                  : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
 
               return (
                 <Link

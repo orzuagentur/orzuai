@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { sendTeamMemberInvite } from "@/services/team-invite.service";
 import { getBusinessEntitlements } from "@/services/entitlement.service";
 
 type BusinessMemberRow = {
@@ -180,6 +181,7 @@ export async function inviteTeamMember(input: {
   permissions?: TeamPermissions;
   accessStartsAt?: string | null;
   accessEndsAt?: string | null;
+  inviteExpiryDays?: number;
 }): Promise<{ success: boolean; message?: string }> {
   const user = await requireUser();
   const business = await getPrimaryBusiness(user.id);
@@ -215,22 +217,52 @@ export async function inviteTeamMember(input: {
     input.role,
   );
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("business_members").upsert(
-    {
-      business_id: business.id,
-      invited_email: normalizedEmail,
-      role: input.role,
-      status: "invited",
-      permissions,
-      access_starts_at: input.accessStartsAt ?? null,
-      access_ends_at: input.accessEndsAt ?? null,
-    },
-    { onConflict: "business_id,invited_email" },
-  );
+  const admin = createAdminClient();
+  const { data: memberRow, error } = await admin
+    .from("business_members")
+    .upsert(
+      {
+        business_id: business.id,
+        invited_email: normalizedEmail,
+        role: input.role,
+        status: "invited",
+        permissions,
+        access_starts_at: input.accessStartsAt ?? null,
+        access_ends_at: input.accessEndsAt ?? null,
+        user_id: null,
+        accepted_at: null,
+        team_onboarding_completed_at: null,
+      },
+      { onConflict: "business_id,invited_email" },
+    )
+    .select("id")
+    .single();
 
-  if (error) {
-    return { success: false, message: error.message };
+  if (error || !memberRow) {
+    return { success: false, message: error?.message ?? "Unable to save invite." };
+  }
+
+  const inviterName =
+    (typeof user.user_metadata?.full_name === "string" &&
+      user.user_metadata.full_name.trim()) ||
+    (typeof user.user_metadata?.name === "string" &&
+      user.user_metadata.name.trim()) ||
+    user.email ||
+    null;
+
+  const inviteResult = await sendTeamMemberInvite({
+    businessId: business.id,
+    businessName: business.business_name,
+    memberId: memberRow.id,
+    email: normalizedEmail,
+    role: input.role,
+    permissions: resolveMemberPermissions(input.role, permissions),
+    inviteExpiryDays: input.inviteExpiryDays ?? 7,
+    inviterName,
+  });
+
+  if (!inviteResult.success) {
+    return inviteResult;
   }
 
   revalidateTeamPaths();

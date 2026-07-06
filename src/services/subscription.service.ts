@@ -9,7 +9,7 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { getAiUsageSummaryForBusiness } from "@/services/ai-usage.service";
 import {
   getStripePaymentMethodForCustomer,
-  listStripeInvoicesForCustomer,
+  listStripeInvoicesForBusiness,
 } from "@/services/stripe.service";
 import { getUsageSnapshot } from "@/services/entitlement.service";
 import {
@@ -110,7 +110,10 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     return empty;
   }
 
-  const planId = resolveSubscriptionPlan(business.subscription_plan);
+  const storedPlanId = business.subscription_plan?.trim().toLowerCase() || "free";
+  const planId = (await getPlatformPlan(storedPlanId))
+    ? storedPlanId
+    : resolveSubscriptionPlan(business.subscription_plan);
   const currentPlan = (await getPlatformPlan(planId)) ?? freePlan;
   const subscriptionStatus = business.subscription_status ?? "active";
   const hasActivePaidSubscription =
@@ -119,13 +122,20 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     ACTIVE_BILLING_STATUSES.has(subscriptionStatus.trim().toLowerCase());
   const activeAddons = parseBusinessSubscriptionAddons(business.subscription_addons);
   const [usage, snapshot, paymentMethod, recentInvoices] = await Promise.all([
-    getAiUsageSummaryForBusiness(business.id, planId),
+    getAiUsageSummaryForBusiness(
+      business.id,
+      planId as Parameters<typeof getAiUsageSummaryForBusiness>[1],
+    ),
     getUsageSnapshot(business.id),
     business.stripe_customer_id
       ? getStripePaymentMethodForCustomer(business.stripe_customer_id)
       : Promise.resolve(null),
     business.stripe_customer_id
-      ? listStripeInvoicesForCustomer(business.stripe_customer_id)
+      ? listStripeInvoicesForBusiness(
+          business.id,
+          business.stripe_customer_id,
+          24,
+        )
       : Promise.resolve([] as BillingInvoiceItem[]),
   ]);
 
@@ -133,9 +143,8 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     hasBusiness: true,
     stripeConfigured,
     currentPlanId: planId,
-    currentPlanLabel: currentPlan?.label ?? SUBSCRIPTION_PLANS[planId]?.label ?? planId,
-    currentPlanTagline:
-      currentPlan?.tagline ?? SUBSCRIPTION_PLANS[planId]?.tagline ?? "",
+    currentPlanLabel: currentPlan?.label ?? planId,
+    currentPlanTagline: currentPlan?.tagline ?? "",
     subscriptionStatus,
     hasStripeCustomer: Boolean(business.stripe_customer_id),
     hasActivePaidSubscription,

@@ -3,11 +3,8 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import type { SubscriptionPlanId } from "@/features/subscription/plans";
 import { getStripePriceIdForPlanAsync, getStripePriceIdForAddonAsync, listPlatformAddons, listPlatformPlans, resolveAddonItemsFromStripePrices, resolvePlanIdFromStripePrice } from "@/services/platform-plans.service";
-import {
-  resolveSubscriptionPlan,
-  type SubscriptionPlanId,
-} from "@/features/subscription/plans";
 import { getAppUrl } from "@/lib/env";
 import { getStripeClient, hasStripeEnv } from "@/lib/stripe/client";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -17,7 +14,9 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { BusinessSubscriptionAddon } from "@/types/platform-plans.types";
 import type {
+  BillingInvoiceDetail,
   BillingInvoiceItem,
+  BillingInvoiceLineItem,
   BillingPaymentMethod,
 } from "@/types/billing.types";
 
@@ -340,6 +339,382 @@ export async function listStripeInvoicesForCustomer(
   return invoices.data.map(mapStripeInvoice);
 }
 
+async function resolveBusinessIdFromStripeCustomer(
+  customerId: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("businesses")
+    .select("id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  return (data?.id as string | undefined) ?? null;
+}
+
+function mapStripeInvoiceLine(invoice: Stripe.Invoice): BillingInvoiceLineItem[] {
+  return (invoice.lines?.data ?? []).map((line) => ({
+    id: line.id,
+    description: line.description ?? "Subscription charge",
+    amountCents: line.amount ?? 0,
+    quantity: line.quantity ?? 1,
+    periodStart: line.period?.start
+      ? new Date(line.period.start * 1000).toISOString()
+      : null,
+    periodEnd: line.period?.end
+      ? new Date(line.period.end * 1000).toISOString()
+      : null,
+  }));
+}
+
+function mapStripeInvoiceDetail(invoice: Stripe.Invoice): BillingInvoiceDetail {
+  return {
+    ...mapStripeInvoice(invoice),
+    lineItems: mapStripeInvoiceLine(invoice),
+    subtotalCents: invoice.subtotal ?? 0,
+    taxCents: 0,
+    periodStart: invoice.period_start
+      ? new Date(invoice.period_start * 1000).toISOString()
+      : null,
+    periodEnd: invoice.period_end
+      ? new Date(invoice.period_end * 1000).toISOString()
+      : null,
+  };
+}
+
+async function cacheBillingInvoice(
+  businessId: string,
+  invoice: Stripe.Invoice,
+): Promise<void> {
+  const admin = createAdminClient();
+
+  await admin.from("billing_invoices").upsert({
+    id: invoice.id,
+    business_id: businessId,
+    stripe_customer_id:
+      typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id ?? null,
+    number: invoice.number,
+    status: invoice.status ?? "unknown",
+    amount_due_cents: invoice.amount_due ?? 0,
+    amount_paid_cents: invoice.amount_paid ?? 0,
+    currency: invoice.currency ?? "usd",
+    line_items: mapStripeInvoiceLine(invoice),
+    period_start: invoice.period_start
+      ? new Date(invoice.period_start * 1000).toISOString()
+      : null,
+    period_end: invoice.period_end
+      ? new Date(invoice.period_end * 1000).toISOString()
+      : null,
+    hosted_invoice_url: invoice.hosted_invoice_url ?? null,
+    pdf_url: invoice.invoice_pdf ?? null,
+    created_at: new Date((invoice.created ?? 0) * 1000).toISOString(),
+    synced_at: new Date().toISOString(),
+  });
+}
+
+export async function syncSubscriptionForCurrentBusiness(): Promise<
+  | { success: true; planId: string; status: string }
+  | { success: false; message: string }
+> {
+  const owned = await getOwnedBusiness();
+
+  if (!owned) {
+    return { success: false, message: "Business not found." };
+  }
+
+  if (!owned.business.stripe_subscription_id) {
+    return {
+      success: true,
+      planId: owned.business.subscription_plan ?? "free",
+      status: owned.business.subscription_status ?? "active",
+    };
+  }
+
+  await syncBusinessFromStripeSubscription(
+    owned.business.id,
+    owned.business.stripe_subscription_id,
+  );
+
+  const admin = createAdminClient();
+  const { data: refreshed } = await admin
+    .from("businesses")
+    .select("subscription_plan, subscription_status")
+    .eq("id", owned.business.id)
+    .maybeSingle();
+
+  return {
+    success: true,
+    planId: (refreshed?.subscription_plan as string) ?? "free",
+    status: (refreshed?.subscription_status as string) ?? "active",
+  };
+}
+
+export async function changeSubscriptionPlan(
+  planId: string,
+): Promise<
+  | { success: true; immediate: boolean; url?: string }
+  | { success: false; message: string }
+> {
+  if (!hasStripeEnv()) {
+    return { success: false, message: "Billing is not configured." };
+  }
+
+  const normalizedPlanId = planId.trim().toLowerCase();
+
+  if (!normalizedPlanId) {
+    return { success: false, message: "Invalid plan." };
+  }
+
+  const owned = await getOwnedBusiness();
+
+  if (!owned) {
+    return { success: false, message: "Business not found." };
+  }
+
+  if (normalizedPlanId === "free") {
+    if (!owned.business.stripe_subscription_id) {
+      await syncBusinessSubscription({
+        businessId: owned.business.id,
+        planId: "free",
+        subscriptionStatus: "active",
+        addons: [],
+      });
+      return { success: true, immediate: true };
+    }
+
+    const stripe = getStripeClient();
+    await stripe.subscriptions.cancel(owned.business.stripe_subscription_id);
+
+    await syncBusinessSubscription({
+      businessId: owned.business.id,
+      stripeSubscriptionId: null,
+      subscriptionStatus: "canceled",
+      planId: "free",
+      addons: [],
+    });
+
+    return { success: true, immediate: true };
+  }
+
+  const priceId = await getStripePriceIdForPlanAsync(normalizedPlanId);
+
+  if (!priceId) {
+    return {
+      success: false,
+      message: `Price not configured for plan "${normalizedPlanId}".`,
+    };
+  }
+
+  if (!owned.business.stripe_subscription_id) {
+    const checkout = await createCheckoutSession(normalizedPlanId);
+
+    if (!checkout.success) {
+      return checkout;
+    }
+
+    return { success: true, immediate: false, url: checkout.url };
+  }
+
+  const stripe = getStripeClient();
+  const subscription = await stripe.subscriptions.retrieve(
+    owned.business.stripe_subscription_id,
+  );
+  const plans = await listPlatformPlans({ force: true });
+  const planPriceIds = new Set(
+    plans
+      .filter((plan) => plan.stripePriceId)
+      .map((plan) => plan.stripePriceId as string),
+  );
+
+  const planItem = subscription.items.data.find(
+    (item) =>
+      item.metadata?.type !== "twilio_phone_number" &&
+      planPriceIds.has(item.price.id),
+  );
+
+  if (planItem) {
+    await stripe.subscriptionItems.update(planItem.id, {
+      price: priceId,
+      quantity: 1,
+      proration_behavior: "create_prorations",
+    });
+  } else {
+    await stripe.subscriptionItems.create({
+      subscription: subscription.id,
+      price: priceId,
+      quantity: 1,
+      proration_behavior: "create_prorations",
+    });
+  }
+
+  await stripe.subscriptions.update(subscription.id, {
+    metadata: {
+      business_id: owned.business.id,
+      plan_id: normalizedPlanId,
+    },
+    proration_behavior: "create_prorations",
+  });
+
+  await syncBusinessFromStripeSubscription(owned.business.id, subscription.id);
+
+  return { success: true, immediate: true };
+}
+
+export async function createPaymentMethodSetupSession(): Promise<
+  { success: true; url: string } | { success: false; message: string }
+> {
+  if (!hasStripeEnv()) {
+    return { success: false, message: "Billing is not configured." };
+  }
+
+  const owned = await getOwnedBusiness();
+
+  if (!owned) {
+    return { success: false, message: "Business not found." };
+  }
+
+  const customerId = await ensureStripeCustomer({
+    businessId: owned.business.id,
+    email: owned.user.email ?? "",
+    businessName: owned.business.business_name,
+  });
+
+  if (!customerId) {
+    return { success: false, message: "Unable to prepare payment method update." };
+  }
+
+  const stripe = getStripeClient();
+  const appUrl = getAppUrl();
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "setup",
+    customer: customerId,
+    success_url: `${appUrl}${DASHBOARD_ROUTES.subscription}?payment=updated`,
+    cancel_url: `${appUrl}${DASHBOARD_ROUTES.subscription}`,
+    metadata: {
+      business_id: owned.business.id,
+    },
+  });
+
+  if (!session.url) {
+    return { success: false, message: "Unable to start payment method update." };
+  }
+
+  return { success: true, url: session.url };
+}
+
+export async function createTwilioTopUpSession(
+  amountCents: number,
+): Promise<{ success: true; url: string } | { success: false; message: string }> {
+  if (!hasStripeEnv()) {
+    return { success: false, message: "Billing is not configured." };
+  }
+
+  if (amountCents < 500) {
+    return { success: false, message: "Minimum top-up is $5." };
+  }
+
+  const owned = await getOwnedBusiness();
+
+  if (!owned) {
+    return { success: false, message: "Business not found." };
+  }
+
+  const customerId = await ensureStripeCustomer({
+    businessId: owned.business.id,
+    email: owned.user.email ?? "",
+    businessName: owned.business.business_name,
+  });
+
+  if (!customerId) {
+    return { success: false, message: "Unable to prepare payment." };
+  }
+
+  const stripe = getStripeClient();
+  const appUrl = getAppUrl();
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Twilio balance top-up",
+            description: "Credits for Twilio voice and SMS usage",
+          },
+          unit_amount: amountCents,
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: `${appUrl}${DASHBOARD_ROUTES.subscriptionTwilio}?topup=success`,
+    cancel_url: `${appUrl}${DASHBOARD_ROUTES.subscriptionTwilio}?topup=canceled`,
+    metadata: {
+      business_id: owned.business.id,
+      type: "twilio_topup",
+      amount_cents: String(amountCents),
+    },
+  });
+
+  if (!session.url) {
+    return { success: false, message: "Unable to start top-up checkout." };
+  }
+
+  return { success: true, url: session.url };
+}
+
+export async function getStripeInvoiceDetail(
+  invoiceId: string,
+): Promise<BillingInvoiceDetail | null> {
+  if (!hasStripeEnv()) {
+    return null;
+  }
+
+  const owned = await getOwnedBusiness();
+
+  if (!owned?.business.stripe_customer_id) {
+    return null;
+  }
+
+  const stripe = getStripeClient();
+  const invoice = await stripe.invoices.retrieve(invoiceId, {
+    expand: ["lines.data"],
+  });
+
+  if (invoice.customer !== owned.business.stripe_customer_id) {
+    return null;
+  }
+
+  return mapStripeInvoiceDetail(invoice);
+}
+
+export async function listStripeInvoicesForBusiness(
+  businessId: string,
+  customerId: string,
+  limit = 24,
+): Promise<BillingInvoiceItem[]> {
+  const live = await listStripeInvoicesForCustomer(customerId, limit);
+
+  if (live.length > 0 && hasSupabaseEnv()) {
+    const stripe = getStripeClient();
+
+    for (const item of live.slice(0, limit)) {
+      try {
+        const invoice = await stripe.invoices.retrieve(item.id, {
+          expand: ["lines.data"],
+        });
+        await cacheBillingInvoice(businessId, invoice);
+      } catch {
+        // Keep live list even if cache fails.
+      }
+    }
+  }
+
+  return live;
+}
+
 export async function addTwilioNumberToStripeSubscription(input: {
   businessId: string;
   stripeSubscriptionId: string;
@@ -518,20 +893,44 @@ export async function handleStripeWebhookEvent(
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const businessId = session.metadata?.business_id;
-    const planId = resolveSubscriptionPlan(session.metadata?.plan_id);
+    let businessId = session.metadata?.business_id ?? null;
+    const metadataPlanId = session.metadata?.plan_id?.trim().toLowerCase();
     const subscriptionId = session.subscription as string | null;
+    const customerId =
+      typeof session.customer === "string" ? session.customer : session.customer?.id;
+
+    if (!businessId && customerId) {
+      businessId = await resolveBusinessIdFromStripeCustomer(customerId);
+    }
 
     if (businessId) {
       if (subscriptionId) {
         await syncBusinessFromStripeSubscription(businessId, subscriptionId);
+
+        if (metadataPlanId && metadataPlanId !== "free") {
+          const admin = createAdminClient();
+          await admin
+            .from("businesses")
+            .update({ subscription_plan: metadataPlanId })
+            .eq("id", businessId);
+        }
+      } else if (session.mode === "payment" && session.metadata?.type === "twilio_topup") {
+        const amountCents = Number.parseInt(session.metadata.amount_cents ?? "0", 10);
+        const admin = createAdminClient();
+
+        await admin.from("twilio_balance_topups").insert({
+          business_id: businessId,
+          amount_cents: amountCents > 0 ? amountCents : session.amount_total ?? 0,
+          stripe_payment_intent_id: session.payment_intent as string | null,
+          status: "completed",
+        });
       } else {
         await syncBusinessSubscription({
           businessId,
-          stripeCustomerId: session.customer as string,
+          stripeCustomerId: customerId ?? null,
           stripeSubscriptionId: null,
           subscriptionStatus: "active",
-          planId,
+          planId: metadataPlanId ?? "free",
           addons: [],
         });
       }
@@ -541,14 +940,31 @@ export async function handleStripeWebhookEvent(
   }
 
   if (
+    event.type === "customer.subscription.created" ||
     event.type === "customer.subscription.updated" ||
     event.type === "customer.subscription.deleted"
   ) {
     const subscription = event.data.object as Stripe.Subscription;
-    const businessId = subscription.metadata?.business_id;
+    let businessId = subscription.metadata?.business_id ?? null;
+    const customerId =
+      typeof subscription.customer === "string"
+        ? subscription.customer
+        : subscription.customer?.id;
+
+    if (!businessId && customerId) {
+      businessId = await resolveBusinessIdFromStripeCustomer(customerId);
+    }
+
     const { planId, addons } = await resolveSubscriptionFromStripeItems(
       subscription.items.data,
     );
+    const metadataPlanId = subscription.metadata?.plan_id?.trim().toLowerCase();
+    const resolvedPlanId =
+      planId !== "free"
+        ? planId
+        : metadataPlanId && metadataPlanId !== "free"
+          ? metadataPlanId
+          : planId;
     const status =
       event.type === "customer.subscription.deleted"
         ? "canceled"
@@ -557,12 +973,31 @@ export async function handleStripeWebhookEvent(
     if (businessId) {
       await syncBusinessSubscription({
         businessId,
-        stripeCustomerId: subscription.customer as string,
-        stripeSubscriptionId: subscription.id,
+        stripeCustomerId: customerId ?? null,
+        stripeSubscriptionId:
+          event.type === "customer.subscription.deleted" ? null : subscription.id,
         subscriptionStatus: status,
-        planId: status === "canceled" ? "free" : planId,
+        planId: status === "canceled" ? "free" : resolvedPlanId,
         addons: status === "canceled" ? [] : addons,
       });
+    }
+
+    return;
+  }
+
+  if (event.type === "invoice.paid" || event.type === "invoice.finalized") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId =
+      typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+
+    if (!customerId) {
+      return;
+    }
+
+    const businessId = await resolveBusinessIdFromStripeCustomer(customerId);
+
+    if (businessId) {
+      await cacheBillingInvoice(businessId, invoice);
     }
   }
 }

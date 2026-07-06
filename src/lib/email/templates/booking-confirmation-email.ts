@@ -1,3 +1,13 @@
+import {
+  renderBusinessSignature,
+  renderDetailsTable,
+  renderEmailHeading,
+  renderEmailParagraph,
+  renderInfoBox,
+} from "@/lib/email/components";
+import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
+import { escapeHtml } from "@/utils/email";
+
 type BookingConfirmationEmailParams = {
   businessName: string;
   pageTitle: string;
@@ -32,32 +42,29 @@ export function renderBookingConfirmationEmail({
 
   const text = lines.join("\n");
 
-  const html = `
-    <div style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #111; max-width: 520px;">
-      <p>Hi ${customerName},</p>
-      <p>Your appointment with <strong>${businessName}</strong> is confirmed.</p>
-      <table style="margin: 20px 0; border-collapse: collapse; width: 100%;">
-        <tr>
-          <td style="padding: 8px 0; color: #666; width: 100px;">Service</td>
-          <td style="padding: 8px 0; font-weight: 500;">${pageTitle}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">When</td>
-          <td style="padding: 8px 0; font-weight: 500;">${slotLabel}</td>
-        </tr>
-        ${
-          resourceName
-            ? `<tr>
-          <td style="padding: 8px 0; color: #666;">With</td>
-          <td style="padding: 8px 0; font-weight: 500;">${resourceName}</td>
-        </tr>`
-            : ""
-        }
-      </table>
-      <p style="color: #666; font-size: 14px;">If you need to reschedule, please contact us directly.</p>
-      <p style="margin-top: 24px; color: #666; font-size: 14px;">— ${businessName}</p>
-    </div>
+  const details = [
+    { label: "Service", value: pageTitle },
+    { label: "When", value: slotLabel },
+  ];
+
+  if (resourceName) {
+    details.push({ label: "With", value: resourceName });
+  }
+
+  const bodyHtml = `
+    ${renderEmailHeading("Booking confirmed")}
+    ${renderEmailParagraph(`Hi ${escapeHtml(customerName)}, your appointment with <strong>${escapeHtml(businessName)}</strong> is confirmed.`)}
+    ${renderDetailsTable(details)}
+    ${renderInfoBox("If you need to reschedule, please contact the business directly.")}
+    ${renderBusinessSignature(businessName)}
   `;
+
+  const html = renderBaseEmailLayout({
+    previewText: `Your booking with ${businessName} is confirmed.`,
+    title: subject,
+    bodyHtml,
+    footerNote: `Sent on behalf of ${businessName} via OrzuX.`,
+  });
 
   return { subject, text, html };
 }

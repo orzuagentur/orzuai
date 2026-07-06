@@ -518,6 +518,202 @@ export type Database = {
           },
         ];
       };
+      billing_invoices: {
+        Row: {
+          id: string;
+          business_id: string;
+          stripe_customer_id: string | null;
+          number: string | null;
+          status: string;
+          amount_due_cents: number;
+          amount_paid_cents: number;
+          currency: string;
+          line_items: Json;
+          period_start: string | null;
+          period_end: string | null;
+          hosted_invoice_url: string | null;
+          pdf_url: string | null;
+          created_at: string;
+          synced_at: string;
+        };
+        Insert: {
+          id: string;
+          business_id: string;
+          stripe_customer_id?: string | null;
+          number?: string | null;
+          status: string;
+          amount_due_cents?: number;
+          amount_paid_cents?: number;
+          currency?: string;
+          line_items?: Json;
+          period_start?: string | null;
+          period_end?: string | null;
+          hosted_invoice_url?: string | null;
+          pdf_url?: string | null;
+          created_at: string;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          stripe_customer_id?: string | null;
+          number?: string | null;
+          status?: string;
+          amount_due_cents?: number;
+          amount_paid_cents?: number;
+          currency?: string;
+          line_items?: Json;
+          period_start?: string | null;
+          period_end?: string | null;
+          hosted_invoice_url?: string | null;
+          pdf_url?: string | null;
+          created_at?: string;
+          synced_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      twilio_balance_topups: {
+        Row: {
+          id: string;
+          business_id: string;
+          amount_cents: number;
+          stripe_payment_intent_id: string | null;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          amount_cents: number;
+          stripe_payment_intent_id?: string | null;
+          status: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          amount_cents?: number;
+          stripe_payment_intent_id?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "twilio_balance_topups_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_send_log: {
+        Row: {
+          id: string;
+          template_id: string | null;
+          resend_id: string | null;
+          to_email: string;
+          subject: string;
+          status: string;
+          error_message: string | null;
+          user_id: string | null;
+          business_id: string | null;
+          metadata: Json;
+          created_at: string;
+          delivered_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          template_id?: string | null;
+          resend_id?: string | null;
+          to_email: string;
+          subject: string;
+          status: string;
+          error_message?: string | null;
+          user_id?: string | null;
+          business_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          delivered_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          template_id?: string | null;
+          resend_id?: string | null;
+          to_email?: string;
+          subject?: string;
+          status?: string;
+          error_message?: string | null;
+          user_id?: string | null;
+          business_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          delivered_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "email_send_log_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_send_log_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "email_templates";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_templates: {
+        Row: {
+          id: string;
+          name: string;
+          category: string;
+          description: string;
+          subject_template: string;
+          body_html_template: string | null;
+          is_active: boolean;
+          is_system: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+          category: string;
+          description?: string;
+          subject_template: string;
+          body_html_template?: string | null;
+          is_active?: boolean;
+          is_system?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          category?: string;
+          description?: string;
+          subject_template?: string;
+          body_html_template?: string | null;
+          is_active?: boolean;
+          is_system?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       google_calendar_connections: {
         Row: {
           id: string;
@@ -811,6 +1007,7 @@ export type Database = {
           email: string;
           drip_day: number;
           sent_at: string;
+          drip_paused_at: string | null;
         };
         Insert: {
           id?: string;
@@ -818,6 +1015,7 @@ export type Database = {
           email: string;
           drip_day: number;
           sent_at?: string;
+          drip_paused_at?: string | null;
         };
         Update: {
           id?: string;
@@ -825,6 +1023,7 @@ export type Database = {
           email?: string;
           drip_day?: number;
           sent_at?: string;
+          drip_paused_at?: string | null;
         };
         Relationships: [];
       };
@@ -3100,6 +3299,11 @@ export type Database = {
           permissions: unknown;
           access_starts_at: string | null;
           access_ends_at: string | null;
+          invite_token: string | null;
+          invite_expires_at: string | null;
+          invited_at: string | null;
+          accepted_at: string | null;
+          team_onboarding_completed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -3113,6 +3317,11 @@ export type Database = {
           permissions?: unknown;
           access_starts_at?: string | null;
           access_ends_at?: string | null;
+          invite_token?: string | null;
+          invite_expires_at?: string | null;
+          invited_at?: string | null;
+          accepted_at?: string | null;
+          team_onboarding_completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3126,6 +3335,11 @@ export type Database = {
           permissions?: unknown;
           access_starts_at?: string | null;
           access_ends_at?: string | null;
+          invite_token?: string | null;
+          invite_expires_at?: string | null;
+          invited_at?: string | null;
+          accepted_at?: string | null;
+          team_onboarding_completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

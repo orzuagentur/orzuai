@@ -176,7 +176,8 @@ export type LoginResult =
 export type MagicLinkErrorCode =
   | "VALIDATION_ERROR"
   | "MAGIC_LINK_FAILED"
-  | "MISSING_CONFIG";
+  | "MISSING_CONFIG"
+  | "EMAIL_FAILED";
 
 export type MagicLinkResult =
   | { success: true; data: { email: string } }

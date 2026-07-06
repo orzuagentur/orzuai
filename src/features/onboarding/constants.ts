@@ -9,35 +9,29 @@ export const ONBOARDING_MESSAGES = {
   stepChannelTitle: "Connect a channel",
   stepChannelDescription:
     "Start with WhatsApp to receive and reply to customer messages.",
-  stepKnowledgeTitle: "Add knowledge",
+  stepKnowledgeTitle: "Add knowledge (optional)",
   stepKnowledgeDescription:
-    "Optional: add FAQs, pricing, or hours so the AI can answer accurately.",
-  stepKnowledgeSkip: "Skip for now",
-  stepKnowledgeAdd: "Add first entry",
+    "Optional: add FAQs, pricing, or hours so the AI can answer accurately. You can do this anytime from Knowledge Base.",
+  stepKnowledgeAdd: "Add knowledge entry",
   stepAiTitle: "Enable AI Assistant",
   stepAiDescription:
-    "Turn on auto-replies for your connected channel. Customize name, tone, and language in AI Assistant.",
-  stepAiTurnOn: "Turn on AI",
-  stepAiTurnOff: "Turn off AI",
-  stepAiEnabled: "AI auto-replies are on for this channel.",
+    "Turn on auto-replies for your connected channel. Optional: add knowledge and run a quick test before going live.",
+  stepAiEnabled: "AI auto-replies are on. You're ready to go live.",
   stepAiCustomize: "Customize assistant",
   stepAiOpenSettings: "Open AI Assistant",
-  stepTestTitle: "Test your assistant",
-  stepTestDescription:
-    "Send a sample customer message and preview how the AI Assistant would respond.",
+  stepTestTitle: "Quick test (optional)",
+  stepTestDescription: "Preview how the AI would reply to a sample message.",
   stepTestPlaceholder: "e.g. What are your opening hours?",
   stepTestButton: "Generate test reply",
   stepFinish: "Go to dashboard",
   back: "Back",
   continue: "Continue",
-  checklistTitle: "Finish setup",
-  checklistDescription: "Complete these steps to go live with your AI inbox.",
+  checklistTitle: "Setup progress",
+  checklistDescription: "Complete required steps to launch your AI inbox.",
 } as const;
 
 export const ONBOARDING_STEPS = [
   { id: "business", label: "Business" },
   { id: "channel", label: "Channel" },
-  { id: "knowledge", label: "Knowledge" },
-  { id: "ai", label: "AI" },
-  { id: "test", label: "Test" },
+  { id: "ai", label: "AI Assistant" },
 ] as const;

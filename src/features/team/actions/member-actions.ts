@@ -21,6 +21,7 @@ const inviteSchema = z.object({
   permissions: permissionsSchema.optional(),
   accessStartsAt: z.string().nullable().optional(),
   accessEndsAt: z.string().nullable().optional(),
+  inviteExpiryDays: z.number().int().min(1).max(7).optional(),
 });
 
 const updateSchema = z.object({

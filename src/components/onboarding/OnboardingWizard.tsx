@@ -77,7 +77,7 @@ export function OnboardingWizard({
       })
     : buildAiAssistantHref({ section: "assistant", assistantEdit: true });
   const activeStep = Math.min(
-    5,
+    ONBOARDING_STEPS.length,
     Math.max(1, Number(searchParams.get("step")) || step),
   );
 
@@ -126,7 +126,10 @@ export function OnboardingWizard({
         {ONBOARDING_STEPS.map((item, index) => {
           const stepNumber = index + 1;
           const isActive = stepNumber === activeStep;
-          const isDone = stepNumber < activeStep;
+          const isDone =
+            (stepNumber === 1 && progress.hasBusiness) ||
+            (stepNumber === 2 && progress.hasConnectedChannel) ||
+            (stepNumber === 3 && progress.hasAiEnabled);
 
           return (
             <button
@@ -202,32 +205,10 @@ export function OnboardingWizard({
       {activeStep === 3 ? (
         <Card className="shadow-none">
           <CardHeader>
-            <CardTitle>{ONBOARDING_MESSAGES.stepKnowledgeTitle}</CardTitle>
-            <CardDescription>
-              {ONBOARDING_MESSAGES.stepKnowledgeDescription}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => goToStep(router, 2)}>
-              {ONBOARDING_MESSAGES.back}
-            </Button>
-            <Button type="button" onClick={() => setKnowledgeOpen(true)}>
-              {ONBOARDING_MESSAGES.stepKnowledgeAdd}
-            </Button>
-            <Button type="button" onClick={() => goToStep(router, 4)}>
-              {ONBOARDING_MESSAGES.stepKnowledgeSkip}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {activeStep === 4 ? (
-        <Card className="shadow-none">
-          <CardHeader>
             <CardTitle>{ONBOARDING_MESSAGES.stepAiTitle}</CardTitle>
             <CardDescription>{ONBOARDING_MESSAGES.stepAiDescription}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {aiSettings?.channel ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -247,64 +228,68 @@ export function OnboardingWizard({
                       {ONBOARDING_MESSAGES.stepAiCustomize}
                     </Link>
                   </Button>
+                  <Button type="button" variant="outline" onClick={() => setKnowledgeOpen(true)}>
+                    {ONBOARDING_MESSAGES.stepKnowledgeAdd}
+                  </Button>
                 </div>
+
+                {isAiOn ? (
+                  <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {ONBOARDING_MESSAGES.stepTestTitle}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {ONBOARDING_MESSAGES.stepTestDescription}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="onboarding-test-message">Sample message</Label>
+                      <Textarea
+                        id="onboarding-test-message"
+                        value={testMessage}
+                        onChange={(event) => setTestMessage(event.target.value)}
+                        placeholder={ONBOARDING_MESSAGES.stepTestPlaceholder}
+                        rows={3}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={isTesting || !testMessage.trim()}
+                      onClick={handleTest}
+                    >
+                      {isTesting ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : null}
+                      {ONBOARDING_MESSAGES.stepTestButton}
+                    </Button>
+                    {testReply ? (
+                      <div className="rounded-lg border bg-background p-3 text-sm">
+                        {testReply}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Connect a channel first, then enable AI Assistant here.
               </p>
             )}
+
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => goToStep(router, 3)}>
+              <Button type="button" variant="outline" onClick={() => goToStep(router, 2)}>
                 {ONBOARDING_MESSAGES.back}
               </Button>
-              <Button
-                type="button"
-                onClick={() => goToStep(router, 5)}
-                disabled={!progress.hasAiEnabled}
-              >
-                {ONBOARDING_MESSAGES.continue}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {activeStep === 5 ? (
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle>{ONBOARDING_MESSAGES.stepTestTitle}</CardTitle>
-            <CardDescription>{ONBOARDING_MESSAGES.stepTestDescription}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="onboarding-test-message">Sample message</Label>
-              <Textarea
-                id="onboarding-test-message"
-                value={testMessage}
-                onChange={(event) => setTestMessage(event.target.value)}
-                placeholder={ONBOARDING_MESSAGES.stepTestPlaceholder}
-                rows={3}
-              />
-            </div>
-            <Button
-              type="button"
-              disabled={isTesting || !testMessage.trim() || !aiSettings?.channel}
-              onClick={handleTest}
-            >
-              {isTesting ? (
-                <Loader2Icon className="size-4 animate-spin" />
+              {progress.hasAiEnabled ? (
+                <Button asChild>
+                  <Link href={DASHBOARD_ROUTES.overview}>
+                    {ONBOARDING_MESSAGES.stepFinish}
+                  </Link>
+                </Button>
               ) : null}
-              {ONBOARDING_MESSAGES.stepTestButton}
-            </Button>
-            {testReply ? (
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm">{testReply}</div>
-            ) : null}
-            <Button asChild>
-              <Link href={DASHBOARD_ROUTES.overview}>
-                {ONBOARDING_MESSAGES.stepFinish}
-              </Link>
-            </Button>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -321,7 +306,6 @@ export function OnboardingWizard({
             onSuccess={() => {
               setKnowledgeOpen(false);
               router.refresh();
-              goToStep(router, 4);
             }}
             onCancel={() => setKnowledgeOpen(false)}
           />

@@ -1,3 +1,7 @@
+"use client";
+
+import Link from "next/link";
+
 import {
   Card,
   CardContent,
@@ -5,11 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BILLING_MESSAGES } from "@/features/billing/constants";
 import type { BillingInvoiceItem } from "@/types/billing.types";
 
 type BillingInvoicesTableProps = {
   invoices: BillingInvoiceItem[];
+  linkToDetail?: boolean;
 };
 
 function formatAmount(cents: number, currency: string): string {
@@ -27,7 +33,10 @@ function formatDate(iso: string): string {
   });
 }
 
-export function BillingInvoicesTable({ invoices }: BillingInvoicesTableProps) {
+export function BillingInvoicesTable({
+  invoices,
+  linkToDetail = true,
+}: BillingInvoicesTableProps) {
   return (
     <Card className="shadow-none">
       <CardHeader>
@@ -64,15 +73,13 @@ export function BillingInvoicesTable({ invoices }: BillingInvoicesTableProps) {
                     </td>
                     <td className="py-3 pr-4 capitalize">{invoice.status}</td>
                     <td className="py-3 text-right">
-                      {invoice.hostedInvoiceUrl ? (
-                        <a
-                          href={invoice.hostedInvoiceUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                      {linkToDetail ? (
+                        <Link
+                          href={`${DASHBOARD_ROUTES.subscriptionInvoices}/${invoice.id}`}
                           className="text-primary hover:underline"
                         >
                           {BILLING_MESSAGES.invoicesView}
-                        </a>
+                        </Link>
                       ) : null}
                     </td>
                   </tr>

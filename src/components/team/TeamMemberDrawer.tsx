@@ -185,8 +185,8 @@ export function TeamMemberDrawer({
               <section className="flex items-start gap-2 rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
                 <MailIcon className="mt-0.5 size-4 shrink-0" />
                 <p>
-                  Invitation saved. The member will get access once they sign in with
-                  this email address.
+                  Invitation email sent. They can accept via the secure link within the
+                  expiry window you selected.
                 </p>
               </section>
             ) : null}

@@ -5,6 +5,7 @@ import {
   type MessagingIntegrationChannelId,
 } from "@/features/integrations";
 import { hasSupabaseEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   getChannelAiSettings,
@@ -22,7 +23,7 @@ export type OnboardingProgress = {
   recommendedStep: number;
 };
 
-const STEP_PERCENT = 20;
+const REQUIRED_STEP_COUNT = 3;
 
 function getFirstConnectedChannel(
   statuses: Awaited<ReturnType<typeof getChannelConnectionStatuses>>,
@@ -36,6 +37,50 @@ function getFirstConnectedChannel(
   return null;
 }
 
+async function buildOnboardingProgress(
+  businessId: string,
+  knowledgeCount: number,
+): Promise<OnboardingProgress> {
+  const channelStatuses = await getChannelConnectionStatuses(businessId);
+  const connectedChannel = getFirstConnectedChannel(channelStatuses);
+  const hasConnectedChannel = connectedChannel !== null;
+  const hasKnowledgeEntry = knowledgeCount > 0;
+  const channelAiSettings =
+    connectedChannel !== null
+      ? await getChannelAiSettings(connectedChannel)
+      : null;
+  const hasAiEnabled = channelAiSettings?.aiEnabled === true;
+
+  let requiredDone = 1;
+  if (hasConnectedChannel) requiredDone += 1;
+  if (hasAiEnabled) requiredDone += 1;
+
+  const isComplete = hasConnectedChannel && hasAiEnabled;
+  const percentComplete = isComplete
+    ? 100
+    : Math.round((requiredDone / REQUIRED_STEP_COUNT) * 100);
+
+  let recommendedStep = 1;
+  if (!hasConnectedChannel) {
+    recommendedStep = 2;
+  } else if (!hasAiEnabled) {
+    recommendedStep = 3;
+  } else {
+    recommendedStep = 3;
+  }
+
+  return {
+    hasBusiness: true,
+    hasConnectedChannel,
+    hasKnowledgeEntry,
+    hasAiEnabled,
+    connectedChannel,
+    percentComplete,
+    isComplete,
+    recommendedStep,
+  };
+}
+
 export async function getOnboardingProgress(
   businessId: string,
 ): Promise<OnboardingProgress> {
@@ -46,69 +91,36 @@ export async function getOnboardingProgress(
       hasKnowledgeEntry: false,
       hasAiEnabled: false,
       connectedChannel: null,
-      percentComplete: STEP_PERCENT,
+      percentComplete: 33,
       isComplete: false,
       recommendedStep: 2,
     };
   }
 
   const supabase = await createClient();
-  const [channelStatuses, knowledgeResult] = await Promise.all([
-    getChannelConnectionStatuses(businessId),
-    supabase
-      .from("knowledge_base")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId),
-  ]);
+  const knowledgeResult = await supabase
+    .from("knowledge_base")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId);
 
-  const connectedChannel = getFirstConnectedChannel(channelStatuses);
-  const hasConnectedChannel = connectedChannel !== null;
-  const hasKnowledgeEntry = (knowledgeResult.count ?? 0) > 0;
-  const channelAiSettings =
-    connectedChannel !== null
-      ? await getChannelAiSettings(connectedChannel)
-      : null;
-  const hasAiEnabled = channelAiSettings?.aiEnabled === true;
+  return buildOnboardingProgress(businessId, knowledgeResult.count ?? 0);
+}
 
-  let completedSteps = 1;
-
-  if (hasConnectedChannel) {
-    completedSteps += 1;
+/** Service-role onboarding check for cron jobs and background email logic. */
+export async function getOnboardingProgressForSystem(
+  businessId: string,
+): Promise<OnboardingProgress> {
+  if (!hasSupabaseEnv()) {
+    return getEmptyOnboardingProgress();
   }
 
-  if (hasKnowledgeEntry) {
-    completedSteps += 1;
-  }
+  const admin = createAdminClient();
+  const knowledgeResult = await admin
+    .from("knowledge_base")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId);
 
-  if (hasAiEnabled) {
-    completedSteps += 1;
-  }
-
-  const percentComplete = Math.min(completedSteps * STEP_PERCENT, 80);
-  const isComplete = hasConnectedChannel && hasAiEnabled;
-
-  let recommendedStep = 2;
-
-  if (!hasConnectedChannel) {
-    recommendedStep = 2;
-  } else if (!hasKnowledgeEntry) {
-    recommendedStep = 3;
-  } else if (!hasAiEnabled) {
-    recommendedStep = 4;
-  } else {
-    recommendedStep = 5;
-  }
-
-  return {
-    hasBusiness: true,
-    hasConnectedChannel,
-    hasKnowledgeEntry,
-    hasAiEnabled,
-    connectedChannel,
-    percentComplete: isComplete ? 100 : percentComplete,
-    isComplete,
-    recommendedStep,
-  };
+  return buildOnboardingProgress(businessId, knowledgeResult.count ?? 0);
 }
 
 export function getEmptyOnboardingProgress(): OnboardingProgress {

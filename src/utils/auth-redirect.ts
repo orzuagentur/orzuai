@@ -29,7 +29,7 @@ export function getPostAuthRedirectPath(
 }
 
 export function shouldUseVerifySuccessRedirect(
-  redirectPath: string,
+  _redirectPath: string,
 ): boolean {
-  return redirectPath !== AUTH_ROUTES.resetPassword;
+  return false;
 }
