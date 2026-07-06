@@ -393,6 +393,20 @@ export function EmailCenterPanel() {
                     className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
                   />
                 </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">Категория</span>
+                  <select
+                    value={newCategory}
+                    onChange={(event) => setNewCategory(event.target.value)}
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                  >
+                    {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="block space-y-1 md:col-span-2">
                   <span className="text-sm font-medium">Назначение</span>
                   <textarea
