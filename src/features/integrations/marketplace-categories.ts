@@ -1,14 +1,11 @@
 import type { IntegrationChannelConfig } from "./constants";
 
 export type MarketplaceCategoryId =
-  | "whatsapp"
-  | "telegram"
-  | "messenger"
+  | "messengers"
   | "website"
   | "email"
   | "sms"
   | "calls"
-  | "ai"
   | "other";
 
 export type MarketplaceCategory = {
@@ -19,19 +16,9 @@ export type MarketplaceCategory = {
 
 export const MARKETPLACE_CATEGORIES: MarketplaceCategory[] = [
   {
-    id: "whatsapp",
-    label: "WhatsApp",
-    description: "Business messaging on WhatsApp.",
-  },
-  {
-    id: "telegram",
-    label: "Telegram",
-    description: "Bot-based customer conversations.",
-  },
-  {
-    id: "messenger",
-    label: "Messenger",
-    description: "Facebook Messenger for your page.",
+    id: "messengers",
+    label: "Messengers",
+    description: "WhatsApp, Telegram, Messenger, and other chat apps.",
   },
   {
     id: "website",
@@ -46,17 +33,12 @@ export const MARKETPLACE_CATEGORIES: MarketplaceCategory[] = [
   {
     id: "sms",
     label: "SMS",
-    description: "Text messaging via Twilio.",
+    description: "Two-way text messaging via Twilio.",
   },
   {
     id: "calls",
     label: "Calls",
-    description: "AI phone line and call handling.",
-  },
-  {
-    id: "ai",
-    label: "AI",
-    description: "Configure your AI agent and automations.",
+    description: "AI phone line and call handling via Twilio.",
   },
   {
     id: "other",

@@ -41,3 +41,10 @@ export type {
   IntegrationChannelStatusEntry,
   IntegrationChannelStatusMap,
 } from "./channel-status";
+export {
+  INTEGRATION_CHANNEL_HELP,
+  LEAD_FORMS_HELP,
+  LEAD_FORMS_PLATFORM_GUIDES,
+  WEBSITE_CHAT_HELP,
+} from "./integration-help";
+export type { IntegrationHelpTopic } from "./integration-help";

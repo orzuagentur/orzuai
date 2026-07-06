@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { enableWebsiteChatAction } from "@/features/website-chat/actions/enable-website-chat";
 import { WEBSITE_CHAT_MESSAGES } from "@/features/website-chat/constants";
 
-export function useEnableWebsiteChat() {
+type UseEnableWebsiteChatOptions = {
+  onSuccess?: (siteKey?: string) => void;
+};
+
+export function useEnableWebsiteChat(options?: UseEnableWebsiteChatOptions) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -21,6 +25,7 @@ export function useEnableWebsiteChat() {
       }
 
       toast.success(WEBSITE_CHAT_MESSAGES.connectSuccess);
+      options?.onSuccess?.(result.siteKey);
       router.refresh();
     });
   }

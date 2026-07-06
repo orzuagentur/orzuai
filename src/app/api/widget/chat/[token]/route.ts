@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { extractWebsiteFormApiKey } from "@/lib/website-forms/auth";
 import {
   getWebsiteChatConfigByToken,
   processWebsiteChatMessage,
@@ -9,7 +10,7 @@ import { websiteChatMessageSchema } from "@/types/website-chat.types";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, X-OrzuAI-Api-Key, Authorization",
 };
 
 type RouteContext = {
@@ -20,9 +21,10 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const { token } = await context.params;
-  const config = await getWebsiteChatConfigByToken(token);
+  const apiKey = extractWebsiteFormApiKey(request);
+  const config = await getWebsiteChatConfigByToken(token, apiKey);
 
   if (!config) {
     return NextResponse.json(
@@ -36,6 +38,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const { token } = await context.params;
+  const apiKey = extractWebsiteFormApiKey(request);
 
   let body: unknown;
 
@@ -57,7 +60,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const result = await processWebsiteChatMessage(token, parsed.data);
+  const result = await processWebsiteChatMessage(
+    token,
+    apiKey,
+    request,
+    parsed.data,
+  );
 
   if (!result.success) {
     return NextResponse.json(

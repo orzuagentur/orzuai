@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { ChannelStatusBadge } from "@/components/integrations/ChannelStatusBadge";
+import { IntegrationHelpTip } from "@/components/integrations/IntegrationHelpTip";
 import { IntegrationWizardNav } from "@/components/integrations/IntegrationWizardNav";
 import { Button } from "@/components/ui/button";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
@@ -12,6 +13,7 @@ import {
   INTEGRATION_CHANNEL_LIST,
   INTEGRATION_SECTION_LIST,
   INTEGRATIONS_MESSAGES,
+  INTEGRATION_CHANNEL_HELP,
   isIntegrationSectionId,
   isMessagingIntegrationChannel,
   type IntegrationChannelId,
@@ -56,6 +58,7 @@ export function IntegrationChannelShell({
       : { status: "coming_soon" });
 
   const Icon = channelConfig?.icon;
+  const channelHelp = INTEGRATION_CHANNEL_HELP[activeChannel];
   const sectionNavItems =
     activeChannel === "google_calendar" ||
     activeChannel === "voice" ||
@@ -87,9 +90,21 @@ export function IntegrationChannelShell({
                 </div>
               ) : null}
               <div className="space-y-1">
-                <h1 className="text-xl font-semibold tracking-tight">
-                  {channelConfig?.label ?? activeChannel}
-                </h1>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-xl font-semibold tracking-tight">
+                    {channelConfig?.label ?? activeChannel}
+                  </h1>
+                  {channelHelp ? (
+                    <IntegrationHelpTip
+                      title={channelHelp.title}
+                      description={channelHelp.summary}
+                    >
+                      {channelHelp.body.map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
+                    </IntegrationHelpTip>
+                  ) : null}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {channelConfig?.description}
                 </p>

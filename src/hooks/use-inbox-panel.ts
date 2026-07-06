@@ -129,23 +129,37 @@ export function useInboxPanel({
     (conversationId: string) => {
       let clearedUnreadCount = 0;
       let clearedChannel: MessagingChannel | null = null;
+      let didChangeList = false;
 
       onConversationsChange((current) => {
         const conversation = current.find((item) => item.id === conversationId);
 
-        if (conversation && isConversationMarkedUnread(conversation)) {
-          clearedUnreadCount = getConversationUnreadCount(current, conversationId);
-          clearedChannel = conversation.channel;
+        if (!conversation || !isConversationMarkedUnread(conversation)) {
+          return current;
         }
 
+        clearedUnreadCount = getConversationUnreadCount(current, conversationId);
+        clearedChannel = conversation.channel;
+        didChangeList = true;
         rememberLocallyReadConversation(conversationId);
         return markConversationListItemRead(current, conversationId);
       });
 
       onNeedsAttentionChange?.((current) => {
+        const conversation = current.find((item) => item.id === conversationId);
+
+        if (!conversation || !isConversationMarkedUnread(conversation)) {
+          return current;
+        }
+
         rememberLocallyReadConversation(conversationId);
+        didChangeList = true;
         return markConversationListItemRead(current, conversationId);
       });
+
+      if (!didChangeList) {
+        return;
+      }
 
       if (clearedUnreadCount > 0 && clearedChannel && navBadges) {
         navBadges.markConversationReadOptimistic({
@@ -162,20 +176,30 @@ export function useInboxPanel({
     ],
   );
 
+  const {
+    selectedConversationId,
+    conversation: activeConversationDetail,
+    selectConversation,
+    syncConversationReadNow,
+    markConversationViewed,
+    updateReadProgress,
+    ...activeConversationRest
+  } = activeConversation;
+
   const preserveListReadState = useCallback(
     (conversations: ConversationListItem[]) =>
       preserveLocallyReadConversations(
         conversations,
         new Set(locallyReadConversationIdsRef.current.keys()),
-        activeConversation.selectedConversationId,
+        selectedConversationId,
       ),
-    [activeConversation.selectedConversationId],
+    [selectedConversationId],
   );
 
   const handleConversationSelect = useCallback(
     (conversationId: string | null) => {
       syncedReadConversationIdRef.current = null;
-      activeConversation.selectConversation(conversationId);
+      selectConversation(conversationId);
 
       if (!conversationId) {
         return;
@@ -183,91 +207,95 @@ export function useInboxPanel({
 
       clearConversationUnread(conversationId);
 
-      void activeConversation.syncConversationReadNow(conversationId).then(
-        (success) => {
-          if (success) {
-            syncedReadConversationIdRef.current = conversationId;
-            void navBadges?.refresh({ force: true });
-          }
-        },
-      );
+      void syncConversationReadNow(conversationId).then((success) => {
+        if (success) {
+          syncedReadConversationIdRef.current = conversationId;
+          void navBadges?.refresh({ force: true });
+        }
+      });
     },
-    [activeConversation, clearConversationUnread, navBadges],
+    [clearConversationUnread, navBadges, selectConversation, syncConversationReadNow],
   );
 
   useEffect(() => {
-    const conversationId = activeConversation.selectedConversationId;
-
-    if (!conversationId) {
+    if (!selectedConversationId) {
       syncedReadConversationIdRef.current = null;
       return;
     }
 
-    if (!activeConversation.conversation) {
+    if (!activeConversationDetail) {
       return;
     }
 
-    if (syncedReadConversationIdRef.current === conversationId) {
+    if (syncedReadConversationIdRef.current === selectedConversationId) {
       return;
     }
 
-    syncedReadConversationIdRef.current = conversationId;
-    clearConversationUnread(conversationId);
+    syncedReadConversationIdRef.current = selectedConversationId;
+    clearConversationUnread(selectedConversationId);
 
-    void activeConversation.syncConversationReadNow(conversationId).then(
-      (success) => {
-        if (success) {
-          void navBadges?.refresh({ force: true });
-        }
-      },
-    );
-  }, [activeConversation, clearConversationUnread, navBadges]);
+    void syncConversationReadNow(selectedConversationId).then((success) => {
+      if (success) {
+        void navBadges?.refresh({ force: true });
+      }
+    });
+  }, [
+    activeConversationDetail?.id,
+    clearConversationUnread,
+    navBadges,
+    selectedConversationId,
+    syncConversationReadNow,
+  ]);
 
   const handleConversationViewed = useCallback(() => {
-    if (!activeConversation.selectedConversationId) {
+    if (!selectedConversationId) {
       return;
     }
 
-    clearConversationUnread(activeConversation.selectedConversationId);
-    activeConversation.markConversationViewed();
-  }, [activeConversation, clearConversationUnread]);
+    clearConversationUnread(selectedConversationId);
+    markConversationViewed();
+  }, [clearConversationUnread, markConversationViewed, selectedConversationId]);
 
   const handleReadProgress = useCallback(
     (readAt: string) => {
-      const conversation = activeConversation.conversation;
-      const conversationId = activeConversation.selectedConversationId;
-
-      if (!conversation || !conversationId) {
+      if (!activeConversationDetail || !selectedConversationId) {
         return;
       }
 
       if (
-        conversation.lastReadAt &&
-        new Date(readAt).getTime() <= new Date(conversation.lastReadAt).getTime()
+        activeConversationDetail.lastReadAt &&
+        new Date(readAt).getTime() <=
+          new Date(activeConversationDetail.lastReadAt).getTime()
       ) {
         return;
       }
 
-      activeConversation.updateReadProgress(readAt);
-      clearConversationUnread(conversationId);
+      updateReadProgress(readAt);
+      clearConversationUnread(selectedConversationId);
 
       const remainingUnread = countUnreadClientMessages(
-        conversation.messages,
+        activeConversationDetail.messages,
         readAt,
       );
 
       if (remainingUnread === 0) {
-        activeConversation.markConversationViewed();
+        markConversationViewed();
       }
     },
-    [activeConversation, clearConversationUnread],
+    [
+      activeConversationDetail,
+      clearConversationUnread,
+      markConversationViewed,
+      selectedConversationId,
+      updateReadProgress,
+    ],
   );
 
   useInboxListRealtime({
     enabled: hasBusiness && !isInitialLoading,
     businessId,
     channelFilter,
-    selectedConversationId: activeConversation.selectedConversationId,
+    selectedConversationId,
     hasActiveFilters: hasActiveListFilters,
     onConnectionChange: setRealtimeConnected,
     onConversationsChange,
@@ -297,7 +325,10 @@ export function useInboxPanel({
     handleConversationViewed,
     handleReadProgress,
     preserveListReadState,
-    ...activeConversation,
+    selectedConversationId,
+    conversation: activeConversationDetail,
+    selectConversation,
+    ...activeConversationRest,
   };
 }
 

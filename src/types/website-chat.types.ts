@@ -9,6 +9,9 @@ export type WebsiteChatConnectionData = {
   welcomeMessage: string;
   primaryColor: string;
   widgetToken: string;
+  apiKeyPrefix: string;
+  connectedAt: string | null;
+  lastSeenAt: string | null;
   embedScriptUrl: string;
   embedSnippet: string;
 };
@@ -19,12 +22,14 @@ export type WebsiteChatConnectConfig = {
 };
 
 export type EnableWebsiteChatResult =
-  | { success: true; connection: WebsiteChatConnectionData }
+  | { success: true; connection: WebsiteChatConnectionData; siteKey?: string }
+  | { success: false; error: { code: string; message: string } };
+
+export type RegenerateWebsiteChatApiKeyResult =
+  | { success: true; data: { siteKey: string; apiKeyPrefix: string } }
   | { success: false; error: { code: string; message: string } };
 
 export const updateWebsiteChatSettingsSchema = z.object({
-  siteName: z.string().max(120).optional().nullable(),
-  siteUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
   welcomeMessage: z.string().min(1).max(500),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });

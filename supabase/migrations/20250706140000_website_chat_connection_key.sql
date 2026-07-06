@@ -1,0 +1,5 @@
+ALTER TABLE public.website_chat_connections
+  ADD COLUMN IF NOT EXISTS api_key_hash TEXT,
+  ADD COLUMN IF NOT EXISTS api_key_prefix TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS connected_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;

@@ -8,7 +8,10 @@ export async function GET() {
   const script = `(function(){
   var script = document.currentScript;
   var token = script && script.getAttribute("data-widget-token");
-  if (!token) return;
+  var siteKey = script && script.getAttribute("data-site-key");
+  if (!token || !siteKey) return;
+
+  var authHeaders = { "X-OrzuAI-Api-Key": siteKey };
 
   var visitorId = localStorage.getItem("orzu_chat_visitor");
   if (!visitorId) {
@@ -19,7 +22,7 @@ export async function GET() {
   var config = { welcomeMessage: "Hi! How can we help?", primaryColor: "#6366f1" };
   var open = false;
 
-  fetch("${apiBase}/" + encodeURIComponent(token))
+  fetch("${apiBase}/" + encodeURIComponent(token), { headers: authHeaders })
     .then(function(r){ return r.json(); })
     .then(function(data){ if (data && data.config) config = data.config; })
     .catch(function(){});
@@ -90,7 +93,7 @@ export async function GET() {
     appendBubble(text, true);
     fetch("${apiBase}/" + encodeURIComponent(token), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders),
       body: JSON.stringify({ visitorId: visitorId, message: text })
     }).catch(function(){ appendBubble("Could not send. Try again.", false); });
   });

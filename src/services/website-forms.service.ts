@@ -47,6 +47,7 @@ import type {
   WebsiteFormFollowUpChannel,
   WebsiteFormSubmissionInput,
 } from "@/types/website-forms.types";
+import { normalizeWebsiteOrigin, extractRequestWebsiteOrigin } from "@/utils/website-origin";
 import { parseWebsiteFormSubmissionPayload } from "@/types/website-forms.types";
 import { mapWebsiteFormConnection } from "@/utils/website-forms";
 import { normalizePhoneNumber } from "@/utils/whatsapp";
@@ -58,6 +59,38 @@ function getWebsiteFormWebhookBaseUrl(): string {
 
 function buildWebhookUrl(token: string): string {
   return `${getWebsiteFormWebhookBaseUrl()}/${token}`;
+}
+
+async function resolveWebsiteFormSiteUpdate(
+  connection: WebsiteFormConnection,
+  submission: WebsiteFormSubmissionInput,
+  request?: Request,
+): Promise<{ site_url?: string; site_name?: string; connected_at?: string }> {
+  if (connection.site_url) {
+    return {};
+  }
+
+  const origin =
+    (submission.sourceUrl ? normalizeWebsiteOrigin(submission.sourceUrl) : null) ??
+    (request ? extractRequestWebsiteOrigin(request) : null);
+
+  if (!origin) {
+    return {};
+  }
+
+  const hostname = (() => {
+    try {
+      return new URL(origin).hostname;
+    } catch {
+      return origin;
+    }
+  })();
+
+  return {
+    site_url: origin,
+    site_name: hostname,
+    connected_at: connection.connected_at ?? new Date().toISOString(),
+  };
 }
 
 function revalidateWebsiteFormsPaths(): void {
@@ -374,7 +407,11 @@ export async function verifyWebsiteFormWebhookAccess(
     return null;
   }
 
-  if (apiKey && !verifyWebsiteFormApiKey(apiKey, connection.api_key_hash)) {
+  if (
+    !apiKey ||
+    !connection.api_key_hash ||
+    !verifyWebsiteFormApiKey(apiKey, connection.api_key_hash)
+  ) {
     return null;
   }
 
@@ -512,6 +549,7 @@ async function processWebsiteFormFollowUp(input: {
 export async function ingestWebsiteFormSubmission(
   connection: WebsiteFormConnection,
   submission: WebsiteFormSubmissionInput,
+  request?: Request,
 ): Promise<{ success: boolean }> {
   if (!hasSupabaseEnv()) {
     return { success: false };
@@ -616,7 +654,10 @@ export async function ingestWebsiteFormSubmission(
 
   await admin
     .from("website_form_connections")
-    .update({ last_submission_at: new Date().toISOString() })
+    .update({
+      last_submission_at: new Date().toISOString(),
+      ...(await resolveWebsiteFormSiteUpdate(connection, submission, request)),
+    })
     .eq("id", connection.id);
 
   await processWebsiteFormFollowUp({
@@ -647,6 +688,7 @@ export async function processWebsiteFormWebhook(
   webhookToken: string,
   apiKey: string | null,
   body: unknown,
+  request?: Request,
 ): Promise<{ success: boolean; message?: string }> {
   const connection = await verifyWebsiteFormWebhookAccess(webhookToken, apiKey);
 
@@ -660,6 +702,6 @@ export async function processWebsiteFormWebhook(
     return { success: false, message: "Invalid payload" };
   }
 
-  const result = await ingestWebsiteFormSubmission(connection, submission);
+  const result = await ingestWebsiteFormSubmission(connection, submission, request);
   return { success: result.success };
 }

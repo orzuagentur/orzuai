@@ -13,13 +13,17 @@ export const WEBSITE_FORMS_MESSAGES = {
   webhookUrlLabel: "Webhook URL",
   apiKeyLabel: "API Key",
   apiKeyHint:
-    "Use the API key for server-side integrations. Many CMS tools only need the webhook URL.",
+    "Required. Add header X-OrzuAI-Api-Key on every POST request.",
   copySuccess: "Copied to clipboard",
   regenerateKey: "Regenerate API key",
   regenerateConfirm:
     "Regenerating invalidates the previous API key. Update integrations that use the old key.",
   siteNameLabel: "Site name (optional)",
   siteUrlLabel: "Site URL (optional)",
+  connectedSiteLabel: "Connected site",
+  connectedSiteHint: "Detected from the form page URL on the first submission.",
+  connectedSitePending: "Waiting for the first form submission…",
+  setupGuideTitle: "Platform setup",
   followUpTitle: "AI follow-up channel",
   followUpDescription:
     "After a form is submitted, OrzuX can reply using AI on WhatsApp, Email, or in-app (Website Forms inbox).",

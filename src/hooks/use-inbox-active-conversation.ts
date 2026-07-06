@@ -237,7 +237,10 @@ export function useInboxActiveConversation({
 
         return {
           ...current,
-          messages: [...olderMessages, ...current.messages],
+          messages: sortMessagesBySentAt([
+            ...olderMessages,
+            ...current.messages,
+          ]),
           hasOlderMessages: result.data.hasMore,
         };
       });
@@ -277,26 +280,31 @@ export function useInboxActiveConversation({
   }, []);
 
   const markConversationViewed = useCallback(() => {
-    if (!conversation) {
-      return;
-    }
-
-    const readAt = new Date().toISOString();
-    const hasUnread = conversation.messages.some(
-      (message) =>
-        message.senderType === "client" &&
-        (!conversation.lastReadAt ||
-          new Date(getMessageSortTime(message)).getTime() >
-            new Date(conversation.lastReadAt).getTime()),
-    );
-
-    if (!hasUnread && conversation.lastReadAt) {
-      return;
-    }
-
     setConversation((current) => {
-      if (!current || current.id !== conversation.id) {
+      if (!current) {
         return current;
+      }
+
+      const readAt = new Date().toISOString();
+      const hasUnread = current.messages.some(
+        (message) =>
+          message.senderType === "client" &&
+          (!current.lastReadAt ||
+            new Date(getMessageSortTime(message)).getTime() >
+              new Date(current.lastReadAt).getTime()),
+      );
+
+      if (!hasUnread && current.lastReadAt) {
+        return current;
+      }
+
+      const now = Date.now();
+
+      if (now - lastReadSyncAtRef.current >= 1500) {
+        lastReadSyncAtRef.current = now;
+        void markConversationReadAction({
+          conversationId: current.id,
+        });
       }
 
       return {
@@ -304,19 +312,7 @@ export function useInboxActiveConversation({
         lastReadAt: readAt,
       };
     });
-
-    const now = Date.now();
-
-    if (now - lastReadSyncAtRef.current < 1500) {
-      return;
-    }
-
-    lastReadSyncAtRef.current = now;
-
-    void markConversationReadAction({
-      conversationId: conversation.id,
-    });
-  }, [conversation]);
+  }, []);
 
   const appendMessage = useCallback((message: ChatMessageData) => {
     setConversation((current) => {
@@ -458,7 +454,10 @@ export function useInboxActiveConversation({
 
         return {
           ...current,
-          messages: [...withoutPending, resolvedMessage],
+          messages: sortMessagesBySentAt([
+            ...withoutPending,
+            resolvedMessage,
+          ]),
           totalMessageCount: hadPending
             ? current.totalMessageCount
             : current.totalMessageCount + 1,
@@ -485,7 +484,10 @@ export function useInboxActiveConversation({
 
         return {
           ...current,
-          messages: [...current.messages, normalizedMessage],
+          messages: sortMessagesBySentAt([
+            ...current.messages,
+            normalizedMessage,
+          ]),
           totalMessageCount: current.totalMessageCount + 1,
           updatedAt: message.editedAt ?? message.sentAt,
         };
@@ -503,7 +505,7 @@ export function useInboxActiveConversation({
 
       return {
         ...current,
-        messages,
+        messages: sortMessagesBySentAt(messages),
         updatedAt: message.editedAt ?? message.sentAt,
       };
     });
@@ -695,15 +697,15 @@ export function useInboxActiveConversation({
     [clearConversation, pathname, router, searchParams],
   );
 
+  // Sync URL → state only when the URL changes (not when local selection changes),
+  // otherwise router.replace races and reverts the newly selected conversation.
   useEffect(() => {
     const conversationFromUrl = searchParams.get("conversation")?.trim() || null;
 
-    if (conversationFromUrl === selectedConversationId) {
-      return;
-    }
-
-    setSelectedConversationId(conversationFromUrl);
-  }, [searchParams, selectedConversationId]);
+    setSelectedConversationId((current) =>
+      conversationFromUrl === current ? current : conversationFromUrl,
+    );
+  }, [searchParams]);
 
   useEffect(() => {
     if (!selectedConversationId) {
