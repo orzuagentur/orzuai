@@ -7,6 +7,10 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { getAiUsageSummaryForBusiness } from "@/services/ai-usage.service";
+import {
+  getStripePaymentMethodForCustomer,
+  listStripeInvoicesForCustomer,
+} from "@/services/stripe.service";
 import { getUsageSnapshot } from "@/services/entitlement.service";
 import {
   getPlatformPlan,
@@ -15,6 +19,7 @@ import {
   parseBusinessSubscriptionAddons,
 } from "@/services/platform-plans.service";
 import type { SubscriptionPageData } from "@/types/subscription.types";
+import type { BillingInvoiceItem } from "@/types/billing.types";
 
 const ACTIVE_BILLING_STATUSES = new Set(["active", "trialing"]);
 
@@ -94,6 +99,8 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     usedReplies: 0,
     monthlyLimit: freeEntitlements.monthlyAiReplies,
     usage: emptyUsage,
+    paymentMethod: null,
+    recentInvoices: [],
   };
 
   const user = await requireUser();
@@ -111,9 +118,15 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     Boolean(business.stripe_subscription_id) &&
     ACTIVE_BILLING_STATUSES.has(subscriptionStatus.trim().toLowerCase());
   const activeAddons = parseBusinessSubscriptionAddons(business.subscription_addons);
-  const [usage, snapshot] = await Promise.all([
+  const [usage, snapshot, paymentMethod, recentInvoices] = await Promise.all([
     getAiUsageSummaryForBusiness(business.id, planId),
     getUsageSnapshot(business.id),
+    business.stripe_customer_id
+      ? getStripePaymentMethodForCustomer(business.stripe_customer_id)
+      : Promise.resolve(null),
+    business.stripe_customer_id
+      ? listStripeInvoicesForCustomer(business.stripe_customer_id)
+      : Promise.resolve([] as BillingInvoiceItem[]),
   ]);
 
   return {
@@ -137,6 +150,8 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
     usedReplies: usage.usedReplies,
     monthlyLimit: usage.monthlyLimit,
     usage: snapshot,
+    paymentMethod,
+    recentInvoices,
   };
 }
 

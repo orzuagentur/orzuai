@@ -6,9 +6,10 @@ export type CrawledPage = {
   text: string;
 };
 
-const MAX_PAGES = 24;
-const MAX_DEPTH = 2;
-const FETCH_TIMEOUT_MS = 12_000;
+const MAX_PAGES = 32;
+const MAX_DEPTH = 3;
+const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_RETRIES = 2;
 const MIN_TEXT_LENGTH = 120;
 const MAX_TEXT_PER_PAGE = 12_000;
 
@@ -46,36 +47,48 @@ function extractTitleFromHtml(html: string): string {
 }
 
 async function fetchPage(url: string): Promise<string | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  for (let attempt = 0; attempt <= FETCH_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "OrzuX-KnowledgeSync/1.0 (+https://orzux.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      cache: "no-store",
-      redirect: "follow",
-    });
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "OrzuX-KnowledgeSync/1.0 (+https://orzux.com)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        cache: "no-store",
+        redirect: "follow",
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        if (attempt < FETCH_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+
+      if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
+        return null;
+      }
+
+      return await response.text();
+    } catch {
+      if (attempt < FETCH_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+        continue;
+      }
       return null;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const contentType = response.headers.get("content-type") ?? "";
-
-    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
-      return null;
-    }
-
-    return await response.text();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return null;
 }
 
 export async function crawlWebsite(startUrlInput: string): Promise<CrawledPage[]> {

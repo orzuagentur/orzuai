@@ -25,31 +25,15 @@ export function AnalyticsSalesPanel({
   return (
     <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
       <div>
-        <h2 className="text-base font-semibold">{ANALYTICS_MESSAGES.salesPanelTitle}</h2>
+        <h2 className="text-base font-semibold">
+          {ANALYTICS_MESSAGES.salesPanelTitle}
+        </h2>
         <p className="text-sm text-muted-foreground">
           {ANALYTICS_MESSAGES.salesPanelDescription}
         </p>
       </div>
 
-      <section className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {ANALYTICS_MESSAGES.salesStepLeads}
-        </p>
-        <LeadSourcePanel
-          sources={leadSources}
-          channelHref={(channel, count) =>
-            count > 0
-              ? buildAnalyticsCrmPipelineHref({ channel })
-              : null
-          }
-          channelLinkLabel={(count) => ANALYTICS_MESSAGES.viewChannelContacts(count)}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {ANALYTICS_MESSAGES.salesStepFunnel}
-        </p>
+      <div className="grid gap-4 xl:grid-cols-2">
         <CrmFunnelPanel
           funnel={crmFunnel}
           stageHref={(stage, count) =>
@@ -61,22 +45,24 @@ export function AnalyticsSalesPanel({
           }
           stageLinkLabel={(count) => ANALYTICS_MESSAGES.viewContacts(count)}
         />
-      </section>
-
-      <section className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {ANALYTICS_MESSAGES.salesStepRevenue}
-        </p>
         <RevenueMetricsPanel
           metrics={revenue}
           crmHref={buildAnalyticsCrmPipelineHref()}
         />
-      </section>
+      </div>
 
-      <section className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {ANALYTICS_MESSAGES.salesStepSentiment}
-        </p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <LeadSourcePanel
+          sources={leadSources}
+          channelHref={(channel, count) =>
+            count > 0
+              ? buildAnalyticsCrmPipelineHref({ channel })
+              : null
+          }
+          channelLinkLabel={(count) =>
+            ANALYTICS_MESSAGES.viewChannelContacts(count)
+          }
+        />
         <SentimentPanel
           breakdown={sentiment}
           negativeHref={
@@ -85,7 +71,7 @@ export function AnalyticsSalesPanel({
               : null
           }
         />
-      </section>
+      </div>
     </div>
   );
 }

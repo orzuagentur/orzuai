@@ -32,6 +32,18 @@ export default function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
 async function AnalyticsPageContent({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
 
+  if (params.tab === "ask") {
+    redirect(
+      buildAnalyticsHref({
+        tab: "pulse",
+        period:
+          params.period === "30d" || params.period === "all"
+            ? params.period
+            : "7d",
+      }),
+    );
+  }
+
   if (
     params.channel &&
     !isMessagingIntegrationChannel(params.channel as IntegrationChannelId)

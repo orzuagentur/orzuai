@@ -16,6 +16,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import type { BusinessSubscriptionAddon } from "@/types/platform-plans.types";
+import type {
+  BillingInvoiceItem,
+  BillingPaymentMethod,
+} from "@/types/billing.types";
 
 function planFromStripePrice(priceId: string | undefined): SubscriptionPlanId {
   // Sync fallback for webhook edge cases before async path runs.
@@ -257,6 +261,169 @@ export async function createBillingPortalSession(): Promise<
   return { success: true, url: session.url };
 }
 
+function mapStripePaymentMethod(
+  paymentMethod: Stripe.PaymentMethod,
+): BillingPaymentMethod {
+  const card = paymentMethod.card;
+
+  return {
+    id: paymentMethod.id,
+    brand: card?.brand ?? "card",
+    last4: card?.last4 ?? "????",
+    expMonth: card?.exp_month ?? 0,
+    expYear: card?.exp_year ?? 0,
+  };
+}
+
+function mapStripeInvoice(invoice: Stripe.Invoice): BillingInvoiceItem {
+  return {
+    id: invoice.id,
+    number: invoice.number,
+    status: invoice.status ?? "unknown",
+    amountDueCents: invoice.amount_due ?? 0,
+    amountPaidCents: invoice.amount_paid ?? 0,
+    currency: invoice.currency ?? "usd",
+    createdAt: new Date((invoice.created ?? 0) * 1000).toISOString(),
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    pdfUrl: invoice.invoice_pdf ?? null,
+  };
+}
+
+export async function getStripePaymentMethodForCustomer(
+  customerId: string,
+): Promise<BillingPaymentMethod | null> {
+  if (!hasStripeEnv()) {
+    return null;
+  }
+
+  const stripe = getStripeClient();
+  const customer = await stripe.customers.retrieve(customerId, {
+    expand: ["invoice_settings.default_payment_method"],
+  });
+
+  if (customer.deleted) {
+    return null;
+  }
+
+  const defaultPaymentMethod =
+    customer.invoice_settings?.default_payment_method;
+
+  if (defaultPaymentMethod && typeof defaultPaymentMethod !== "string") {
+    return mapStripePaymentMethod(defaultPaymentMethod);
+  }
+
+  const paymentMethods = await stripe.paymentMethods.list({
+    customer: customerId,
+    type: "card",
+    limit: 1,
+  });
+
+  const first = paymentMethods.data[0];
+
+  return first ? mapStripePaymentMethod(first) : null;
+}
+
+export async function listStripeInvoicesForCustomer(
+  customerId: string,
+  limit = 8,
+): Promise<BillingInvoiceItem[]> {
+  if (!hasStripeEnv()) {
+    return [];
+  }
+
+  const stripe = getStripeClient();
+  const invoices = await stripe.invoices.list({
+    customer: customerId,
+    limit,
+  });
+
+  return invoices.data.map(mapStripeInvoice);
+}
+
+export async function addTwilioNumberToStripeSubscription(input: {
+  businessId: string;
+  stripeSubscriptionId: string;
+  phoneNumber: string;
+  phoneSid: string;
+  countryCode: string;
+  monthlyPriceCents: number;
+}): Promise<
+  { success: true; subscriptionItemId: string } | { success: false; message: string }
+> {
+  if (!hasStripeEnv()) {
+    return { success: false, message: "Stripe is not configured." };
+  }
+
+  const stripe = getStripeClient();
+  const countryLabel = input.countryCode.toUpperCase();
+  const productId = process.env.STRIPE_PRODUCT_TWILIO_NUMBER?.trim();
+
+  if (!productId) {
+    return {
+      success: false,
+      message:
+        "Twilio number billing is not configured (STRIPE_PRODUCT_TWILIO_NUMBER).",
+    };
+  }
+
+  try {
+    const item = await stripe.subscriptionItems.create({
+      subscription: input.stripeSubscriptionId,
+      price_data: {
+        currency: "usd",
+        product: productId,
+        unit_amount: input.monthlyPriceCents,
+        recurring: { interval: "month" },
+      },
+      quantity: 1,
+      metadata: {
+        type: "twilio_phone_number",
+        business_id: input.businessId,
+        phone_number: input.phoneNumber,
+        phone_sid: input.phoneSid,
+        country_code: countryLabel,
+      },
+      proration_behavior: "create_prorations",
+    });
+
+    return { success: true, subscriptionItemId: item.id };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unable to add phone number to subscription.",
+    };
+  }
+}
+
+export async function removeTwilioNumberFromStripeSubscription(
+  subscriptionItemId: string,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasStripeEnv() || !subscriptionItemId.trim()) {
+    return { success: true };
+  }
+
+  const stripe = getStripeClient();
+
+  try {
+    await stripe.subscriptionItems.del(subscriptionItemId, {
+      proration_behavior: "create_prorations",
+    });
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unable to remove phone number from subscription.",
+    };
+  }
+}
+
 async function resolveSubscriptionFromStripeItems(
   items: Stripe.SubscriptionItem[],
 ): Promise<{ planId: string; addons: BusinessSubscriptionAddon[] }> {
@@ -269,6 +436,10 @@ async function resolveSubscriptionFromStripeItems(
   const addonPriceIds: string[] = [];
 
   for (const item of items) {
+    if (item.metadata?.type === "twilio_phone_number") {
+      continue;
+    }
+
     const priceId = item.price.id;
     const quantity = item.quantity ?? 1;
 

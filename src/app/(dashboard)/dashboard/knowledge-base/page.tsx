@@ -14,7 +14,6 @@ export default async function KnowledgeBasePage({
 }: KnowledgeBasePageProps) {
   const params = await searchParams;
   const query = new URLSearchParams();
-  query.set("tab", "knowledge");
 
   if (params.q) {
     query.set("q", params.q);
@@ -24,5 +23,11 @@ export default async function KnowledgeBasePage({
     query.set("category", params.category);
   }
 
-  redirect(`${DASHBOARD_ROUTES.aiAssistant}?${query.toString()}`);
+  const suffix = query.toString();
+
+  redirect(
+    suffix
+      ? `${DASHBOARD_ROUTES.aiAssistantKnowledge}?${suffix}`
+      : DASHBOARD_ROUTES.aiAssistantKnowledge,
+  );
 }

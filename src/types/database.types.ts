@@ -630,6 +630,53 @@ export type Database = {
           },
         ];
       };
+      twilio_number_subscriptions: {
+        Row: {
+          id: string;
+          business_id: string;
+          phone_number: string;
+          phone_sid: string;
+          country_code: string;
+          monthly_price_cents: number;
+          stripe_subscription_item_id: string | null;
+          status: string;
+          created_at: string;
+          canceled_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          phone_number: string;
+          phone_sid: string;
+          country_code: string;
+          monthly_price_cents: number;
+          stripe_subscription_item_id?: string | null;
+          status?: string;
+          created_at?: string;
+          canceled_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          phone_number?: string;
+          phone_sid?: string;
+          country_code?: string;
+          monthly_price_cents?: number;
+          stripe_subscription_item_id?: string | null;
+          status?: string;
+          created_at?: string;
+          canceled_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "twilio_number_subscriptions_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       website_form_connections: {
         Row: {
           id: string;

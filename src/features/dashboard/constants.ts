@@ -117,12 +117,6 @@ export function buildDashboardNavItems(
   return [...DASHBOARD_NAV_ITEMS];
 }
 
-export const SETTINGS_MESSAGES = {
-  pageTitle: "Settings",
-  pageDescription:
-    "Manage push notifications and saved quick replies for your inbox.",
-} as const;
-
 export const OVERVIEW_MESSAGES = {
   title: "Home",
   description: "Monitor messages, AI performance, and activity across all channels.",
@@ -151,6 +145,12 @@ export const AI_HUMAN_REQUEST_MESSAGES = {
   resolvedLabel: "Handled",
   connect: "Connect",
   dismiss: "Dismiss",
+  deleteNotification: "Delete",
+  deleteNotificationTitle: "Delete notification?",
+  deleteNotificationDescription:
+    "This removes the notification from your list. It cannot be undone.",
+  deleteNotificationConfirm: "Delete",
+  deleteNotificationCancel: "Cancel",
   accept: "Accept",
   decline: "Decline",
   openChat: "Open chat",

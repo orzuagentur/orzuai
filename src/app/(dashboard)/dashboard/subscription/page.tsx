@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 
+import { BillingOverviewPanel } from "@/components/billing/BillingOverviewPanel";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
-import { SubscriptionHub } from "@/components/subscription/SubscriptionHub";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
+import { BILLING_MESSAGES } from "@/features/billing/constants";
 import { getSubscriptionPageData } from "@/services/subscription.service";
 
 export default function SubscriptionPage() {
@@ -19,11 +20,11 @@ async function SubscriptionPageContent() {
   if (!data.hasBusiness) {
     return (
       <DashboardSetupPrompt
-        title="Subscription & Billing"
-        description="Create your business profile to manage plans and payment methods."
+        title={BILLING_MESSAGES.pageTitle}
+        description="Create your business profile to manage billing and subscriptions."
       />
     );
   }
 
-  return <SubscriptionHub data={data} />;
+  return <BillingOverviewPanel data={data} />;
 }

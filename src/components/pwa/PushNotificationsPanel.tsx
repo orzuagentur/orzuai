@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/card";
 import { usePushNotificationsContext } from "@/components/pwa/push-notifications-context";
 
-export function PushNotificationsPanel() {
+const cardClass = (layout: "default" | "settings") =>
+  layout === "settings" ? "shadow-none" : "mx-auto w-full max-w-3xl";
+
+export function PushNotificationsPanel({
+  layout = "default",
+}: {
+  layout?: "default" | "settings";
+}) {
   const {
     supported,
     enabledOnServer,
@@ -52,7 +59,7 @@ export function PushNotificationsPanel() {
 
   if (!supported) {
     return (
-      <Card className="mx-auto w-full max-w-3xl">
+      <Card className={cardClass(layout)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <BellOffIcon className="size-4" />
@@ -68,7 +75,7 @@ export function PushNotificationsPanel() {
 
   if (!enabledOnServer) {
     return (
-      <Card className="mx-auto w-full max-w-3xl">
+      <Card className={cardClass(layout)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <BellIcon className="size-4" />
@@ -84,7 +91,7 @@ export function PushNotificationsPanel() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-3xl">
+    <Card className={cardClass(layout)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <BellIcon className="size-4" />

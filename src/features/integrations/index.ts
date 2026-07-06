@@ -8,7 +8,9 @@ export {
   INTEGRATION_CHANNELS,
   isMessagingIntegrationChannel,
   isInboxMessagingChannel,
+  AI_AGENT_CHANNELS,
   MESSAGING_INTEGRATION_CHANNELS,
+  isAiAgentChannel,
   INTEGRATION_SECTION_LIST,
   INTEGRATION_SECTIONS,
   INTEGRATION_WIZARD_STEPS,
@@ -23,6 +25,7 @@ export type {
   IntegrationSectionId,
   IntegrationWizardStepId,
   LegacyIntegrationWorkspaceSectionId,
+  AiAgentChannelId,
   MessagingIntegrationChannelId,
 } from "./constants";
 export {

@@ -3,10 +3,9 @@ import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
 
 export type PulseKpiId =
   | "new_contacts"
+  | "messages"
   | "ai_reply_share"
-  | "avg_first_response"
-  | "qualified"
-  | "won_revenue";
+  | "avg_first_response";
 
 export type PulseKpi = {
   id: PulseKpiId;

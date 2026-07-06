@@ -1,3 +1,8 @@
+import type {
+  BillingInvoiceItem,
+  BillingPaymentMethod,
+} from "@/types/billing.types";
+
 export type SubscriptionPlanCard = {
   id: string;
   label: string;
@@ -43,4 +48,6 @@ export type SubscriptionPageData = {
   usedReplies: number;
   monthlyLimit: number;
   usage: SubscriptionUsageSnapshot;
+  paymentMethod: BillingPaymentMethod | null;
+  recentInvoices: BillingInvoiceItem[];
 };

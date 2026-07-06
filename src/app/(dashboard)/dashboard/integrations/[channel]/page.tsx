@@ -66,7 +66,7 @@ export default async function IntegrationsChannelPage({
   const { section: sectionParam } = await searchParams;
 
   if (channelParam === "website_knowledge") {
-    redirect(`${DASHBOARD_ROUTES.knowledgeBase}#website-sync`);
+    redirect(DASHBOARD_ROUTES.aiAssistantKnowledgeWebsite);
   }
 
   if (channelParam === "google-calendar") {

@@ -3,11 +3,11 @@ import "server-only";
 import { SUBSCRIPTION_PLANS } from "@/features/subscription/plans";
 import { hasSupabaseEnv } from "@/lib/env";
 import {
-    getAutomationOpsMetrics,
-    getAgentRunsMetrics,
-    listAgentsAnalyticsRollup,
-    listRecentAgentRuns,
-  } from "@/services/analytics-ai-ops.service";
+  getAutomationOpsMetrics,
+  getAgentRunsMetrics,
+  listRecentAgentRuns,
+} from "@/services/analytics-ai-ops.service";
+import { getAgentDashboardStats } from "@/services/agent-dashboard.service";
 import {
   getAiPerformanceMetrics,
   getCrmFunnelMetrics,
@@ -63,7 +63,7 @@ export async function askAnalyticsAssistant(input: {
     teamAnalytics,
     revenue,
     sentiment,
-    agentsRollup,
+    agentStats,
     automationOps,
     agentRuns,
     recentAgentRuns,
@@ -77,7 +77,7 @@ export async function askAnalyticsAssistant(input: {
     getTeamAnalyticsMetrics(business.id),
     getRevenueMetrics(business.id),
     getSentimentBreakdown(business.id),
-    listAgentsAnalyticsRollup(business.id),
+    getAgentDashboardStats(business.id),
     getAutomationOpsMetrics(business.id),
     getAgentRunsMetrics(business.id),
     listRecentAgentRuns(business.id),
@@ -94,7 +94,7 @@ export async function askAnalyticsAssistant(input: {
     sentiment,
     aiCost,
     usage,
-    agentsRollup,
+    agentStats,
     automationOps,
     agentRuns,
     recentAgentRuns,

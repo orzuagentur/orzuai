@@ -8,7 +8,6 @@ export const ANALYTICS_TABS = [
   "channels",
   "sales",
   "ai_ops",
-  "ask",
 ] as const;
 
 export type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
@@ -63,7 +62,11 @@ export function parseAnalyticsSearchParams(input: {
   activeChannelId: MessagingChannel | null;
 } {
   const activeTab =
-    input.tab && isAnalyticsTab(input.tab) ? input.tab : "pulse";
+    input.tab && isAnalyticsTab(input.tab)
+      ? input.tab
+      : input.tab === "ask"
+        ? "pulse"
+        : "pulse";
   const activePeriod =
     input.period && isAnalyticsPeriod(input.period) ? input.period : "7d";
   const activeChannelId =

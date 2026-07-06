@@ -1,6 +1,7 @@
 "use server";
 
-import { getActiveMessagingChannelIds } from "@/features/integrations";
+import { AI_AGENT_CHANNELS } from "@/features/integrations/constants";
+import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
 import {
@@ -60,7 +61,9 @@ export async function activateAiAgentAction(): Promise<{
   }
 
   const statuses = await getChannelConnectionStatuses(business.id);
-  const connectedChannels = getActiveMessagingChannelIds(statuses);
+  const connectedChannels = AI_AGENT_CHANNELS.filter((channel) =>
+    isChannelConnectedForWorkspace(channel, statuses),
+  );
 
   await Promise.all(
     connectedChannels.map((channel) =>

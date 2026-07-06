@@ -9,10 +9,16 @@ const schema = z.object({
     .string()
     .trim()
     .regex(/^\+[1-9]\d{6,14}$/, "Invalid phone number."),
+  countryCode: z
+    .string()
+    .trim()
+    .length(2, "Country code is required.")
+    .optional(),
 });
 
 export async function purchaseTwilioPhoneNumberAction(input: {
   phoneNumber: string;
+  countryCode?: string;
 }) {
   const parsed = schema.safeParse(input);
 
@@ -23,5 +29,5 @@ export async function purchaseTwilioPhoneNumberAction(input: {
     };
   }
 
-  return purchaseTwilioNumberForCurrentUser(parsed.data.phoneNumber);
+  return purchaseTwilioNumberForCurrentUser(parsed.data);
 }

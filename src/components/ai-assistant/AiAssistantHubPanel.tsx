@@ -14,11 +14,11 @@ import {
   buildIntegrationActivateHref,
   INTEGRATION_CHANNEL_LIST,
 } from "@/features/integrations";
-import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import type { IntegrationChannelId } from "@/features/integrations/constants";
 import { useToggleChannelAi } from "@/hooks/use-toggle-channel-ai";
 import { cn } from "@/lib/utils";
 import type { ChannelAiSettingsData } from "@/types/channel-workspace.types";
-import { buildAiAssistantHref } from "@/utils/ai-assistant-url";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 type AiAssistantChannelRowProps = {
   settings: ChannelAiSettingsData;
@@ -61,7 +61,7 @@ export function AiAssistantChannelRow({
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border bg-muted/30">
             <ChannelBrandIcon
-              channel={settings.channel as MessagingIntegrationChannelId}
+              channel={settings.channel}
               className="size-5"
             />
           </div>
@@ -117,7 +117,7 @@ export function AiAssistantChannelRow({
             <Button type="button" size="sm" variant="secondary" asChild>
               <Link
                 href={buildIntegrationActivateHref(
-                  settings.channel as MessagingIntegrationChannelId,
+                  settings.channel as IntegrationChannelId,
                 )}
               >
                 {AI_ASSISTANT_MESSAGES.assistantConnectChannel}
@@ -131,7 +131,10 @@ export function AiAssistantChannelRow({
 }
 
 type AiAssistantHubPanelProps = {
-  channels: Array<{ channel: MessagingIntegrationChannelId; settings: ChannelAiSettingsData }>;
+  channels: Array<{
+    channel: IntegrationChannelId;
+    settings: ChannelAiSettingsData;
+  }>;
   enabledChannelCount: number;
   onEdit?: () => void;
 };
@@ -149,18 +152,14 @@ export function AiAssistantHubPanel({
       return;
     }
 
-    router.push(
-      buildAiAssistantHref({
-        section: "assistant",
-        assistantEdit: true,
-      }),
-    );
+    router.push(DASHBOARD_ROUTES.aiAssistantSettings);
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
         <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Active channels</h1>
           <p className="text-sm text-muted-foreground">
             {AI_ASSISTANT_MESSAGES.assistantTabDescription}
           </p>

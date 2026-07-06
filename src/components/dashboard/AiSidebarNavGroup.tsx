@@ -8,6 +8,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { SIDEBAR_NAV_BUTTON_CLASS } from "@/features/navigation/sidebar-nav-ui";
 
 type AiSidebarNavGroupProps = {
   pathname: string;
@@ -29,7 +30,7 @@ export function AiSidebarNavGroup({ pathname }: AiSidebarNavGroupProps) {
         asChild
         isActive={isParentActive}
         tooltip="AI Agent"
-        className="h-10 text-[15px] [&_svg]:size-5"
+        className={SIDEBAR_NAV_BUTTON_CLASS}
       >
         <Link href={DASHBOARD_ROUTES.aiAssistant}>
           <Bot />

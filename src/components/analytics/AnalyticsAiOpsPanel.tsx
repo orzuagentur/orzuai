@@ -1,25 +1,25 @@
 "use client";
 
 import { AnalyticsAgentRunsPanel } from "@/components/analytics/AnalyticsAgentRunsPanel";
-import { AnalyticsAgentsRollupPanel } from "@/components/analytics/AnalyticsAgentsRollupPanel";
+import { AnalyticsAgentSummaryPanel } from "@/components/analytics/AnalyticsAgentSummaryPanel";
 import { AnalyticsAutomationsOpsPanel } from "@/components/analytics/AnalyticsAutomationsOpsPanel";
 import { AnalyticsOperationsPanel } from "@/components/analytics/AnalyticsOperationsPanel";
 import { AiCostPanel } from "@/components/analytics/AiCostPanel";
 import { ANALYTICS_MESSAGES } from "@/features/analytics/constants";
 import type { AnalyticsPageData } from "@/types/channel-workspace.types";
 import type {
-  AgentAnalyticsRollupItem,
   AgentRunListItem,
   AgentRunsMetrics,
   AutomationOpsMetrics,
 } from "@/types/analytics.types";
+import type { AgentDashboardStats } from "@/types/agent-dashboard.types";
 
 type AnalyticsAiOpsPanelProps = {
   aiPerformance: AnalyticsPageData["aiPerformance"];
   teamAnalytics: AnalyticsPageData["teamAnalytics"];
   responseTime: AnalyticsPageData["responseTime"];
   aiCost: AnalyticsPageData["aiCost"];
-  agentsRollup: AgentAnalyticsRollupItem[];
+  agentStats: AgentDashboardStats;
   automationOps: AutomationOpsMetrics;
   agentRuns: AgentRunsMetrics;
   recentAgentRuns: AgentRunListItem[];
@@ -30,7 +30,7 @@ export function AnalyticsAiOpsPanel({
   teamAnalytics,
   responseTime,
   aiCost,
-  agentsRollup,
+  agentStats,
   automationOps,
   agentRuns,
   recentAgentRuns,
@@ -46,6 +46,8 @@ export function AnalyticsAiOpsPanel({
         </p>
       </div>
 
+      <AnalyticsAgentSummaryPanel stats={agentStats} />
+
       <AnalyticsOperationsPanel
         aiPerformance={aiPerformance}
         teamAnalytics={teamAnalytics}
@@ -53,8 +55,6 @@ export function AnalyticsAiOpsPanel({
       />
 
       <AiCostPanel metrics={aiCost} />
-
-      <AnalyticsAgentsRollupPanel agents={agentsRollup} />
 
       <AnalyticsAgentRunsPanel
         metrics={agentRuns}

@@ -7,6 +7,7 @@ import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { BusinessProfileForm } from "@/components/business/BusinessProfileForm";
+import { isMessagingIntegrationChannel } from "@/features/integrations";
 import { KnowledgeEntryForm } from "@/components/knowledge-base/KnowledgeEntryForm";
 import { OnboardingProgressRing } from "@/components/onboarding/OnboardingProgressRing";
 import { WhatsAppConnectPanel } from "@/components/whatsapp/WhatsAppConnectPanel";
@@ -81,7 +82,11 @@ export function OnboardingWizard({
   );
 
   async function handleTest() {
-    if (!aiSettings?.channel || !testMessage.trim()) {
+    if (
+      !aiSettings?.channel ||
+      !isMessagingIntegrationChannel(aiSettings.channel) ||
+      !testMessage.trim()
+    ) {
       return;
     }
 

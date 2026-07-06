@@ -50,6 +50,7 @@ import { formatContactIdentifier } from "@/utils/contact-display";
 type DealDetailPanelProps = {
   deal: CrmDealListItem;
   dealsData: CrmDealsPageData;
+  onClose?: () => void;
 };
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
@@ -116,7 +117,7 @@ function parseDealValue(value: string): number | null {
   return Number(trimmed);
 }
 
-export function DealDetailPanel({ deal, dealsData }: DealDetailPanelProps) {
+export function DealDetailPanel({ deal, dealsData, onClose }: DealDetailPanelProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(deal.title);
@@ -343,6 +344,17 @@ export function DealDetailPanel({ deal, dealsData }: DealDetailPanelProps) {
                 <PencilIcon className="size-4" />
               </Button>
             )}
+            {onClose ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Close deal"
+                onClick={onClose}
+              >
+                <XIcon className="size-4" />
+              </Button>
+            ) : null}
           </div>
         </div>
 

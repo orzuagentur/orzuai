@@ -3,6 +3,10 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import {
+  getTwilioCountryPricing,
+  inferCountryCodeFromPhoneNumber,
+} from "@/features/twilio/country-pricing";
 import { TWILIO_MESSAGES } from "@/features/twilio/constants";
 import { buildAppUrl } from "@/lib/app-url";
 import {
@@ -32,6 +36,7 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { registerTwilioNumberBilling } from "@/services/billing-twilio.service";
 import type { TwilioConnection } from "@/types/database.types";
 import type {
   TwilioAvailablePhoneNumber,
@@ -49,6 +54,7 @@ function revalidateTwilioPaths(): void {
   revalidatePath(DASHBOARD_ROUTES.integrations);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/voice`);
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.subscriptionTwilio);
 }
 
 function mapTwilioConnection(row: TwilioConnection): TwilioConnectionData {
@@ -271,6 +277,7 @@ export async function searchAvailableTwilioNumbersForBusiness(input: {
 export async function purchaseAndConnectTwilioNumber(input: {
   businessId: string;
   phoneNumber: string;
+  countryCode?: string;
 }): Promise<{ success: boolean; message?: string }> {
   const ctx = await getTwilioCredentialsForBusiness(input.businessId);
 
@@ -278,11 +285,70 @@ export async function purchaseAndConnectTwilioNumber(input: {
     return { success: false, message: TWILIO_MESSAGES.platformKeysMissing };
   }
 
+  const countryCode =
+    input.countryCode?.trim().toUpperCase() ||
+    inferCountryCodeFromPhoneNumber(input.phoneNumber);
+  const pricing = getTwilioCountryPricing(countryCode);
+
+  if (!pricing) {
+    return {
+      success: false,
+      message: "Phone numbers for this country are not available yet.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: business } = await admin
+    .from("businesses")
+    .select("stripe_subscription_id, subscription_status")
+    .eq("id", input.businessId)
+    .maybeSingle();
+
+  const billingStatus = business?.subscription_status?.trim().toLowerCase();
+
+  if (
+    !business?.stripe_subscription_id ||
+    (billingStatus !== "active" && billingStatus !== "trialing")
+  ) {
+    return {
+      success: false,
+      message:
+        "Upgrade to an active paid plan before purchasing a phone number.",
+    };
+  }
+
   try {
     const purchased = await purchaseTwilioPhoneNumber({
       credentials: ctx.credentials,
       phoneNumber: input.phoneNumber,
     });
+
+    const billingResult = await registerTwilioNumberBilling({
+      businessId: input.businessId,
+      phoneNumber: purchased.phoneNumber,
+      phoneSid: purchased.sid,
+      countryCode,
+      monthlyPriceCents: pricing.monthlyPriceCents,
+      stripeSubscriptionId: business.stripe_subscription_id,
+    });
+
+    if (!billingResult.success) {
+      try {
+        await clearTwilioPhoneNumberWebhooks({
+          credentials: ctx.credentials,
+          phoneSid: purchased.sid,
+        });
+      } catch {
+        // Best-effort rollback if billing fails after Twilio purchase.
+      }
+
+      return {
+        success: false,
+        message:
+          billingResult.message ??
+          "Number purchased on Twilio but billing could not be activated.",
+      };
+    }
 
     return selectTwilioPhoneNumber({
       businessId: input.businessId,
@@ -932,16 +998,21 @@ export async function searchAvailableTwilioNumbersForCurrentUser(input: {
   });
 }
 
-export async function purchaseTwilioNumberForCurrentUser(
-  phoneNumber: string,
-): Promise<{ success: boolean; message?: string }> {
+export async function purchaseTwilioNumberForCurrentUser(input: {
+  phoneNumber: string;
+  countryCode?: string;
+}): Promise<{ success: boolean; message?: string }> {
   const businessId = await getOwnedBusinessId();
 
   if (!businessId) {
     return { success: false, message: TWILIO_MESSAGES.noBusiness };
   }
 
-  return purchaseAndConnectTwilioNumber({ businessId, phoneNumber });
+  return purchaseAndConnectTwilioNumber({
+    businessId,
+    phoneNumber: input.phoneNumber,
+    countryCode: input.countryCode,
+  });
 }
 
 export async function resyncTwilioForCurrentUser(): Promise<{

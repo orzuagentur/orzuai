@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  MESSAGING_INTEGRATION_CHANNELS,
+  AI_AGENT_CHANNELS,
   getActiveMessagingChannelIds,
 } from "@/features/integrations";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
@@ -37,7 +37,7 @@ import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service"
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
 
-const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
+const MESSAGING_CHANNELS = AI_AGENT_CHANNELS;
 
 async function getOwnedBusinessId(): Promise<string | null> {
   const user = await requireUser();

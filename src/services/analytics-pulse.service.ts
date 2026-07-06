@@ -92,13 +92,6 @@ function formatMinutes(value: number | null): string {
   return `${hours}h`;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 async function countContactsInRange(
   businessId: string,
@@ -128,17 +121,27 @@ async function countContactsInRange(
   return count ?? 0;
 }
 
-async function sumWonRevenueInRange(
+async function countMessagesInRange(
   businessId: string,
   rangeStart: Date | null,
   rangeEnd: Date | null,
 ): Promise<number> {
   const supabase = await createClient();
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("business_id", businessId);
+
+  const conversationIds = conversations?.map((row) => row.id) ?? [];
+
+  if (conversationIds.length === 0) {
+    return 0;
+  }
+
   let query = supabase
-    .from("contacts")
-    .select("deal_value")
-    .eq("business_id", businessId)
-    .eq("pipeline_stage", "won");
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .in("conversation_id", conversationIds);
 
   if (rangeStart) {
     query = query.gte("created_at", rangeStart.toISOString());
@@ -148,13 +151,10 @@ async function sumWonRevenueInRange(
     query = query.lte("created_at", rangeEnd.toISOString());
   }
 
-  const { data } = await query;
-
-  return (data ?? []).reduce((sum, row) => {
-    const value = typeof row.deal_value === "number" ? row.deal_value : 0;
-    return sum + value;
-  }, 0);
+  const { count } = await query;
+  return count ?? 0;
 }
+
 
 async function getAiReplyShareInRange(
   businessId: string,
@@ -328,14 +328,12 @@ export async function getAnalyticsPulseData(
   const [
     newContacts,
     prevNewContacts,
+    messageCount,
+    prevMessageCount,
     aiShare,
     prevAiShare,
     avgFirstResponse,
     prevAvgFirstResponse,
-    qualified,
-    prevQualified,
-    wonRevenue,
-    prevWonRevenue,
   ] = await Promise.all([
     countContactsInRange(businessId, bounds.start, rangeEnd),
     hasComparison
@@ -345,6 +343,10 @@ export async function getAnalyticsPulseData(
           bounds.prevEnd,
         )
       : Promise.resolve(0),
+    countMessagesInRange(businessId, bounds.start, rangeEnd),
+    hasComparison
+      ? countMessagesInRange(businessId, bounds.prevStart, bounds.prevEnd)
+      : Promise.resolve(0),
     getAiReplyShareInRange(businessId, bounds.start, rangeEnd),
     hasComparison
       ? getAiReplyShareInRange(businessId, bounds.prevStart, bounds.prevEnd)
@@ -353,21 +355,6 @@ export async function getAnalyticsPulseData(
     hasComparison
       ? getAvgFirstResponseInRange(businessId, bounds.prevStart)
       : Promise.resolve(null),
-    period === "all"
-      ? countContactsInRange(businessId, null, null, "qualified")
-      : countContactsInRange(businessId, bounds.start, rangeEnd, "qualified"),
-    hasComparison
-      ? countContactsInRange(
-          businessId,
-          bounds.prevStart,
-          bounds.prevEnd,
-          "qualified",
-        )
-      : Promise.resolve(0),
-    sumWonRevenueInRange(businessId, bounds.start, rangeEnd),
-    hasComparison
-      ? sumWonRevenueInRange(businessId, bounds.prevStart, bounds.prevEnd)
-      : Promise.resolve(0),
   ]);
 
   const activityDays = activityDaysForPeriod(period);
@@ -379,6 +366,12 @@ export async function getAnalyticsPulseData(
       label: ANALYTICS_MESSAGES.pulseNewContacts,
       value: String(newContacts),
       deltaPercent: calcDelta(newContacts, prevNewContacts, hasComparison),
+    },
+    {
+      id: "messages",
+      label: ANALYTICS_MESSAGES.pulseMessages,
+      value: String(messageCount),
+      deltaPercent: calcDelta(messageCount, prevMessageCount, hasComparison),
     },
     {
       id: "ai_reply_share",
@@ -394,18 +387,6 @@ export async function getAnalyticsPulseData(
         avgFirstResponse != null && prevAvgFirstResponse != null && hasComparison
           ? calcDelta(avgFirstResponse, prevAvgFirstResponse, true)
           : null,
-    },
-    {
-      id: "qualified",
-      label: ANALYTICS_MESSAGES.pulseQualified,
-      value: String(qualified),
-      deltaPercent: calcDelta(qualified, prevQualified, hasComparison),
-    },
-    {
-      id: "won_revenue",
-      label: ANALYTICS_MESSAGES.pulseWonRevenue,
-      value: formatCurrency(wonRevenue),
-      deltaPercent: calcDelta(wonRevenue, prevWonRevenue, hasComparison),
     },
   ];
 

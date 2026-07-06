@@ -4,22 +4,41 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+
+import type { TenantSupportMessage } from "@/features/platform-support/actions";
+
+const SUPPORT_OPEN_STORAGE_KEY = "orzu-support-open";
 
 type PlatformSupportContextValue = {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   toggle: () => void;
   unreadCount: number;
-  setUnreadCount: (count: number) => void;
+  setUnreadCount: React.Dispatch<React.SetStateAction<number>>;
+  messages: TenantSupportMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<TenantSupportMessage[]>>;
+  threadId: string | null;
+  setThreadId: (threadId: string | null) => void;
+  threadLoaded: boolean;
+  setThreadLoaded: (loaded: boolean) => void;
 };
 
 const PlatformSupportContext = createContext<PlatformSupportContextValue | null>(
   null,
 );
+
+function readStoredOpenState(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(SUPPORT_OPEN_STORAGE_KEY) === "1";
+}
 
 export function PlatformSupportProvider({
   children,
@@ -30,13 +49,32 @@ export function PlatformSupportProvider({
 }) {
   const [isOpen, setIsOpenState] = useState(false);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [messages, setMessages] = useState<TenantSupportMessage[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadLoaded, setThreadLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsOpenState(readStoredOpenState());
+  }, []);
 
   const setIsOpen = useCallback((open: boolean) => {
     setIsOpenState(open);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SUPPORT_OPEN_STORAGE_KEY, open ? "1" : "0");
+    }
   }, []);
 
   const toggle = useCallback(() => {
-    setIsOpenState((current) => !current);
+    setIsOpenState((current) => {
+      const next = !current;
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(SUPPORT_OPEN_STORAGE_KEY, next ? "1" : "0");
+      }
+
+      return next;
+    });
   }, []);
 
   const value = useMemo(
@@ -46,8 +84,22 @@ export function PlatformSupportProvider({
       toggle,
       unreadCount,
       setUnreadCount,
+      messages,
+      setMessages,
+      threadId,
+      setThreadId,
+      threadLoaded,
+      setThreadLoaded,
     }),
-    [isOpen, setIsOpen, toggle, unreadCount],
+    [
+      isOpen,
+      setIsOpen,
+      toggle,
+      unreadCount,
+      messages,
+      threadId,
+      threadLoaded,
+    ],
   );
 
   return (

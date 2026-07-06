@@ -45,6 +45,7 @@ import type {
 
 type SubscriptionHubProps = {
   data: SubscriptionPageData;
+  embedded?: boolean;
 };
 
 type UsageMetricCardProps = {
@@ -199,7 +200,7 @@ function AddOnRow({
   );
 }
 
-export function SubscriptionHub({ data }: SubscriptionHubProps) {
+export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
@@ -294,13 +295,14 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      {!data.stripeConfigured ? (
+    <div className={embedded ? "space-y-6" : "flex flex-1 flex-col gap-6 p-4 md:p-6"}>
+      {!embedded && !data.stripeConfigured ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
           {SUBSCRIPTION_MESSAGES.stripeMissing}
         </div>
       ) : null}
 
+      {!embedded ? (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]">
         <Card className="shadow-none">
           <CardHeader className="pb-4">
@@ -424,6 +426,7 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
           </CardContent>
         </Card>
       </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <UsageMetricCard
@@ -596,6 +599,7 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
           </CardContent>
         </Card>
 
+        {!embedded ? (
         <Card className="shadow-none">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -619,6 +623,7 @@ export function SubscriptionHub({ data }: SubscriptionHubProps) {
             ))}
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </div>
   );

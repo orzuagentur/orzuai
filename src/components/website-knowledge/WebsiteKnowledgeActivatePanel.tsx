@@ -34,6 +34,7 @@ type WebsiteKnowledgeActivatePanelProps = {
   geminiConfigured: boolean;
   embeddedInHub?: boolean;
   showKnowledgeBaseLink?: boolean;
+  onSyncStarted?: () => void;
 };
 
 function statusBadge(sync: WebsiteKnowledgeSyncData | null) {
@@ -62,6 +63,7 @@ export function WebsiteKnowledgeActivatePanel({
   geminiConfigured,
   embeddedInHub = false,
   showKnowledgeBaseLink = true,
+  onSyncStarted,
 }: WebsiteKnowledgeActivatePanelProps) {
   const router = useRouter();
   const [siteUrl, setSiteUrl] = useState(sync?.siteUrl ?? "");
@@ -90,6 +92,13 @@ export function WebsiteKnowledgeActivatePanel({
         return;
       }
 
+      if (result.data.background) {
+        onSyncStarted?.();
+        toast.success("Website scan started. This may take a few minutes.");
+        router.refresh();
+        return;
+      }
+
       toast.success(WEBSITE_KNOWLEDGE_MESSAGES.syncSuccess);
       router.refresh();
     } finally {
@@ -105,6 +114,13 @@ export function WebsiteKnowledgeActivatePanel({
 
       if (!result.success) {
         toast.error(result.error.message);
+        return;
+      }
+
+      if (result.data.background) {
+        onSyncStarted?.();
+        toast.success("Website scan started. This may take a few minutes.");
+        router.refresh();
         return;
       }
 
@@ -308,7 +324,7 @@ export function WebsiteKnowledgeActivatePanel({
 
           {showKnowledgeBaseLink ? (
             <Button asChild variant="outline">
-              <Link href={DASHBOARD_ROUTES.knowledgeBase}>
+              <Link href={DASHBOARD_ROUTES.aiAssistantKnowledge}>
                 {WEBSITE_KNOWLEDGE_MESSAGES.openKnowledgeBase}
               </Link>
             </Button>

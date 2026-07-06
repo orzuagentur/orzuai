@@ -12,6 +12,7 @@ import {
 
 import { dismissAiHumanRequestAction } from "@/features/dashboard/actions/dismiss-ai-human-request";
 import { declineAiHumanRequestAction } from "@/features/dashboard/actions/decline-ai-human-request";
+import { deleteBusinessNotificationAction } from "@/features/dashboard/actions/delete-business-notification";
 import { fetchAiHumanRequestsAction } from "@/features/dashboard/actions/fetch-ai-human-requests";
 import { fetchBusinessNotificationsAction } from "@/features/dashboard/actions/fetch-business-notifications";
 import { markBusinessNotificationsReadAction } from "@/features/dashboard/actions/mark-business-notifications-read";
@@ -37,6 +38,7 @@ type AiHumanRequestsContextValue = {
   declineRequest: (
     requestId: string,
   ) => Promise<{ success: boolean; customerNotified: boolean }>;
+  deleteNotification: (notificationId: string) => Promise<boolean>;
 };
 
 const AiHumanRequestsContext = createContext<AiHumanRequestsContextValue | null>(
@@ -211,6 +213,29 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const removeNotification = useCallback((notificationId: string) => {
+    setNotifications((current) => {
+      const existing = current.find((item) => item.id === notificationId);
+
+      if (existing && !existing.readAt) {
+        setUnreadCount((count) => Math.max(0, count - 1));
+      }
+
+      return current.filter((item) => item.id !== notificationId);
+    });
+  }, []);
+
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    const result = await deleteBusinessNotificationAction(notificationId);
+
+    if (!result.success) {
+      return false;
+    }
+
+    removeNotification(notificationId);
+    return true;
+  }, [removeNotification]);
+
   const upsertRequest = useCallback((request: AiHumanRequest) => {
     setRequests((current) => {
       const withoutDuplicate = current.filter(
@@ -371,6 +396,23 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
             );
           },
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "business_notifications",
+          },
+          (payload) => {
+            const deleted = payload.old as { id?: string };
+
+            if (deleted.id) {
+              removeNotification(deleted.id);
+            } else {
+              scheduleRefresh();
+            }
+          },
+        )
         .subscribe();
     })();
 
@@ -390,6 +432,7 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
       }
     };
   }, [
+    removeNotification,
     removeRequest,
     scheduleRefresh,
     updateNotification,
@@ -410,6 +453,7 @@ export function AiHumanRequestsProvider({ children }: { children: ReactNode }) {
         markAllRead,
         dismissRequest,
         declineRequest,
+        deleteNotification,
       }}
     >
       {children}

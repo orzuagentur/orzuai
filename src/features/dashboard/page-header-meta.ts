@@ -6,7 +6,6 @@ import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import {
   OVERVIEW_MESSAGES,
-  SETTINGS_MESSAGES,
 } from "@/features/dashboard/constants";
 import { INTEGRATIONS_MESSAGES } from "@/features/integrations";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
@@ -16,6 +15,7 @@ import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
 import {
   ACCOUNT_SETTINGS_MESSAGES,
   BUSINESS_PROFILE_MESSAGES,
+  SETTINGS_MESSAGES,
 } from "@/features/settings/constants";
 import { TEAM_MESSAGES } from "@/features/team/constants";
 
@@ -127,7 +127,7 @@ export function getDashboardPageHeaderMeta(
     };
   }
 
-  if (pathname === DASHBOARD_ROUTES.settings) {
+  if (pathname === DASHBOARD_ROUTES.settings || pathname.startsWith(`${DASHBOARD_ROUTES.settings}/`)) {
     return {
       title: SETTINGS_MESSAGES.pageTitle,
       description: SETTINGS_MESSAGES.pageDescription,

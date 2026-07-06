@@ -27,6 +27,7 @@ import type { MessagingIntegrationChannelId } from "@/features/integrations/cons
 
 type CannedResponsesPanelProps = {
   initialResponses: CannedResponseItem[];
+  layout?: "default" | "settings";
 };
 
 type DraftState = {
@@ -44,6 +45,7 @@ const EMPTY_DRAFT: DraftState = {
 
 export function CannedResponsesPanel({
   initialResponses,
+  layout = "default",
 }: CannedResponsesPanelProps) {
   const router = useRouter();
   const [responses, setResponses] = useState(initialResponses);
@@ -124,7 +126,11 @@ export function CannedResponsesPanel({
   }
 
   return (
-    <Card className="shadow-none">
+    <Card
+      className={
+        layout === "settings" ? "max-w-3xl shadow-none" : "shadow-none"
+      }
+    >
       <CardHeader>
         <CardTitle>{CANNED_RESPONSES_MESSAGES.sectionTitle}</CardTitle>
         <CardDescription>

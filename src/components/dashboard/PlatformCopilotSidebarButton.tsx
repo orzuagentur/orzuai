@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sidebar";
 import { usePlatformCopilot } from "@/contexts/platform-copilot-context";
 import { PLATFORM_COPILOT_MESSAGES } from "@/features/platform-copilot/constants";
+import { SIDEBAR_NAV_BUTTON_CLASS } from "@/features/navigation/sidebar-nav-ui";
 
 export function PlatformCopilotSidebarButton() {
   const { isOpen, toggle } = usePlatformCopilot();
@@ -19,10 +20,10 @@ export function PlatformCopilotSidebarButton() {
           type="button"
           tooltip={PLATFORM_COPILOT_MESSAGES.sidebarLabel}
           isActive={isOpen}
-          className="h-10 text-[15px]"
+          className={SIDEBAR_NAV_BUTTON_CLASS}
           onClick={toggle}
         >
-          <AiAssistantIcon size={24} className="size-6 shrink-0" />
+          <AiAssistantIcon size={16} className="shrink-0" />
           <span>{PLATFORM_COPILOT_MESSAGES.sidebarLabel}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>

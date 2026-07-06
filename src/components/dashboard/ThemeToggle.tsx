@@ -9,6 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { SIDEBAR_NAV_BUTTON_CLASS } from "@/features/navigation/sidebar-nav-ui";
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -27,7 +28,7 @@ export function ThemeToggle() {
           type="button"
           disabled={!mounted}
           tooltip={isDark ? "Light theme" : "Dark theme"}
-          className="h-10 text-[15px] [&_svg]:size-5"
+          className={SIDEBAR_NAV_BUTTON_CLASS}
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           {isDark ? <SunIcon /> : <MoonIcon />}

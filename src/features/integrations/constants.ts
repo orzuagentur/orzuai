@@ -25,6 +25,13 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
   "email",
 ] as const;
 
+/** All channels the AI Agent can be enabled on (messaging + SMS + voice calls). */
+export const AI_AGENT_CHANNELS = [
+  ...MESSAGING_INTEGRATION_CHANNELS,
+  "sms",
+  "voice",
+] as const;
+
 export const INTEGRATION_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
   "facebook_messenger",
@@ -37,12 +44,20 @@ export const INTEGRATION_CHANNELS = [
 export type MessagingIntegrationChannelId =
   (typeof MESSAGING_INTEGRATION_CHANNELS)[number];
 
+export type AiAgentChannelId = (typeof AI_AGENT_CHANNELS)[number];
+
 export type IntegrationChannelId = (typeof INTEGRATION_CHANNELS)[number];
 
 export function isMessagingIntegrationChannel(
   channel: IntegrationChannelId,
 ): channel is MessagingIntegrationChannelId {
   return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
+}
+
+export function isAiAgentChannel(
+  channel: string,
+): channel is AiAgentChannelId {
+  return (AI_AGENT_CHANNELS as readonly string[]).includes(channel);
 }
 
 export function isInboxMessagingChannel(

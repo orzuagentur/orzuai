@@ -25,16 +25,6 @@ export function AnalyticsOperationsPanel({
 }: AnalyticsOperationsPanelProps) {
   const items = [
     {
-      label: ANALYTICS_MESSAGES.aiAssistantOnlyReplies,
-      value: String(aiPerformance.assistantOnlyReplies),
-      hint: ANALYTICS_MESSAGES.aiAssistantOnlyDescription,
-    },
-    {
-      label: ANALYTICS_MESSAGES.aiDelegatedReplies,
-      value: `${aiPerformance.delegatedAgentReplies} (${aiPerformance.delegatedSharePercent}%)`,
-      hint: ANALYTICS_MESSAGES.aiDelegatedDescription,
-    },
-    {
       label: ANALYTICS_MESSAGES.aiResolutionRate,
       value: `${aiPerformance.aiResolutionRate}%`,
       hint: ANALYTICS_MESSAGES.aiResolutionDescription,
@@ -43,6 +33,11 @@ export function AnalyticsOperationsPanel({
       label: ANALYTICS_MESSAGES.aiVsHuman,
       value: `${aiPerformance.aiReplies} / ${aiPerformance.humanReplies}`,
       hint: ANALYTICS_MESSAGES.aiVsHumanDescription,
+    },
+    {
+      label: ANALYTICS_MESSAGES.handoffRate,
+      value: `${aiPerformance.handoffRate}%`,
+      hint: ANALYTICS_MESSAGES.handoffDescription,
     },
     {
       label: ANALYTICS_MESSAGES.slaCompliance,
@@ -64,11 +59,6 @@ export function AnalyticsOperationsPanel({
           ? `${responseTime.avgResolutionHours} h`
           : "—",
       hint: "Across recently resolved conversations",
-    },
-    {
-      label: ANALYTICS_MESSAGES.timeSaved,
-      value: `${aiPerformance.estimatedMinutesSaved} min`,
-      hint: ANALYTICS_MESSAGES.timeSavedDescription,
     },
   ];
 
@@ -94,11 +84,14 @@ export function AnalyticsOperationsPanel({
             </div>
           ))}
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">
-          {teamAnalytics.teamReplies} team replies · {teamAnalytics.clientMessages}{" "}
-          customer messages · {teamAnalytics.aiReplies} AI replies sampled across{" "}
-          {teamAnalytics.sampledConversations} conversations for SLA
-        </p>
+        {teamAnalytics.sampledConversations > 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            {teamAnalytics.teamReplies} team replies ·{" "}
+            {teamAnalytics.clientMessages} customer messages ·{" "}
+            {teamAnalytics.aiReplies} AI replies across{" "}
+            {teamAnalytics.sampledConversations} sampled conversations
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

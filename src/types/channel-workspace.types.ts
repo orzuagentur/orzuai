@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
 import type {
-  AgentAnalyticsRollupItem,
   AnalyticsPulseData,
   AgentRunListItem,
   AgentRunsMetrics,
@@ -27,6 +26,7 @@ import type {
 import type { KnowledgeEntryData } from "./knowledge.types";
 import type { WebsiteKnowledgeSyncData } from "./website-knowledge.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
+import type { AiAgentChannelId } from "@/features/integrations/constants";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import type { AiCostMetrics } from "./ai-usage.types";
@@ -85,7 +85,7 @@ export type AiProviderAvailability = {
 
 export type ChannelAiSettingsData = {
   hasBusiness: boolean;
-  channel: MessagingIntegrationChannelId;
+  channel: AiAgentChannelId;
   aiEnabled: boolean;
   provider: string;
   model: string;
@@ -99,7 +99,7 @@ export type ChannelAiSettingsData = {
 };
 
 export type AiAssistantChannelEntry = {
-  channel: MessagingIntegrationChannelId;
+  channel: AiAgentChannelId;
   settings: ChannelAiSettingsData;
 };
 
@@ -193,7 +193,7 @@ export type AnalyticsPageData = {
   teamAnalytics: TeamAnalyticsMetrics;
   revenue: RevenueMetrics;
   sentiment: SentimentBreakdown;
-  agentsRollup: AgentAnalyticsRollupItem[];
+  agentStats: AgentDashboardStats;
   automationOps: AutomationOpsMetrics;
   agentRuns: AgentRunsMetrics;
   recentAgentRuns: AgentRunListItem[];

@@ -343,6 +343,23 @@ export async function markBusinessNotificationsRead(input: {
   }
 }
 
+export async function deleteBusinessNotificationForBusiness(input: {
+  businessId: string;
+  notificationId: string;
+}): Promise<void> {
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("business_notifications")
+    .delete()
+    .eq("business_id", input.businessId)
+    .eq("id", input.notificationId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function fetchBusinessNotificationsForBusiness(
   businessId: string,
 ): Promise<{ data: BusinessNotification[]; unreadCount: number }> {

@@ -43,8 +43,8 @@ export const KNOWLEDGE_MESSAGES = {
     "Paste text or upload a file. AI splits it into categorized entries.",
   importPlaceholder:
     "Paste services, prices, FAQ, policies, or any business information...",
-  importUploadLabel: "Upload file (.txt, .md, .csv)",
-  importAction: "Import with AI",
+  importUploadLabel: "Upload file (PDF, DOCX, XLSX, TXT, MD, CSV)",
+  importAction: "Import",
   importSuccess: "Imported and categorized successfully.",
   websiteSyncCardTitle: "Website synchronization",
   websiteSyncCardDescription:

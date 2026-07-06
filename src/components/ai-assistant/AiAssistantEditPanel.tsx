@@ -35,7 +35,7 @@ import type { FollowUpAgentSettings } from "@/services/follow-up-settings.servic
 type AiAssistantEditPanelProps = {
   profile: AiAssistantProfileData;
   followUpAgent: FollowUpAgentSettings;
-  onBack: () => void;
+  onBack?: () => void;
 };
 
 type AgentPermissions = Pick<
@@ -179,7 +179,7 @@ export function AiAssistantEditPanel({
 
       toast.success(AI_ASSISTANT_MESSAGES.assistantEditSaved);
       router.refresh();
-      onBack();
+      onBack?.();
     } finally {
       setIsSaving(false);
     }
@@ -304,9 +304,11 @@ export function AiAssistantEditPanel({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 md:p-6">
-        <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={onBack}>
-          ← {AI_ASSISTANT_MESSAGES.assistantEditBack}
-        </Button>
+        {onBack ? (
+          <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={onBack}>
+            ← {AI_ASSISTANT_MESSAGES.assistantEditBack}
+          </Button>
+        ) : null}
 
         <Card className="shadow-none">
           <CardHeader>
@@ -457,9 +459,11 @@ export function AiAssistantEditPanel({
                   AI_ASSISTANT_MESSAGES.assistantEditSave
                 )}
               </Button>
-              <Button type="button" variant="outline" disabled={isSaving} onClick={onBack}>
-                Cancel
-              </Button>
+              {onBack ? (
+                <Button type="button" variant="outline" disabled={isSaving} onClick={onBack}>
+                  Cancel
+                </Button>
+              ) : null}
             </div>
           </CardContent>
         </Card>

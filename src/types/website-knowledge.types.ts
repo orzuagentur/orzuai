@@ -55,6 +55,7 @@ export type SyncWebsiteKnowledgeResult =
       data: {
         pagesIndexed: number;
         entriesSynced: number;
+        background?: boolean;
       };
     }
   | { success: false; error: { code: string; message: string } };

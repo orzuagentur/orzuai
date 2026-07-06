@@ -10,11 +10,12 @@ import { usePlatformSupport } from "@/contexts/platform-support-context";
 import {
   fetchTenantSupportThreadAction,
   sendTenantSupportMessageAction,
-  type TenantSupportMessage,
 } from "@/features/platform-support/actions";
+import { createClientIfConfigured } from "@/lib/supabase/client";
+import { waitForSupabaseRealtime } from "@/lib/supabase/realtime-auth";
 import { cn } from "@/lib/utils";
 
-const PANEL_WIDTH = 380;
+const PANEL_WIDTH = 480;
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -26,9 +27,18 @@ function formatTime(value: string): string {
 }
 
 export function PlatformSupportWidget() {
-  const { isOpen, setIsOpen, setUnreadCount } = usePlatformSupport();
+  const {
+    isOpen,
+    setIsOpen,
+    setUnreadCount,
+    messages,
+    setMessages,
+    threadId,
+    setThreadId,
+    threadLoaded,
+    setThreadLoaded,
+  } = usePlatformSupport();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<TenantSupportMessage[]>([]);
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -43,20 +53,96 @@ export function PlatformSupportWidget() {
       return;
     }
 
+    setThreadId(result.threadId);
     setMessages(result.messages);
+    setThreadLoaded(true);
     setUnreadCount(0);
-  }, [setUnreadCount]);
+  }, [setMessages, setThreadId, setThreadLoaded, setUnreadCount]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!threadLoaded) {
       void loadThread();
     }
-  }, [isOpen, loadThread]);
+  }, [loadThread, threadLoaded]);
+
+  useEffect(() => {
+    if (isOpen && !threadLoaded) {
+      void loadThread();
+    }
+  }, [isOpen, loadThread, threadLoaded]);
 
   useEffect(() => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    const supabase = createClientIfConfigured();
+
+    if (!supabase || !threadId) {
+      return;
+    }
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    void (async () => {
+      const authed = await waitForSupabaseRealtime(supabase);
+
+      if (cancelled || !authed) {
+        return;
+      }
+
+      channel = supabase
+        .channel(`platform-support-${threadId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "platform_support_messages",
+            filter: `thread_id=eq.${threadId}`,
+          },
+          (payload) => {
+            const row = payload.new as {
+              id: string;
+              sender_type: "platform" | "business";
+              content: string;
+              created_at: string;
+            };
+
+            setMessages((current) => {
+              if (current.some((message) => message.id === row.id)) {
+                return current;
+              }
+
+              return [
+                ...current,
+                {
+                  id: row.id,
+                  senderType: row.sender_type,
+                  content: row.content,
+                  createdAt: row.created_at,
+                },
+              ];
+            });
+
+            if (row.sender_type === "platform" && !isOpen) {
+              setUnreadCount((count) => count + 1);
+            }
+          },
+        )
+        .subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [isOpen, setMessages, setUnreadCount, threadId]);
 
   const handleSend = async () => {
     const trimmed = content.trim();
@@ -81,16 +167,20 @@ export function PlatformSupportWidget() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-50 flex flex-col overflow-hidden rounded-xl border bg-background shadow-xl"
-      style={{ width: PANEL_WIDTH, maxHeight: "min(640px, calc(100vh - 2rem))" }}
+      className="fixed bottom-4 right-4 z-50 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
+      style={{
+        width: PANEL_WIDTH,
+        maxWidth: "calc(100vw - 2rem)",
+        height: "min(720px, calc(100vh - 2rem))",
+      }}
     >
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <HeadphonesIcon className="size-4 text-primary" />
           <div>
             <p className="text-sm font-semibold">Поддержка OrzuX</p>
             <p className="text-xs text-muted-foreground">
-              Ответ команды платформы
+              История сохраняется в вашем аккаунте
             </p>
           </div>
         </div>
@@ -105,14 +195,15 @@ export function PlatformSupportWidget() {
         </Button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {isLoading ? (
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        {isLoading && messages.length === 0 ? (
           <div className="flex justify-center py-8">
             <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Напишите нам — команда OrzuX ответит в этом окне.
+            Напишите нам — команда OrzuX ответит в этом окне. Переписка сохранится
+            после закрытия.
           </p>
         ) : (
           messages.map((message) => (
@@ -141,14 +232,14 @@ export function PlatformSupportWidget() {
         )}
       </div>
 
-      <div className="border-t p-3">
+      <div className="shrink-0 border-t p-3">
         <div className="flex gap-2">
           <Textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
             placeholder="Ваш вопрос..."
-            rows={2}
-            className="min-h-[72px] resize-none"
+            rows={3}
+            className="min-h-[88px] resize-none"
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();

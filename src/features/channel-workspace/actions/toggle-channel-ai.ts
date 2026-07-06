@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { isMessagingIntegrationChannel } from "@/features/integrations";
+import { isAiAgentChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
 import { updateChannelAiEnabled } from "@/services/channel-workspace.service";
 
@@ -13,7 +13,7 @@ export async function toggleChannelAiAction(
 ): Promise<{ success: boolean; message?: string }> {
   const channelId = channel as IntegrationChannelId;
 
-  if (!isMessagingIntegrationChannel(channelId)) {
+  if (!isAiAgentChannel(channelId)) {
     return { success: false, message: "Invalid channel." };
   }
 
@@ -21,6 +21,7 @@ export async function toggleChannelAiAction(
 
   if (result.success) {
     revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+    revalidatePath(DASHBOARD_ROUTES.aiAssistantChannels);
     revalidatePath(DASHBOARD_ROUTES.aiManager);
     revalidatePath(DASHBOARD_ROUTES.integrations);
     revalidatePath(DASHBOARD_ROUTES.chats);

@@ -7,7 +7,7 @@ import {
   DEFAULT_AI_LANGUAGE,
   DEFAULT_AI_SYSTEM_PROMPT,
 } from "@/features/business/constants";
-import type { IntegrationChannelId, MessagingIntegrationChannelId } from "@/features/integrations/constants";
+import type { AiAgentChannelId, IntegrationChannelId, MessagingIntegrationChannelId } from "@/features/integrations/constants";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
 import {
   buildIntegrationChannelStatuses,
@@ -135,8 +135,9 @@ export async function syncChannelAiEnabledAfterAgentChange(
   // Single-agent mode stores channel enablement directly in ai_settings.
 }
 
-function revalidateChannelWorkspacePaths(channel: MessagingIntegrationChannelId): void {
+function revalidateChannelWorkspacePaths(channel: AiAgentChannelId): void {
   revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistantChannels);
   revalidatePath(DASHBOARD_ROUTES.aiManager);
   revalidatePath(DASHBOARD_ROUTES.analytics);
   revalidatePath(DASHBOARD_ROUTES.onboarding);
@@ -155,7 +156,7 @@ async function getOwnedBusinessId(): Promise<string | null> {
 async function ensureChannelAiSettings(
   supabase: SupabaseClient<Database>,
   businessId: string,
-  channel: MessagingIntegrationChannelId,
+  channel: AiAgentChannelId,
 ) {
   const { data } = await supabase
     .from("ai_settings")
@@ -190,7 +191,7 @@ function resolveStoredProvider(value: string | null | undefined): AiProvider {
 async function syncStoredModelIfNeeded(
   supabase: Awaited<ReturnType<typeof createClient>>,
   businessId: string,
-  channel: MessagingIntegrationChannelId,
+  channel: AiAgentChannelId,
   storedModel: string | null | undefined,
 ): Promise<string> {
   const resolved = resolveGeminiModel(storedModel);
@@ -208,7 +209,7 @@ async function syncStoredModelIfNeeded(
 
 export async function getChannelAiSettingsForBusiness(
   businessId: string,
-  channel: MessagingIntegrationChannelId,
+  channel: AiAgentChannelId,
   isChannelConnected: boolean,
 ): Promise<ChannelAiSettingsData> {
   const defaultModel = getDefaultGeminiModel();
@@ -722,7 +723,7 @@ export async function setMessagingChannelsAiEnabled(
 }
 
 export async function updateChannelAiEnabled(
-  channel: MessagingIntegrationChannelId,
+  channel: AiAgentChannelId,
   enabled: boolean,
 ): Promise<{ success: boolean; message?: string }> {
   const businessId = await getOwnedBusinessId();

@@ -9,6 +9,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandWordmark } from "@/components/brand/BrandWordmark";
 import { BRAND_NAME } from "@/constants/brand";
 import { buildDashboardNavItems, DASHBOARD_NAV_ITEMS } from "@/features/dashboard/constants";
+import { SIDEBAR_NAV_BUTTON_CLASS } from "@/features/navigation/sidebar-nav-ui";
 import { useDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import {
   Sidebar,
@@ -122,7 +123,7 @@ function AppSidebarContent({
                       asChild
                       isActive={isActive}
                       tooltip={item.label}
-                      className="h-10 text-[15px] [&_svg]:size-5"
+                      className={SIDEBAR_NAV_BUTTON_CLASS}
                     >
                       <Link href={item.href}>
                         <item.icon />

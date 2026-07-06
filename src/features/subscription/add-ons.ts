@@ -37,6 +37,6 @@ export const PASS_THROUGH_SERVICES = [
   {
     id: "twilio",
     label: "Twilio Voice & SMS",
-    note: "Usage billed on your Twilio account connected to OrzuX.",
+    note: "Phone numbers billed monthly on your OrzuAI subscription. Call/SMS usage runs on your connected Twilio account.",
   },
 ] as const;

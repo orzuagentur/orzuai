@@ -17,7 +17,6 @@ const TAB_LABELS: Record<AnalyticsTab, string> = {
   channels: ANALYTICS_MESSAGES.tabChannels,
   sales: ANALYTICS_MESSAGES.tabSales,
   ai_ops: ANALYTICS_MESSAGES.tabAiOps,
-  ask: ANALYTICS_MESSAGES.tabAsk,
 };
 
 export function AnalyticsTabBar({

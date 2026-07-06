@@ -239,7 +239,10 @@ export function VoiceActivatePanel({
     setPurchasingNumber(phoneNumber);
 
     try {
-      const result = await purchaseTwilioPhoneNumberAction({ phoneNumber });
+      const result = await purchaseTwilioPhoneNumberAction({
+        phoneNumber,
+        countryCode,
+      });
 
       if (!result.success) {
         toast.error(result.message ?? TWILIO_MESSAGES.purchaseNumberFailed);

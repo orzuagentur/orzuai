@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
 import { useAnalyticsChromeRegistration } from "@/components/analytics/analytics-chrome-context";
-import { AnalyticsAskPanel } from "@/components/analytics/AnalyticsAskPanel";
 import { AnalyticsChannelsPanel } from "@/components/analytics/AnalyticsChannelsPanel";
 import { AnalyticsAiOpsPanel } from "@/components/analytics/AnalyticsAiOpsPanel";
 import { AnalyticsPulsePanel } from "@/components/analytics/AnalyticsPulsePanel";
@@ -97,14 +96,12 @@ export function AnalyticsCommandCenter({ data }: AnalyticsCommandCenterProps) {
           teamAnalytics={data.teamAnalytics}
           responseTime={data.responseTime}
           aiCost={data.aiCost}
-          agentsRollup={data.agentsRollup}
+          agentStats={data.agentStats}
           automationOps={data.automationOps}
           agentRuns={data.agentRuns}
           recentAgentRuns={data.recentAgentRuns}
         />
       ) : null}
-
-      {data.activeTab === "ask" ? <AnalyticsAskPanel /> : null}
     </div>
   );
 }

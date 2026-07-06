@@ -225,7 +225,11 @@ export function DealsWorkspace({ dealsData }: DealsWorkspaceProps) {
               </Button>
             </div>
 
-            <DealDetailPanel deal={selectedDeal} dealsData={dealsData} />
+            <DealDetailPanel
+              deal={selectedDeal}
+              dealsData={dealsData}
+              onClose={clearDealSelection}
+            />
 
             {dealsData.showProfilePanel && dealsData.activeContactId ? (
               <div className="min-h-0 flex-1 overflow-hidden border-t">

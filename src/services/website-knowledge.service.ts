@@ -2,6 +2,8 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 
+import { scheduleAfterResponse } from "@/lib/queue/schedule-deferred";
+
 import { APP_ROUTES, DASHBOARD_ROUTES } from "@/constants/routes";
 import { WEBSITE_KNOWLEDGE_MESSAGES } from "@/features/website-knowledge/constants";
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
@@ -27,6 +29,8 @@ import {
 
 function revalidateWebsiteKnowledgePaths(): void {
   revalidatePath(DASHBOARD_ROUTES.knowledgeBase);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistantKnowledge);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistantKnowledgeWebsite);
   revalidatePath(DASHBOARD_ROUTES.integrations);
   revalidatePath(`${DASHBOARD_ROUTES.integrations}/website_knowledge`);
   revalidatePath(APP_ROUTES.dashboard);
@@ -201,6 +205,7 @@ async function replaceWebsiteSyncKnowledge(
 
 export async function runWebsiteKnowledgeSyncForRow(
   syncRow: WebsiteKnowledgeSync,
+  options?: { skipStatusUpdate?: boolean },
 ): Promise<SyncWebsiteKnowledgeResult> {
   if (!hasSupabaseEnv() || !hasGeminiEnv()) {
     return {
@@ -211,13 +216,15 @@ export async function runWebsiteKnowledgeSyncForRow(
 
   const admin = createAdminClient();
 
-  await admin
-    .from("website_knowledge_syncs")
-    .update({
-      sync_status: "syncing",
-      last_sync_error: null,
-    })
-    .eq("id", syncRow.id);
+  if (!options?.skipStatusUpdate) {
+    await admin
+      .from("website_knowledge_syncs")
+      .update({
+        sync_status: "syncing",
+        last_sync_error: null,
+      })
+      .eq("id", syncRow.id);
+  }
 
   try {
     const pages = await crawlWebsite(syncRow.site_url);
@@ -284,7 +291,10 @@ export async function runWebsiteKnowledgeSyncForRow(
   }
 }
 
-export async function syncWebsiteKnowledgeNow(): Promise<SyncWebsiteKnowledgeResult> {
+export async function startWebsiteKnowledgeSyncInBackground(): Promise<
+  | { success: true; data: { started: true } }
+  | { success: false; error: { code: string; message: string } }
+> {
   const businessId = await getOwnedBusinessId();
 
   if (!businessId) {
@@ -310,12 +320,46 @@ export async function syncWebsiteKnowledgeNow(): Promise<SyncWebsiteKnowledgeRes
 
   if (syncRow.sync_status === "syncing") {
     return {
-      success: false,
-      error: { code: "IN_PROGRESS", message: WEBSITE_KNOWLEDGE_MESSAGES.syncInProgress },
+      success: true,
+      data: { started: true },
     };
   }
 
-  return runWebsiteKnowledgeSyncForRow(syncRow);
+  const admin = createAdminClient();
+  await admin
+    .from("website_knowledge_syncs")
+    .update({
+      sync_status: "syncing",
+      last_sync_error: null,
+    })
+    .eq("id", syncRow.id);
+
+  revalidateWebsiteKnowledgePaths();
+
+  const rowSnapshot = { ...syncRow };
+
+  scheduleAfterResponse(0, async () => {
+    await runWebsiteKnowledgeSyncForRow(rowSnapshot, { skipStatusUpdate: true });
+  });
+
+  return { success: true, data: { started: true } };
+}
+
+export async function syncWebsiteKnowledgeNow(): Promise<SyncWebsiteKnowledgeResult> {
+  const started = await startWebsiteKnowledgeSyncInBackground();
+
+  if (!started.success) {
+    return started;
+  }
+
+  return {
+    success: true,
+    data: {
+      pagesIndexed: 0,
+      entriesSynced: 0,
+      background: true,
+    },
+  };
 }
 
 export async function runDueWebsiteKnowledgeSyncs(): Promise<{

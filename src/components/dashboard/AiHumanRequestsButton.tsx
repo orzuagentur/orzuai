@@ -5,12 +5,21 @@ import {
   BellIcon,
   BotIcon,
   Loader2Icon,
-  Trash2Icon,
   UserRoundIcon,
+  XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
@@ -26,11 +35,13 @@ import {
 } from "@/components/ui/sidebar";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { AI_HUMAN_REQUEST_MESSAGES } from "@/features/dashboard/constants";
+import { SIDEBAR_NAV_BUTTON_CLASS } from "@/features/navigation/sidebar-nav-ui";
 import { useAiHumanRequests } from "@/contexts/ai-human-requests-context";
 import { INTEGRATION_CHANNEL_LIST } from "@/features/integrations/constants";
 import type { BusinessNotification } from "@/types/business-notification.types";
 import type { MessagingChannel } from "@/types/database.types";
 import { formatRelativeTime } from "@/utils/dashboard";
+import { cn } from "@/lib/utils";
 
 function buildChatHref(channel: MessagingChannel, conversationId: string): string {
   return `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`;
@@ -64,9 +75,13 @@ export function AiHumanRequestsButton() {
     isLoading,
     markAllRead,
     dismissRequest,
+    deleteNotification,
   } = useAiHumanRequests();
   const [open, setOpen] = useState(false);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const pendingRequestIds = new Set(requests.map((request) => request.id));
 
@@ -82,6 +97,19 @@ export function AiHumanRequestsButton() {
     setDismissingId(requestId);
     await dismissRequest(requestId);
     setDismissingId(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirmDeleteId) return;
+
+    setIsDeleting(true);
+    const success = await deleteNotification(confirmDeleteId);
+    setIsDeleting(false);
+    setConfirmDeleteId(null);
+
+    if (!success) {
+      toast.error("Unable to delete notification.");
+    }
   }
 
   function handleConnect(
@@ -105,7 +133,7 @@ export function AiHumanRequestsButton() {
           <SidebarMenuButton
             type="button"
             tooltip={AI_HUMAN_REQUEST_MESSAGES.buttonLabel}
-            className="h-10 text-[15px] [&_svg]:size-5"
+            className={SIDEBAR_NAV_BUTTON_CLASS}
             onClick={() => handleOpenChange(true)}
           >
             <BellIcon />
@@ -146,18 +174,20 @@ export function AiHumanRequestsButton() {
                     pendingRequestIds,
                   );
                   const isUnread = !notification.readAt;
+                  const isDeletingThis = deletingId === notification.id;
 
                   return (
                     <li
                       key={notification.id}
-                      className={
+                      className={cn(
+                        "relative rounded-lg border p-4",
                         isHuman
-                          ? "rounded-lg border border-amber-500/25 bg-amber-500/5 p-4"
-                          : "rounded-lg border bg-card p-4"
-                      }
+                          ? "border-amber-500/25 bg-amber-500/5"
+                          : "bg-card",
+                      )}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div className="flex min-w-0 flex-1 items-start gap-3 pr-6">
                           <div
                             className={
                               isHuman
@@ -190,25 +220,21 @@ export function AiHumanRequestsButton() {
                           </div>
                         </div>
 
-                        {isPending && notification.sourceId ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                            disabled={dismissingId === notification.sourceId}
-                            aria-label={AI_HUMAN_REQUEST_MESSAGES.dismiss}
-                            onClick={() =>
-                              void handleDismiss(notification.sourceId!)
-                            }
-                          >
-                            {dismissingId === notification.sourceId ? (
-                              <Loader2Icon className="size-4 animate-spin" />
-                            ) : (
-                              <Trash2Icon className="size-4" />
-                            )}
-                          </Button>
-                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-2 size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          disabled={isDeletingThis || isDeleting}
+                          aria-label={AI_HUMAN_REQUEST_MESSAGES.deleteNotification}
+                          onClick={() => setConfirmDeleteId(notification.id)}
+                        >
+                          {isDeletingThis ? (
+                            <Loader2Icon className="size-3.5 animate-spin" />
+                          ) : (
+                            <XIcon className="size-3.5" />
+                          )}
+                        </Button>
                       </div>
 
                       <p
@@ -240,20 +266,38 @@ export function AiHumanRequestsButton() {
                       ) : null}
 
                       {isPending ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="mt-4 w-full"
-                          onClick={() =>
-                            handleConnect(
-                              notification.channel,
-                              notification.conversationId,
-                              notification.sourceId,
-                            )
-                          }
-                        >
-                          {AI_HUMAN_REQUEST_MESSAGES.connect}
-                        </Button>
+                        <div className="mt-4 flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            disabled={dismissingId === notification.sourceId}
+                            onClick={() =>
+                              void handleDismiss(notification.sourceId!)
+                            }
+                          >
+                            {dismissingId === notification.sourceId ? (
+                              <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                              AI_HUMAN_REQUEST_MESSAGES.dismiss
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() =>
+                              handleConnect(
+                                notification.channel,
+                                notification.conversationId,
+                                notification.sourceId,
+                              )
+                            }
+                          >
+                            {AI_HUMAN_REQUEST_MESSAGES.connect}
+                          </Button>
+                        </div>
                       ) : (
                         <div className="mt-4 flex items-center justify-between gap-2">
                           {notification.resolvedAt ? (
@@ -286,6 +330,53 @@ export function AiHumanRequestsButton() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !isDeleting) {
+            setConfirmDeleteId(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {AI_HUMAN_REQUEST_MESSAGES.deleteNotificationTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {AI_HUMAN_REQUEST_MESSAGES.deleteNotificationDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setConfirmDeleteId(null)}
+            >
+              {AI_HUMAN_REQUEST_MESSAGES.deleteNotificationCancel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => {
+                if (confirmDeleteId) {
+                  setDeletingId(confirmDeleteId);
+                }
+                void handleConfirmDelete().finally(() => setDeletingId(null));
+              }}
+            >
+              {isDeleting ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                AI_HUMAN_REQUEST_MESSAGES.deleteNotificationConfirm
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

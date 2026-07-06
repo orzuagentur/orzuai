@@ -8,7 +8,6 @@ import type { KnowledgeCategory } from "@/types/database.types";
 
 function buildKnowledgeUrl(query: string, category: KnowledgeCategory | ""): string {
   const params = new URLSearchParams();
-  params.set("tab", "knowledge");
 
   const trimmedQuery = query.trim();
 
@@ -20,7 +19,11 @@ function buildKnowledgeUrl(query: string, category: KnowledgeCategory | ""): str
     params.set("category", category);
   }
 
-  return `${DASHBOARD_ROUTES.aiAssistant}?${params.toString()}`;
+  const suffix = params.toString();
+
+  return suffix
+    ? `${DASHBOARD_ROUTES.aiAssistantKnowledge}?${suffix}`
+    : DASHBOARD_ROUTES.aiAssistantKnowledge;
 }
 
 export function useKnowledgeSearch() {
@@ -44,7 +47,7 @@ export function useKnowledgeSearch() {
 
   const clearFilters = useCallback(() => {
     startTransition(() => {
-      router.push(`${DASHBOARD_ROUTES.aiAssistant}?tab=knowledge`);
+      router.push(DASHBOARD_ROUTES.aiAssistantKnowledge);
     });
   }, [router]);
 
