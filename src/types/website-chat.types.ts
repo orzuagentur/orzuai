@@ -1,13 +1,21 @@
 import { z } from "zod";
 
+import {
+  WEBSITE_CHAT_LAUNCHER_ICONS,
+  WEBSITE_CHAT_POSITIONS,
+} from "@/features/website-chat/widget-appearance";
+
 export type WebsiteChatConnectionData = {
   id: string;
   businessId: string;
   status: "connected" | "pending" | "disconnected";
   siteName: string | null;
   siteUrl: string | null;
+  widgetTitle: string;
   welcomeMessage: string;
   primaryColor: string;
+  launcherIcon: (typeof WEBSITE_CHAT_LAUNCHER_ICONS)[number];
+  position: (typeof WEBSITE_CHAT_POSITIONS)[number];
   widgetToken: string;
   apiKeyPrefix: string;
   connectedAt: string | null;
@@ -29,14 +37,21 @@ export type RegenerateWebsiteChatApiKeyResult =
   | { success: true; data: { siteKey: string; apiKeyPrefix: string } }
   | { success: false; error: { code: string; message: string } };
 
-export const updateWebsiteChatSettingsSchema = z.object({
-  welcomeMessage: z.string().min(1).max(500),
+export const websiteChatAppearanceSchema = z.object({
+  widgetTitle: z.string().trim().min(1).max(80),
+  welcomeMessage: z.string().trim().min(1).max(500),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  launcherIcon: z.enum(WEBSITE_CHAT_LAUNCHER_ICONS),
+  position: z.enum(WEBSITE_CHAT_POSITIONS),
 });
+
+export const updateWebsiteChatSettingsSchema = websiteChatAppearanceSchema;
 
 export type UpdateWebsiteChatSettingsInput = z.infer<
   typeof updateWebsiteChatSettingsSchema
 >;
+
+export type EnableWebsiteChatInput = UpdateWebsiteChatSettingsInput;
 
 export const websiteChatMessageSchema = z.object({
   visitorId: z.string().min(8).max(128),

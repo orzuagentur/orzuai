@@ -97,8 +97,15 @@ export const WEBSITE_CHAT_HELP = {
   appearance: {
     title: "Widget appearance",
     body: [
-      "Welcome message is shown when a visitor opens chat.",
-      "Brand color styles the chat button and header.",
+      "Set the chat title, welcome message, brand color, launcher icon, and screen position.",
+      "Visitors see these settings on your live widget.",
+    ],
+  },
+  position: {
+    title: "Widget position",
+    body: [
+      "Choose where the chat button appears on your site.",
+      "Bottom right is the recommended default for most websites.",
     ],
   },
 } as const;

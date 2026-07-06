@@ -15,6 +15,11 @@ import { IntegrationCopyField } from "@/components/integrations/IntegrationCopyF
 import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
 import { IntegrationHelpTip } from "@/components/integrations/IntegrationHelpTip";
 import { IntegrationPlatformGuide } from "@/components/integrations/IntegrationPlatformGuide";
+import {
+  WebsiteChatAppearanceSettings,
+  type WebsiteChatAppearanceFormValues,
+} from "@/components/website-chat/WebsiteChatAppearanceSettings";
+import { WebsiteChatWidgetPreview } from "@/components/website-chat/WebsiteChatWidgetPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +37,7 @@ import { regenerateWebsiteChatApiKeyAction } from "@/features/website-chat/actio
 import { updateWebsiteChatSettingsAction } from "@/features/website-chat/actions/update-settings";
 import { WEBSITE_CHAT_HELP } from "@/features/integrations/integration-help";
 import { WEBSITE_CHAT_MESSAGES } from "@/features/website-chat/constants";
+import { WEBSITE_CHAT_DEFAULT_APPEARANCE } from "@/features/website-chat/widget-appearance";
 import { useEnableWebsiteChat } from "@/hooks/use-enable-website-chat";
 import type {
   WebsiteChatConnectConfig,
@@ -76,6 +82,19 @@ const WEBSITE_CHAT_PLATFORM_GUIDES = [
   },
 ] as const;
 
+function toAppearanceValues(
+  connection?: WebsiteChatConnectionData | null,
+): WebsiteChatAppearanceFormValues {
+  return {
+    widgetTitle: connection?.widgetTitle ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.widgetTitle,
+    welcomeMessage:
+      connection?.welcomeMessage ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.welcomeMessage,
+    primaryColor: connection?.primaryColor ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.primaryColor,
+    launcherIcon: connection?.launcherIcon ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.launcherIcon,
+    position: connection?.position ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.position,
+  };
+}
+
 export function WebsiteChatActivatePanel({
   connection,
   hasBusiness,
@@ -84,11 +103,8 @@ export function WebsiteChatActivatePanel({
 }: WebsiteChatActivatePanelProps) {
   const router = useRouter();
   const [revealedSiteKey, setRevealedSiteKey] = useState<string | null>(null);
-  const [welcomeMessage, setWelcomeMessage] = useState(
-    connection?.welcomeMessage ?? "Hi! How can we help you today?",
-  );
-  const [primaryColor, setPrimaryColor] = useState(
-    connection?.primaryColor ?? "#6366f1",
+  const [appearance, setAppearance] = useState<WebsiteChatAppearanceFormValues>(() =>
+    toAppearanceValues(connection),
   );
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -104,7 +120,7 @@ export function WebsiteChatActivatePanel({
 
   const cardClass = embeddedInHub
     ? "w-full max-w-none border-0 bg-transparent shadow-none"
-    : "max-w-4xl shadow-none";
+    : "max-w-5xl shadow-none";
 
   const displaySiteKey = revealedSiteKey
     ? revealedSiteKey
@@ -132,10 +148,7 @@ export function WebsiteChatActivatePanel({
     setSaving(true);
 
     try {
-      const result = await updateWebsiteChatSettingsAction({
-        welcomeMessage,
-        primaryColor,
-      });
+      const result = await updateWebsiteChatSettingsAction(appearance);
 
       if (result.success) {
         toast.success(WEBSITE_CHAT_MESSAGES.settingsSaved);
@@ -146,7 +159,32 @@ export function WebsiteChatActivatePanel({
     } finally {
       setSaving(false);
     }
-  }, [primaryColor, router, welcomeMessage]);
+  }, [appearance, router]);
+
+  const appearancePreviewCard = (
+    <Card className={cardClass}>
+      <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-base">{WEBSITE_CHAT_MESSAGES.customizeTitle}</CardTitle>
+          <IntegrationHelpTip title={WEBSITE_CHAT_HELP.appearance.title}>
+            {WEBSITE_CHAT_HELP.appearance.body.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </IntegrationHelpTip>
+        </div>
+        <CardDescription>{WEBSITE_CHAT_MESSAGES.customizeDescription}</CardDescription>
+      </CardHeader>
+      <CardContent className={embeddedInHub ? "px-0 pb-0" : undefined}>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <WebsiteChatAppearanceSettings values={appearance} onChange={setAppearance} />
+          <div className="space-y-2">
+            <Label>{WEBSITE_CHAT_MESSAGES.previewTitle}</Label>
+            <WebsiteChatWidgetPreview appearance={appearance} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   if (!hasBusiness) {
     return (
@@ -177,32 +215,40 @@ export function WebsiteChatActivatePanel({
 
   if (connection?.status !== "connected") {
     return (
-      <Card className={cardClass}>
-        <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
-          <div className="flex items-center gap-2">
-            <MessageCircleIcon className="size-5 text-primary" />
-            <CardTitle>{WEBSITE_CHAT_MESSAGES.connectTitle}</CardTitle>
-            <IntegrationHelpTip title={WEBSITE_CHAT_HELP.embedCode.title}>
-              {WEBSITE_CHAT_HELP.embedCode.body.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </IntegrationHelpTip>
-          </div>
-          <CardDescription>{WEBSITE_CHAT_MESSAGES.connectDescription}</CardDescription>
-        </CardHeader>
-        <CardContent className={embeddedInHub ? "px-0 pb-0" : undefined}>
-          <Button type="button" size="lg" disabled={isLoading} onClick={() => enableChat()}>
-            {isLoading ? (
-              <>
-                <Loader2Icon className="size-4 animate-spin" />
-                Enabling...
-              </>
-            ) : (
-              WEBSITE_CHAT_MESSAGES.connectButton
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {appearancePreviewCard}
+        <Card className={cardClass}>
+          <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
+            <div className="flex items-center gap-2">
+              <MessageCircleIcon className="size-5 text-primary" />
+              <CardTitle>{WEBSITE_CHAT_MESSAGES.connectTitle}</CardTitle>
+              <IntegrationHelpTip title={WEBSITE_CHAT_HELP.embedCode.title}>
+                {WEBSITE_CHAT_HELP.embedCode.body.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </IntegrationHelpTip>
+            </div>
+            <CardDescription>{WEBSITE_CHAT_MESSAGES.connectDescription}</CardDescription>
+          </CardHeader>
+          <CardContent className={embeddedInHub ? "px-0 pb-0" : undefined}>
+            <Button
+              type="button"
+              size="lg"
+              disabled={isLoading}
+              onClick={() => enableChat(appearance)}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" />
+                  Enabling...
+                </>
+              ) : (
+                WEBSITE_CHAT_MESSAGES.connectButton
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -226,12 +272,14 @@ export function WebsiteChatActivatePanel({
         </Card>
       ) : null}
 
+      {appearancePreviewCard}
+
       <Card className={cardClass}>
         <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <GlobeIcon className="size-5 text-primary" />
-              <CardTitle>{WEBSITE_CHAT_MESSAGES.connectTitle}</CardTitle>
+              <CardTitle>Connection</CardTitle>
             </div>
             <Badge>Connected</Badge>
           </div>
@@ -280,6 +328,10 @@ export function WebsiteChatActivatePanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={saving} onClick={() => void handleSaveSettings()}>
+              {saving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              {WEBSITE_CHAT_MESSAGES.saveSettings}
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -315,53 +367,6 @@ export function WebsiteChatActivatePanel({
               {WEBSITE_CHAT_MESSAGES.regenerateKey}
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className={cardClass}>
-        <CardHeader className={embeddedInHub ? "px-0 pt-0" : undefined}>
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Widget appearance</CardTitle>
-            <IntegrationHelpTip title={WEBSITE_CHAT_HELP.appearance.title}>
-              {WEBSITE_CHAT_HELP.appearance.body.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </IntegrationHelpTip>
-          </div>
-        </CardHeader>
-        <CardContent className={embeddedInHub ? "space-y-4 px-0 pb-0" : "space-y-4"}>
-          <div className="space-y-2">
-            <Label htmlFor="wc-welcome">{WEBSITE_CHAT_MESSAGES.welcomeMessageLabel}</Label>
-            <Input
-              id="wc-welcome"
-              value={welcomeMessage}
-              onChange={(event) => setWelcomeMessage(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="wc-color">{WEBSITE_CHAT_MESSAGES.primaryColorLabel}</Label>
-            <div className="flex gap-2">
-              <Input
-                id="wc-color"
-                value={primaryColor}
-                onChange={(event) => setPrimaryColor(event.target.value)}
-                className="font-mono"
-              />
-              <input
-                type="color"
-                value={primaryColor}
-                onChange={(event) => setPrimaryColor(event.target.value)}
-                className="size-10 cursor-pointer rounded-md border"
-                aria-label={WEBSITE_CHAT_MESSAGES.primaryColorLabel}
-              />
-            </div>
-          </div>
-
-          <Button type="button" disabled={saving} onClick={() => void handleSaveSettings()}>
-            {saving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-            {WEBSITE_CHAT_MESSAGES.saveSettings}
-          </Button>
         </CardContent>
       </Card>
 

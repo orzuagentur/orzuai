@@ -25,11 +25,17 @@ export const WEBSITE_CHAT_MESSAGES = {
   siteNameLabel: "Site name (optional)",
   siteUrlLabel: "Site URL (optional)",
   welcomeMessageLabel: "Welcome message",
+  widgetTitleLabel: "Chat title",
+  launcherIconLabel: "Launcher icon",
+  positionLabel: "Widget position",
+  customizeTitle: "Customize your widget",
+  customizeDescription:
+    "Set the look and position before enabling. Default placement is bottom-right.",
   primaryColorLabel: "Brand color",
   saveSettings: "Save settings",
   settingsSaved: "Settings saved",
   disconnect: "Disconnect",
   disconnectSuccess: "Website Chat disconnected",
   previewTitle: "Preview",
-  previewDescription: "The widget opens in the bottom-right corner on your website.",
+  previewDescription: "Preview how the widget will look on your website.",
 } as const;

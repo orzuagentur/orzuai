@@ -701,6 +701,9 @@ export type Database = {
           site_url: string | null;
           welcome_message: string;
           primary_color: string;
+          widget_title: string;
+          launcher_icon: string;
+          position: string;
           connected_at: string | null;
           last_seen_at: string | null;
           created_at: string;
@@ -717,6 +720,9 @@ export type Database = {
           site_url?: string | null;
           welcome_message?: string;
           primary_color?: string;
+          widget_title?: string;
+          launcher_icon?: string;
+          position?: string;
           connected_at?: string | null;
           last_seen_at?: string | null;
           created_at?: string;
@@ -733,6 +739,9 @@ export type Database = {
           site_url?: string | null;
           welcome_message?: string;
           primary_color?: string;
+          widget_title?: string;
+          launcher_icon?: string;
+          position?: string;
           connected_at?: string | null;
           last_seen_at?: string | null;
           created_at?: string;

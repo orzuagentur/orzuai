@@ -2,6 +2,11 @@ import { randomBytes } from "node:crypto";
 
 import type { WebsiteChatConnectionData } from "@/types/website-chat.types";
 import { buildWebsiteChatEmbedSnippet } from "@/utils/website-chat-embed";
+import {
+  isWebsiteChatLauncherIcon,
+  isWebsiteChatPosition,
+  WEBSITE_CHAT_DEFAULT_APPEARANCE,
+} from "@/features/website-chat/widget-appearance";
 
 type WebsiteChatConnectionRow = {
   id: string;
@@ -14,6 +19,9 @@ type WebsiteChatConnectionRow = {
   site_url: string | null;
   welcome_message: string;
   primary_color: string;
+  widget_title?: string;
+  launcher_icon?: string;
+  position?: string;
   connected_at?: string | null;
   last_seen_at?: string | null;
 };
@@ -33,8 +41,15 @@ export function mapWebsiteChatConnection(
     status: row.connection_status,
     siteName: row.site_name,
     siteUrl: row.site_url,
+    widgetTitle: row.widget_title ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.widgetTitle,
     welcomeMessage: row.welcome_message,
     primaryColor: row.primary_color,
+    launcherIcon: isWebsiteChatLauncherIcon(row.launcher_icon ?? "")
+      ? (row.launcher_icon as WebsiteChatConnectionData["launcherIcon"])
+      : WEBSITE_CHAT_DEFAULT_APPEARANCE.launcherIcon,
+    position: isWebsiteChatPosition(row.position ?? "")
+      ? (row.position as WebsiteChatConnectionData["position"])
+      : WEBSITE_CHAT_DEFAULT_APPEARANCE.position,
     widgetToken: row.widget_token,
     apiKeyPrefix: row.api_key_prefix ?? "",
     connectedAt: row.connected_at ?? null,

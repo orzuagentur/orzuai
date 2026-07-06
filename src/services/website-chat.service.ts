@@ -23,7 +23,9 @@ import {
   resolveInboundMessageContext,
 } from "@/services/inbound-ingest.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
+import { WEBSITE_CHAT_DEFAULT_APPEARANCE } from "@/features/website-chat/widget-appearance";
 import type {
+  EnableWebsiteChatInput,
   EnableWebsiteChatResult,
   RegenerateWebsiteChatApiKeyResult,
   UpdateWebsiteChatSettingsInput,
@@ -48,6 +50,9 @@ type WebsiteChatConnectionRow = {
   site_url: string | null;
   welcome_message: string;
   primary_color: string;
+  widget_title: string;
+  launcher_icon: string;
+  position: string;
   connected_at: string | null;
   last_seen_at: string | null;
   created_at: string;
@@ -105,7 +110,9 @@ export async function getWebsiteChatConnection(
   );
 }
 
-export async function enableWebsiteChat(): Promise<EnableWebsiteChatResult> {
+export async function enableWebsiteChat(
+  input?: EnableWebsiteChatInput,
+): Promise<EnableWebsiteChatResult> {
   if (!hasSupabaseEnv()) {
     return {
       success: false,
@@ -168,6 +175,29 @@ export async function enableWebsiteChat(): Promise<EnableWebsiteChatResult> {
     existingRow?.widget_token ?? generateWebsiteChatWidgetToken();
   const now = new Date().toISOString();
 
+  const appearance = {
+    widget_title:
+      input?.widgetTitle.trim() ??
+      existingRow?.widget_title ??
+      WEBSITE_CHAT_DEFAULT_APPEARANCE.widgetTitle,
+    welcome_message:
+      input?.welcomeMessage.trim() ??
+      existingRow?.welcome_message ??
+      WEBSITE_CHAT_DEFAULT_APPEARANCE.welcomeMessage,
+    primary_color:
+      input?.primaryColor ??
+      existingRow?.primary_color ??
+      WEBSITE_CHAT_DEFAULT_APPEARANCE.primaryColor,
+    launcher_icon:
+      input?.launcherIcon ??
+      existingRow?.launcher_icon ??
+      WEBSITE_CHAT_DEFAULT_APPEARANCE.launcherIcon,
+    position:
+      input?.position ??
+      existingRow?.position ??
+      WEBSITE_CHAT_DEFAULT_APPEARANCE.position,
+  };
+
   const { data, error } = await supabase
     .from("website_chat_connections")
     .upsert(
@@ -178,9 +208,7 @@ export async function enableWebsiteChat(): Promise<EnableWebsiteChatResult> {
         api_key_prefix: getWebsiteFormApiKeyPrefix(siteKey),
         connection_status: "connected",
         connected_at: existingRow?.connected_at ?? now,
-        welcome_message:
-          existingRow?.welcome_message ?? "Hi! How can we help you today?",
-        primary_color: existingRow?.primary_color ?? "#6366f1",
+        ...appearance,
       },
       { onConflict: "business_id" },
     )
@@ -273,8 +301,11 @@ export async function updateWebsiteChatSettings(
   const { error } = await supabase
     .from("website_chat_connections")
     .update({
+      widget_title: input.widgetTitle.trim(),
       welcome_message: input.welcomeMessage.trim(),
       primary_color: input.primaryColor,
+      launcher_icon: input.launcherIcon,
+      position: input.position,
       connection_status: "connected",
     })
     .eq("business_id", businessId);
@@ -432,6 +463,9 @@ export async function getWebsiteChatConfigByToken(
 ): Promise<{
   welcomeMessage: string;
   primaryColor: string;
+  widgetTitle: string;
+  launcherIcon: string;
+  position: string;
 } | null> {
   if (!hasSupabaseEnv()) {
     return null;
@@ -440,7 +474,9 @@ export async function getWebsiteChatConfigByToken(
   const admin = createAdminClient();
   const { data } = await admin
     .from("website_chat_connections")
-    .select("welcome_message, primary_color, connection_status, api_key_hash")
+    .select(
+      "welcome_message, primary_color, widget_title, launcher_icon, position, connection_status, api_key_hash",
+    )
     .eq("widget_token", widgetToken)
     .maybeSingle();
 
@@ -459,5 +495,8 @@ export async function getWebsiteChatConfigByToken(
   return {
     welcomeMessage: data.welcome_message,
     primaryColor: data.primary_color,
+    widgetTitle: data.widget_title ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.widgetTitle,
+    launcherIcon: data.launcher_icon ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.launcherIcon,
+    position: data.position ?? WEBSITE_CHAT_DEFAULT_APPEARANCE.position,
   };
 }
