@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchConversationDetailAction } from "@/features/chats/actions/fetch-conversation-detail";
@@ -97,6 +98,10 @@ export function useInboxActiveConversation({
   initialAiEnabled,
   initialCannedResponses,
 }: UseInboxActiveConversationOptions) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const bootstrap = resolveConversationBootstrap({
     initialConversationId,
     initialConversation,
@@ -659,19 +664,13 @@ export function useInboxActiveConversation({
     (conversationId: string | null) => {
       setSelectedConversationId(conversationId);
 
-      if (typeof window === "undefined") {
-        if (!conversationId) {
-          clearConversation();
-        }
-        return;
-      }
-
-      const nextUrl = new URL(window.location.href);
+      const params = new URLSearchParams(searchParams.toString());
 
       if (!conversationId) {
-        nextUrl.searchParams.delete("conversation");
-        window.history.replaceState(null, "", nextUrl.toString());
+        params.delete("conversation");
         clearConversation();
+        const href = params.size > 0 ? `${pathname}?${params.toString()}` : pathname;
+        router.replace(href, { scroll: false });
         return;
       }
 
@@ -688,13 +687,23 @@ export function useInboxActiveConversation({
         setIsLoadingConversation(true);
       }
 
-      if (nextUrl.searchParams.get("conversation") !== conversationId) {
-        nextUrl.searchParams.set("conversation", conversationId);
-        window.history.replaceState(null, "", nextUrl.toString());
+      if (params.get("conversation") !== conversationId) {
+        params.set("conversation", conversationId);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
       }
     },
-    [clearConversation],
+    [clearConversation, pathname, router, searchParams],
   );
+
+  useEffect(() => {
+    const conversationFromUrl = searchParams.get("conversation")?.trim() || null;
+
+    if (conversationFromUrl === selectedConversationId) {
+      return;
+    }
+
+    setSelectedConversationId(conversationFromUrl);
+  }, [searchParams, selectedConversationId]);
 
   useEffect(() => {
     if (!selectedConversationId) {

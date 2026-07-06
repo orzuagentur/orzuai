@@ -30,8 +30,9 @@ import { getGmailConnection } from "@/services/gmail-integration.service";
 import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
+import { getWebsiteChatConnection } from "@/services/website-chat.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
-import { getVoiceConnection } from "@/services/voice-agent.service";
+import { getVoiceAgentSettings, getVoiceConnection } from "@/services/voice-agent.service";
 import { getWhatsAppConnection } from "@/services/whatsapp.service";
 import type { Database } from "@/types/database.types";
 import type {
@@ -333,23 +334,36 @@ export async function syncChannelAnalytics(
 }
 
 export async function getChannelConnectionStatuses(businessId: string) {
-  const [whatsapp, telegram, websiteForms, websiteKnowledge, voice, googleCalendar, gmail] =
-    await Promise.all([
-      getWhatsAppConnection(businessId),
-      getTelegramConnection(businessId),
-      getWebsiteFormConnection(businessId),
-      getWebsiteKnowledgeSync(businessId),
-      getVoiceConnection(businessId),
-      getGoogleCalendarConnection(businessId),
-      getGmailConnection(businessId),
-    ]);
+  const [
+    whatsapp,
+    telegram,
+    websiteForms,
+    websiteChat,
+    websiteKnowledge,
+    voice,
+    voiceSettings,
+    googleCalendar,
+    gmail,
+  ] = await Promise.all([
+    getWhatsAppConnection(businessId),
+    getTelegramConnection(businessId),
+    getWebsiteFormConnection(businessId),
+    getWebsiteChatConnection(businessId),
+    getWebsiteKnowledgeSync(businessId),
+    getVoiceConnection(businessId),
+    getVoiceAgentSettings(businessId),
+    getGoogleCalendarConnection(businessId),
+    getGmailConnection(businessId),
+  ]);
 
   return buildIntegrationChannelStatuses({
     whatsappConnection: whatsapp,
     telegramConnection: telegram,
     websiteFormConnection: websiteForms,
+    websiteChatConnection: websiteChat,
     websiteKnowledgeSync: websiteKnowledge,
     voiceConnection: voice,
+    voiceSmsEnabled: voiceSettings?.smsEnabled ?? false,
     googleCalendarConnection: googleCalendar,
     gmailConnection: gmail,
   });

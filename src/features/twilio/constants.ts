@@ -1,16 +1,19 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 export const TWILIO_INTEGRATION_HREF = `${DASHBOARD_ROUTES.integrations}/voice`;
+export const SMS_INTEGRATION_HREF = `${DASHBOARD_ROUTES.integrations}/sms`;
 
 export const TWILIO_MESSAGES = {
   channelLabel: "Twilio",
-  connectTitle: "Подключить Twilio",
+  callsLabel: "Calls",
+  smsLabel: "SMS",
+  connectTitle: "Connect Twilio for Calls",
   connectDescription:
-    "Авторизуйте Twilio через официальный Connect — мы автоматически настроим голос, SMS, webhooks и AI Agent.",
+    "Authorize Twilio to enable AI phone line, inbound and outbound calls.",
   connectButton: "Подключить Twilio",
   selectPhoneTitle: "Выберите номер",
   selectPhoneDescription:
-    "Выберите существующий номер Twilio. После выбора OrzuX автоматически настроит Voice, SMS и status webhooks.",
+    "Choose a Twilio number for voice calls. OrzuX configures webhooks automatically.",
   numberPickerTitle: "Номера в подключённом Twilio аккаунте",
   numberPickerDescription:
     "Выберите номер, который должен принимать входящие звонки и SMS в OrzuX. Покупать новый номер нужно только если в аккаунте нет подходящего номера.",

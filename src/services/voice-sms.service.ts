@@ -44,7 +44,7 @@ export async function handleInboundTwilioSms(input: {
   }
 
   const messageRepo = getMessageRepository(admin);
-  const existing = await messageRepo.findByExternalId("voice", input.messageSid);
+  const existing = await messageRepo.findByExternalId("sms", input.messageSid);
 
   if (existing) {
     return;
@@ -52,7 +52,7 @@ export async function handleInboundTwilioSms(input: {
 
   const context = await resolveInboundMessageContext(admin, {
     businessId: input.businessId,
-    channel: "voice",
+    channel: "sms",
     contactName: phone,
     contactPhone: phone,
     identifier: phone,
@@ -65,7 +65,7 @@ export async function handleInboundTwilioSms(input: {
 
   await insertInboundChannelMessage(admin, {
     conversationId: context.conversationId,
-    channel: "voice",
+    channel: "sms",
     content: text,
     externalMessageId: input.messageSid,
   });
@@ -134,7 +134,7 @@ export async function sendVoiceChannelSms(input: {
   const admin = createAdminClient();
   const context = await resolveInboundMessageContext(admin, {
     businessId: input.businessId,
-    channel: "voice",
+    channel: "sms",
     contactName: to,
     contactPhone: to,
     identifier: to,
@@ -144,7 +144,7 @@ export async function sendVoiceChannelSms(input: {
   if (context) {
     await insertChannelMessage(admin, {
       conversationId: context.conversationId,
-      channel: "voice",
+      channel: "sms",
       senderType: "user",
       content: body,
       externalMessageId: messageSid,

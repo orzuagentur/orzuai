@@ -15,6 +15,7 @@ import {
 } from "@/services/contacts.service";
 import { getCrmDealsPageData } from "@/services/crm-deals.service";
 import { getCurrentUser } from "@/services/auth.service";
+import { isSmsInboxVisible, isVoiceInboxVisible } from "@/services/voice-inbox.service";
 import type { CrmEntityTab } from "@/types/contact.types";
 import { CRM_ENTITY_TABS } from "@/types/contact.types";
 
@@ -126,6 +127,12 @@ async function ContactsPageContent({ searchParams }: ContactsPageProps) {
     ? await getChannelConnectionStatuses(business.id)
     : {};
   const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
+  const [voiceInboxEnabled, smsInboxEnabled] = business
+    ? await Promise.all([
+        isVoiceInboxVisible(business.id),
+        isSmsInboxVisible(business.id),
+      ])
+    : [false, false];
 
   return (
     <ContactRecordHub
@@ -136,6 +143,8 @@ async function ContactsPageContent({ searchParams }: ContactsPageProps) {
       pipelineData={pipelineData}
       leadsPipelineData={leadsPipelineData}
       visibleChannelIds={visibleChannelIds}
+      voiceInboxEnabled={voiceInboxEnabled}
+      smsInboxEnabled={smsInboxEnabled}
     />
   );
 }

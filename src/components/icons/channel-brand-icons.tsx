@@ -84,14 +84,25 @@ export function VoiceIcon({ className, ...props }: IconProps) {
       strokeLinejoin="round"
       {...props}
     >
-      <path
-        fill="#6366F1"
-        stroke="none"
-        d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"
-      />
-      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-      <path d="M12 18v4" />
-      <path d="M8 22h8" />
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+export function SmsIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
@@ -102,12 +113,61 @@ export function WebsiteFormsIcon({ className, ...props }: IconProps) {
       viewBox="0 0 24 24"
       className={className}
       aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       {...props}
     >
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="M9 12h6" />
+      <path d="M9 16h4" />
+    </svg>
+  );
+}
+
+/** Official Twilio mark (red). */
+export function TwilioIcon({ className, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...props}>
       <path
-        fill="#F59E0B"
-        d="M4 4a2 2 0 0 1 2-2h8.586a1 1 0 0 1 .707.293l4.414 4.414A1 1 0 0 1 20 7.414V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4zm2 0v16h12V8h-4a2 2 0 0 1-2-2V4H6zm6 1.414L16.586 8H14a1 1 0 0 1-1-1V5.414zM8 12h8v1.5H8V12zm0 3.5h8V17H8v-1.5zm0 3.5h5V20H8v-1z"
+        fill="#F22F46"
+        d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-3.6 5.4a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zm7.2 0a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zm-7.2 7.2a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8zm7.2 0a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z"
       />
+    </svg>
+  );
+}
+
+export function MessengerIcon({ className, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...props}>
+      <path
+        fill="#0084FF"
+        d="M12 2C6.477 2 2 6.145 2 11.243c0 2.906 1.446 5.502 3.709 7.207V22l3.405-1.872c.909.252 1.871.388 2.886.388 5.523 0 10-4.145 10-9.243S17.523 2 12 2z"
+      />
+    </svg>
+  );
+}
+
+export function WebsiteChatIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -159,9 +219,12 @@ const CHANNEL_ICON_MAP = {
   instagram: InstagramIcon,
   telegram: TelegramIcon,
   website_forms: WebsiteFormsIcon,
+  website_chat: WebsiteChatIcon,
   voice: VoiceIcon,
+  sms: SmsIcon,
   email: GmailIcon,
   google_calendar: GoogleCalendarIcon,
+  facebook_messenger: MessengerIcon,
 } as const;
 
 export type ChannelBrandId = keyof typeof CHANNEL_ICON_MAP;

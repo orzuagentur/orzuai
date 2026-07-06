@@ -2,9 +2,10 @@ import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelCont
 import { EmailActivatePanelClient } from "@/components/email/EmailActivatePanelClient";
 import { GoogleCalendarConnectPanelClient } from "@/components/google-calendar/GoogleCalendarConnectPanelClient";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
+import { SmsActivatePanel } from "@/components/sms/SmsActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
 import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
-import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { WebsiteChatActivatePanel } from "@/components/website-chat/WebsiteChatActivatePanel";
 import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
 
@@ -16,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  INTEGRATION_CHANNEL_LIST,
   INTEGRATIONS_MESSAGES,
   isChannelConnectedForWorkspace,
   isMessagingIntegrationChannel,
@@ -32,16 +34,18 @@ import type {
   WebsiteFormConnectionData,
 } from "@/types/website-forms.types";
 import type {
+  WebsiteChatConnectConfig,
+  WebsiteChatConnectionData,
+} from "@/types/website-chat.types";
+import type {
   ChannelAiSettingsData,
   ChannelContactsData,
 } from "@/types/channel-workspace.types";
 import type {
-  TwilioNumberDiagnostics,
   TwilioPhoneNumberOption,
 } from "@/types/twilio-integration.types";
 import type {
   VoiceAgentSettings,
-  VoiceCallLogItem,
   VoiceConnectConfig,
   VoiceConnectionData,
 } from "@/types/voice-agent.types";
@@ -75,13 +79,19 @@ type IntegrationSectionPanelsProps = {
     connection: WebsiteFormConnectionData | null;
     connectConfig: WebsiteFormConnectConfig;
   };
+  websiteChat?: {
+    connection: WebsiteChatConnectionData | null;
+    connectConfig: WebsiteChatConnectConfig;
+  };
   voice?: {
     connection: VoiceConnectionData;
     settings: VoiceAgentSettings;
-    recentCalls: VoiceCallLogItem[];
     connectConfig: VoiceConnectConfig;
     availablePhoneNumbers: TwilioPhoneNumberOption[];
-    diagnostics: TwilioNumberDiagnostics | null;
+  };
+  sms?: {
+    connection: VoiceConnectionData | null;
+    settings: VoiceAgentSettings | null;
   };
   googleCalendar?: {
     connection: GoogleCalendarConnectionData | null;
@@ -103,7 +113,9 @@ export function IntegrationSectionPanels({
   whatsapp,
   telegram,
   websiteForms,
+  websiteChat,
   voice,
+  sms,
   googleCalendar,
   gmail,
   channelContacts,
@@ -120,20 +132,14 @@ export function IntegrationSectionPanels({
           whatsapp={whatsapp}
           telegram={telegram}
           websiteForms={websiteForms}
+          websiteChat={websiteChat}
           voice={voice}
+          sms={sms}
           googleCalendar={googleCalendar}
           gmail={gmail}
         />
       </div>
     );
-  }
-
-  if (channel === "voice" && voice) {
-    if (!isConnected) {
-      return <ActivateFirstPrompt channel={channel} />;
-    }
-
-    return <VoiceCallsSection calls={voice.recentCalls} />;
   }
 
   if (!isMessagingChannel) {
@@ -159,7 +165,9 @@ function ActivateSection({
   whatsapp,
   telegram,
   websiteForms,
+  websiteChat,
   voice,
+  sms,
   googleCalendar,
   gmail,
 }: {
@@ -168,7 +176,9 @@ function ActivateSection({
   whatsapp?: IntegrationSectionPanelsProps["whatsapp"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
+  websiteChat?: IntegrationSectionPanelsProps["websiteChat"];
   voice?: IntegrationSectionPanelsProps["voice"];
+  sms?: IntegrationSectionPanelsProps["sms"];
   googleCalendar?: IntegrationSectionPanelsProps["googleCalendar"];
   gmail?: IntegrationSectionPanelsProps["gmail"];
 }) {
@@ -205,15 +215,35 @@ function ActivateSection({
     );
   }
 
+  if (channel === "website_chat" && websiteChat) {
+    return (
+      <WebsiteChatActivatePanel
+        connection={websiteChat.connection}
+        hasBusiness={hasBusiness}
+        config={websiteChat.connectConfig}
+        embeddedInHub
+      />
+    );
+  }
+
   if (channel === "voice" && voice) {
     return (
       <VoiceActivatePanel
         connection={voice.connection}
         settings={voice.settings}
-        recentCalls={voice.recentCalls}
         config={voice.connectConfig}
         availablePhoneNumbers={voice.availablePhoneNumbers}
-        diagnostics={voice.diagnostics}
+        hasBusiness={hasBusiness}
+        embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "sms" && sms) {
+    return (
+      <SmsActivatePanel
+        connection={sms.connection}
+        settings={sms.settings}
         hasBusiness={hasBusiness}
         embeddedInHub
       />
@@ -245,45 +275,9 @@ function ActivateSection({
   return <ComingSoonChannelPanel channel={channel} />;
 }
 
-function VoiceCallsSection({ calls }: { calls: VoiceCallLogItem[] }) {
-  return (
-    <Card className="max-w-2xl shadow-none">
-      <CardHeader>
-        <CardTitle>{VOICE_MESSAGES.recentCallsTitle}</CardTitle>
-        <CardDescription>{INTEGRATIONS_MESSAGES.contactsHint}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {calls.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.noCalls}</p>
-        ) : (
-          <ul className="divide-y rounded-lg border text-sm">
-            {calls.map((call) => (
-              <li
-                key={call.id}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-              >
-                <span>
-                  {call.direction === "outbound" ? "→" : "←"} {call.phoneNumber}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {call.status} · {new Date(call.createdAt).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) {
-  const label =
-    channel === "telegram"
-      ? "Telegram"
-      : channel === "website_forms"
-        ? "Website Forms"
-        : channel;
+  const channelConfig = INTEGRATION_CHANNEL_LIST.find((item) => item.id === channel);
+  const label = channelConfig?.label ?? channel;
 
   return (
     <Card className="max-w-2xl shadow-none">
@@ -295,13 +289,9 @@ function ComingSoonChannelPanel({ channel }: { channel: IntegrationChannelId }) 
       </CardHeader>
       <CardContent className="space-y-4 text-sm text-muted-foreground">
         <p>
-          The integrations hub is ready. Next phases will add OAuth, webhooks,
-          and messaging for {label}.
+          The integrations hub is ready. {label} will be available in an upcoming
+          release.
         </p>
-        <ul className="list-disc space-y-1 pl-5">
-          <li>Settings — connect account</li>
-          <li>Contacts — channel contacts</li>
-        </ul>
       </CardContent>
     </Card>
   );

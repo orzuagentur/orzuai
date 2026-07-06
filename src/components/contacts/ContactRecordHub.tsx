@@ -36,6 +36,8 @@ type ContactRecordHubProps = {
   pipelineData: ContactPipelinePageData | null;
   leadsPipelineData: ContactPipelinePageData | null;
   visibleChannelIds: MessagingChannel[];
+  voiceInboxEnabled?: boolean;
+  smsInboxEnabled?: boolean;
 };
 
 function buildContactsHubHref(
@@ -80,6 +82,8 @@ export function ContactRecordHub({
   pipelineData,
   leadsPipelineData,
   visibleChannelIds,
+  voiceInboxEnabled = false,
+  smsInboxEnabled = false,
 }: ContactRecordHubProps) {
   const router = useRouter();
   const currentListData =
@@ -297,6 +301,8 @@ export function ContactRecordHub({
             showProfilePanel={currentListData.showProfilePanel}
             searchQuery={currentListData.searchQuery}
             visibleChannelIds={visibleChannelIds}
+            voiceInboxEnabled={voiceInboxEnabled}
+            smsInboxEnabled={smsInboxEnabled}
           />
         </ChannelRailAside>
 

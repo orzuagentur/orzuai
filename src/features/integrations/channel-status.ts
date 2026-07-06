@@ -3,6 +3,7 @@ import type { GmailConnectionData } from "@/types/gmail-integration.types";
 import type { GoogleCalendarConnectionData } from "@/types/google-calendar.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
+import type { WebsiteChatConnectionData } from "@/types/website-chat.types";
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type { WhatsAppConnectionData } from "@/types/whatsapp.types";
 
@@ -31,8 +32,10 @@ type BuildChannelStatusesInput = {
   whatsappConnection: WhatsAppConnectionData | null;
   telegramConnection: TelegramConnectionData | null;
   websiteFormConnection: WebsiteFormConnectionData | null;
+  websiteChatConnection?: WebsiteChatConnectionData | null;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
   voiceConnection?: VoiceConnectionData | null;
+  voiceSmsEnabled?: boolean;
   googleCalendarConnection?: GoogleCalendarConnectionData | null;
   gmailConnection?: GmailConnectionData | null;
 };
@@ -41,8 +44,10 @@ export function buildIntegrationChannelStatuses({
   whatsappConnection,
   telegramConnection,
   websiteFormConnection,
+  websiteChatConnection,
   websiteKnowledgeSync,
   voiceConnection,
+  voiceSmsEnabled = false,
   googleCalendarConnection,
   gmailConnection,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
@@ -129,6 +134,30 @@ export function buildIntegrationChannelStatuses({
     emailStatus = "pending";
   }
 
+  let websiteChatStatus: IntegrationChannelStatus = "disconnected";
+  let websiteChatDetail: string | undefined;
+
+  if (websiteChatConnection?.status === "connected") {
+    websiteChatStatus = "connected";
+    websiteChatDetail =
+      websiteChatConnection.siteName ?? websiteChatConnection.siteUrl ?? undefined;
+  } else if (websiteChatConnection?.status === "pending") {
+    websiteChatStatus = "pending";
+  }
+
+  let smsStatus: IntegrationChannelStatus = "disconnected";
+  let smsDetail: string | undefined;
+
+  if (voiceConnection?.status === "connected" && voiceSmsEnabled) {
+    smsStatus = "connected";
+    smsDetail = voiceConnection.phoneNumber ?? undefined;
+  } else if (voiceConnection?.status === "connected") {
+    smsStatus = "pending";
+    smsDetail = "Twilio connected — enable SMS";
+  } else if (voiceConnection?.status === "pending") {
+    smsStatus = "pending";
+  }
+
   return {
     whatsapp: {
       status: whatsappStatus,
@@ -157,6 +186,17 @@ export function buildIntegrationChannelStatuses({
     email: {
       status: emailStatus,
       detail: emailDetail,
+    },
+    website_chat: {
+      status: websiteChatStatus,
+      detail: websiteChatDetail,
+    },
+    sms: {
+      status: smsStatus,
+      detail: smsDetail,
+    },
+    facebook_messenger: {
+      status: "coming_soon",
     },
   };
 }

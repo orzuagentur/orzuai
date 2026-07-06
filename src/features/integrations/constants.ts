@@ -3,14 +3,17 @@ import type { ComponentType, SVGProps } from "react";
 import {
   GmailIcon,
   GoogleCalendarIcon,
-  InstagramIcon,
+  MessengerIcon,
   TelegramIcon,
+  TwilioIcon,
   VoiceIcon,
+  WebsiteChatIcon,
   WebsiteFormsIcon,
   WhatsAppIcon,
 } from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import type { MessagingChannel } from "@/types/database.types";
+import type { MarketplaceCategoryId } from "./marketplace-categories";
 
 export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -18,14 +21,15 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
   "telegram",
   "website_forms",
+  "website_chat",
   "email",
 ] as const;
 
 export const INTEGRATION_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
-  "instagram",
+  "facebook_messenger",
+  "sms",
   "voice",
-  "email",
   "google_calendar",
   "website_knowledge",
 ] as const;
@@ -76,6 +80,7 @@ export type IntegrationChannelConfig = {
   id: IntegrationChannelId;
   label: string;
   category: string;
+  marketplaceCategory: MarketplaceCategoryId;
   description: string;
   icon: ChannelIconComponent;
   available: boolean;
@@ -85,7 +90,8 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "whatsapp",
     label: "WhatsApp",
-    category: "Messaging",
+    category: "WhatsApp",
+    marketplaceCategory: "whatsapp",
     description: "WhatsApp Business via 360dialog",
     icon: WhatsAppIcon,
     available: true,
@@ -93,47 +99,71 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "telegram",
     label: "Telegram",
-    category: "Messaging",
-    description: "Telegram Bot API",
+    category: "Telegram",
+    marketplaceCategory: "telegram",
+    description: "Telegram Bot API for customer conversations",
     icon: TelegramIcon,
     available: true,
   },
   {
-    id: "instagram",
-    label: "Instagram",
-    category: "Messaging",
-    description: "Instagram Direct messaging",
-    icon: InstagramIcon,
+    id: "facebook_messenger",
+    label: "Messenger",
+    category: "Messenger",
+    marketplaceCategory: "messenger",
+    description: "Facebook Messenger for your business page",
+    icon: MessengerIcon,
     available: false,
   },
   {
+    id: "website_chat",
+    label: "Website Chat",
+    category: "Website",
+    marketplaceCategory: "website",
+    description: "Embed live chat on your site — messages sync to Inbox",
+    icon: WebsiteChatIcon,
+    available: true,
+  },
+  {
     id: "website_forms",
-    label: "Website Forms",
-    category: "Lead capture",
-    description: "Leads from any website or CMS",
+    label: "Lead Forms",
+    category: "Website",
+    marketplaceCategory: "website",
+    description: "Capture leads from any website or CMS via webhook",
     icon: WebsiteFormsIcon,
     available: true,
   },
   {
-    id: "voice",
-    label: "Twilio Voice",
-    category: "Voice",
-    description: "Подключите Twilio для AI-звонков и SMS",
-    icon: VoiceIcon,
+    id: "email",
+    label: "Email",
+    category: "Email",
+    marketplaceCategory: "email",
+    description: "Gmail inbox and AI replies",
+    icon: GmailIcon,
     available: true,
   },
   {
-    id: "email",
-    label: "Gmail",
-    category: "Email",
-    description: "Email inbox and AI replies",
-    icon: GmailIcon,
+    id: "sms",
+    label: "SMS",
+    category: "SMS",
+    marketplaceCategory: "sms",
+    description: "Two-way SMS via Twilio",
+    icon: TwilioIcon,
+    available: true,
+  },
+  {
+    id: "voice",
+    label: "Calls",
+    category: "Calls",
+    marketplaceCategory: "calls",
+    description: "AI phone line, inbound and outbound calls via Twilio",
+    icon: VoiceIcon,
     available: true,
   },
   {
     id: "google_calendar",
     label: "Google Calendar",
-    category: "Calendar",
+    category: "Productivity",
+    marketplaceCategory: "other",
     description: "AI booking and calendar sync",
     icon: GoogleCalendarIcon,
     available: true,
@@ -167,10 +197,13 @@ export const INTEGRATIONS_MESSAGES = {
     "Your connected channels. Add more from the Marketplace.",
   indexEmptyTitle: "No active integrations yet",
   indexEmptyDescription:
-    "Browse the Marketplace to connect WhatsApp, Telegram, Website Forms, AI Voice, and more.",
+    "Browse the Marketplace to connect WhatsApp, Website Chat, Calls, SMS, and more.",
   marketplaceTitle: "Integrations Marketplace",
   marketplaceDescription:
-    "Browse all channels. Activated ones are marked with a green badge.",
+    "Connect channels by category. Activated integrations show a green badge in My integrations.",
+  marketplaceAiTitle: "AI Agent",
+  marketplaceAiDescription:
+    "Configure replies, tools, follow-ups, and orchestration for all channels.",
   backToIntegrations: "My integrations",
   backToMarketplace: "Marketplace",
   configureChannel: "Open settings",

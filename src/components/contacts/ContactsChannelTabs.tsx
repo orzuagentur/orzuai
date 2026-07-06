@@ -25,6 +25,8 @@ type ContactsChannelTabsProps = {
   showProfilePanel?: boolean;
   searchQuery: string;
   visibleChannelIds: MessagingChannel[];
+  voiceInboxEnabled?: boolean;
+  smsInboxEnabled?: boolean;
   className?: string;
 };
 
@@ -38,11 +40,25 @@ export function ContactsChannelTabs({
   showProfilePanel = false,
   searchQuery,
   visibleChannelIds,
+  voiceInboxEnabled = false,
+  smsInboxEnabled = false,
   className,
 }: ContactsChannelTabsProps) {
-  const visibleChannels = CONTACT_CHANNEL_FILTERS.filter(
-    (filter) => filter.id !== null && visibleChannelIds.includes(filter.id),
-  );
+  const visibleChannels = CONTACT_CHANNEL_FILTERS.filter((filter) => {
+    if (filter.id === null) {
+      return false;
+    }
+
+    if (filter.id === "voice") {
+      return voiceInboxEnabled;
+    }
+
+    if (filter.id === "sms") {
+      return smsInboxEnabled;
+    }
+
+    return visibleChannelIds.includes(filter.id);
+  });
 
   function hrefForChannel(channel: MessagingChannel | null) {
     if (activeTab === "leads") {

@@ -4,15 +4,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  AlertTriangleIcon,
   CheckCircle2Icon,
   Loader2Icon,
   PhoneCallIcon,
   RefreshCwIcon,
-  SettingsIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { TwilioIcon } from "@/components/icons/channel-brand-icons";
 import { IntegrationDangerZone } from "@/components/integrations/IntegrationDangerZone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,7 @@ import { refreshTwilioPhoneNumbersAction } from "@/features/twilio/actions/refre
 import { resyncTwilioAction } from "@/features/twilio/actions/resync";
 import { searchTwilioPhoneNumbersAction } from "@/features/twilio/actions/search-phone-numbers";
 import { selectTwilioPhoneNumberAction } from "@/features/twilio/actions/select-phone";
-import { TWILIO_INTEGRATION_HREF, TWILIO_MESSAGES } from "@/features/twilio/constants";
+import { TWILIO_INTEGRATION_HREF, TWILIO_MESSAGES, SMS_INTEGRATION_HREF } from "@/features/twilio/constants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { triggerTestVoiceCallAction } from "@/features/voice/actions/trigger-test-voice-call";
@@ -39,14 +38,10 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type {
   TwilioAvailablePhoneNumber,
-  TwilioErrorLogItem,
-  TwilioNumberDiagnostics,
   TwilioPhoneNumberOption,
-  TwilioWebhookField,
 } from "@/types/twilio-integration.types";
 import type {
   VoiceAgentSettings,
-  VoiceCallLogItem,
   VoiceConnectConfig,
   VoiceConnectionData,
 } from "@/types/voice-agent.types";
@@ -54,10 +49,8 @@ import type {
 type VoiceActivatePanelProps = {
   connection: VoiceConnectionData;
   settings: VoiceAgentSettings;
-  recentCalls: VoiceCallLogItem[];
   config: VoiceConnectConfig;
   availablePhoneNumbers: TwilioPhoneNumberOption[];
-  diagnostics: TwilioNumberDiagnostics | null;
   hasBusiness: boolean;
   embeddedInHub?: boolean;
 };
@@ -73,10 +66,8 @@ function formatDateTime(value: string | null): string {
 export function VoiceActivatePanel({
   connection,
   settings,
-  recentCalls,
   config,
   availablePhoneNumbers,
-  diagnostics,
   hasBusiness,
   embeddedInHub = false,
 }: VoiceActivatePanelProps) {
@@ -469,7 +460,11 @@ export function VoiceActivatePanel({
               />
             ) : null}
 
-            <TwilioNumberSettings diagnostics={diagnostics} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href={SMS_INTEGRATION_HREF}>Configure SMS</Link>
+              </Button>
+            </div>
 
             <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
               <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-600" />
@@ -487,8 +482,6 @@ export function VoiceActivatePanel({
               isToggling={isTogglingAi}
               onToggle={handleToggleAi}
             />
-
-            <VoiceCallHistory calls={recentCalls} />
 
             <div className="space-y-3 rounded-lg border p-4">
               <p className="text-sm font-medium">{VOICE_MESSAGES.testCallTitle}</p>
@@ -529,7 +522,7 @@ export function VoiceActivatePanel({
     <Card className={cardClassName}>
       <CardHeader className={headerClassName}>
         <CardTitle className="flex items-center gap-2">
-          <PhoneCallIcon className="size-5 text-indigo-600" />
+          <TwilioIcon className="size-5" />
           {TWILIO_MESSAGES.connectTitle}
         </CardTitle>
         <CardDescription>{TWILIO_MESSAGES.connectDescription}</CardDescription>
@@ -550,177 +543,6 @@ export function VoiceActivatePanel({
         </Button>
       </CardContent>
     </Card>
-  );
-}
-
-function TwilioNumberSettings({
-  diagnostics,
-}: {
-  diagnostics: TwilioNumberDiagnostics | null;
-}) {
-  const statusVariant =
-    diagnostics?.status === "error"
-      ? "destructive"
-      : diagnostics?.status === "warning"
-        ? "secondary"
-        : "outline";
-
-  return (
-    <section id="twilio-number-settings" className="space-y-4 rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <SettingsIcon className="size-4 text-indigo-600" />
-            {TWILIO_MESSAGES.numberSettingsTitle}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {diagnostics?.summary ?? TWILIO_MESSAGES.numberSettingsUnavailable}
-          </p>
-        </div>
-        {diagnostics ? (
-          <Badge variant={statusVariant}>
-            {diagnostics.status === "ok"
-              ? TWILIO_MESSAGES.numberSettingsOk
-              : diagnostics.status === "error"
-                ? TWILIO_MESSAGES.numberSettingsError
-                : TWILIO_MESSAGES.numberSettingsWarning}
-          </Badge>
-        ) : null}
-      </div>
-
-      {diagnostics ? (
-        <>
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <DiagnosticValue
-              label={TWILIO_MESSAGES.connectedAccountSidLabel}
-              value={diagnostics.connectedAccountSid}
-            />
-            <DiagnosticValue
-              label={TWILIO_MESSAGES.platformAccountSidLabel}
-              value={diagnostics.platformAccountSid}
-            />
-            <DiagnosticValue
-              label={TWILIO_MESSAGES.selectedPhoneSidLabel}
-              value={diagnostics.selectedPhoneSid}
-            />
-            <DiagnosticValue
-              label={TWILIO_MESSAGES.browserTwimlAppSidLabel}
-              value={diagnostics.browserTwimlAppSid}
-            />
-          </div>
-
-          <WebhookFieldGroup
-            title={TWILIO_MESSAGES.selectedNumberWebhooksTitle}
-            fields={diagnostics.numberFields}
-          />
-
-          <WebhookFieldGroup
-            title={TWILIO_MESSAGES.browserAppWebhooksTitle}
-            fields={diagnostics.browserAppFields}
-          />
-
-          <TwilioErrorLogList errors={diagnostics.errorLogs} />
-        </>
-      ) : null}
-    </section>
-  );
-}
-
-function DiagnosticValue({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="rounded-md bg-muted/40 p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 break-all font-mono text-xs">{value || "—"}</p>
-    </div>
-  );
-}
-
-function WebhookFieldGroup({
-  title,
-  fields,
-}: {
-  title: string;
-  fields: TwilioWebhookField[];
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{title}</p>
-      {fields.length === 0 ? (
-        <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          {TWILIO_MESSAGES.numberSettingsUnavailable}
-        </p>
-      ) : (
-        <div className="divide-y rounded-md border">
-          {fields.map((field) => (
-            <div
-              key={field.label}
-              className="grid gap-2 p-3 text-sm md:grid-cols-[12rem_minmax(0,1fr)_auto]"
-            >
-              <span className="font-medium">{field.label}</span>
-              <span className="break-all font-mono text-xs text-muted-foreground">
-                {field.value || "—"}
-              </span>
-              <Badge variant={field.ok ? "outline" : "destructive"}>
-                {field.ok ? TWILIO_MESSAGES.numberSettingsOk : TWILIO_MESSAGES.mismatchLabel}
-              </Badge>
-              {field.expected && field.value !== field.expected ? (
-                <p className="md:col-start-2 md:col-span-2 break-all text-xs text-muted-foreground">
-                  {TWILIO_MESSAGES.expectedLabel}: {field.expected}
-                </p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TwilioErrorLogList({ errors }: { errors: TwilioErrorLogItem[] }) {
-  return (
-    <div className="space-y-2">
-      <p className="flex items-center gap-2 text-sm font-medium">
-        <AlertTriangleIcon className="size-4 text-amber-600" />
-        {TWILIO_MESSAGES.errorLogTitle}
-      </p>
-      {errors.length === 0 ? (
-        <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          {TWILIO_MESSAGES.noTwilioErrors}
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {errors.map((error) => (
-            <li key={error.sid} className="space-y-2 rounded-md border p-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">
-                  {error.errorCode ? `Twilio ${error.errorCode}` : error.message}
-                </p>
-                <span className="text-xs text-muted-foreground">
-                  {formatDateTime(error.dateCreated)}
-                </span>
-              </div>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                {error.diagnosis}
-              </p>
-              <DiagnosticValue
-                label={TWILIO_MESSAGES.requestUrlLabel}
-                value={
-                  [error.requestMethod, error.requestUrl]
-                    .filter(Boolean)
-                    .join(" ") || null
-                }
-              />
-              {error.responseBody ? (
-                <DiagnosticValue
-                  label={TWILIO_MESSAGES.responseBodyLabel}
-                  value={error.responseBody}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
 
@@ -1019,33 +841,6 @@ function VoiceAiSection({
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">{VOICE_MESSAGES.knowledgeHint}</p>
-      )}
-    </div>
-  );
-}
-
-function VoiceCallHistory({ calls }: { calls: VoiceCallLogItem[] }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{VOICE_MESSAGES.recentCallsTitle}</p>
-      {calls.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.noCalls}</p>
-      ) : (
-        <ul className="divide-y rounded-lg border text-sm">
-          {calls.map((call) => (
-            <li
-              key={call.id}
-              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-            >
-              <span>
-                {call.direction === "outbound" ? "→" : "←"} {call.phoneNumber}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {call.status} · {new Date(call.createdAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );

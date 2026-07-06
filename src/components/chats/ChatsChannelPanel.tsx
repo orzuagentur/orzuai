@@ -16,11 +16,10 @@ import {
   getCachedConversationList,
   setCachedConversationList,
 } from "@/lib/client-cache/inbox-messenger-cache";
-import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
+import { InboxConversationList } from "@/components/chats/inbox/InboxConversationList";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
-import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { useInboxLayout, InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import { Button } from "@/components/ui/button";
@@ -303,18 +302,16 @@ function ChatsChannelPanelContent({
     );
   }, [conversations, selectedConversationId]);
 
-  useInboxChromeRegistration(
-    hasBusiness
-      ? {
-          searchQuery,
-          onSearchChange: setSearchQuery,
-          activeFilter,
-          onFilterChange: setActiveFilter,
-          aiChannel: channel,
-          aiEnabled: resolvedConversationAiEnabled,
-        }
-      : null,
-  );
+  const inboxToolbar = hasBusiness
+    ? {
+        searchQuery,
+        onSearchChange: setSearchQuery,
+        activeFilter,
+        onFilterChange: setActiveFilter,
+        aiChannel: channel,
+        aiEnabled: resolvedConversationAiEnabled,
+      }
+    : null;
 
   if (!hasBusiness) {
     return (
@@ -352,22 +349,18 @@ function ChatsChannelPanelContent({
         />
       }
       listColumn={
-        <div className="min-h-0 flex-1">
-          <ChatList
-            className="h-full"
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            channelId={channelId}
-            hideChannelBadge
-            onConversationSelect={handleConversationSelect}
-            variant="inbox"
-            emptyVariant={
-              hasActiveListFilters && conversations.length === 0
-                ? "search"
-                : "default"
-            }
-          />
-        </div>
+        <InboxConversationList
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          channelId={channelId}
+          onConversationSelect={handleConversationSelect}
+          emptyVariant={
+            hasActiveListFilters && conversations.length === 0
+              ? "search"
+              : "default"
+          }
+          toolbar={inboxToolbar}
+        />
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">

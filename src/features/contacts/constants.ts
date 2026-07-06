@@ -2,6 +2,8 @@ import {
   INTEGRATION_CHANNEL_LIST,
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations/constants";
+import { SMS_MESSAGES } from "@/features/sms/constants";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 
 const channelLabelById = new Map(
   INTEGRATION_CHANNEL_LIST.map((channel) => [channel.id, channel.label]),
@@ -211,4 +213,6 @@ export const CONTACT_CHANNEL_FILTERS = [
     id: channelId,
     label: channelLabelById.get(channelId) ?? channelId,
   })),
+  { id: "voice" as const, label: VOICE_MESSAGES.inboxTabLabel },
+  { id: "sms" as const, label: SMS_MESSAGES.inboxTabLabel },
 ] as const;

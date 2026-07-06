@@ -184,6 +184,18 @@ export class VoiceRepository {
     return { error: error?.message ?? null };
   }
 
+  async updateSmsEnabled(
+    businessId: string,
+    smsEnabled: boolean,
+  ): Promise<{ error: string | null }> {
+    const { error } = await this.db
+      .from("voice_agent_config")
+      .update({ sms_enabled: smsEnabled })
+      .eq("business_id", businessId);
+
+    return { error: error?.message ?? null };
+  }
+
   async listRecentCallLogs(
     businessId: string,
     limit = 10,

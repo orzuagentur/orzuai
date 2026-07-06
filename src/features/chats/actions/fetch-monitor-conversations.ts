@@ -16,6 +16,7 @@ import { hasSupabaseEnv } from "@/lib/env";
 const inboxChannelEnum = z.enum([
   ...MESSAGING_INTEGRATION_CHANNELS,
   "voice",
+  "sms",
 ] as const);
 
 const fetchMonitorConversationsSchema = z.object({

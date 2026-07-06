@@ -57,7 +57,10 @@ export function IntegrationChannelShell({
 
   const Icon = channelConfig?.icon;
   const sectionNavItems =
-    activeChannel === "google_calendar"
+    activeChannel === "google_calendar" ||
+    activeChannel === "voice" ||
+    activeChannel === "sms" ||
+    activeChannel === "facebook_messenger"
       ? INTEGRATION_SECTION_LIST.filter((section) => section.id === "activate")
       : INTEGRATION_SECTION_LIST;
 

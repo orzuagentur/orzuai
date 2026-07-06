@@ -47,7 +47,7 @@ export async function getSmsInboxPageData(
   const [smsInboxEnabled, voiceInboxEnabled, channelPage] = await Promise.all([
     isSmsInboxVisible(ctx.businessId),
     isVoiceInboxVisible(ctx.businessId),
-    getChatsChannelPageData("voice", ctx),
+    getChatsChannelPageData("sms", ctx),
   ]);
 
   let activeConversation: ConversationDetail | null = null;

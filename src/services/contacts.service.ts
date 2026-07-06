@@ -254,7 +254,11 @@ function isMessagingChannel(value: string): value is MessagingChannel {
     value === "whatsapp" ||
     value === "instagram" ||
     value === "telegram" ||
-    value === "website_forms"
+    value === "website_forms" ||
+    value === "facebook_messenger" ||
+    value === "email" ||
+    value === "voice" ||
+    value === "sms"
   );
 }
 

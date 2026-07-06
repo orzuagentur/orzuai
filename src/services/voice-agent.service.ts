@@ -766,3 +766,25 @@ export async function setVoiceAiEnabled(
   revalidateVoicePaths();
   return { success: true };
 }
+
+export async function setSmsEnabled(
+  businessId: string,
+  smsEnabled: boolean,
+): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const { error } = await getVoiceRepository().updateSmsEnabled(
+    businessId,
+    smsEnabled,
+  );
+
+  if (error) {
+    return { success: false, message: error };
+  }
+
+  revalidateVoicePaths();
+  revalidatePath(`${DASHBOARD_ROUTES.integrations}/sms`);
+  return { success: true };
+}

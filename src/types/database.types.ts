@@ -49,7 +49,9 @@ export type MessagingChannel =
   | "website_forms"
   | "facebook_messenger"
   | "email"
-  | "voice";
+  | "voice"
+  | "sms"
+  | "website_chat";
 
 export type ConversationStatus =
   | "open"
@@ -680,6 +682,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "website_form_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      website_chat_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          widget_token: string;
+          connection_status: WebsiteFormStatus;
+          site_name: string | null;
+          site_url: string | null;
+          welcome_message: string;
+          primary_color: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          widget_token: string;
+          connection_status?: WebsiteFormStatus;
+          site_name?: string | null;
+          site_url?: string | null;
+          welcome_message?: string;
+          primary_color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          widget_token?: string;
+          connection_status?: WebsiteFormStatus;
+          site_name?: string | null;
+          site_url?: string | null;
+          welcome_message?: string;
+          primary_color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "website_chat_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
             referencedRelation: "businesses";

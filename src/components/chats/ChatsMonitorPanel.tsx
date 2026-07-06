@@ -10,13 +10,12 @@ import {
   useTransition,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
+import { ArrowLeftIcon } from "lucide-react";
 
-import { ChatList } from "@/components/chats/ChatList";
 import { ChatWindow } from "@/components/chats/ChatWindow";
 import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
+import { InboxConversationList } from "@/components/chats/inbox/InboxConversationList";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
-import { useInboxChromeRegistration } from "@/components/chats/inbox/inbox-chrome-context";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { useInboxLayout, InboxLayoutProvider } from "@/components/chats/inbox/inbox-layout-context";
 import { Button } from "@/components/ui/button";
@@ -51,6 +50,7 @@ import type {
 import {
   countUnreadByChannel,
 } from "@/utils/conversation-unread";
+import { sortConversations } from "@/utils/chat-inbox-priority";
 
 type ChatsMonitorPanelProps = Partial<ChatsMonitorPageData> & {
   favoritesOnly?: boolean;
@@ -111,7 +111,7 @@ function ChatsMonitorPanelContent({
   const { searchQuery, setSearchQuery, debouncedSearch } =
     useDebouncedInboxSearch();
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
-  const [activeSort] = useState<ChatInboxSort>("latest");
+  const [activeSort] = useState<ChatInboxSort>("needs_reply_first");
   const [activeQuickView] = useState<ChatInboxQuickView>(
     favoritesOnly ? "favorites" : "all",
   );
@@ -250,25 +250,13 @@ function ChatsMonitorPanelContent({
     );
   }, [conversations, hasMore, listScope, totalCount]);
 
-  const needsAttentionIds = useMemo(
-    () => new Set(needsAttentionConversations.map((item) => item.id)),
-    [needsAttentionConversations],
-  );
+  const displayConversations = useMemo(() => {
+    if (hasActiveListFilters) {
+      return conversations;
+    }
 
-  const showNeedsAttentionSection =
-    !favoritesOnly &&
-    activeQuickView === "all" &&
-    !debouncedSearch &&
-    activeFilter === "all" &&
-    needsAttentionConversations.length > 0;
-
-  const mainConversations = useMemo(
-    () =>
-      showNeedsAttentionSection
-        ? conversations.filter((item) => !needsAttentionIds.has(item.id))
-        : conversations,
-    [conversations, needsAttentionIds, showNeedsAttentionSection],
-  );
+    return sortConversations(conversations, activeSort);
+  }, [activeSort, conversations, hasActiveListFilters]);
 
   const unreadByChannel = useMemo(() => {
     const merged = new Map<string, ConversationListItem>();
@@ -389,18 +377,16 @@ function ChatsMonitorPanelContent({
     initialTotalCount,
   ]);
 
-  useInboxChromeRegistration(
-    hasBusiness
-      ? {
-          searchQuery,
-          onSearchChange: setSearchQuery,
-          activeFilter,
-          onFilterChange: setActiveFilter,
-          aiChannel,
-          aiEnabled: activeAiEnabled,
-        }
-      : null,
-  );
+  const inboxToolbar = hasBusiness
+    ? {
+        searchQuery,
+        onSearchChange: setSearchQuery,
+        activeFilter,
+        onFilterChange: setActiveFilter,
+        aiChannel,
+        aiEnabled: activeAiEnabled,
+      }
+    : null;
 
   if (!hasBusiness) {
     return (
@@ -434,59 +420,25 @@ function ChatsMonitorPanelContent({
         />
       }
       listColumn={
-        <div className="flex min-h-0 flex-1 flex-col">
-          {showNeedsAttentionSection ? (
-            <div className="shrink-0 border-b bg-amber-500/5">
-              <div className="px-4 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                {CHAT_MESSAGES.needsAttentionTitle}
-              </div>
-              <ChatList
-                conversations={needsAttentionConversations}
-                activeConversationId={activeConversationId}
-                channelId="whatsapp"
-                linkToConversationChannel
-                linkMode="overview"
-                onConversationSelect={handleConversationSelect}
-                variant="inbox"
-              />
-            </div>
-          ) : null}
-
-          <ChatList
-            className="min-h-0 flex-1"
-            conversations={mainConversations}
-            activeConversationId={activeConversationId}
-            channelId="whatsapp"
-            linkToConversationChannel
-            linkMode={favoritesOnly ? "favorites" : "overview"}
-            onConversationSelect={handleConversationSelect}
-            variant="inbox"
-            emptyVariant={
-              favoritesOnly
-                ? "favorites"
-                : totalCount > 0 && conversations.length === 0
-                  ? "search"
-                  : "default"
-            }
-          />
-
-          {hasMore ? (
-            <div className="shrink-0 border-t p-3">
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full text-muted-foreground"
-                disabled={isFetching}
-                onClick={() => fetchConversations(conversations.length, true)}
-              >
-                {isFetching ? (
-                  <Loader2Icon className="mr-2 size-4 animate-spin" />
-                ) : null}
-                {CHAT_MESSAGES.loadMoreConversationsShort}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <InboxConversationList
+          conversations={displayConversations}
+          activeConversationId={activeConversationId}
+          channelId="whatsapp"
+          linkToConversationChannel
+          linkMode={favoritesOnly ? "favorites" : "overview"}
+          onConversationSelect={handleConversationSelect}
+          emptyVariant={
+            favoritesOnly
+              ? "favorites"
+              : totalCount > 0 && conversations.length === 0
+                ? "search"
+                : "default"
+          }
+          toolbar={inboxToolbar}
+          hasMore={hasMore}
+          isFetching={isFetching}
+          onLoadMore={() => fetchConversations(conversations.length, true)}
+        />
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">

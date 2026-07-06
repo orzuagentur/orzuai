@@ -76,7 +76,7 @@ export function SmsThreadPanel({
       id: pendingId,
       conversationId: conversation?.id ?? pendingId,
       content: body,
-      channel: "voice",
+      channel: "sms",
     });
 
     onOptimisticMessage?.(optimisticMessage);

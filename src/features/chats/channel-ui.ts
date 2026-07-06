@@ -20,6 +20,10 @@ export function getChannelIconContainerClassName(
     return "bg-indigo-50 dark:bg-indigo-950/50";
   }
 
+  if (channel === "sms") {
+    return "bg-teal-50 dark:bg-teal-950/50";
+  }
+
   if (channel === "email") {
     return "bg-red-50 dark:bg-red-950/40";
   }
@@ -28,7 +32,15 @@ export function getChannelIconContainerClassName(
     return "bg-blue-50 dark:bg-blue-950/50";
   }
 
-  return "bg-amber-50 dark:bg-amber-950/50";
+  if (channel === "website_chat") {
+    return "bg-violet-50 dark:bg-violet-950/50";
+  }
+
+  if (channel === "website_forms") {
+    return "bg-amber-50 dark:bg-amber-950/50";
+  }
+
+  return "bg-muted/50";
 }
 
 export function getChannelBadgeLabel(channel: MessagingChannel): string {
@@ -46,6 +58,22 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
 
   if (channel === "email") {
     return "Email";
+  }
+
+  if (channel === "voice") {
+    return "Calls";
+  }
+
+  if (channel === "sms") {
+    return "SMS";
+  }
+
+  if (channel === "website_chat") {
+    return "Website Chat";
+  }
+
+  if (channel === "website_forms") {
+    return "Lead Forms";
   }
 
   if (channel === "facebook_messenger") {
@@ -66,6 +94,18 @@ export function getChannelBadgeClassName(channel: MessagingChannel): string {
 
   if (channel === "telegram") {
     return "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200";
+  }
+
+  if (channel === "voice") {
+    return "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200";
+  }
+
+  if (channel === "sms") {
+    return "border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-200";
+  }
+
+  if (channel === "website_chat") {
+    return "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-200";
   }
 
   return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200";

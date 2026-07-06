@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { LayoutGridIcon, MessageSquareIcon, StarIcon } from "lucide-react";
+import { LayoutGridIcon, StarIcon } from "lucide-react";
 
+import { SmsIcon, VoiceIcon } from "@/components/icons/channel-brand-icons";
 import { ChannelRailItem } from "@/components/navigation/ChannelRailItem";
-import { VoiceIcon } from "@/components/icons/channel-brand-icons";
 import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
@@ -163,10 +163,10 @@ export function InboxChannelTabs({
             <div
               className={getChannelRailIconShellClassName(
                 activeChannel === "sms",
-                getChannelIconContainerClassName("voice"),
+                getChannelIconContainerClassName("sms"),
               )}
             >
-              <MessageSquareIcon className="size-5" />
+              <SmsIcon className="size-5" />
             </div>
           }
         />

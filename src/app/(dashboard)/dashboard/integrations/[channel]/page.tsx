@@ -16,17 +16,17 @@ import {
   getWebsiteFormConnection,
   getWebsiteFormConnectConfig,
 } from "@/services/website-forms.service";
+import {
+  getWebsiteChatConnection,
+  getWebsiteChatConnectConfig,
+} from "@/services/website-chat.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import {
   getVoiceAgentSettings,
   getVoiceConnectConfig,
   getVoiceConnection,
-  listRecentVoiceCalls,
 } from "@/services/voice-agent.service";
-import {
-  getTwilioNumberDiagnostics,
-  listTwilioPhoneNumbersForBusiness,
-} from "@/services/twilio-integration.service";
+import { listTwilioPhoneNumbersForBusiness } from "@/services/twilio-integration.service";
 import {
   getGmailConnection,
   getGmailConnectConfig,
@@ -97,13 +97,13 @@ export default async function IntegrationsChannelPage({
     telegramConfig,
     websiteFormConnection,
     websiteFormConfig,
+    websiteChatConnection,
+    websiteChatConfig,
     websiteKnowledgeSync,
     voiceConnection,
     voiceSettings,
-    voiceRecentCalls,
     voiceConnectConfig,
     twilioPhoneNumbers,
-    twilioNumberDiagnostics,
     googleCalendarConnection,
     googleCalendarConnectConfig,
     gmailConnection,
@@ -115,19 +115,15 @@ export default async function IntegrationsChannelPage({
     Promise.resolve(getTelegramConnectConfig()),
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWebsiteFormConnectConfig()),
+    business ? getWebsiteChatConnection(business.id) : Promise.resolve(null),
+    Promise.resolve(getWebsiteChatConnectConfig()),
     business ? getWebsiteKnowledgeSync(business.id) : Promise.resolve(null),
     business ? getVoiceConnection(business.id) : Promise.resolve(null),
-    business
-      ? getVoiceAgentSettings(business.id)
-      : Promise.resolve(null),
-    business ? listRecentVoiceCalls(business.id) : Promise.resolve([]),
+    business ? getVoiceAgentSettings(business.id) : Promise.resolve(null),
     Promise.resolve(getVoiceConnectConfig()),
     business
       ? listTwilioPhoneNumbersForBusiness(business.id)
       : Promise.resolve([]),
-    business && channel === "voice"
-      ? getTwilioNumberDiagnostics(business.id)
-      : Promise.resolve(null),
     business ? getGoogleCalendarConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getGoogleCalendarConnectConfig()),
     business ? getGmailConnection(business.id) : Promise.resolve(null),
@@ -138,8 +134,10 @@ export default async function IntegrationsChannelPage({
     whatsappConnection,
     telegramConnection,
     websiteFormConnection,
+    websiteChatConnection,
     websiteKnowledgeSync,
     voiceConnection,
+    voiceSmsEnabled: voiceSettings?.smsEnabled ?? false,
     googleCalendarConnection,
     gmailConnection,
   });
@@ -186,18 +184,24 @@ export default async function IntegrationsChannelPage({
             connection: websiteFormConnection,
             connectConfig: websiteFormConfig,
           }}
+          websiteChat={{
+            connection: websiteChatConnection,
+            connectConfig: websiteChatConfig,
+          }}
           voice={
             voiceConnection && voiceSettings
               ? {
                   connection: voiceConnection,
                   settings: voiceSettings,
-                  recentCalls: voiceRecentCalls,
                   connectConfig: voiceConnectConfig,
                   availablePhoneNumbers: twilioPhoneNumbers,
-                  diagnostics: twilioNumberDiagnostics,
                 }
               : undefined
           }
+          sms={{
+            connection: voiceConnection,
+            settings: voiceSettings,
+          }}
           googleCalendar={{
             connection: googleCalendarConnection,
             connectConfig: googleCalendarConnectConfig,

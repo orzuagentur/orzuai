@@ -83,7 +83,7 @@ function SmsInboxPanelContent({
   const fetchConversations = useCallback((silent = false) => {
     const run = async () => {
       const result = await fetchMonitorConversationsAction({
-        channel: "voice",
+        channel: "sms",
         offset: 0,
         limit: INBOX_PAGE_SIZE,
         view: "all",
@@ -130,7 +130,7 @@ function SmsInboxPanelContent({
     hasBusiness,
     businessId,
     isInitialLoading: false,
-    channelFilter: "voice",
+    channelFilter: "sms",
     hasActiveListFilters: false,
     onConversationsChange: setConversations,
     onRefreshConversations: () => refreshConversationsRef.current(),
@@ -182,7 +182,7 @@ function SmsInboxPanelContent({
   const handleSentToNewNumber = useCallback(
     async (phoneNumber: string) => {
       const result = await fetchMonitorConversationsAction({
-        channel: "voice",
+        channel: "sms",
         offset: 0,
         limit: INBOX_PAGE_SIZE,
         view: "all",
@@ -318,7 +318,7 @@ function SmsInboxPanelContent({
                 className="h-full"
                 conversations={conversations}
                 activeConversationId={selectedConversationId}
-                channelId="voice"
+                channelId="sms"
                 hideChannelBadge
                 onConversationSelect={handleConversationSelect}
                 variant="inbox"

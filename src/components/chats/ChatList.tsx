@@ -29,7 +29,7 @@ import { HIGH_INTENT_LEAD_SCORE } from "@/features/chats/constants";
 
 const CHAT_LIST_ROW_ESTIMATE_PX = 80;
 const CHAT_LIST_VIRTUALIZE_THRESHOLD = 20;
-type ChatListChannelId = ChatChannelId | "voice";
+type ChatListChannelId = ChatChannelId | "voice" | "sms";
 
 type ChatListProps = {
   conversations: ConversationListItem[];
@@ -63,6 +63,10 @@ function buildConversationHref(
 
   const channel = linkToConversationChannel ? conversationChannel : channelId;
   if (channel === "voice") {
+    return `${DASHBOARD_ROUTES.chatsVoice}?conversation=${conversationId}`;
+  }
+
+  if (channel === "sms") {
     return `${DASHBOARD_ROUTES.chatsSms}?conversation=${conversationId}`;
   }
 
