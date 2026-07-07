@@ -136,7 +136,8 @@ type IncomingPhoneNumberListResponse = {
 };
 
 type AccountResource = {
-  sid: string;
+  sid?: string;
+  account_sid?: string;
   friendly_name?: string;
   owner_account_sid?: string;
 };

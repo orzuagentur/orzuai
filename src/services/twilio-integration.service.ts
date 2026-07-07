@@ -1041,6 +1041,32 @@ function normalizeTwilioSid(value: string, prefix: "AC" | "SK"): string | null {
   return trimmed;
 }
 
+function sanitizeTwilioSecret(value: string): string {
+  return value.trim().replace(/\s+/g, "");
+}
+
+function resolveTwilioAccountSid(
+  account: { sid?: string; account_sid?: string },
+  fallback: string,
+): string {
+  return (account.sid ?? account.account_sid ?? fallback).trim().toUpperCase();
+}
+
+function formatTwilioConnectError(error: unknown, fallback: string): string {
+  if (error instanceof TwilioApiRequestError) {
+    if (error.code === 20003 || error.status === 401 || error.status === 403) {
+      return (
+        "Twilio отклонил учётные данные (код 20003). Проверьте Account SID и Auth Token " +
+        "с одной страницы в Twilio Console. Для API Key нужен Main key, не Standard."
+      );
+    }
+
+    return error.message;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+}
+
 export async function connectTwilioWithAuthToken(input: {
   businessId: string;
   accountSid: string;
@@ -1053,7 +1079,7 @@ export async function connectTwilioWithAuthToken(input: {
   }
 
   const accountSid = normalizeTwilioSid(input.accountSid, "AC");
-  const authToken = input.authToken.trim();
+  const authToken = sanitizeTwilioSecret(input.authToken);
 
   if (!accountSid) {
     return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
@@ -1074,8 +1100,16 @@ export async function connectTwilioWithAuthToken(input: {
     const account = await fetchTwilioAccount(credentials);
     friendlyName = account.friendly_name ?? null;
 
-    if (account.sid && account.sid !== accountSid) {
-      return { success: false, message: TWILIO_MESSAGES.authTokenAccountMismatch };
+    const resolvedAccountSid = resolveTwilioAccountSid(account, accountSid);
+    if (resolvedAccountSid !== accountSid) {
+      console.warn(
+        "[twilio] auth token connect account sid mismatch",
+        JSON.stringify({
+          businessId: input.businessId,
+          expected: accountSid,
+          resolved: resolvedAccountSid,
+        }),
+      );
     }
 
     await listTwilioIncomingPhoneNumbers(credentials);
@@ -1091,10 +1125,7 @@ export async function connectTwilioWithAuthToken(input: {
 
     return {
       success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : TWILIO_MESSAGES.authTokenConnectFailed,
+      message: formatTwilioConnectError(error, TWILIO_MESSAGES.authTokenConnectFailed),
     };
   }
 
@@ -1174,8 +1205,8 @@ export async function connectTwilioWithApiKey(input: {
 
   const accountSid = normalizeTwilioSid(input.accountSid, "AC");
   const apiKeySid = normalizeTwilioSid(input.apiKeySid, "SK");
-  const apiKeySecret = input.apiKeySecret.trim();
-  const authToken = input.authToken.trim();
+  const apiKeySecret = sanitizeTwilioSecret(input.apiKeySecret);
+  const authToken = sanitizeTwilioSecret(input.authToken);
 
   if (!accountSid) {
     return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
@@ -1193,6 +1224,18 @@ export async function connectTwilioWithApiKey(input: {
     return { success: false, message: TWILIO_MESSAGES.invalidAuthToken };
   }
 
+  const apiKeyCredentials: TwilioApiCredentials = {
+    accountSid,
+    authToken: "",
+    apiKeySid,
+    apiKeySecret,
+  };
+
+  const authTokenCredentials: TwilioApiCredentials = {
+    accountSid,
+    authToken,
+  };
+
   const credentials: TwilioApiCredentials = {
     accountSid,
     authToken,
@@ -1203,21 +1246,11 @@ export async function connectTwilioWithApiKey(input: {
   let friendlyName: string | null = null;
 
   try {
-    const account = await fetchTwilioAccount(credentials);
+    // Standard API keys cannot call /Accounts — validate via IncomingPhoneNumbers.
+    await listTwilioIncomingPhoneNumbers(apiKeyCredentials);
+
+    const account = await fetchTwilioAccount(authTokenCredentials);
     friendlyName = account.friendly_name ?? null;
-
-    if (account.sid && account.sid !== accountSid) {
-      return { success: false, message: TWILIO_MESSAGES.apiKeyAccountMismatch };
-    }
-
-    const authTokenAccount = await fetchTwilioAccount({
-      accountSid,
-      authToken,
-    });
-
-    if (authTokenAccount.sid && authTokenAccount.sid !== accountSid) {
-      return { success: false, message: TWILIO_MESSAGES.authTokenAccountMismatch };
-    }
 
     await listTwilioIncomingPhoneNumbers(credentials);
   } catch (error) {
@@ -1232,10 +1265,7 @@ export async function connectTwilioWithApiKey(input: {
 
     return {
       success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : TWILIO_MESSAGES.apiKeyConnectFailed,
+      message: formatTwilioConnectError(error, TWILIO_MESSAGES.apiKeyConnectFailed),
     };
   }
 
