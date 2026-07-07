@@ -9,16 +9,18 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
-  EMAIL_FROM_PRESET_OPTIONS,
   createEmailTemplateAction,
   fetchEmailCenterDataAction,
   previewEmailTemplateAction,
   saveEmailTemplateAction,
   sendPlatformBroadcastAction,
   sendTestEmailTemplateAction,
-  type EmailSendLogRow,
-  type EmailTemplateRow,
 } from "@/features/email-center/actions";
+import { EMAIL_FROM_PRESET_OPTIONS } from "@/features/email-center/constants";
+import type {
+  EmailSendLogRow,
+  EmailTemplateRow,
+} from "@/features/email-center/types";
 import { formatAdminDateTime } from "@/lib/format-datetime";
 
 const CATEGORY_LABELS: Record<string, string> = {

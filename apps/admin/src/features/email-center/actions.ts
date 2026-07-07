@@ -4,52 +4,13 @@ import {
   createServiceRoleClient,
   requirePlatformAdmin,
 } from "@/lib/supabase/server";
-import {
-  FROM_EMAIL_PRESET_OPTIONS,
-  normalizeTemplateFromEmailInput,
-} from "@orzuai/lib/email/from-addresses";
+import { normalizeTemplateFromEmailInput } from "@orzuai/lib/email/from-addresses";
 
-export type EmailTemplateRow = {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  subjectTemplate: string;
-  bodyHtmlTemplate: string | null;
-  fromEmail: string | null;
-  isActive: boolean;
-  isSystem: boolean;
-  sendCount: number;
-  deliveredCount: number;
-  failedCount: number;
-  updatedAt: string;
-};
-
-export const EMAIL_FROM_PRESET_OPTIONS = [
-  { value: "default", label: "Default (code mapping)" },
-  ...FROM_EMAIL_PRESET_OPTIONS,
-  { value: "custom", label: "Custom email address…" },
-] as const;
-
-export type EmailSendLogRow = {
-  id: string;
-  templateId: string | null;
-  templateName: string | null;
-  resendId: string | null;
-  toEmail: string;
-  subject: string;
-  status: string;
-  errorMessage: string | null;
-  createdAt: string;
-  deliveredAt: string | null;
-};
-
-export type EmailCenterStats = {
-  totalSent: number;
-  totalDelivered: number;
-  totalFailed: number;
-  deliveryRate: number;
-};
+import type {
+  EmailCenterStats,
+  EmailSendLogRow,
+  EmailTemplateRow,
+} from "./types";
 
 export async function fetchEmailCenterDataAction(): Promise<
   | {
