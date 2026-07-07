@@ -6,7 +6,7 @@ export const GOOGLE_CALENDAR_MESSAGES = {
     "Your OrzuX schedule for bookings, events, and tasks. Connect Google Calendar optionally to sync external events.",
   connectTitle: "Connect Google Calendar",
   connectDescription:
-    "Link the calendar you already use. OrzuAI reads your real availability and can book appointments from customer chats.",
+    "Link the calendar you already use. OrzuX reads your real availability and can book appointments from customer chats.",
   connectButton: "Connect Google Calendar",
   reconnectButton: "Reconnect",
   connectedAs: "Connected as",

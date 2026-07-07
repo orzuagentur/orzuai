@@ -1,16 +1,15 @@
 import "server-only";
 
-import {
-  getResendApiKey,
-  getResendFromEmail,
-  hasResendEnv,
-} from "@/lib/env";
+import { getAdminTemplateFromAddress } from "@/lib/email/resolve-template-from";
+
+import { getResendApiKey, hasResendEnv } from "@/lib/env";
 
 type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
   templateId?: string | null;
+  from?: string | null;
   userId?: string | null;
   businessId?: string | null;
   metadata?: Record<string, unknown>;
@@ -60,7 +59,9 @@ export async function sendAdminEmail(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: getResendFromEmail(),
+      from:
+        input.from?.trim() ||
+        (await getAdminTemplateFromAddress(input.templateId)),
       to: [input.to],
       subject: input.subject,
       html: input.html,

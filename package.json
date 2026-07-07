@@ -19,6 +19,7 @@
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
     "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",
+    "setup:stripe": "npx tsx scripts/setup-stripe-webhook.ts",
     "postinstall": "patch-package",
     "voice-stream": "npm run start --workspace=@orzu/voice-stream",
     "dev:voice-stream": "npm run dev --workspace=@orzu/voice-stream"

@@ -5,7 +5,8 @@ export type EmailTemplateCategory =
   | "booking"
   | "team"
   | "system"
-  | "admin";
+  | "admin"
+  | "billing";
 
 export type EmailTemplateDefinition = {
   id: string;
@@ -36,6 +37,20 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     category: "auth",
     description: "Password recovery link.",
     defaultSubject: "Reset your OrzuX password",
+  },
+  {
+    id: "password_changed",
+    name: "Password changed",
+    category: "auth",
+    description: "Sent when a user updates their account password.",
+    defaultSubject: "Your OrzuX password was changed",
+  },
+  {
+    id: "new_device_login",
+    name: "New device sign-in",
+    category: "auth",
+    description: "Sent when a user signs in from a new browser or device.",
+    defaultSubject: "New sign-in to your OrzuX account",
   },
   {
     id: "google_welcome",
@@ -99,6 +114,48 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     category: "system",
     description: "Global email to all platform users from OrzuX.",
     defaultSubject: "Message from OrzuX",
+  },
+  {
+    id: "subscription_purchased",
+    name: "Subscription purchased",
+    category: "billing",
+    description: "Sent when a business subscribes to a paid plan.",
+    defaultSubject: "Your OrzuX subscription is active",
+  },
+  {
+    id: "subscription_renewed",
+    name: "Subscription renewed",
+    category: "billing",
+    description: "Sent when a monthly subscription payment succeeds.",
+    defaultSubject: "Your OrzuX subscription was renewed",
+  },
+  {
+    id: "subscription_plan_changed",
+    name: "Subscription plan changed",
+    category: "billing",
+    description: "Sent when a business upgrades or downgrades its plan.",
+    defaultSubject: "Your OrzuX plan was updated",
+  },
+  {
+    id: "payment_card_failed",
+    name: "Card payment failed",
+    category: "billing",
+    description: "Sent when a subscription card payment fails.",
+    defaultSubject: "Action required: your OrzuX payment failed",
+  },
+  {
+    id: "payment_bank_failed",
+    name: "Bank debit payment failed",
+    category: "billing",
+    description: "Sent when a subscription bank debit payment fails.",
+    defaultSubject: "Action required: your OrzuX bank payment failed",
+  },
+  {
+    id: "card_expiring",
+    name: "Card expiring soon",
+    category: "billing",
+    description: "Sent when the default payment card is expiring soon.",
+    defaultSubject: "Your OrzuX payment card is expiring soon",
   },
 ];
 

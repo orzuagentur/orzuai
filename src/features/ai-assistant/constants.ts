@@ -127,7 +127,7 @@ export const AI_ASSISTANT_MESSAGES = {
   wizardStep4Title: "Review and create",
   wizardStep4Description:
     "Confirm the name, instructions, and routing. Enable when you are ready to go live.",
-  wizardBillingPlatformTitle: "OrzuAI Platform AI",
+  wizardBillingPlatformTitle: "OrzuX Platform AI",
   wizardBillingPlatformDescription: "Included in your plan. No API setup required.",
   wizardBillingPlatformBadge: "Recommended",
   wizardBillingPlatformPoint1: "Ready to use immediately",
@@ -143,7 +143,7 @@ export const AI_ASSISTANT_MESSAGES = {
   wizardStep3NoPlatform:
     "Platform AI is not available in this environment. Connect your own API key to continue.",
   wizardStep3PlatformProviderHint:
-    "Select a provider included with OrzuAI.",
+    "Select a provider included with OrzuX.",
   wizardStep3OwnProviderHint:
     "Choose a provider, then enter your API key below.",
   wizardStep3SavingKey: "Saving API key…",
@@ -201,7 +201,7 @@ export const AI_ASSISTANT_MESSAGES = {
       ? "1 provider ready. Choose which one powers this agent."
       : `${count} providers ready. Choose which one powers this agent.`,
   aiProviderMissingEnv: (envKey: string) => `Add ${envKey} to enable`,
-  aiProviderPlatformIncluded: "Included with OrzuAI",
+  aiProviderPlatformIncluded: "Included with OrzuX",
   aiProviderOwnKey: "Your API key",
   aiProviderAddOwnKey: "Add your API key in agent settings",
   aiCustomModelLabel: "Use custom model ID",

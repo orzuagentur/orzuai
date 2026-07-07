@@ -1,17 +1,17 @@
 import {
   DRIP_CONTENT,
   type OnboardingDripDay,
-} from "@/lib/email/drip-schedule";
+} from "../drip-schedule";
 import {
   renderEmailHeading,
   renderEmailParagraph,
   renderFallbackLink,
   renderPrimaryButton,
-} from "@/lib/email/components";
-import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
-import { escapeHtml } from "@/utils/email";
+} from "../components";
+import { renderBaseEmailLayout } from "./base-layout";
+import { escapeHtml } from "../../../utils/email";
 
-export type { OnboardingDripDay } from "@/lib/email/drip-schedule";
+export type { OnboardingDripDay } from "../drip-schedule";
 
 type OnboardingDripEmailParams = {
   dripDay: OnboardingDripDay;

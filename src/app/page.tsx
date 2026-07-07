@@ -30,7 +30,7 @@ export async function generateMetadata({
     description: copy.meta.description,
     keywords: [
       "OrzuX",
-      "OrzuAI",
+      "OrzuX",
       "AI business communication platform",
       "AI customer support",
       "unified AI inbox",

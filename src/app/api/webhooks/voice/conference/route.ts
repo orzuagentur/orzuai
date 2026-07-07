@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
 import {
   isTwilioWebhookSignatureValid,
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
+import { resolveTwilioWebhookValidationContext } from "@/services/twilio-integration.service";
 import { handleTwilioConferenceEvent } from "@/services/voice-inbox.service";
 
 export async function POST(request: NextRequest) {
@@ -26,14 +26,16 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Missing parentCallSid", { status: 400 });
   }
 
-  const authToken = getTwilioPlatformAuthToken() ?? null;
+  const validation = await resolveTwilioWebhookValidationContext(businessId);
 
   if (
+    !validation?.authToken ||
     !isTwilioWebhookSignatureValid({
       request,
       params,
-      authToken,
+      authToken: validation.authToken,
       businessId,
+      expectedAccountSid: validation.expectedAccountSid,
     })
   ) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });

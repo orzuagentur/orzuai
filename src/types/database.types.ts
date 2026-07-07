@@ -32,6 +32,10 @@ export type TwilioConnectionStatus =
   | "disconnected"
   | "authorized";
 
+export type TwilioBillingOwner = "customer" | "platform";
+
+export type TwilioAuthMode = "connect" | "api_key";
+
 export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
 
 export type WebsiteFormFollowUp =
@@ -127,6 +131,7 @@ export type Database = {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           subscription_addons: Json;
+          twilio_wallet_balance_cents: number;
           created_at: string;
           updated_at: string;
         };
@@ -145,6 +150,7 @@ export type Database = {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
+          twilio_wallet_balance_cents?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -163,6 +169,7 @@ export type Database = {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
+          twilio_wallet_balance_cents?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -585,6 +592,9 @@ export type Database = {
           id: string;
           business_id: string;
           amount_cents: number;
+          credited_cents: number;
+          fee_cents: number;
+          charged_cents: number | null;
           stripe_payment_intent_id: string | null;
           status: string;
           created_at: string;
@@ -593,6 +603,9 @@ export type Database = {
           id?: string;
           business_id: string;
           amount_cents: number;
+          credited_cents: number;
+          fee_cents?: number;
+          charged_cents?: number | null;
           stripe_payment_intent_id?: string | null;
           status: string;
           created_at?: string;
@@ -601,6 +614,9 @@ export type Database = {
           id?: string;
           business_id?: string;
           amount_cents?: number;
+          credited_cents?: number;
+          fee_cents?: number;
+          charged_cents?: number | null;
           stripe_payment_intent_id?: string | null;
           status?: string;
           created_at?: string;
@@ -608,6 +624,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "twilio_balance_topups_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      twilio_wallet_debits: {
+        Row: {
+          id: string;
+          business_id: string;
+          amount_cents: number;
+          source_type: string;
+          source_id: string | null;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          amount_cents: number;
+          source_type: string;
+          source_id?: string | null;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          amount_cents?: number;
+          source_type?: string;
+          source_id?: string | null;
+          description?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "twilio_wallet_debits_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
@@ -683,6 +737,7 @@ export type Database = {
           description: string;
           subject_template: string;
           body_html_template: string | null;
+          from_email: string | null;
           is_active: boolean;
           is_system: boolean;
           created_at: string;
@@ -695,6 +750,7 @@ export type Database = {
           description?: string;
           subject_template: string;
           body_html_template?: string | null;
+          from_email?: string | null;
           is_active?: boolean;
           is_system?: boolean;
           created_at?: string;
@@ -707,10 +763,194 @@ export type Database = {
           description?: string;
           subject_template?: string;
           body_html_template?: string | null;
+          from_email?: string | null;
           is_active?: boolean;
           is_system?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      marketing_templates: {
+        Row: {
+          id: string;
+          name: string;
+          subject_template: string;
+          headline: string;
+          greeting: string;
+          body_template: string;
+          cta_label: string;
+          cta_url: string;
+          from_email: string;
+          feature_highlights: Json;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          name?: string;
+          subject_template: string;
+          headline: string;
+          greeting?: string;
+          body_template: string;
+          cta_label?: string;
+          cta_url?: string;
+          from_email?: string;
+          feature_highlights?: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          subject_template?: string;
+          headline?: string;
+          greeting?: string;
+          body_template?: string;
+          cta_label?: string;
+          cta_url?: string;
+          from_email?: string;
+          feature_highlights?: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      marketing_campaigns: {
+        Row: {
+          id: string;
+          name: string;
+          subject: string;
+          template_snapshot: Json;
+          from_email: string;
+          sent_count: number;
+          failed_count: number;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name?: string;
+          subject: string;
+          template_snapshot?: Json;
+          from_email?: string;
+          sent_count?: number;
+          failed_count?: number;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          subject?: string;
+          template_snapshot?: Json;
+          from_email?: string;
+          sent_count?: number;
+          failed_count?: number;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      marketing_campaign_recipients: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          business_id: string | null;
+          recipient_email: string;
+          recipient_name: string;
+          tracking_token: string;
+          status: string;
+          sent_at: string | null;
+          opened_at: string | null;
+          clicked_at: string | null;
+          open_count: number;
+          click_count: number;
+          resend_id: string | null;
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          business_id?: string | null;
+          recipient_email: string;
+          recipient_name?: string;
+          tracking_token: string;
+          status?: string;
+          sent_at?: string | null;
+          opened_at?: string | null;
+          clicked_at?: string | null;
+          open_count?: number;
+          click_count?: number;
+          resend_id?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          business_id?: string | null;
+          recipient_email?: string;
+          recipient_name?: string;
+          tracking_token?: string;
+          status?: string;
+          sent_at?: string | null;
+          opened_at?: string | null;
+          clicked_at?: string | null;
+          open_count?: number;
+          click_count?: number;
+          resend_id?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaign_recipients_campaign_id_fkey";
+            columns: ["campaign_id"];
+            isOneToOne: false;
+            referencedRelation: "marketing_campaigns";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketing_campaign_recipients_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      user_auth_devices: {
+        Row: {
+          id: string;
+          user_id: string;
+          device_fingerprint: string;
+          device_label: string;
+          user_agent: string | null;
+          last_ip: string | null;
+          first_seen_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          device_fingerprint: string;
+          device_label: string;
+          user_agent?: string | null;
+          last_ip?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          device_fingerprint?: string;
+          device_label?: string;
+          user_agent?: string | null;
+          last_ip?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
         };
         Relationships: [];
       };
@@ -781,7 +1021,17 @@ export type Database = {
           id: string;
           business_id: string;
           twilio_status: TwilioConnectionStatus;
+          auth_mode: TwilioAuthMode;
+          billing_owner: TwilioBillingOwner;
           connected_account_sid: string | null;
+          parent_account_sid: string | null;
+          api_key_sid: string | null;
+          api_key_secret_key_name: string | null;
+          auth_token_secret_key_name: string | null;
+          browser_twiml_app_sid: string | null;
+          browser_phone_status: string;
+          browser_phone_last_error: string | null;
+          browser_phone_provisioned_at: string | null;
           account_friendly_name: string | null;
           phone_number: string | null;
           phone_sid: string | null;
@@ -794,7 +1044,17 @@ export type Database = {
           id?: string;
           business_id: string;
           twilio_status?: TwilioConnectionStatus;
+          auth_mode?: TwilioAuthMode;
+          billing_owner?: TwilioBillingOwner;
           connected_account_sid?: string | null;
+          parent_account_sid?: string | null;
+          api_key_sid?: string | null;
+          api_key_secret_key_name?: string | null;
+          auth_token_secret_key_name?: string | null;
+          browser_twiml_app_sid?: string | null;
+          browser_phone_status?: string;
+          browser_phone_last_error?: string | null;
+          browser_phone_provisioned_at?: string | null;
           account_friendly_name?: string | null;
           phone_number?: string | null;
           phone_sid?: string | null;
@@ -807,7 +1067,17 @@ export type Database = {
           id?: string;
           business_id?: string;
           twilio_status?: TwilioConnectionStatus;
+          auth_mode?: TwilioAuthMode;
+          billing_owner?: TwilioBillingOwner;
           connected_account_sid?: string | null;
+          parent_account_sid?: string | null;
+          api_key_sid?: string | null;
+          api_key_secret_key_name?: string | null;
+          auth_token_secret_key_name?: string | null;
+          browser_twiml_app_sid?: string | null;
+          browser_phone_status?: string;
+          browser_phone_last_error?: string | null;
+          browser_phone_provisioned_at?: string | null;
           account_friendly_name?: string | null;
           phone_number?: string | null;
           phone_sid?: string | null;
@@ -3971,6 +4241,7 @@ export type Database = {
       email_connection_status: EmailConnectionStatus;
       google_calendar_status: GoogleCalendarStatus;
       twilio_connection_status: TwilioConnectionStatus;
+      twilio_auth_mode: TwilioAuthMode;
       website_form_status: WebsiteFormStatus;
       website_form_follow_up: WebsiteFormFollowUp;
       website_knowledge_sync_status: WebsiteKnowledgeSyncStatus;

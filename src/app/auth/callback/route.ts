@@ -6,11 +6,13 @@ import {
   hasOnboardingDripAnchor,
   triggerGoogleWelcomeEmail,
 } from "@/services/onboarding-drip.service";
+import { handlePostLoginSecurityNotify } from "@/services/auth-security-email.service";
 import { authCallbackQuerySchema } from "@/types/auth.types";
 import {
   getSafeRedirectPath,
   shouldUseVerifySuccessRedirect,
 } from "@/utils/auth";
+import { getLoginContextFromRequest } from "@/utils/request-login-context";
 import { resolveAuthenticatedLandingPathForUser } from "@/utils/post-auth-redirect";
 
 const NEW_USER_WINDOW_MS = 10 * 60 * 1000;
@@ -124,6 +126,16 @@ export async function GET(request: NextRequest) {
 
   if (user) {
     await maybeSendGoogleWelcomeEmail(user);
+
+    if (user.email) {
+      const loginContext = getLoginContextFromRequest(request);
+      void handlePostLoginSecurityNotify({
+        userId: user.id,
+        email: user.email,
+        userAgent: loginContext.userAgent,
+        ipAddress: loginContext.ipAddress,
+      });
+    }
   }
 
   const redirectPath = user

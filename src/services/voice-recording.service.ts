@@ -1,6 +1,10 @@
 import "server-only";
 
 import { buildRecordingStatusCallbackUrl, withCallRecording } from "@/lib/voice/twiml";
+import {
+  buildTwilioApiAuthorizationHeader,
+  hasTwilioApiCredentials,
+} from "@/lib/twilio/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
 import {
@@ -49,6 +53,19 @@ export async function handleTwilioRecordingStatusUpdate(input: {
     return { callLogId: null };
   }
 
+  if (callLog.business_id !== input.businessId) {
+    console.warn(
+      "[voice-recording] ignored recording update for mismatched business",
+      JSON.stringify({
+        expectedBusinessId: callLog.business_id,
+        receivedBusinessId: input.businessId,
+        callSid: input.callSid,
+        recordingSid: input.recordingSid,
+      }),
+    );
+    return { callLogId: null };
+  }
+
   await repo.updateCallLog(callLog.id, {
     recordingUrl: input.recordingUrl,
     recordingSid: input.recordingSid,
@@ -65,21 +82,17 @@ export async function downloadTwilioRecordingAudio(input: {
   | { success: false; message: string }
 > {
   const connection = await getTwilioConnection(input.businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
-  if (!credentials?.accountSid || !credentials.authToken) {
+  if (!hasTwilioApiCredentials(credentials)) {
     return { success: false, message: "Twilio credentials missing." };
   }
 
   const recordingUrl = input.recordingUrl.endsWith(".mp3")
     ? input.recordingUrl
     : `${input.recordingUrl}.mp3`;
-  const authHeader = `Basic ${Buffer.from(
-    `${credentials.accountSid}:${credentials.authToken}`,
-  ).toString("base64")}`;
-
   const response = await fetch(recordingUrl, {
-    headers: { Authorization: authHeader },
+    headers: { Authorization: buildTwilioApiAuthorizationHeader(credentials) },
     cache: "no-store",
   });
 

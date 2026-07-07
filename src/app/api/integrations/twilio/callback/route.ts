@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const parsedState = verifyTwilioConnectState(state);
+  const parsedState = await verifyTwilioConnectState(state);
 
   if (!parsedState) {
     return NextResponse.redirect(

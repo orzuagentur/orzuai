@@ -19,7 +19,7 @@ export function buildWebsiteSchema(locale: LandingLocale) {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "OrzuX",
-    alternateName: "OrzuAI",
+    alternateName: "OrzuX",
     url: buildLandingPageUrl(locale),
     inLanguage: locale,
     description: copy.meta.description,

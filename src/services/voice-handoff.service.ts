@@ -13,10 +13,10 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
 import {
   getTwilioConnection,
+  isBrowserPhoneSupportedForTwilioConnection,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
-import { hasTwilioVoiceClientEnv } from "@/lib/twilio/access-token";
 import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 
 export async function buildHandoffAgentTwiml(
@@ -47,10 +47,12 @@ export async function handoffActiveVoiceCallToAgent(input: {
     return { success: false, message: "Configuration missing." };
   }
 
-  if (!hasTwilioVoiceClientEnv()) {
+  const connection = await getTwilioConnection(input.businessId);
+
+  if (!isBrowserPhoneSupportedForTwilioConnection(connection)) {
     return {
       success: false,
-      message: "Browser calling is not configured on this platform.",
+      message: "Browser calling is not provisioned for this Twilio connection.",
     };
   }
 
@@ -65,8 +67,7 @@ export async function handoffActiveVoiceCallToAgent(input: {
     return { success: false, message: "Call is no longer active." };
   }
 
-  const connection = await getTwilioConnection(input.businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
   if (!credentials?.accountSid || !credentials.authToken) {
     return { success: false, message: "Twilio credentials missing." };

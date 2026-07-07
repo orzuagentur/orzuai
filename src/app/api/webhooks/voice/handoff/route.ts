@@ -4,11 +4,7 @@ import {
   isTwilioWebhookSignatureValid,
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
-import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
-import {
-  getTwilioConnection,
-  resolveTwilioCredentialsForBusiness,
-} from "@/services/twilio-integration.service";
+import { resolveTwilioWebhookValidationContext } from "@/services/twilio-integration.service";
 import { buildHandoffAgentTwiml } from "@/services/voice-handoff.service";
 
 export async function POST(request: NextRequest) {
@@ -19,17 +15,16 @@ export async function POST(request: NextRequest) {
   }
 
   const params = await readTwilioRequestParams(request);
-  const connection = await getTwilioConnection(businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
-  const authToken =
-    credentials?.authToken ?? getTwilioPlatformAuthToken() ?? null;
+  const validation = await resolveTwilioWebhookValidationContext(businessId);
 
   if (
+    !validation?.authToken ||
     !isTwilioWebhookSignatureValid({
       request,
       params,
-      authToken,
+      authToken: validation.authToken,
       businessId,
+      expectedAccountSid: validation.expectedAccountSid,
     })
   ) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });

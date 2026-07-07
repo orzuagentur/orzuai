@@ -27,10 +27,13 @@ export type VoiceConnectionData = {
   lastSyncedAt: string | null;
   accountFriendlyName: string | null;
   pendingPhoneSelection: boolean;
+  authMode: "connect" | "api_key" | null;
 };
 
 export type VoiceConnectConfig = {
   isConfigured: boolean;
+  connectOAuthEnabled: boolean;
+  manualConnectEnabled: boolean;
   aiConfigured: boolean;
   connectUrl: string;
   authorizeRedirectUri: string;

@@ -1,6 +1,7 @@
 "use server";
 
 import { updatePassword } from "@/services/auth.service";
+import { notifyPasswordChanged } from "@/services/auth-security-email.service";
 import type {
   PasswordUpdateResult,
   ResetPasswordInput,
@@ -22,7 +23,25 @@ export async function updatePasswordAction(
     };
   }
 
-  return updatePassword({
+  const result = await updatePassword({
     password: parsed.data.password,
   });
+
+  if (result.success) {
+    const supabase = await import("@/lib/supabase/server").then((mod) =>
+      mod.createClient(),
+    );
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user?.email) {
+      void notifyPasswordChanged({
+        userId: user.id,
+        email: user.email,
+      });
+    }
+  }
+
+  return result;
 }

@@ -33,6 +33,7 @@ import { createBillingPortalAction } from "@/features/subscription/actions/creat
 import { changeSubscriptionPlanAction } from "@/features/subscription/actions/change-subscription-plan";
 import { syncSubscriptionAction } from "@/features/subscription/actions/sync-subscription";
 import { purchaseSubscriptionAddonAction } from "@/features/subscription/actions/purchase-subscription-addon";
+import { updatePaymentMethodAction } from "@/features/subscription/actions/update-payment-method";
 import { PASS_THROUGH_SERVICES } from "@/features/subscription/add-ons";
 import { SUBSCRIPTION_MESSAGES } from "@/features/subscription/constants";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -208,6 +209,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingAddon, setLoadingAddon] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const [, startTransition] = useTransition();
 
   const aiUsageLabel = isUnlimitedAiReplies(data.monthlyLimit)
@@ -226,9 +228,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
 
     if (checkout === "success" || payment === "updated") {
       startTransition(async () => {
-        if (checkout === "success") {
-          await syncSubscriptionAction();
-        }
+        await syncSubscriptionAction();
 
         toast.success(
           payment === "updated"
@@ -302,6 +302,23 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
       router.refresh();
     } finally {
       setLoadingAddon(null);
+    }
+  }
+
+  async function handleUpdatePaymentMethod() {
+    setIsUpdatingPaymentMethod(true);
+
+    try {
+      const result = await updatePaymentMethodAction();
+
+      if (!result.success) {
+        toast.error(result.message ?? "Unable to update payment method.");
+        return;
+      }
+
+      window.location.href = result.url;
+    } finally {
+      setIsUpdatingPaymentMethod(false);
     }
   }
 
@@ -408,28 +425,56 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {data.hasStripeCustomer ? (
-              <Button
-                type="button"
-                className="w-full justify-between"
-                variant="secondary"
-                disabled={isOpeningPortal || !data.stripeConfigured}
-                onClick={() => {
-                  void handleManageBilling();
-                }}
-              >
-                <span className="inline-flex items-center gap-2">
-                  {isOpeningPortal ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <ReceiptTextIcon className="size-4" />
-                  )}
-                  {isOpeningPortal
-                    ? "Opening billing portal"
-                    : SUBSCRIPTION_MESSAGES.manageBilling}
-                </span>
-                {!isOpeningPortal ? <ArrowUpRightIcon className="size-4" /> : null}
-              </Button>
+            {data.stripeConfigured && data.hasBusiness ? (
+              <>
+                <Button
+                  type="button"
+                  className="w-full justify-between"
+                  variant="secondary"
+                  disabled={isUpdatingPaymentMethod}
+                  onClick={() => {
+                    void handleUpdatePaymentMethod();
+                  }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {isUpdatingPaymentMethod ? (
+                      <Loader2Icon className="size-4 animate-spin" />
+                    ) : (
+                      <CreditCardIcon className="size-4" />
+                    )}
+                    {isUpdatingPaymentMethod
+                      ? "Opening payment update"
+                      : "Update payment method"}
+                  </span>
+                  {!isUpdatingPaymentMethod ? (
+                    <ArrowUpRightIcon className="size-4" />
+                  ) : null}
+                </Button>
+
+                {data.hasStripeCustomer ? (
+                  <Button
+                    type="button"
+                    className="w-full justify-between"
+                    variant="outline"
+                    disabled={isOpeningPortal}
+                    onClick={() => {
+                      void handleManageBilling();
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      {isOpeningPortal ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        <ReceiptTextIcon className="size-4" />
+                      )}
+                      {isOpeningPortal
+                        ? "Opening billing portal"
+                        : SUBSCRIPTION_MESSAGES.manageBilling}
+                    </span>
+                    {!isOpeningPortal ? <ArrowUpRightIcon className="size-4" /> : null}
+                  </Button>
+                ) : null}
+              </>
             ) : (
               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                 Free plan - no payment method required.

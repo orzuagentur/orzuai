@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { MailIcon, PlusIcon, SendIcon } from "lucide-react";
+import { MailIcon, EyeIcon, PlusIcon, SendHorizonalIcon, SendIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -9,10 +9,13 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
+  EMAIL_FROM_PRESET_OPTIONS,
   createEmailTemplateAction,
   fetchEmailCenterDataAction,
+  previewEmailTemplateAction,
   saveEmailTemplateAction,
   sendPlatformBroadcastAction,
+  sendTestEmailTemplateAction,
   type EmailSendLogRow,
   type EmailTemplateRow,
 } from "@/features/email-center/actions";
@@ -26,7 +29,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   team: "Team",
   system: "System",
   admin: "Admin",
+  billing: "Billing",
 };
+
+const PRESET_FROM_KEYS = new Set(["security", "billing", "hello", "noreply"]);
+
+function resolveFromPresetValue(fromEmail: string | null): {
+  preset: string;
+  customEmail: string;
+} {
+  if (!fromEmail?.trim()) {
+    return { preset: "default", customEmail: "" };
+  }
+
+  if (PRESET_FROM_KEYS.has(fromEmail.trim())) {
+    return { preset: fromEmail.trim(), customEmail: "" };
+  }
+
+  return { preset: "custom", customEmail: fromEmail.trim() };
+}
 
 const LOG_STATUS_TONE: Record<string, "success" | "warning" | "danger" | "default"> = {
   sent: "default",
@@ -55,6 +76,8 @@ export function EmailCenterPanel() {
   const [editDescription, setEditDescription] = useState("");
   const [editSubject, setEditSubject] = useState("");
   const [editBody, setEditBody] = useState("");
+  const [editFromPreset, setEditFromPreset] = useState("default");
+  const [editFromCustom, setEditFromCustom] = useState("");
   const [editActive, setEditActive] = useState(true);
 
   const [newId, setNewId] = useState("");
@@ -69,6 +92,12 @@ export function EmailCenterPanel() {
   const [broadcastBody, setBroadcastBody] = useState("");
   const [broadcastActionUrl, setBroadcastActionUrl] = useState("");
   const [broadcastActionLabel, setBroadcastActionLabel] = useState("");
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSubject, setPreviewSubject] = useState("");
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewFrom, setPreviewFrom] = useState("");
+  const [testEmail, setTestEmail] = useState("");
 
   const selectedTemplate = templates.find((item) => item.id === selectedTemplateId) ?? null;
 
@@ -102,6 +131,9 @@ export function EmailCenterPanel() {
     setEditDescription(selectedTemplate.description);
     setEditSubject(selectedTemplate.subjectTemplate);
     setEditBody(selectedTemplate.bodyHtmlTemplate ?? "");
+    const fromPreset = resolveFromPresetValue(selectedTemplate.fromEmail);
+    setEditFromPreset(fromPreset.preset);
+    setEditFromCustom(fromPreset.customEmail);
     setEditActive(selectedTemplate.isActive);
   }, [selectedTemplate]);
 
@@ -118,6 +150,12 @@ export function EmailCenterPanel() {
         description: editDescription,
         subjectTemplate: editSubject,
         bodyHtmlTemplate: editBody || null,
+        fromEmail:
+          editFromPreset === "custom"
+            ? editFromCustom
+            : editFromPreset === "default"
+              ? null
+              : editFromPreset,
         isActive: editActive,
       });
 
@@ -196,11 +234,58 @@ export function EmailCenterPanel() {
     });
   };
 
+  const handlePreviewTemplate = () => {
+    if (!selectedTemplate) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await previewEmailTemplateAction({
+        templateId: selectedTemplate.id,
+        subjectOverride: editSubject,
+        bodyHtmlOverride: editBody || null,
+      });
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      setPreviewSubject(result.subject);
+      setPreviewHtml(result.html);
+      setPreviewFrom(result.fromLabel);
+      setPreviewOpen(true);
+    });
+  };
+
+  const handleSendTestEmail = () => {
+    if (!selectedTemplate || !testEmail.trim()) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await sendTestEmailTemplateAction({
+        templateId: selectedTemplate.id,
+        toEmail: testEmail,
+        subjectOverride: editSubject,
+        bodyHtmlOverride: editBody || null,
+      });
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success(`Тест отправлен на ${testEmail.trim()}`);
+      load();
+    });
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Email Center"
-        description="Шаблоны, статистика доставки, журнал отправок и глобальные рассылки OrzuAI"
+        description="Шаблоны, статистика доставки, журнал отправок и глобальные рассылки OrzuX"
       />
 
       <div className="grid gap-3 sm:grid-cols-4">
@@ -348,6 +433,31 @@ export function EmailCenterPanel() {
                       placeholder="Оставьте пустым, чтобы использовать кодовый шаблон"
                     />
                   </label>
+                  <label className="block space-y-1">
+                    <span className="text-sm font-medium">Адрес отправителя (From)</span>
+                    <select
+                      value={editFromPreset}
+                      onChange={(event) => setEditFromPreset(event.target.value)}
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                    >
+                      {EMAIL_FROM_PRESET_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {editFromPreset === "custom" ? (
+                      <input
+                        value={editFromCustom}
+                        onChange={(event) => setEditFromCustom(event.target.value)}
+                        placeholder="billing@orzux.com"
+                        className="mt-2 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      />
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      Можно выбрать preset или указать свой адрес без изменения кода.
+                    </p>
+                  </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -356,14 +466,50 @@ export function EmailCenterPanel() {
                     />
                     Шаблон активен
                   </label>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={handleSaveTemplate}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                  >
-                    Сохранить
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handleSaveTemplate}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handlePreviewTemplate}
+                      className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    >
+                      <EyeIcon className="size-4" />
+                      Посмотреть шаблон
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                    <p className="text-sm font-medium">Тестовое письмо</p>
+                    <p className="text-xs text-muted-foreground">
+                      Отправит с адреса шаблона на указанный email. Тема будет с префиксом [TEST].
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(event) => setTestEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        className="flex h-10 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={isPending || !testEmail.trim()}
+                        onClick={handleSendTestEmail}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+                      >
+                        <SendHorizonalIcon className="size-4" />
+                        Отправить тест
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <EmptyState title="Выберите шаблон" description="Список слева" />
@@ -494,7 +640,7 @@ export function EmailCenterPanel() {
       {tab === "broadcast" ? (
         <SectionCard
           title="Глобальная рассылка"
-          description="Официальное письмо всем пользователям платформы с аккаунта OrzuAI"
+          description="Официальное письмо всем пользователям платформы с hello@orzux.com"
           icon={SendIcon}
         >
           <div className="grid gap-3 md:grid-cols-2">
@@ -504,7 +650,7 @@ export function EmailCenterPanel() {
                 value={broadcastSubject}
                 onChange={(event) => setBroadcastSubject(event.target.value)}
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                placeholder="Важное обновление OrzuAI"
+                placeholder="Важное обновление OrzuX"
               />
             </label>
             <label className="block space-y-1 md:col-span-2">
@@ -550,6 +696,32 @@ export function EmailCenterPanel() {
             Отправить всем пользователям
           </button>
         </SectionCard>
+      ) : null}
+
+      {previewOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-background shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Предпросмотр шаблона</p>
+                <p className="text-xs text-muted-foreground">{previewFrom}</p>
+                <p className="text-sm">{previewSubject}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+              >
+                Закрыть
+              </button>
+            </div>
+            <iframe
+              title="Email preview"
+              srcDoc={previewHtml}
+              className="min-h-[480px] w-full flex-1 bg-white"
+            />
+          </div>
+        </div>
       ) : null}
     </div>
   );

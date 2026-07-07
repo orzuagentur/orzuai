@@ -307,6 +307,18 @@ export async function handleTwilioCallStatusUpdate(input: {
     return;
   }
 
+  if (existing.business_id !== input.businessId) {
+    console.warn(
+      "[voice-inbox] ignored status update for mismatched business",
+      JSON.stringify({
+        expectedBusinessId: existing.business_id,
+        receivedBusinessId: input.businessId,
+        callSid: input.callSid,
+      }),
+    );
+    return;
+  }
+
   await guardAiOutboundOnMissedStatus({
     businessId: input.businessId,
     callSid: input.callSid,
@@ -423,6 +435,18 @@ export async function handleTwilioCustomerLegStatusUpdate(input: {
   const repo = getVoiceRepository();
   const callLog = await repo.findCallLogByExternalCallId(input.parentCallSid);
 
+  if (callLog && callLog.business_id !== input.businessId) {
+    console.warn(
+      "[voice-inbox] ignored customer leg update for mismatched business",
+      JSON.stringify({
+        expectedBusinessId: callLog.business_id,
+        receivedBusinessId: input.businessId,
+        parentCallSid: input.parentCallSid,
+      }),
+    );
+    return;
+  }
+
   if (callLog && isActiveVoiceCallStatus(callLog.status)) {
     const mappedStatus =
       input.callStatus === "completed" && callLog.status === "ringing"
@@ -476,6 +500,18 @@ export async function handleTwilioConferenceEvent(input: {
   const callLog = await repo.findCallLogByExternalCallId(input.parentCallSid);
 
   if (!callLog) {
+    return;
+  }
+
+  if (callLog.business_id !== input.businessId) {
+    console.warn(
+      "[voice-inbox] ignored conference event for mismatched business",
+      JSON.stringify({
+        expectedBusinessId: callLog.business_id,
+        receivedBusinessId: input.businessId,
+        parentCallSid: input.parentCallSid,
+      }),
+    );
     return;
   }
 
@@ -588,6 +624,18 @@ export async function recordClientOutboundVoiceCall(input: {
   const existing = await repo.findCallLogByExternalCallId(input.callSid);
 
   if (existing) {
+    if (existing.business_id !== input.businessId) {
+      console.warn(
+        "[voice-inbox] ignored browser outbound call for mismatched business",
+        JSON.stringify({
+          expectedBusinessId: existing.business_id,
+          receivedBusinessId: input.businessId,
+          callSid: input.callSid,
+        }),
+      );
+      return { callLogId: null };
+    }
+
     return { callLogId: existing.id };
   }
 
@@ -634,8 +682,24 @@ export async function syncVoiceCallToConversation(input: {
   const repo = getVoiceRepository();
   const callLog = await repo.findCallLogByExternalCallId(input.callSid);
 
-  if (!callLog || callLog.conversation_id) {
-    return callLog?.conversation_id ?? null;
+  if (!callLog) {
+    return null;
+  }
+
+  if (callLog.business_id !== input.businessId) {
+    console.warn(
+      "[voice-inbox] ignored conversation sync for mismatched business",
+      JSON.stringify({
+        expectedBusinessId: callLog.business_id,
+        receivedBusinessId: input.businessId,
+        callSid: input.callSid,
+      }),
+    );
+    return null;
+  }
+
+  if (callLog.conversation_id) {
+    return callLog.conversation_id;
   }
 
   const session = await repo.findSessionByCallSid(input.callSid);

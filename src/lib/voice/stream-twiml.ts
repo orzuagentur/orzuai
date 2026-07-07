@@ -28,7 +28,12 @@ export function buildMediaStreamConnectTwiml(input: {
     .filter(Boolean)
     .join("\n      ");
 
-  const signedUrl = input.wsUrl.trim();
+  const signedUrl = buildSignedStreamUrl({
+    wsUrl: input.wsUrl,
+    businessId: input.businessId,
+    callSid: input.callSid,
+    streamToken,
+  });
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -40,6 +45,23 @@ export function buildMediaStreamConnectTwiml(input: {
 </Response>`;
 
   return withCallRecording(twiml, input.recordingStatusCallback);
+}
+
+function buildSignedStreamUrl(input: {
+  wsUrl: string;
+  businessId: string;
+  callSid: string;
+  streamToken: string | null;
+}): string {
+  const url = new URL(input.wsUrl.trim());
+  url.searchParams.set("businessId", input.businessId);
+  url.searchParams.set("callSid", input.callSid);
+
+  if (input.streamToken) {
+    url.searchParams.set("streamToken", input.streamToken);
+  }
+
+  return url.toString();
 }
 
 function escapeXmlAttr(value: string): string {

@@ -1,15 +1,15 @@
 import {
   EMAIL_SUBJECTS,
   PLATFORM_FEATURE_HIGHLIGHTS,
-} from "@/lib/email/constants";
+} from "../constants";
 import {
   renderEmailHeading,
   renderEmailParagraph,
   renderFeatureList,
   renderPrimaryButton,
-} from "@/lib/email/components";
-import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
-import { escapeHtml } from "@/utils/email";
+} from "../components";
+import { renderBaseEmailLayout } from "./base-layout";
+import { escapeHtml } from "../../../utils/email";
 
 type GoogleWelcomeEmailParams = {
   dashboardUrl: string;

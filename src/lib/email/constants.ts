@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL } from "@/constants/app-origin";
+import { SUPPORT_EMAIL } from "../../constants/app-origin";
 
 export const EMAIL_APP_NAME = "OrzuX";
 

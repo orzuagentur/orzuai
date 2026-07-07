@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowUpRightIcon, MessageCircleIcon, PhoneIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { BillingPaymentMethodCard } from "@/components/billing/BillingPaymentMethodCard";
 import { SubscriptionHub } from "@/components/subscription/SubscriptionHub";
@@ -22,20 +24,34 @@ type BillingOverviewPanelProps = {
 };
 
 export function BillingOverviewPanel({ data }: BillingOverviewPanelProps) {
+  const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
+
+  async function handleUpdatePaymentMethod() {
+    setIsUpdatingPaymentMethod(true);
+
+    try {
+      const result = await updatePaymentMethodAction();
+
+      if (!result.success) {
+        toast.error(result.message ?? "Unable to update payment method.");
+        return;
+      }
+
+      window.location.href = result.url;
+    } finally {
+      setIsUpdatingPaymentMethod(false);
+    }
+  }
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.75fr)]">
         <BillingPaymentMethodCard
           paymentMethod={data.paymentMethod}
+          isManaging={isUpdatingPaymentMethod}
           onManage={
-            data.hasStripeCustomer
-              ? async () => {
-                  const result = await updatePaymentMethodAction();
-
-                  if (result.success) {
-                    window.location.href = result.url;
-                  }
-                }
+            data.stripeConfigured && data.hasBusiness
+              ? handleUpdatePaymentMethod
               : undefined
           }
         />

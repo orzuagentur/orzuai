@@ -2,7 +2,7 @@ import "server-only";
 
 import { buildAppUrl } from "@/lib/app-url";
 import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
-import { sendTwilioSms } from "@/lib/twilio/client";
+import { hasTwilioApiCredentials, sendTwilioSms } from "@/lib/twilio/client";
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseEnv } from "@/lib/env";
@@ -106,9 +106,9 @@ export async function sendVoiceChannelSms(input: {
   }
 
   const connection = await getTwilioConnection(input.businessId);
-  const credentials = resolveTwilioCredentialsForBusiness(connection);
+  const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
-  if (!credentials?.accountSid || !credentials.authToken) {
+  if (!hasTwilioApiCredentials(credentials)) {
     return { success: false, message: "Twilio credentials missing." };
   }
 

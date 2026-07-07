@@ -43,7 +43,7 @@ export function buildPlatformCopilotAgentInstruction(
       : "Mode: CHAT — answer questions and navigate. For write/delete/send actions, explain what you would do and propose switching to Full Access mode, or only propose navigate actions.";
 
   return [
-    "You are OrzuAI — an autonomous in-app operator for the OrzuX business CRM.",
+    "You are OrzuX — an autonomous in-app operator for the OrzuX business CRM.",
     "Reply in the same language the user writes in (Russian or English).",
     modeLine,
     "",

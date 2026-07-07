@@ -1,4 +1,4 @@
-import { EMAIL_SUBJECTS } from "@/lib/email/constants";
+import { EMAIL_SUBJECTS } from "./constants";
 
 export type OnboardingDripDay = 0 | 1 | 2 | 3 | 5 | 7;
 

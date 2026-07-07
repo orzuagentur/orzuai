@@ -4,8 +4,8 @@ import {
   isTwilioWebhookSignatureValid,
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
-import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
 import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
+import { resolveTwilioWebhookValidationContext } from "@/services/twilio-integration.service";
 import { buildClientOutboundTwiml } from "@/services/voice-client.service";
 
 export async function POST(request: NextRequest) {
@@ -18,14 +18,16 @@ export async function POST(request: NextRequest) {
   if (!businessId) {
     return new NextResponse("Missing businessId", { status: 400 });
   }
-  const authToken = getTwilioPlatformAuthToken() ?? null;
+  const validation = await resolveTwilioWebhookValidationContext(businessId);
 
   if (
+    !validation?.authToken ||
     !isTwilioWebhookSignatureValid({
       request,
       params,
-      authToken,
+      authToken: validation.authToken,
       businessId,
+      expectedAccountSid: validation.expectedAccountSid,
     })
   ) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });

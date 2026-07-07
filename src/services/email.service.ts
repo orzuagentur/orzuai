@@ -2,11 +2,24 @@ import "server-only";
 
 import { renderLeadFollowUpEmail } from "@/lib/email/templates/lead-follow-up-email";
 import { renderMagicLinkEmail } from "@/lib/email/templates/magic-link-email";
+import { renderNewDeviceLoginEmail } from "@/lib/email/templates/new-device-login-email";
+import { renderPasswordChangedEmail } from "@/lib/email/templates/password-changed-email";
 import { renderPasswordResetEmail } from "@/lib/email/templates/password-reset-email";
+import {
+  renderSubscriptionPlanChangedEmail,
+  renderSubscriptionPurchasedEmail,
+  renderSubscriptionRenewedEmail,
+} from "@/lib/email/templates/subscription-billing-email";
+import {
+  renderCardExpiringEmail,
+  renderPaymentBankFailedEmail,
+  renderPaymentCardFailedEmail,
+} from "@/lib/email/templates/payment-billing-email";
 import { renderSystemNotificationEmail } from "@/lib/email/templates/system-notification-email";
 import { renderTeamInviteEmail } from "@/lib/email/templates/team-invite-email";
 import { renderVerificationEmail } from "@/lib/email/templates/verification-email";
-import { getResendFromEmail, hasResendEnv } from "@/lib/env";
+import { getEmailFromAddressForTemplate } from "@/services/email-template-config.service";
+import { hasResendEnv } from "@/lib/env";
 import { getResendClient } from "@/lib/resend/client";
 import type {
   EmailServiceResult,
@@ -84,7 +97,7 @@ async function sendTransactionalEmail({
   }
 
   const response = await getResendClient().emails.send({
-    from: getResendFromEmail(),
+    from: await getEmailFromAddressForTemplate(templateId),
     to: [to],
     subject,
     html,
@@ -294,5 +307,214 @@ export async function sendSystemNotificationEmail(
     subject,
     html,
     templateId: "system_notification",
+  });
+}
+
+export async function sendPasswordChangedEmail(input: {
+  to: string;
+  userId: string;
+  changedAtLabel: string;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderPasswordChangedEmail({
+    changedAtLabel: input.changedAtLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "password_changed",
+    userId: input.userId,
+  });
+}
+
+export async function sendNewDeviceLoginEmail(input: {
+  to: string;
+  userId: string;
+  deviceLabel: string;
+  signedInAtLabel: string;
+  ipAddress?: string | null;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderNewDeviceLoginEmail({
+    deviceLabel: input.deviceLabel,
+    signedInAtLabel: input.signedInAtLabel,
+    ipAddress: input.ipAddress,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "new_device_login",
+    userId: input.userId,
+    metadata: { deviceLabel: input.deviceLabel },
+  });
+}
+
+export async function sendSubscriptionPurchasedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  planLabel: string;
+  amountLabel?: string | null;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderSubscriptionPurchasedEmail({
+    planLabel: input.planLabel,
+    amountLabel: input.amountLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "subscription_purchased",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: { planLabel: input.planLabel },
+  });
+}
+
+export async function sendSubscriptionRenewedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  planLabel: string;
+  amountLabel?: string | null;
+  billingPeriodLabel?: string | null;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderSubscriptionRenewedEmail({
+    planLabel: input.planLabel,
+    amountLabel: input.amountLabel,
+    billingPeriodLabel: input.billingPeriodLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "subscription_renewed",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: { planLabel: input.planLabel },
+  });
+}
+
+export async function sendSubscriptionPlanChangedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  planLabel: string;
+  previousPlanLabel?: string | null;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderSubscriptionPlanChangedEmail({
+    planLabel: input.planLabel,
+    previousPlanLabel: input.previousPlanLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "subscription_plan_changed",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: {
+      planLabel: input.planLabel,
+      previousPlanLabel: input.previousPlanLabel,
+    },
+  });
+}
+
+export async function sendPaymentCardFailedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  planLabel: string;
+  amountLabel?: string | null;
+  failureMessage?: string | null;
+  paymentMethodLabel: string;
+  dedupeKey: string;
+  stripeEventId: string;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderPaymentCardFailedEmail({
+    planLabel: input.planLabel,
+    amountLabel: input.amountLabel,
+    failureMessage: input.failureMessage,
+    paymentMethodLabel: input.paymentMethodLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "payment_card_failed",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: {
+      dedupeKey: input.dedupeKey,
+      stripeEventId: input.stripeEventId,
+    },
+  });
+}
+
+export async function sendPaymentBankFailedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  planLabel: string;
+  amountLabel?: string | null;
+  failureMessage?: string | null;
+  paymentMethodLabel: string;
+  dedupeKey: string;
+  stripeEventId: string;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderPaymentBankFailedEmail({
+    planLabel: input.planLabel,
+    amountLabel: input.amountLabel,
+    failureMessage: input.failureMessage,
+    paymentMethodLabel: input.paymentMethodLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "payment_bank_failed",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: {
+      dedupeKey: input.dedupeKey,
+      stripeEventId: input.stripeEventId,
+    },
+  });
+}
+
+export async function sendCardExpiringEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+  cardLabel: string;
+  expiryLabel: string;
+  planLabel?: string | null;
+  dedupeKey: string;
+  stripeEventId: string;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderCardExpiringEmail({
+    cardLabel: input.cardLabel,
+    expiryLabel: input.expiryLabel,
+    planLabel: input.planLabel,
+  });
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "card_expiring",
+    userId: input.userId,
+    businessId: input.businessId,
+    metadata: {
+      dedupeKey: input.dedupeKey,
+      stripeEventId: input.stripeEventId,
+    },
   });
 }

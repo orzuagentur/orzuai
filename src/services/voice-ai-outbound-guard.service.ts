@@ -29,7 +29,7 @@ const MACHINE_ANSWERED_BY = new Set([
 
 async function resolveTwilioCredentials(businessId: string) {
   const connection = await getTwilioConnection(businessId);
-  const resolved = resolveTwilioCredentialsForBusiness(connection);
+  const resolved = await resolveTwilioCredentialsForBusiness(connection);
   const platformAccountSid = getTwilioPlatformAccountSid();
   const platformAuthToken = getTwilioPlatformAuthToken();
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ExternalLinkIcon, Loader2Icon } from "lucide-react";
+import { ExternalLinkIcon, Loader2Icon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { BILLING_MESSAGES } from "@/features/billing/constants";
 import { createTwilioTopUpAction } from "@/features/billing/actions/create-twilio-topup";
+import { quoteTwilioTopUpAction } from "@/features/billing/actions/quote-twilio-topup";
+import { refreshTwilioBillingAction } from "@/features/billing/actions/refresh-twilio-billing";
 import { purchaseTwilioPhoneNumberAction } from "@/features/twilio/actions/purchase-phone-number";
 import { searchTwilioPhoneNumbersAction } from "@/features/twilio/actions/search-phone-numbers";
 import {
@@ -56,6 +58,22 @@ export function BillingTwilioPanel({
   const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("25");
   const [isToppingUp, setIsToppingUp] = useState(false);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
+  const [showTopUpForm, setShowTopUpForm] = useState(false);
+  const [topUpQuote, setTopUpQuote] = useState<{
+    creditCents: number;
+    feeCents: number;
+    chargedCents: number;
+    feePercent: number;
+  } | null>(null);
+  const [walletBalanceCents, setWalletBalanceCents] = useState(data.walletBalanceCents);
+  const [providerBalanceCents, setProviderBalanceCents] = useState<number | null>(
+    data.balanceCents,
+  );
+  const [balanceError, setBalanceError] = useState<string | null>(data.balanceError);
+  const [balanceUpdatedAt, setBalanceUpdatedAt] = useState<string | null>(
+    data.balanceUpdatedAt,
+  );
 
   const selectedPricing =
     TWILIO_COUNTRY_PRICING.find((entry) => entry.code === countryCode) ??
@@ -103,6 +121,84 @@ export function BillingTwilioPanel({
     }
   }
 
+  async function handleRefreshBalance() {
+    setIsRefreshingBalance(true);
+
+    try {
+      const result = await refreshTwilioBillingAction();
+
+      if (!result.success) {
+        toast.error("Unable to refresh Twilio balance.");
+        return;
+      }
+
+      setWalletBalanceCents(result.walletBalanceCents);
+      setProviderBalanceCents(result.balanceCents);
+      setBalanceError(result.balanceError);
+      setBalanceUpdatedAt(result.balanceUpdatedAt);
+
+      if (result.balanceError) {
+        toast.message("Twilio balance unavailable", {
+          description: result.balanceError,
+        });
+      } else {
+        toast.success("Twilio balance updated.");
+      }
+
+      router.refresh();
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  }
+
+  async function handleTopUpQuote(amount: string) {
+    const dollars = Number.parseFloat(amount);
+
+    if (Number.isNaN(dollars) || dollars < 5) {
+      setTopUpQuote(null);
+      return;
+    }
+
+    const result = await quoteTwilioTopUpAction({
+      creditCents: Math.round(dollars * 100),
+    });
+
+    if (result.success) {
+      setTopUpQuote(result.quote);
+    }
+  }
+
+  async function handleTopUp() {
+    const dollars = Number.parseFloat(topUpAmount);
+
+    if (Number.isNaN(dollars) || dollars < 5) {
+      toast.error("Minimum top-up is $5.");
+      return;
+    }
+
+    setIsToppingUp(true);
+
+    try {
+      const result = await createTwilioTopUpAction({
+        amountCents: Math.round(dollars * 100),
+      });
+
+      if (!result.success) {
+        toast.error(result.message ?? "Top-up failed.");
+        return;
+      }
+
+      window.location.href = result.url;
+    } finally {
+      setIsToppingUp(false);
+    }
+  }
+
+  const isCustomerBilling = data.billingOwner === "customer";
+  const displayBalanceCents = isCustomerBilling
+    ? providerBalanceCents
+    : walletBalanceCents;
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -122,17 +218,124 @@ export function BillingTwilioPanel({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="shadow-none">
+        <Card className="shadow-none sm:col-span-2 xl:col-span-2">
           <CardHeader className="pb-2">
-            <CardDescription>{BILLING_MESSAGES.twilioBalance}</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
-              {data.balanceCents !== null
-                ? formatCents(data.balanceCents)
-                : "—"}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardDescription>{BILLING_MESSAGES.twilioBalance}</CardDescription>
+                <CardTitle className="text-3xl tabular-nums">
+                  {displayBalanceCents !== null ? formatCents(displayBalanceCents) : "—"}
+                </CardTitle>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  disabled={isRefreshingBalance}
+                  onClick={() => {
+                    void handleRefreshBalance();
+                  }}
+                  aria-label={BILLING_MESSAGES.twilioBalanceRefresh}
+                >
+                  {isRefreshingBalance ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCwIcon className="size-4" />
+                  )}
+                </Button>
+                {data.isConnected && isCustomerBilling ? (
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <a
+                      href={data.twilioConsoleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {BILLING_MESSAGES.twilioConsoleTopUp}
+                    </a>
+                  </Button>
+                ) : null}
+                {data.isConnected && !isCustomerBilling ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowTopUpForm((current) => !current);
+                      if (!showTopUpForm) {
+                        void handleTopUpQuote(topUpAmount);
+                      }
+                    }}
+                  >
+                    {BILLING_MESSAGES.twilioTopUp}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            {data.isConnected ? "Live from Twilio API" : "Connect Twilio to view balance"}
+          <CardContent className="space-y-3 text-xs text-muted-foreground">
+            <p>
+              {isCustomerBilling
+                ? BILLING_MESSAGES.twilioBalanceDescription
+                : BILLING_MESSAGES.twilioCreditsDescription}
+            </p>
+            {data.balanceSource === "parent" ? (
+              <p>{BILLING_MESSAGES.twilioBalanceParentNote}</p>
+            ) : null}
+            {balanceError ? <p className="text-amber-700">{balanceError}</p> : null}
+            {balanceUpdatedAt ? (
+              <p>Updated {new Date(balanceUpdatedAt).toLocaleString()}</p>
+            ) : null}
+            {showTopUpForm && !isCustomerBilling ? (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="space-y-1">
+                    <Label htmlFor="twilio-topup-amount">Credit amount (USD)</Label>
+                    <Input
+                      id="twilio-topup-amount"
+                      type="number"
+                      min={5}
+                      step={5}
+                      value={topUpAmount}
+                      onChange={(event) => {
+                        setTopUpAmount(event.target.value);
+                        void handleTopUpQuote(event.target.value);
+                      }}
+                      className="w-32"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={isToppingUp}
+                    onClick={() => {
+                      void handleTopUp();
+                    }}
+                  >
+                    {isToppingUp ? <Loader2Icon className="size-4 animate-spin" /> : null}
+                    Continue to payment
+                  </Button>
+                </div>
+                {topUpQuote ? (
+                  <div className="mt-3 space-y-1 text-sm text-foreground">
+                    <p>
+                      Credit: {formatCents(topUpQuote.creditCents)} · Fee:{" "}
+                      {formatCents(topUpQuote.feeCents)} · Total:{" "}
+                      <span className="font-medium">
+                        {formatCents(topUpQuote.chargedCents)}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {BILLING_MESSAGES.twilioTopUpFeeNote(topUpQuote.feePercent)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs">
+                    {BILLING_MESSAGES.twilioTopUpFeeNote(data.topUpFeePercent)}
+                  </p>
+                )}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
         <Card className="shadow-none">
@@ -202,64 +405,7 @@ export function BillingTwilioPanel({
         </Card>
       </div>
 
-      {data.isConnected ? (
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle className="text-base">{BILLING_MESSAGES.twilioTopUp}</CardTitle>
-            <CardDescription>
-              Add funds to your connected Twilio account via OrzuAI billing.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="space-y-1">
-              <Label htmlFor="twilio-topup-amount">Amount (USD)</Label>
-              <Input
-                id="twilio-topup-amount"
-                type="number"
-                min={5}
-                step={5}
-                value={topUpAmount}
-                onChange={(event) => setTopUpAmount(event.target.value)}
-                className="w-32"
-              />
-            </div>
-            <Button
-              type="button"
-              disabled={isToppingUp}
-              onClick={async () => {
-                const dollars = Number.parseFloat(topUpAmount);
-
-                if (Number.isNaN(dollars) || dollars < 5) {
-                  toast.error("Minimum top-up is $5.");
-                  return;
-                }
-
-                setIsToppingUp(true);
-
-                try {
-                  const result = await createTwilioTopUpAction({
-                    amountCents: Math.round(dollars * 100),
-                  });
-
-                  if (!result.success) {
-                    toast.error(result.message ?? "Top-up failed.");
-                    return;
-                  }
-
-                  window.location.href = result.url;
-                } finally {
-                  setIsToppingUp(false);
-                }
-              }}
-            >
-              {isToppingUp ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              {BILLING_MESSAGES.twilioTopUp}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {!data.isConnected ? (
+      {data.isConnected ? null : (
         <Card className="shadow-none">
           <CardContent className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
@@ -272,13 +418,13 @@ export function BillingTwilioPanel({
             ) : null}
           </CardContent>
         </Card>
-      ) : null}
+      )}
 
       {data.numbers.length > 0 ? (
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="text-base">Active numbers</CardTitle>
-            <CardDescription>Billed monthly on your OrzuAI subscription.</CardDescription>
+            <CardDescription>Billed monthly on your OrzuX subscription.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.numbers.map((number) => (

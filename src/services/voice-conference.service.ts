@@ -1,8 +1,11 @@
 import "server-only";
 
-import { getTwilioPlatformAccountSid, getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
 import { completeTwilioCall, updateTwilioConferenceParticipant } from "@/lib/twilio/client";
 import { getVoiceRepository, type VoiceCallEventRow } from "@/repositories/voice.repository";
+import {
+  getTwilioConnection,
+  resolveTwilioCredentialsForBusiness,
+} from "@/services/twilio-integration.service";
 import type { Json } from "@/types/database.types";
 
 export type ConferenceParticipantAction =
@@ -108,15 +111,15 @@ export async function controlVoiceConferenceParticipant(input: {
     return { success: false, message: "Conference participant is not active." };
   }
 
-  const accountSid = getTwilioPlatformAccountSid();
-  const authToken = getTwilioPlatformAuthToken();
+  const connection = await getTwilioConnection(input.businessId);
+  const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
-  if (!accountSid || !authToken) {
-    return { success: false, message: "Twilio platform credentials are missing." };
+  if (!credentials) {
+    return { success: false, message: "Twilio credentials are missing." };
   }
 
   await updateTwilioConferenceParticipant({
-    credentials: { accountSid, authToken },
+    credentials,
     conferenceSid: input.conferenceSid,
     participantCallSid: input.participantCallSid,
     hold:
@@ -160,16 +163,16 @@ export async function completeOperatorCallAfterCustomerLeave(input: {
   businessId: string;
   parentCallSid: string;
 }): Promise<void> {
-  const accountSid = getTwilioPlatformAccountSid();
-  const authToken = getTwilioPlatformAuthToken();
+  const connection = await getTwilioConnection(input.businessId);
+  const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
-  if (!accountSid || !authToken || !input.parentCallSid.trim()) {
+  if (!credentials || !input.parentCallSid.trim()) {
     return;
   }
 
   try {
     await completeTwilioCall({
-      credentials: { accountSid, authToken },
+      credentials,
       callSid: input.parentCallSid.trim(),
     });
   } catch (error) {

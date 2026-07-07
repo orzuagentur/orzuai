@@ -1,12 +1,12 @@
-import { EMAIL_SUBJECTS } from "@/lib/email/constants";
+import { EMAIL_SUBJECTS } from "../constants";
 import {
   renderEmailHeading,
   renderEmailParagraph,
   renderFallbackLink,
   renderInfoBox,
   renderPrimaryButton,
-} from "@/lib/email/components";
-import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
+} from "../components";
+import { renderBaseEmailLayout } from "./base-layout";
 
 type PasswordResetEmailTemplateParams = {
   resetUrl: string;

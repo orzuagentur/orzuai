@@ -50,6 +50,39 @@ export function verifyStreamToken(input: {
   return timingSafeEqual(left, right);
 }
 
+export function validateTwilioRequestSignature(input: {
+  authToken: string;
+  signature: string | null | undefined;
+  url: string;
+  params?: Record<string, string>;
+}): boolean {
+  const signature = input.signature?.trim();
+
+  if (!signature) {
+    return false;
+  }
+
+  const sortedKeys = Object.keys(input.params ?? {}).sort();
+  let payload = input.url;
+
+  for (const key of sortedKeys) {
+    payload += key + (input.params?.[key] ?? "");
+  }
+
+  const expected = createHmac("sha1", input.authToken)
+    .update(payload, "utf8")
+    .digest("base64");
+
+  const left = Buffer.from(signature);
+  const right = Buffer.from(expected);
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return timingSafeEqual(left, right);
+}
+
 const MONITOR_TOKEN_TTL_SECONDS = 300;
 
 export type MonitorTokenClaims = {

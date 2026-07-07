@@ -175,7 +175,7 @@ export const ANALYTICS_MESSAGES = {
     "Platform AI replies included in your plan.",
   aiCostPlatformIncludedTitle: "Platform AI usage",
   aiCostPlatformIncludedDescription:
-    "AI replies powered by OrzuAI are included in your subscription.",
+    "AI replies powered by OrzuX are included in your subscription.",
   aiCostMonth: "This month",
   aiCostPerReply: "Avg cost per reply",
   aiCostEmpty:

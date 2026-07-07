@@ -11,6 +11,8 @@ const TWILIO_MONITOR_BASE = "https://monitor.twilio.com/v1";
 export type TwilioApiCredentials = {
   accountSid: string;
   authToken: string;
+  apiKeySid?: string;
+  apiKeySecret?: string;
 };
 
 type TwilioApiError = {
@@ -31,10 +33,23 @@ export class TwilioApiRequestError extends Error {
   }
 }
 
-function buildAuthHeader(credentials: TwilioApiCredentials): string {
-  return `Basic ${Buffer.from(
-    `${credentials.accountSid}:${credentials.authToken}`,
-  ).toString("base64")}`;
+export function hasTwilioApiCredentials(
+  credentials: TwilioApiCredentials | null | undefined,
+): credentials is TwilioApiCredentials {
+  return Boolean(
+    credentials?.accountSid &&
+      (credentials.authToken ||
+        (credentials.apiKeySid && credentials.apiKeySecret)),
+  );
+}
+
+export function buildTwilioApiAuthorizationHeader(
+  credentials: TwilioApiCredentials,
+): string {
+  const username = credentials.apiKeySid ?? credentials.accountSid;
+  const password = credentials.apiKeySecret ?? credentials.authToken;
+
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
 async function twilioRequest<T>(
@@ -48,7 +63,7 @@ async function twilioRequest<T>(
   const response = await fetch(`${TWILIO_API_BASE}${path}`, {
     method: init?.method ?? "GET",
     headers: {
-      Authorization: buildAuthHeader(credentials),
+      Authorization: buildTwilioApiAuthorizationHeader(credentials),
       ...(init?.body
         ? { "Content-Type": "application/x-www-form-urlencoded" }
         : {}),
@@ -77,7 +92,7 @@ async function twilioMonitorRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${TWILIO_MONITOR_BASE}${path}`, {
     headers: {
-      Authorization: buildAuthHeader(credentials),
+      Authorization: buildTwilioApiAuthorizationHeader(credentials),
     },
     cache: "no-store",
   });
@@ -123,6 +138,7 @@ type IncomingPhoneNumberListResponse = {
 type AccountResource = {
   sid: string;
   friendly_name?: string;
+  owner_account_sid?: string;
 };
 
 export type TwilioIncomingPhoneNumberDetails = {
@@ -207,9 +223,13 @@ type TwilioBalanceResource = {
   currency: string;
 };
 
+export type TwilioBalanceResult =
+  | { success: true; balance: number; currency: string }
+  | { success: false; message: string };
+
 export async function fetchTwilioBalance(
   credentials: TwilioApiCredentials,
-): Promise<{ balance: number; currency: string } | null> {
+): Promise<TwilioBalanceResult> {
   try {
     const data = await twilioRequest<TwilioBalanceResource>(
       credentials,
@@ -219,16 +239,51 @@ export async function fetchTwilioBalance(
     const balance = Number.parseFloat(data.balance);
 
     if (Number.isNaN(balance)) {
-      return null;
+      return { success: false, message: "Twilio returned an invalid balance." };
     }
 
     return {
+      success: true,
       balance,
       currency: data.currency ?? "USD",
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof TwilioApiRequestError
+          ? error.message
+          : "Unable to load Twilio balance.",
+    };
   }
+}
+
+export async function fetchTwilioBalanceForConnection(input: {
+  credentials: TwilioApiCredentials;
+  parentAccountSid?: string | null;
+}): Promise<TwilioBalanceResult & { source: "connected" | "parent" | "none" }> {
+  const direct = await fetchTwilioBalance(input.credentials);
+
+  if (direct.success) {
+    return { ...direct, source: "connected" };
+  }
+
+  const parentSid = input.parentAccountSid?.trim();
+
+  if (!parentSid || parentSid === input.credentials.accountSid) {
+    return { ...direct, source: "none" };
+  }
+
+  const parentBalance = await fetchTwilioBalance({
+    accountSid: parentSid,
+    authToken: input.credentials.authToken,
+  });
+
+  if (parentBalance.success) {
+    return { ...parentBalance, source: "parent" };
+  }
+
+  return { ...direct, source: "none" };
 }
 
 export async function fetchTwilioIncomingPhoneNumber(
@@ -276,6 +331,87 @@ export async function fetchTwilioApplication(
     smsUrl: app.sms_url ?? null,
     smsMethod: app.sms_method ?? null,
   };
+}
+
+function mapTwilioApplicationDetails(
+  app: TwilioApplicationResource,
+): TwilioApplicationDetails {
+  return {
+    sid: app.sid,
+    accountSid: app.account_sid ?? null,
+    friendlyName: app.friendly_name ?? null,
+    voiceUrl: app.voice_url ?? null,
+    voiceMethod: app.voice_method ?? null,
+    statusCallback: app.status_callback ?? null,
+    statusCallbackMethod: app.status_callback_method ?? null,
+    smsUrl: app.sms_url ?? null,
+    smsMethod: app.sms_method ?? null,
+  };
+}
+
+function buildTwilioApplicationBody(input: {
+  friendlyName: string;
+  voiceUrl: string;
+  statusCallbackUrl?: string | null;
+  smsUrl?: string | null;
+}): URLSearchParams {
+  const body = new URLSearchParams({
+    FriendlyName: input.friendlyName,
+    VoiceUrl: input.voiceUrl,
+    VoiceMethod: "POST",
+    PublicApplicationConnectEnabled: "false",
+  });
+
+  if (input.statusCallbackUrl?.trim()) {
+    body.set("StatusCallback", input.statusCallbackUrl.trim());
+    body.set("StatusCallbackMethod", "POST");
+  }
+
+  if (input.smsUrl?.trim()) {
+    body.set("SmsUrl", input.smsUrl.trim());
+    body.set("SmsMethod", "POST");
+  }
+
+  return body;
+}
+
+export async function createTwilioApplication(input: {
+  credentials: TwilioApiCredentials;
+  friendlyName: string;
+  voiceUrl: string;
+  statusCallbackUrl?: string | null;
+  smsUrl?: string | null;
+}): Promise<TwilioApplicationDetails> {
+  const app = await twilioRequest<TwilioApplicationResource>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Applications.json`,
+    {
+      method: "POST",
+      body: buildTwilioApplicationBody(input),
+    },
+  );
+
+  return mapTwilioApplicationDetails(app);
+}
+
+export async function updateTwilioApplication(input: {
+  credentials: TwilioApiCredentials;
+  applicationSid: string;
+  friendlyName: string;
+  voiceUrl: string;
+  statusCallbackUrl?: string | null;
+  smsUrl?: string | null;
+}): Promise<TwilioApplicationDetails> {
+  const app = await twilioRequest<TwilioApplicationResource>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Applications/${input.applicationSid}.json`,
+    {
+      method: "POST",
+      body: buildTwilioApplicationBody(input),
+    },
+  );
+
+  return mapTwilioApplicationDetails(app);
 }
 
 export async function listTwilioMonitorAlerts(

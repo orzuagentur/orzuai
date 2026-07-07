@@ -1,4 +1,4 @@
-import { EMAIL_APP_NAME } from "@/lib/email/constants";
+import { EMAIL_APP_NAME } from "../email/constants";
 
 /** Builds Resend `from` — accepts bare email or `Name <email>` from env. */
 export function formatResendFromAddress(raw: string): string {

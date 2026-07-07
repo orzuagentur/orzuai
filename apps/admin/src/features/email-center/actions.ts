@@ -4,6 +4,10 @@ import {
   createServiceRoleClient,
   requirePlatformAdmin,
 } from "@/lib/supabase/server";
+import {
+  FROM_EMAIL_PRESET_OPTIONS,
+  normalizeTemplateFromEmailInput,
+} from "@orzuai/lib/email/from-addresses";
 
 export type EmailTemplateRow = {
   id: string;
@@ -12,6 +16,7 @@ export type EmailTemplateRow = {
   description: string;
   subjectTemplate: string;
   bodyHtmlTemplate: string | null;
+  fromEmail: string | null;
   isActive: boolean;
   isSystem: boolean;
   sendCount: number;
@@ -19,6 +24,12 @@ export type EmailTemplateRow = {
   failedCount: number;
   updatedAt: string;
 };
+
+export const EMAIL_FROM_PRESET_OPTIONS = [
+  { value: "default", label: "Default (code mapping)" },
+  ...FROM_EMAIL_PRESET_OPTIONS,
+  { value: "custom", label: "Custom email address…" },
+] as const;
 
 export type EmailSendLogRow = {
   id: string;
@@ -56,7 +67,7 @@ export async function fetchEmailCenterDataAction(): Promise<
     const { data: templates, error: templatesError } = await service
       .from("email_templates")
       .select(
-        "id, name, category, description, subject_template, body_html_template, is_active, is_system, updated_at",
+        "id, name, category, description, subject_template, body_html_template, from_email, is_active, is_system, updated_at",
       )
       .order("category")
       .order("name");
@@ -145,6 +156,7 @@ export async function fetchEmailCenterDataAction(): Promise<
         description: (row.description as string) ?? "",
         subjectTemplate: row.subject_template as string,
         bodyHtmlTemplate: (row.body_html_template as string | null) ?? null,
+        fromEmail: (row.from_email as string | null) ?? null,
         isActive: row.is_active as boolean,
         isSystem: row.is_system as boolean,
         sendCount: counts.sent + counts.failed,
@@ -198,11 +210,21 @@ export async function saveEmailTemplateAction(input: {
   description: string;
   subjectTemplate: string;
   bodyHtmlTemplate?: string | null;
+  fromEmail?: string | null;
   isActive: boolean;
 }): Promise<{ success: true } | { success: false; message: string }> {
   try {
     await requirePlatformAdmin();
     const service = createServiceRoleClient();
+
+    const normalizedFromEmail = normalizeTemplateFromEmailInput(input.fromEmail);
+
+    if (input.fromEmail?.trim() && input.fromEmail.trim() !== "default" && !normalizedFromEmail) {
+      return {
+        success: false,
+        message: "Invalid from address. Use a preset key or valid email.",
+      };
+    }
 
     const { error } = await service
       .from("email_templates")
@@ -212,6 +234,7 @@ export async function saveEmailTemplateAction(input: {
         description: input.description.trim(),
         subject_template: input.subjectTemplate.trim(),
         body_html_template: input.bodyHtmlTemplate?.trim() || null,
+        from_email: normalizedFromEmail,
         is_active: input.isActive,
         updated_at: new Date().toISOString(),
       })
@@ -237,10 +260,20 @@ export async function createEmailTemplateAction(input: {
   description: string;
   subjectTemplate: string;
   bodyHtmlTemplate?: string | null;
+  fromEmail?: string | null;
 }): Promise<{ success: true } | { success: false; message: string }> {
   try {
     await requirePlatformAdmin();
     const service = createServiceRoleClient();
+
+    const normalizedFromEmail = normalizeTemplateFromEmailInput(input.fromEmail);
+
+    if (input.fromEmail?.trim() && input.fromEmail.trim() !== "default" && !normalizedFromEmail) {
+      return {
+        success: false,
+        message: "Invalid from address. Use a preset key or valid email.",
+      };
+    }
 
     const { error } = await service.from("email_templates").insert({
       id: input.id.trim(),
@@ -249,6 +282,7 @@ export async function createEmailTemplateAction(input: {
       description: input.description.trim(),
       subject_template: input.subjectTemplate.trim(),
       body_html_template: input.bodyHtmlTemplate?.trim() || null,
+      from_email: normalizedFromEmail,
       is_active: true,
       is_system: false,
     });
@@ -334,6 +368,92 @@ export async function sendPlatformBroadcastAction(input: {
     return {
       success: false,
       message: error instanceof Error ? error.message : "Broadcast failed",
+    };
+  }
+}
+
+export async function previewEmailTemplateAction(input: {
+  templateId: string;
+  subjectOverride?: string;
+  bodyHtmlOverride?: string | null;
+}): Promise<
+  | {
+      success: true;
+      subject: string;
+      html: string;
+      fromLabel: string;
+    }
+  | { success: false; message: string }
+> {
+  try {
+    await requirePlatformAdmin();
+
+    const { renderAdminEmailTemplatePreview } = await import(
+      "@/lib/email/template-preview"
+    );
+    const preview = await renderAdminEmailTemplatePreview(input);
+
+    if ("error" in preview) {
+      return { success: false, message: preview.error };
+    }
+
+    return {
+      success: true,
+      subject: preview.subject,
+      html: preview.html,
+      fromLabel: preview.fromLabel,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Preview failed",
+    };
+  }
+}
+
+export async function sendTestEmailTemplateAction(input: {
+  templateId: string;
+  toEmail: string;
+  subjectOverride?: string;
+  bodyHtmlOverride?: string | null;
+}): Promise<{ success: true } | { success: false; message: string }> {
+  try {
+    await requirePlatformAdmin();
+
+    const toEmail = input.toEmail.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+      return { success: false, message: "Enter a valid email address." };
+    }
+
+    const { renderAdminEmailTemplatePreview } = await import(
+      "@/lib/email/template-preview"
+    );
+    const preview = await renderAdminEmailTemplatePreview(input);
+
+    if ("error" in preview) {
+      return { success: false, message: preview.error };
+    }
+
+    const { sendAdminEmail } = await import("@/lib/email/send");
+    const subject = `[TEST] ${preview.subject}`;
+    const result = await sendAdminEmail({
+      to: toEmail,
+      subject,
+      html: preview.html,
+      templateId: input.templateId,
+      metadata: { test: true, templateId: input.templateId },
+    });
+
+    if (!result.success) {
+      return { success: false, message: result.message ?? "Test send failed." };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Test send failed",
     };
   }
 }

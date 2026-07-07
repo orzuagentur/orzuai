@@ -23,7 +23,7 @@ export const TWILIO_MESSAGES = {
   noPhoneNumbersTitle: "Номера не найдены в подключённом аккаунте",
   noPhoneNumbersDescription:
     "Нажмите «Обновить список», чтобы заново получить номера из Twilio. Если номеров нет, можно купить новый номер через OrzuX.",
-  buyNumberTitle: "Купить номер через OrzuAI",
+  buyNumberTitle: "Купить номер через OrzuX",
   buyNumberDescription:
     "Номер будет куплен в вашем авторизованном Twilio-аккаунте и сразу подключён к AI Voice.",
   buyNumberCountryLabel: "Страна",
@@ -37,7 +37,7 @@ export const TWILIO_MESSAGES = {
   searchNumbersFailed: "Не удалось найти доступные номера.",
   listNumbersFailed: "Не удалось получить список номеров из Twilio.",
   platformKeysMissing:
-    "Платформенные ключи Twilio не настроены. Обратитесь в поддержку OrzuAI.",
+    "Платформенные ключи Twilio не настроены. Обратитесь в поддержку OrzuX.",
   refreshButton: "Обновить список",
   refreshSuccess: "Список номеров обновлён.",
   refreshFailed: "Не удалось обновить список номеров.",
@@ -94,5 +94,29 @@ export const TWILIO_MESSAGES = {
   noBusiness: "Сначала создайте бизнес в настройках.",
   selectPhoneButton: "Использовать этот номер",
   connectNote:
-    "Секретные ключи хранятся только на сервере OrzuAI. Вы проходите официальную авторизацию Twilio Connect.",
+    "One-click Twilio Connect. Usage is charged to your Twilio account and card. Numbers are managed in your Connect workspace inside Twilio.",
+  manualConnectTitle: "Подключить вручную",
+  manualConnectDescription:
+    "Подключите свой Twilio-аккаунт: API Key нужен для REST и Voice SDK, Auth Token нужен для проверки webhook signatures.",
+  manualConnectAccountSidLabel: "Account SID",
+  manualConnectApiKeySidLabel: "API Key SID",
+  manualConnectApiKeySecretLabel: "API Key Secret",
+  manualConnectButton: "Подключить по API Key",
+  manualConnectConnecting: "Проверка…",
+  manualConnectSuccess: "Twilio подключён по API Key. Выберите номер.",
+  manualConnectSecurityNote:
+    "Секреты шифруются и хранятся только на сервере OrzuX. Auth Token обязателен, чтобы безопасно проверять запросы Twilio.",
+  manualConnectHelpLink: "Как создать API Key в Twilio",
+  invalidApiKeySid: "Некорректный API Key SID (должен начинаться с SK).",
+  invalidApiKeySecret: "API Key Secret слишком короткий.",
+  apiKeyConnectFailed: "Не удалось подключить Twilio по API Key. Проверьте данные и права ключа.",
+  apiKeyAccountMismatch: "API Key не принадлежит указанному Account SID.",
+  apiKeySecretStoreFailed: "Не удалось сохранить API Key Secret.",
+  manualConnectAuthTokenLabel: "Auth Token",
+  invalidAuthToken: "Twilio Auth Token is invalid or too short.",
+  authTokenAccountMismatch: "Twilio Auth Token does not belong to the selected Account SID.",
+  authTokenStoreFailed: "Unable to store Twilio Auth Token securely.",
+  browserPhoneProvisionFailed: "Unable to provision customer Browser Phone TwiML App.",
+  authModeConnectLabel: "Twilio Connect",
+  authModeApiKeyLabel: "API Key (полный аккаунт)",
 } as const;

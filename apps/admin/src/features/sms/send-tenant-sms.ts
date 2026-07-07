@@ -7,6 +7,8 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 type TwilioCredentials = {
   accountSid: string;
   authToken: string;
+  apiKeySid?: string;
+  apiKeySecret?: string;
 };
 
 async function resolveTwilioCredentials(
@@ -14,23 +16,57 @@ async function resolveTwilioCredentials(
 ): Promise<TwilioCredentials | null> {
   const service = createServiceRoleClient();
 
-  const [{ data: connection }, authTokenFromVault] = await Promise.all([
-    service
-      .from("twilio_connections")
-      .select("connected_account_sid, twilio_status")
-      .eq("business_id", businessId)
-      .maybeSingle(),
-    getSecret(service, "TWILIO_AUTH_TOKEN"),
-  ]);
+  const { data: connection } = await service
+    .from("twilio_connections")
+    .select(
+      "connected_account_sid, twilio_status, auth_mode, api_key_sid, api_key_secret_key_name, auth_token_secret_key_name",
+    )
+    .eq("business_id", businessId)
+    .maybeSingle();
 
-  const authToken = authTokenFromVault?.trim() || process.env.TWILIO_AUTH_TOKEN?.trim();
   const accountSid = connection?.connected_account_sid?.trim();
 
   if (
-    !authToken ||
+    !connection ||
     !accountSid ||
     connection?.twilio_status === "disconnected"
   ) {
+    return null;
+  }
+
+  if (connection.auth_mode === "api_key") {
+    const apiKeySid = connection.api_key_sid?.trim();
+    const apiKeySecretKeyName = connection.api_key_secret_key_name?.trim();
+    const authTokenSecretKeyName = connection.auth_token_secret_key_name?.trim();
+
+    if (!apiKeySid || !apiKeySecretKeyName) {
+      return null;
+    }
+
+    const [apiKeySecret, authToken] = await Promise.all([
+      getSecret(service, apiKeySecretKeyName),
+      authTokenSecretKeyName
+        ? getSecret(service, authTokenSecretKeyName)
+        : Promise.resolve(null),
+    ]);
+
+    if (!apiKeySecret?.trim()) {
+      return null;
+    }
+
+    return {
+      accountSid,
+      authToken: authToken?.trim() ?? "",
+      apiKeySid,
+      apiKeySecret: apiKeySecret.trim(),
+    };
+  }
+
+  const authTokenFromVault = await getSecret(service, "TWILIO_AUTH_TOKEN");
+  const authToken =
+    authTokenFromVault?.trim() || process.env.TWILIO_AUTH_TOKEN?.trim();
+
+  if (!authToken) {
     return null;
   }
 
@@ -66,7 +102,9 @@ async function sendTwilioMessage(input: {
       method: "POST",
       headers: {
         Authorization: `Basic ${Buffer.from(
-          `${input.credentials.accountSid}:${input.credentials.authToken}`,
+          `${input.credentials.apiKeySid ?? input.credentials.accountSid}:${
+            input.credentials.apiKeySecret ?? input.credentials.authToken
+          }`,
         ).toString("base64")}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },

@@ -42,6 +42,9 @@ export async function syncPlatformPlanToStripe(planId: string): Promise<
     const product = await stripe.products.create({
       name: `OrzuX ${plan.label}`,
       description: plan.tagline || undefined,
+      tax_code: "txcd_10103001",
+      statement_descriptor: `ORZUX ${plan.label.toUpperCase()}`.slice(0, 22),
+      shippable: false,
       metadata: {
         plan_id: plan.id,
         platform: "orzux",
@@ -52,6 +55,9 @@ export async function syncPlatformPlanToStripe(planId: string): Promise<
     await stripe.products.update(productId, {
       name: `OrzuX ${plan.label}`,
       description: plan.tagline || undefined,
+      tax_code: "txcd_10103001",
+      statement_descriptor: `ORZUX ${plan.label.toUpperCase()}`.slice(0, 22),
+      shippable: false,
     });
   }
 
@@ -60,6 +66,7 @@ export async function syncPlatformPlanToStripe(planId: string): Promise<
     unit_amount: plan.priceMonthlyCents,
     currency: "usd",
     recurring: { interval: "month" },
+    tax_behavior: "exclusive",
     metadata: {
       plan_id: plan.id,
       platform: "orzux",
@@ -151,6 +158,9 @@ export async function syncPlatformAddonToStripe(addonId: string): Promise<
     const product = await stripe.products.create({
       name: `OrzuX ${addon.label}`,
       description: addon.description || undefined,
+      tax_code: "txcd_10103001",
+      statement_descriptor: `ORZUX ${addon.label.toUpperCase()}`.slice(0, 22),
+      shippable: false,
       metadata: {
         addon_id: addon.id,
         platform: "orzux",
@@ -161,6 +171,9 @@ export async function syncPlatformAddonToStripe(addonId: string): Promise<
     await stripe.products.update(productId, {
       name: `OrzuX ${addon.label}`,
       description: addon.description || undefined,
+      tax_code: "txcd_10103001",
+      statement_descriptor: `ORZUX ${addon.label.toUpperCase()}`.slice(0, 22),
+      shippable: false,
     });
   }
 
@@ -169,6 +182,7 @@ export async function syncPlatformAddonToStripe(addonId: string): Promise<
     unit_amount: addon.price_monthly_cents,
     currency: "usd",
     recurring: { interval: "month" },
+    tax_behavior: "exclusive",
     metadata: {
       addon_id: addon.id,
       platform: "orzux",

@@ -9,7 +9,7 @@ export default function SuspendedAccountPage() {
         </div>
         <h1 className="text-xl font-semibold">Аккаунт приостановлен</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Доступ к панели OrzuAI временно ограничен администратором платформы.
+          Доступ к панели OrzuX временно ограничен администратором платформы.
           Если вы считаете, что это ошибка, напишите в поддержку OrzuX.
         </p>
       </div>

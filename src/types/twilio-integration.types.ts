@@ -54,11 +54,33 @@ export type TwilioNumberDiagnostics = {
   errorLogs: TwilioErrorLogItem[];
 };
 
+export type TwilioAuthMode = "connect" | "api_key";
+
+export type TwilioBillingOwner = "customer" | "platform";
+
+export type TwilioBrowserPhoneStatus =
+  | "disabled"
+  | "pending"
+  | "ready"
+  | "failed";
+
 export type TwilioConnectionData = {
   id: string;
   businessId: string;
   status: TwilioConnectionStatus;
+  authMode: TwilioAuthMode;
+  billingOwner: TwilioBillingOwner;
   connectedAccountSid: string | null;
+  parentAccountSid: string | null;
+  apiKeySid: string | null;
+  apiKeySecretKeyName: string | null;
+  authTokenSecretKeyName: string | null;
+  browserTwimlAppSid: string | null;
+  browserPhoneStatus: TwilioBrowserPhoneStatus;
+  browserPhoneLastError: string | null;
+  browserPhoneProvisionedAt: string | null;
+  hasApiKeySecret: boolean;
+  hasAuthTokenSecret: boolean;
   accountFriendlyName: string | null;
   phoneNumber: string | null;
   phoneSid: string | null;
@@ -69,6 +91,8 @@ export type TwilioConnectionData = {
 
 export type TwilioConnectConfig = {
   isConfigured: boolean;
+  connectOAuthEnabled: boolean;
+  manualConnectEnabled: boolean;
   connectUrl: string;
   authorizeRedirectUri: string;
   deauthorizeRedirectUri: string;

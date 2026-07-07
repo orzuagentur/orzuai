@@ -14,7 +14,9 @@ export type IntegrationSecretKind =
   | "GMAIL_ACCESS_TOKEN"
   | "GMAIL_REFRESH_TOKEN"
   | "GOOGLE_CALENDAR_ACCESS_TOKEN"
-  | "GOOGLE_CALENDAR_REFRESH_TOKEN";
+  | "GOOGLE_CALENDAR_REFRESH_TOKEN"
+  | "TWILIO_API_KEY_SECRET"
+  | "TWILIO_AUTH_TOKEN";
 
 function normalizeBusinessId(businessId: string): string {
   return businessId.replace(/-/g, "_").toUpperCase();

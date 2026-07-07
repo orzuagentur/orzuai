@@ -305,6 +305,7 @@ export async function addAdminAction(input: z.infer<typeof addAdminSchema>) {
     to: authUser.email,
     subject: inviteEmail.subject,
     html: inviteEmail.html,
+    templateId: "admin_invite",
   });
 
   await writeTeamAudit({

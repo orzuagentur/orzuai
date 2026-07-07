@@ -6,6 +6,7 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ENV_KEYS } from "@/constants/env-keys";
 import {
   getTwilioConnection,
+  isBrowserPhoneSupportedForTwilioConnection,
   getTwilioConnectConfig as getPlatformTwilioConnectConfig,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
@@ -60,6 +61,8 @@ export function getVoiceConnectConfig(): VoiceConnectConfig {
 
   return {
     isConfigured: twilioConfig.isConfigured,
+    connectOAuthEnabled: twilioConfig.connectOAuthEnabled,
+    manualConnectEnabled: twilioConfig.manualConnectEnabled,
     aiConfigured: isVoiceAiConfigured(),
     connectUrl: twilioConfig.connectUrl,
     authorizeRedirectUri: twilioConfig.authorizeRedirectUri,
@@ -82,6 +85,7 @@ export async function getVoiceConnection(
     accountFriendlyName: twilio?.accountFriendlyName ?? null,
     phoneSid: twilio?.phoneSid ?? null,
     pendingPhoneSelection: twilio?.status === "authorized",
+    authMode: twilio?.authMode ?? null,
   };
 
   if (twilio?.status === "connected" && settings.phoneNumber) {
@@ -468,7 +472,7 @@ export async function placeOutboundVoiceCall(input: {
   }
 
   const twilioConnection = await getTwilioConnection(input.businessId);
-  const twilioCredentials = resolveTwilioCredentialsForBusiness(twilioConnection);
+  const twilioCredentials = await resolveTwilioCredentialsForBusiness(twilioConnection);
 
   if (
     settings.provider === "twilio" &&
@@ -685,6 +689,7 @@ export async function getVoiceAgentSettingsForUser(): Promise<{
 
 export async function getInboundVoiceTwiml(
   businessId: string,
+  callSid?: string | null,
 ): Promise<string> {
   const settings = await getVoiceAgentSettings(businessId);
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
@@ -720,6 +725,27 @@ export async function getInboundVoiceTwiml(
     return applyCallRecordingToTwiml(
       businessId,
       await buildBusinessLineBusyTwiml(businessId),
+    );
+  }
+
+  const twilioConnection = await getTwilioConnection(businessId);
+
+  if (!isBrowserPhoneSupportedForTwilioConnection(twilioConnection)) {
+    if (settings.aiEnabled && settings.aiConfigured) {
+      return buildVoiceConversationTwiml({
+        businessId,
+        direction: "inbound",
+        forceAi: true,
+        callSid,
+      });
+    }
+
+    return applyCallRecordingToTwiml(
+      businessId,
+      buildStaticSayTwiml({
+        speech: settings.inboundGreeting,
+        speechLocale,
+      }),
     );
   }
 

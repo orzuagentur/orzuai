@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   CheckCircle2Icon,
+  ChevronDownIcon,
+  KeyRoundIcon,
   Loader2Icon,
   PhoneCallIcon,
   RefreshCwIcon,
@@ -23,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { connectTwilioApiKeyAction } from "@/features/twilio/actions/connect-api-key";
 import { disconnectTwilioAction } from "@/features/twilio/actions/disconnect";
 import { purchaseTwilioPhoneNumberAction } from "@/features/twilio/actions/purchase-phone-number";
 import { refreshTwilioPhoneNumbersAction } from "@/features/twilio/actions/refresh-phone-numbers";
@@ -88,6 +91,12 @@ export function VoiceActivatePanel({
   const [isTesting, setIsTesting] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(settings.aiEnabled);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
+  const [showManualConnect, setShowManualConnect] = useState(false);
+  const [manualAccountSid, setManualAccountSid] = useState("");
+  const [manualApiKeySid, setManualApiKeySid] = useState("");
+  const [manualApiKeySecret, setManualApiKeySecret] = useState("");
+  const [manualAuthToken, setManualAuthToken] = useState("");
+  const [isConnectingManual, setIsConnectingManual] = useState(false);
 
   const cardClassName = embeddedInHub
     ? "w-full max-w-none border-0 bg-transparent shadow-none"
@@ -160,6 +169,45 @@ export function VoiceActivatePanel({
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  async function handleManualConnect() {
+    setIsConnectingManual(true);
+
+    try {
+      const result = await connectTwilioApiKeyAction({
+        accountSid: manualAccountSid,
+        apiKeySid: manualApiKeySid,
+        apiKeySecret: manualApiKeySecret,
+        authToken: manualAuthToken,
+      });
+
+      if (!result.success) {
+        toast.error(result.message ?? TWILIO_MESSAGES.apiKeyConnectFailed);
+        return;
+      }
+
+      toast.success(TWILIO_MESSAGES.manualConnectSuccess);
+      setManualApiKeySecret("");
+      setManualAuthToken("");
+      router.refresh();
+    } finally {
+      setIsConnectingManual(false);
+    }
+  }
+
+  function renderAuthModeBadge() {
+    if (!connection.authMode) {
+      return null;
+    }
+
+    return (
+      <Badge variant="outline">
+        {connection.authMode === "api_key"
+          ? TWILIO_MESSAGES.authModeApiKeyLabel
+          : TWILIO_MESSAGES.authModeConnectLabel}
+      </Badge>
     );
   }
 
@@ -323,6 +371,7 @@ export function VoiceActivatePanel({
         <CardHeader className={headerClassName}>
           <CardTitle>{TWILIO_MESSAGES.selectPhoneTitle}</CardTitle>
           <CardDescription>{TWILIO_MESSAGES.selectPhoneDescription}</CardDescription>
+          <div className="pt-2">{renderAuthModeBadge()}</div>
         </CardHeader>
         <CardContent className={`space-y-5 ${contentClassName ?? ""}`}>
           {connection.accountFriendlyName ? (
@@ -374,7 +423,10 @@ export function VoiceActivatePanel({
                 </CardTitle>
                 <CardDescription>{TWILIO_MESSAGES.connectDescription}</CardDescription>
               </div>
-              <Badge>{TWILIO_MESSAGES.connectedStatus}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{TWILIO_MESSAGES.connectedStatus}</Badge>
+                {renderAuthModeBadge()}
+              </div>
             </div>
           </CardHeader>
           <CardContent className={`space-y-6 ${contentClassName ?? ""}`}>
@@ -531,8 +583,6 @@ export function VoiceActivatePanel({
         <CardDescription>{TWILIO_MESSAGES.connectDescription}</CardDescription>
       </CardHeader>
       <CardContent className={`space-y-5 ${contentClassName ?? ""}`}>
-        <p className="text-sm text-muted-foreground">{TWILIO_MESSAGES.connectNote}</p>
-
         {config.aiConfigured ? (
           <p className="text-sm text-muted-foreground">{VOICE_MESSAGES.aiDescription}</p>
         ) : (
@@ -541,11 +591,192 @@ export function VoiceActivatePanel({
           </p>
         )}
 
-        <Button type="button" className="w-full sm:w-auto" asChild>
-          <a href={config.connectUrl}>{TWILIO_MESSAGES.connectButton}</a>
-        </Button>
+        {config.connectOAuthEnabled ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{TWILIO_MESSAGES.connectNote}</p>
+            <Button type="button" className="w-full sm:w-auto" asChild>
+              <a href={config.connectUrl}>{TWILIO_MESSAGES.connectButton}</a>
+            </Button>
+          </div>
+        ) : null}
+
+        {config.connectOAuthEnabled && config.manualConnectEnabled ? (
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">или</span>
+            </div>
+          </div>
+        ) : null}
+
+        {config.manualConnectEnabled ? (
+          <TwilioManualConnectSection
+            accountSid={manualAccountSid}
+            apiKeySid={manualApiKeySid}
+            apiKeySecret={manualApiKeySecret}
+            authToken={manualAuthToken}
+            expanded={showManualConnect || !config.connectOAuthEnabled}
+            isConnecting={isConnectingManual}
+            onAccountSidChange={setManualAccountSid}
+            onApiKeySidChange={setManualApiKeySid}
+            onApiKeySecretChange={setManualApiKeySecret}
+            onAuthTokenChange={setManualAuthToken}
+            onConnect={() => void handleManualConnect()}
+            onToggleExpanded={() => setShowManualConnect((value) => !value)}
+          />
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function TwilioManualConnectSection({
+  accountSid,
+  apiKeySid,
+  apiKeySecret,
+  authToken,
+  expanded,
+  isConnecting,
+  onAccountSidChange,
+  onApiKeySidChange,
+  onApiKeySecretChange,
+  onAuthTokenChange,
+  onConnect,
+  onToggleExpanded,
+}: {
+  accountSid: string;
+  apiKeySid: string;
+  apiKeySecret: string;
+  authToken: string;
+  expanded: boolean;
+  isConnecting: boolean;
+  onAccountSidChange: (value: string) => void;
+  onApiKeySidChange: (value: string) => void;
+  onApiKeySecretChange: (value: string) => void;
+  onAuthTokenChange: (value: string) => void;
+  onConnect: () => void;
+  onToggleExpanded: () => void;
+}) {
+  const canSubmit =
+    accountSid.trim().length > 0 &&
+    apiKeySid.trim().length > 0 &&
+    apiKeySecret.trim().length >= 16 &&
+    authToken.trim().length >= 16;
+
+  return (
+    <div className="rounded-lg border">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+        onClick={onToggleExpanded}
+      >
+        <div className="flex items-start gap-3">
+          <KeyRoundIcon className="mt-0.5 size-5 shrink-0 text-indigo-600" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{TWILIO_MESSAGES.manualConnectTitle}</p>
+            <p className="text-sm text-muted-foreground">
+              {TWILIO_MESSAGES.manualConnectDescription}
+            </p>
+          </div>
+        </div>
+        <ChevronDownIcon
+          className={cn(
+            "size-5 shrink-0 text-muted-foreground transition-transform",
+            expanded ? "rotate-180" : "",
+          )}
+        />
+      </button>
+
+      {expanded ? (
+        <div className="space-y-4 border-t px-4 pb-4 pt-3">
+          <p className="text-xs text-muted-foreground">
+            {TWILIO_MESSAGES.manualConnectSecurityNote}{" "}
+            <a
+              href="https://www.twilio.com/docs/iam/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              {TWILIO_MESSAGES.manualConnectHelpLink}
+            </a>
+          </p>
+
+          <div className="grid gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="twilio-manual-account-sid">
+                {TWILIO_MESSAGES.manualConnectAccountSidLabel}
+              </Label>
+              <Input
+                id="twilio-manual-account-sid"
+                value={accountSid}
+                onChange={(event) => onAccountSidChange(event.target.value)}
+                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="twilio-manual-api-key-sid">
+                {TWILIO_MESSAGES.manualConnectApiKeySidLabel}
+              </Label>
+              <Input
+                id="twilio-manual-api-key-sid"
+                value={apiKeySid}
+                onChange={(event) => onApiKeySidChange(event.target.value)}
+                placeholder="SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="twilio-manual-api-key-secret">
+                {TWILIO_MESSAGES.manualConnectApiKeySecretLabel}
+              </Label>
+              <Input
+                id="twilio-manual-api-key-secret"
+                type="password"
+                value={apiKeySecret}
+                onChange={(event) => onApiKeySecretChange(event.target.value)}
+                placeholder="••••••••••••••••"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="twilio-manual-auth-token">
+                {TWILIO_MESSAGES.manualConnectAuthTokenLabel}
+              </Label>
+              <Input
+                id="twilio-manual-auth-token"
+                type="password"
+                value={authToken}
+                onChange={(event) => onAuthTokenChange(event.target.value)}
+                placeholder="********************************"
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full sm:w-auto"
+            disabled={!canSubmit || isConnecting}
+            onClick={onConnect}
+          >
+            {isConnecting ? (
+              <>
+                <Loader2Icon className="size-4 animate-spin" />
+                {TWILIO_MESSAGES.manualConnectConnecting}
+              </>
+            ) : (
+              TWILIO_MESSAGES.manualConnectButton
+            )}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

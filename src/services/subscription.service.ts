@@ -10,6 +10,7 @@ import { getAiUsageSummaryForBusiness } from "@/services/ai-usage.service";
 import {
   getStripePaymentMethodForCustomer,
   listStripeInvoicesForBusiness,
+  syncSubscriptionForCurrentBusiness,
 } from "@/services/stripe.service";
 import { getUsageSnapshot } from "@/services/entitlement.service";
 import {
@@ -104,10 +105,20 @@ export async function getSubscriptionPageData(): Promise<SubscriptionPageData> {
   };
 
   const user = await requireUser();
-  const business = await getPrimaryBusiness(user.id);
+  let business = await getPrimaryBusiness(user.id);
 
   if (!business || !hasSupabaseEnv()) {
     return empty;
+  }
+
+  if (
+    stripeConfigured &&
+    business.stripe_customer_id &&
+    (!business.stripe_subscription_id ||
+      (business.subscription_plan?.trim().toLowerCase() || "free") === "free")
+  ) {
+    await syncSubscriptionForCurrentBusiness();
+    business = (await getPrimaryBusiness(user.id)) ?? business;
   }
 
   const storedPlanId = business.subscription_plan?.trim().toLowerCase() || "free";

@@ -81,6 +81,13 @@ export type TwilioBillingData = {
   isConnectConfigured: boolean;
   balanceCents: number | null;
   balanceCurrency: string | null;
+  balanceError: string | null;
+  walletBalanceCents: number;
+  topUpFeePercent: number;
+  billingOwner: "customer" | "platform";
+  balanceSource: "connected" | "parent" | "none" | null;
+  twilioConsoleUrl: string;
+  balanceUpdatedAt: string | null;
   voiceRateCentsPerMinute: number | null;
   smsRateCents: number | null;
   topUpHistory: Array<{

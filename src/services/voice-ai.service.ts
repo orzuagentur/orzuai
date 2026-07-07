@@ -38,6 +38,10 @@ import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
 import {
+  getTwilioConnection,
+  isBrowserPhoneSupportedForTwilioConnection,
+} from "@/services/twilio-integration.service";
+import {
   applyCallRecordingToTwiml,
   resolveRecordingCallbackUrl,
 } from "@/services/voice-recording.service";
@@ -45,7 +49,6 @@ import {
   buildHandoffAgentTwiml,
   markVoiceCallHandoffByCallSid,
 } from "@/services/voice-handoff.service";
-import { hasTwilioVoiceClientEnv } from "@/lib/twilio/access-token";
 import {
   customerConfirmedHumanHandoff,
   customerExplicitlyRequestedHuman,
@@ -539,7 +542,8 @@ export async function buildVoiceConversationTwiml(input: {
   const prompts = getVoicePhonePrompts(phoneVoice.language);
   const opening = resolveOpeningLine(settings, input.direction);
   const aiActive = input.forceAi || settings.aiEnabled;
-  const callSid = input.callSid?.trim() || `opening-${Date.now()}`;
+  const realCallSid = input.callSid?.trim() || null;
+  const turnCallSid = realCallSid ?? `opening-${Date.now()}`;
 
   if (!aiActive) {
     return applyCallRecordingToTwiml(
@@ -548,7 +552,11 @@ export async function buildVoiceConversationTwiml(input: {
     );
   }
 
-  if (isVoiceStreamEnabled() && callSid && phoneVoice.voiceId) {
+  const twilioConnection = await getTwilioConnection(input.businessId);
+  const mediaStreamAllowed =
+    isBrowserPhoneSupportedForTwilioConnection(twilioConnection);
+
+  if (mediaStreamAllowed && isVoiceStreamEnabled() && realCallSid && phoneVoice.voiceId) {
     const wsBase = getVoiceStreamWsUrl();
     if (wsBase) {
       const wsUrl = `${wsBase.replace(/\/$/, "")}/voice/stream`;
@@ -559,7 +567,7 @@ export async function buildVoiceConversationTwiml(input: {
         buildMediaStreamConnectTwiml({
           businessId: input.businessId,
           wsUrl,
-          callSid,
+          callSid: realCallSid,
           direction: input.direction,
           triggerReason: input.triggerReason,
           recordingStatusCallback: recordingCallback,
@@ -576,7 +584,7 @@ export async function buildVoiceConversationTwiml(input: {
 
   const twiml = await buildSpokenConversationTwiml({
     businessId: input.businessId,
-    callSid,
+    callSid: turnCallSid,
     speech: opening,
     gatherActionUrl: gatherUrl,
     speechLocale,
@@ -659,8 +667,9 @@ export async function handleVoiceGatherInput(input: {
     );
   }
 
+  const handoffTwilioConnection = await getTwilioConnection(input.businessId);
   const shouldHandoff =
-    hasTwilioVoiceClientEnv() &&
+    isBrowserPhoneSupportedForTwilioConnection(handoffTwilioConnection) &&
     (customerExplicitlyRequestedHuman(userSpeech) ||
       customerConfirmedHumanHandoff(userSpeech, session.turns));
 

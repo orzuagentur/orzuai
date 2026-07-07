@@ -2,7 +2,8 @@ import "server-only";
 
 import { sendGmailMessage } from "@/lib/gmail/client";
 import { getResendClient } from "@/lib/resend/client";
-import { getResendFromEmail, hasResendEnv } from "@/lib/env";
+import { getEmailFromAddress } from "@/lib/email/from-addresses";
+import { hasResendEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getGmailAccessTokenForBusiness } from "@/services/gmail-integration.service";
 
@@ -96,7 +97,7 @@ export async function sendBusinessOutboundEmail(
   try {
     const resend = getResendClient();
     const { error } = await resend.emails.send({
-      from: getResendFromEmail(),
+      from: getEmailFromAddress("booking_confirmation"),
       replyTo: [replyTo],
       to: recipient,
       subject: input.subject,

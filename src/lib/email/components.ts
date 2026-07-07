@@ -1,6 +1,6 @@
-import { APP_ORIGIN } from "@/constants/app-origin";
-import { EMAIL_APP_NAME, EMAIL_BRAND } from "@/lib/email/constants";
-import { escapeHtml } from "@/utils/email";
+import { APP_ORIGIN } from "../../constants/app-origin";
+import { EMAIL_APP_NAME, EMAIL_BRAND } from "./constants";
+import { escapeHtml } from "../../utils/email";
 
 export function renderEmailHeading(text: string): string {
   return `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.35;font-weight:700;color:${EMAIL_BRAND.foreground};">${escapeHtml(text)}</h1>`;

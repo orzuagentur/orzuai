@@ -6,12 +6,12 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
 import {
   createTwilioVoiceAccessToken,
-  getTwilioVoiceAccountSid,
   hasTwilioVoiceClientEnv,
 } from "@/lib/twilio/access-token";
 import {
   createTwilioOutboundCallWithTwiml,
   listTwilioIncomingPhoneNumbers,
+  type TwilioApiCredentials,
   TwilioApiRequestError,
 } from "@/lib/twilio/client";
 import {
@@ -32,6 +32,8 @@ import { requireUser } from "@/services/auth.service";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import {
   getTwilioConnection,
+  isBrowserPhoneSupportedForTwilioConnection,
+  resolveTwilioBrowserPhoneRuntimeConfig,
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall, markInboundCallAiFallback } from "@/services/voice-inbox.service";
@@ -54,12 +56,14 @@ export async function getVoiceClientConfig(
     getVoiceAgentSettings(businessId),
   ]);
 
-  const twilioConnected = connection?.status === "connected";
+  const browserPhoneSupported =
+    connection?.authMode === "api_key"
+      ? isBrowserPhoneSupportedForTwilioConnection(connection)
+      : hasTwilioVoiceClientEnv() &&
+        isBrowserPhoneSupportedForTwilioConnection(connection);
+
   const enabled =
-    hasTwilioVoiceClientEnv() &&
-    twilioConnected &&
-    Boolean(settings.phoneNumber) &&
-    settings.outboundEnabled;
+    browserPhoneSupported && Boolean(settings.phoneNumber) && settings.outboundEnabled;
 
   return {
     enabled,
@@ -79,25 +83,22 @@ export async function createVoiceClientTokenForUser(input: {
     return { success: false, message: "Configuration missing." };
   }
 
-  if (!hasTwilioVoiceClientEnv()) {
+  const connection = await getTwilioConnection(input.businessId);
+
+  if (!isBrowserPhoneSupportedForTwilioConnection(connection)) {
     return {
       success: false,
-      message: "Browser calling is not configured on this platform.",
+      message:
+        "Browser calling is not provisioned for this Twilio connection.",
     };
   }
 
-  const connection = await getTwilioConnection(input.businessId);
+  const browserPhone = await resolveTwilioBrowserPhoneRuntimeConfig(input.businessId);
 
-  if (!connection || connection.status !== "connected") {
-    return { success: false, message: "Twilio is not connected." };
-  }
-
-  const voiceTokenAccountSid = getTwilioVoiceAccountSid();
-
-  if (!voiceTokenAccountSid) {
+  if (!browserPhone) {
     return {
       success: false,
-      message: "Twilio Voice account SID is not configured.",
+      message: "Browser calling credentials are not configured.",
     };
   }
 
@@ -105,7 +106,10 @@ export async function createVoiceClientTokenForUser(input: {
 
   try {
     const token = createTwilioVoiceAccessToken({
-      accountSid: voiceTokenAccountSid,
+      accountSid: browserPhone.accountSid,
+      apiKeySid: browserPhone.apiKeySid,
+      apiKeySecret: browserPhone.apiKeySecret,
+      twimlAppSid: browserPhone.twimlAppSid,
       identity,
     });
 
@@ -274,6 +278,39 @@ function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
   return "Unable to connect the customer call.";
 }
 
+function buildBrowserPhoneRestCredentials(
+  config: Awaited<ReturnType<typeof resolveTwilioBrowserPhoneRuntimeConfig>>,
+): TwilioApiCredentials | null {
+  if (!config) {
+    return null;
+  }
+
+  if (config.mode === "customer") {
+    return {
+      accountSid: config.accountSid,
+      authToken: config.authToken,
+      apiKeySid: config.apiKeySid,
+      apiKeySecret: config.apiKeySecret,
+    };
+  }
+
+  return {
+    accountSid: config.accountSid,
+    authToken: config.authToken,
+  };
+}
+
+async function resolveBrowserPhoneOutboundCallerId(input: {
+  mode: "platform" | "customer";
+  preferredCallerId: string;
+}): Promise<string | null> {
+  if (input.mode === "customer") {
+    return input.preferredCallerId.trim() || null;
+  }
+
+  return resolveBrowserPhoneCallerId(input.preferredCallerId);
+}
+
 export async function buildClientOutboundTwiml(input: {
   businessId: string;
   toNumber: string;
@@ -325,21 +362,24 @@ export async function buildClientOutboundTwiml(input: {
     callSid: parentCallSid,
   });
 
-  const browserCallerId = await resolveBrowserPhoneCallerId(phoneNumber);
+  const browserPhone = await resolveTwilioBrowserPhoneRuntimeConfig(input.businessId);
+  const browserCredentials = buildBrowserPhoneRestCredentials(browserPhone);
 
-  if (!browserCallerId) {
+  if (!browserPhone || !browserCredentials) {
     return buildStaticSayTwiml({
-      speech: "Browser calling is missing a valid caller ID.",
+      speech: "Browser calling is not provisioned for this Twilio connection.",
       speechLocale,
     });
   }
 
-  const platformAccountSid = getTwilioPlatformAccountSid();
-  const platformAuthToken = getTwilioPlatformAuthToken();
+  const browserCallerId = await resolveBrowserPhoneOutboundCallerId({
+    mode: browserPhone.mode,
+    preferredCallerId: phoneNumber,
+  });
 
-  if (!platformAccountSid || !platformAuthToken) {
+  if (!browserCallerId) {
     return buildStaticSayTwiml({
-      speech: "Twilio platform credentials are missing.",
+      speech: "Browser calling is missing a valid caller ID.",
       speechLocale,
     });
   }
@@ -355,10 +395,7 @@ export async function buildClientOutboundTwiml(input: {
 
   try {
     const customerCallSid = await createTwilioOutboundCallWithTwiml({
-      credentials: {
-        accountSid: platformAccountSid,
-        authToken: platformAuthToken,
-      },
+      credentials: browserCredentials,
       from: browserCallerId,
       to,
       twiml: customerTwiml,

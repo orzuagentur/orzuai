@@ -35,11 +35,11 @@ export function renderPlatformBroadcastEmail({
           <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e4e4e7">
             <tr>
               <td>
-                <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a">OrzuAI</p>
+                <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a">OrzuX</p>
                 <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3">${escapeHtml(title)}</h1>
                 <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-wrap">${escapeHtml(body)}</p>
                 ${actionBlock}
-                <p style="margin:32px 0 0;font-size:12px;color:#71717a">Official message from OrzuAI.</p>
+                <p style="margin:32px 0 0;font-size:12px;color:#71717a">Official message from OrzuX.</p>
               </td>
             </tr>
           </table>

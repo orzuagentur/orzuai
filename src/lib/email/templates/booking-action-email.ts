@@ -4,9 +4,9 @@ import {
   renderEmailHeading,
   renderEmailParagraph,
   renderInfoBox,
-} from "@/lib/email/components";
-import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
-import { escapeHtml } from "@/utils/email";
+} from "../components";
+import { renderBaseEmailLayout } from "./base-layout";
+import { escapeHtml } from "../../../utils/email";
 
 type BookingActionEmailParams = {
   businessName: string;

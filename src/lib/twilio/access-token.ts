@@ -36,11 +36,15 @@ export function hasTwilioVoiceClientEnv(): boolean {
 export function createTwilioVoiceAccessToken(input: {
   accountSid: string;
   identity: string;
+  apiKeySid?: string;
+  apiKeySecret?: string;
+  twimlAppSid?: string;
   ttlSeconds?: number;
 }): string {
-  const apiKeySid = getTwilioApiKeySid();
-  const apiKeySecret = getTwilioApiKeySecret();
-  const twimlAppSid = getTwilioTwimlAppSid();
+  const apiKeySid = input.apiKeySid?.trim() || getTwilioApiKeySid();
+  const apiKeySecret =
+    input.apiKeySecret?.trim() || getTwilioApiKeySecret();
+  const twimlAppSid = input.twimlAppSid?.trim() || getTwilioTwimlAppSid();
 
   if (!apiKeySid || !apiKeySecret || !twimlAppSid) {
     throw new Error("Twilio Voice Client is not configured.");

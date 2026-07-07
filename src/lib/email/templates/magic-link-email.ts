@@ -1,4 +1,4 @@
-import { EMAIL_SUBJECTS } from "@/lib/email/constants";
+import { EMAIL_SUBJECTS } from "../constants";
 import {
   renderEmailHeading,
   renderEmailParagraph,
@@ -6,8 +6,8 @@ import {
   renderInfoBox,
   renderOtpCode,
   renderPrimaryButton,
-} from "@/lib/email/components";
-import { renderBaseEmailLayout } from "@/lib/email/templates/base-layout";
+} from "../components";
+import { renderBaseEmailLayout } from "./base-layout";
 
 type MagicLinkEmailTemplateParams = {
   signInUrl: string;

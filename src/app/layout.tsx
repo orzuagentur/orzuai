@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     "OrzuX helps businesses reply to customers, manage CRM, automate follow-ups, and run an autonomous AI agent across messaging channels.",
   keywords: [
     "OrzuX",
-    "OrzuAI",
+    "OrzuX",
     "AI communication platform",
     "AI inbox",
     "customer service automation",

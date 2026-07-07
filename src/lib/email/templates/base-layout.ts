@@ -3,9 +3,9 @@ import {
   EMAIL_BRAND,
   EMAIL_FOOTER_SUPPORT,
   EMAIL_TAGLINE,
-} from "@/lib/email/constants";
-import { renderEmailLogo } from "@/lib/email/components";
-import { escapeHtml } from "@/utils/email";
+} from "../constants";
+import { renderEmailLogo } from "../components";
+import { escapeHtml } from "../../../utils/email";
 
 type BaseEmailLayoutParams = {
   previewText: string;
@@ -75,5 +75,5 @@ export function renderBaseEmailLayout({
 </html>`;
 }
 
-/** @deprecated Import from @/lib/email/components instead */
-export { renderPrimaryButton } from "@/lib/email/components";
+/** @deprecated Import from ../components instead */
+export { renderPrimaryButton } from "../components";

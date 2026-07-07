@@ -84,7 +84,7 @@ export function AnnouncementsPanel() {
     <div className="space-y-6">
       <PageHeader
         title="Уведомления"
-        description="Broadcast-сообщения для клиентов в панели OrzuAI"
+        description="Broadcast-сообщения для клиентов в панели OrzuX"
       />
 
       <SectionCard title="Новое объявление" description="Показывается вверху dashboard">

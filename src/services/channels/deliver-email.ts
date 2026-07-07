@@ -2,7 +2,8 @@ import "server-only";
 
 import { sendGmailMessage } from "@/lib/gmail/client";
 import { getResendClient } from "@/lib/resend/client";
-import { hasResendEnv, getResendFromEmail } from "@/lib/env";
+import { getEmailFromAddress } from "@/lib/email/from-addresses";
+import { hasResendEnv } from "@/lib/env";
 import { getGmailAccessTokenForBusiness } from "@/services/gmail-integration.service";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import type { Database } from "@/types/database.types";
@@ -51,7 +52,7 @@ export async function deliverEmailTextMessage(input: {
   try {
     const resend = getResendClient();
     const { error } = await resend.emails.send({
-      from: getResendFromEmail(),
+      from: getEmailFromAddress("lead_follow_up"),
       to: recipient,
       subject: input.subject,
       text: input.content,

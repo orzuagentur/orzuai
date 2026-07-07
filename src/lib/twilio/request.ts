@@ -30,11 +30,26 @@ export function isTwilioWebhookSignatureValid(input: {
   params: Record<string, string>;
   authToken: string | null | undefined;
   businessId?: string | null;
+  expectedAccountSid?: string | null;
 }): boolean {
   const authToken = input.authToken?.trim();
   const businessId = input.businessId?.trim();
+  const expectedAccountSid = input.expectedAccountSid?.trim();
+  const receivedAccountSid = input.params.AccountSid?.trim();
+
+  if (
+    expectedAccountSid &&
+    receivedAccountSid &&
+    receivedAccountSid !== expectedAccountSid
+  ) {
+    return false;
+  }
 
   if (!authToken) {
+    if (expectedAccountSid && !receivedAccountSid) {
+      return false;
+    }
+
     return (
       isOrzuSignedRequestValid(input.request, businessId) ||
       isSignatureValidationBypassedForLocalDevelopment()
@@ -44,10 +59,7 @@ export function isTwilioWebhookSignatureValid(input: {
   const signature = input.request.headers.get("x-twilio-signature");
 
   if (!signature) {
-    return (
-      isOrzuSignedRequestValid(input.request, businessId) ||
-      isSignatureValidationBypassedForLocalDevelopment()
-    );
+    return isSignatureValidationBypassedForLocalDevelopment();
   }
 
   for (const url of getTwilioSignatureUrlCandidates(input.request)) {
@@ -63,7 +75,7 @@ export function isTwilioWebhookSignatureValid(input: {
     }
   }
 
-  return isOrzuSignedRequestValid(input.request, businessId);
+  return false;
 }
 
 function isSignatureValidationBypassedForLocalDevelopment(): boolean {
@@ -140,5 +152,7 @@ function isOrzuSignedRequestValid(
     businessId,
     signature: request.nextUrl.searchParams.get("orzuSig"),
     version: request.nextUrl.searchParams.get("orzuSigVersion"),
+    method: request.method,
+    pathname: request.nextUrl.pathname,
   });
 }
