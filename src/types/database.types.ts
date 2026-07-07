@@ -34,7 +34,7 @@ export type TwilioConnectionStatus =
 
 export type TwilioBillingOwner = "customer" | "platform";
 
-export type TwilioAuthMode = "connect" | "api_key";
+export type TwilioAuthMode = "connect" | "api_key" | "auth_token";
 
 export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
 

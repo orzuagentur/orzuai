@@ -62,6 +62,25 @@ async function resolveTwilioCredentials(
     };
   }
 
+  if (connection.auth_mode === "auth_token") {
+    const authTokenSecretKeyName = connection.auth_token_secret_key_name?.trim();
+
+    if (!authTokenSecretKeyName) {
+      return null;
+    }
+
+    const authToken = await getSecret(service, authTokenSecretKeyName);
+
+    if (!authToken?.trim()) {
+      return null;
+    }
+
+    return {
+      accountSid,
+      authToken: authToken.trim(),
+    };
+  }
+
   const authTokenFromVault = await getSecret(service, "TWILIO_AUTH_TOKEN");
   const authToken =
     authTokenFromVault?.trim() || process.env.TWILIO_AUTH_TOKEN?.trim();

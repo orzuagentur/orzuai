@@ -170,7 +170,8 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
   if (
     connection &&
     (connection.status === "connected" ||
-      (connection.status === "authorized" && connection.authMode === "api_key"))
+      (connection.status === "authorized" &&
+        (connection.authMode === "api_key" || connection.authMode === "auth_token")))
   ) {
     const credentials = await resolveTwilioCredentialsForBusiness(connection);
 

@@ -248,6 +248,26 @@ export async function resolveTwilioCredentialsForBusiness(
     };
   }
 
+  if (connection.authMode === "auth_token") {
+    if (!connection.connectedAccountSid || !connection.authTokenSecretKeyName) {
+      return null;
+    }
+
+    const authToken = await readIntegrationSecret(
+      createAdminClient(),
+      connection.authTokenSecretKeyName,
+    );
+
+    if (!authToken) {
+      return null;
+    }
+
+    return {
+      accountSid: connection.connectedAccountSid,
+      authToken,
+    };
+  }
+
   const authToken = getTwilioPlatformAuthToken();
 
   if (!authToken || !connection.connectedAccountSid) {
@@ -282,7 +302,7 @@ export async function resolveTwilioWebhookValidationContext(
     return null;
   }
 
-  if (connection.authMode === "api_key") {
+  if (connection.authMode === "api_key" || connection.authMode === "auth_token") {
     return {
       authToken: await readCustomerTwilioAuthToken(connection),
       expectedAccountSid: connection.connectedAccountSid,
@@ -810,7 +830,7 @@ export async function getTwilioNumberDiagnostics(
         ? { accountSid: platformAccountSid, authToken: platformAuthToken }
         : null;
   const monitorCredentials =
-    connection.authMode === "api_key"
+    connection.authMode === "api_key" || connection.authMode === "auth_token"
       ? ctx.credentials
       : platformAccountSid && platformAuthToken
         ? { accountSid: platformAccountSid, authToken: platformAuthToken }
@@ -1019,6 +1039,124 @@ function normalizeTwilioSid(value: string, prefix: "AC" | "SK"): string | null {
   }
 
   return trimmed;
+}
+
+export async function connectTwilioWithAuthToken(input: {
+  businessId: string;
+  accountSid: string;
+  authToken: string;
+  actorUserId?: string | null;
+  actorEmail?: string;
+}): Promise<{ success: boolean; message?: string }> {
+  if (!hasSupabaseEnv()) {
+    return { success: false, message: TWILIO_MESSAGES.saveFailed };
+  }
+
+  const accountSid = normalizeTwilioSid(input.accountSid, "AC");
+  const authToken = input.authToken.trim();
+
+  if (!accountSid) {
+    return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
+  }
+
+  if (authToken.length < 16) {
+    return { success: false, message: TWILIO_MESSAGES.invalidAuthToken };
+  }
+
+  const credentials: TwilioApiCredentials = {
+    accountSid,
+    authToken,
+  };
+
+  let friendlyName: string | null = null;
+
+  try {
+    const account = await fetchTwilioAccount(credentials);
+    friendlyName = account.friendly_name ?? null;
+
+    if (account.sid && account.sid !== accountSid) {
+      return { success: false, message: TWILIO_MESSAGES.authTokenAccountMismatch };
+    }
+
+    await listTwilioIncomingPhoneNumbers(credentials);
+  } catch (error) {
+    console.warn(
+      "[twilio] auth token connect validation failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        accountSid,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : TWILIO_MESSAGES.authTokenConnectFailed,
+    };
+  }
+
+  const admin = createAdminClient();
+
+  const authTokenSecretKeyName = await storeIntegrationSecret(admin, {
+    businessId: input.businessId,
+    kind: "TWILIO_AUTH_TOKEN",
+    value: authToken,
+    description: `Twilio Auth Token for business ${input.businessId}`,
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  });
+
+  if (!authTokenSecretKeyName) {
+    return { success: false, message: TWILIO_MESSAGES.authTokenStoreFailed };
+  }
+
+  const connection = await upsertTwilioConnectionRow(admin, input.businessId, {
+    twilio_status: "authorized",
+    auth_mode: "auth_token",
+    billing_owner: "customer",
+    connected_account_sid: accountSid,
+    parent_account_sid: null,
+    api_key_sid: null,
+    api_key_secret_key_name: null,
+    auth_token_secret_key_name: authTokenSecretKeyName,
+    browser_phone_status: "disabled",
+    browser_phone_last_error: null,
+    account_friendly_name: friendlyName,
+    phone_number: null,
+    phone_sid: null,
+    connected_at: null,
+    last_synced_at: new Date().toISOString(),
+  });
+
+  if (!connection) {
+    return { success: false, message: TWILIO_MESSAGES.saveFailed };
+  }
+
+  revalidateTwilioPaths();
+  return { success: true };
+}
+
+export async function connectTwilioWithAuthTokenForCurrentUser(input: {
+  accountSid: string;
+  authToken: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const user = await requireUser();
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return { success: false, message: TWILIO_MESSAGES.noBusiness };
+  }
+
+  return connectTwilioWithAuthToken({
+    businessId,
+    accountSid: input.accountSid,
+    authToken: input.authToken,
+    actorUserId: user.id,
+    actorEmail: user.email ?? undefined,
+  });
 }
 
 export async function connectTwilioWithApiKey(input: {

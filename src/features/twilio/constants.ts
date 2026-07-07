@@ -95,21 +95,32 @@ export const TWILIO_MESSAGES = {
   selectPhoneButton: "Использовать этот номер",
   connectNote:
     "One-click Twilio Connect. Usage is charged to your Twilio account and card. Numbers are managed in your Connect workspace inside Twilio.",
-  manualConnectTitle: "Подключить вручную",
+  manualConnectTitle: "Полное подключение",
   manualConnectDescription:
-    "Подключите свой Twilio-аккаунт: API Key нужен для REST и Voice SDK, Auth Token нужен для проверки webhook signatures.",
+    "Account SID, API Key и Auth Token — для SMS, AI-звонков и звонков из панели OrzuX в браузере (Browser Phone).",
+  manualServerConnectTitle: "Серверное подключение",
+  manualServerConnectDescription:
+    "Только Account SID и Auth Token — для SMS, входящих/исходящих AI-звонков и webhooks. Звонки из браузера недоступны.",
   manualConnectAccountSidLabel: "Account SID",
   manualConnectApiKeySidLabel: "API Key SID",
   manualConnectApiKeySecretLabel: "API Key Secret",
-  manualConnectButton: "Подключить по API Key",
+  manualConnectButton:
+    "Подключить: SMS + AI-звонки + звонки из панели в браузере",
+  manualServerConnectButton:
+    "Подключить: SMS + AI-звонки на сервере (без браузера)",
   manualConnectConnecting: "Проверка…",
   manualConnectSuccess: "Twilio подключён по API Key. Выберите номер.",
+  manualServerConnectSuccess: "Twilio подключён (серверный режим). Выберите номер.",
   manualConnectSecurityNote:
-    "Секреты шифруются и хранятся только на сервере OrzuX. Auth Token обязателен, чтобы безопасно проверять запросы Twilio.",
+    "Секреты шифруются и хранятся только на сервере OrzuX. Auth Token обязателен для проверки webhook-подписей Twilio.",
+  manualServerConnectSecurityNote:
+    "Auth Token шифруется и хранится только на сервере OrzuX. Для звонков из панели используйте полное подключение с API Key.",
   manualConnectHelpLink: "Как создать API Key в Twilio",
   invalidApiKeySid: "Некорректный API Key SID (должен начинаться с SK).",
   invalidApiKeySecret: "API Key Secret слишком короткий.",
   apiKeyConnectFailed: "Не удалось подключить Twilio по API Key. Проверьте данные и права ключа.",
+  authTokenConnectFailed:
+    "Не удалось подключить Twilio. Проверьте Account SID и Auth Token.",
   apiKeyAccountMismatch: "API Key не принадлежит указанному Account SID.",
   apiKeySecretStoreFailed: "Не удалось сохранить API Key Secret.",
   manualConnectAuthTokenLabel: "Auth Token",
@@ -119,4 +130,5 @@ export const TWILIO_MESSAGES = {
   browserPhoneProvisionFailed: "Unable to provision customer Browser Phone TwiML App.",
   authModeConnectLabel: "Twilio Connect",
   authModeApiKeyLabel: "API Key (полный аккаунт)",
+  authModeAuthTokenLabel: "Auth Token (сервер)",
 } as const;
