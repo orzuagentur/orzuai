@@ -40,7 +40,10 @@ import {
   loadContactSnapshot,
 } from "@/services/agent-task-executor.service";
 import { reportAgentActions } from "@/services/agent-action-reporting.service";
-import { resolveAssistantFallbackReplyMessage } from "@/lib/ai/fallback-reply";
+import {
+  isLikelyBookingOrOrderMessage,
+  resolveAssistantFallbackReplyMessage,
+} from "@/lib/ai/fallback-reply";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 import { sanitizeWorkerFacingReply } from "@/lib/ai/worker-reply-safety";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
@@ -111,6 +114,7 @@ type AutoReplyPrep = {
   conversationHistory: ConversationTurn[];
   conversationSummary: string | null;
   crmContext: string;
+  bookingContext: string;
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
   systemPrompt: string;
   provider: AiProvider;
@@ -166,6 +170,52 @@ function mapKnowledgeForLlm(
     content: entry.content,
     category: entry.category ?? "",
   }));
+}
+
+async function buildFastBookingReplyContext(input: {
+  businessId: string;
+  clientMessage: string;
+}): Promise<string> {
+  if (!isLikelyBookingOrOrderMessage(input.clientMessage)) {
+    return "";
+  }
+
+  try {
+    const [bookingSetup, calendarResources, bookingPages] = await Promise.all([
+      getBusinessBookingSetup(input.businessId),
+      listBusinessCalendarResources(input.businessId),
+      listPublishedBookingPagesForBusinessAdmin(input.businessId),
+    ]);
+    const calendarBookingEnabled =
+      calendarResources.length > 0 || bookingPages.length > 0;
+    const bookableResourcesText = formatCalendarResourcesForAiPrompt(
+      calendarResources,
+      bookingSetup,
+    );
+    const bookingPagesText = formatBookingPagesForAiPrompt(bookingPages);
+    const availabilityText = calendarBookingEnabled
+      ? await formatAvailabilityForAiPrompt(input.businessId)
+      : "";
+
+    return [
+      "Live booking/order context for this customer message:",
+      calendarBookingEnabled
+        ? "Calendar booking is enabled. If the customer gave a usable date/time or date range, say the booking is being created now. Do not make the customer wait for a manager."
+        : "Calendar booking is not configured. Ask only for the missing date/time/contact detail and capture the request without promising a manager callback.",
+      "Use live availability below to answer whether a slot is open. State price only when pricing exists in business knowledge or conversation context; never invent price.",
+      availabilityText.trim(),
+      bookingPagesText.trim(),
+      bookableResourcesText.trim(),
+    ]
+      .filter(Boolean)
+      .join("\n");
+  } catch (error) {
+    console.warn(
+      "[auto-reply-pipeline] fast booking context failed",
+      error instanceof Error ? error.message : "unknown",
+    );
+    return "";
+  }
 }
 
 export async function resolveAssistantProfile(
@@ -297,6 +347,7 @@ function assembleAutoReplySystemPrompt(input: {
   baseSystemPrompt: string;
   conversationSummary: string | null;
   crmContext: string;
+  bookingContext: string;
 }): string {
   const sections = [input.baseSystemPrompt];
   const summarySection = formatConversationSummaryForSystemPrompt(
@@ -312,6 +363,10 @@ function assembleAutoReplySystemPrompt(input: {
     sections.push(crmSection);
   }
 
+  if (input.bookingContext.trim()) {
+    sections.push(input.bookingContext.trim());
+  }
+
   return sections.join("\n\n");
 }
 
@@ -319,6 +374,7 @@ function buildPrepFromProfile(input: {
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
   conversationSummary: string | null;
   crmContext: string;
+  bookingContext: string;
 }): {
   systemPrompt: string;
   provider: AiProvider;
@@ -330,6 +386,7 @@ function buildPrepFromProfile(input: {
       baseSystemPrompt: buildAssistantSystemPrompt(input.profile),
       conversationSummary: input.conversationSummary,
       crmContext: input.crmContext,
+      bookingContext: input.bookingContext,
     }),
     provider: getPrimaryPlatformLlmProvider(),
     model: resolveLlmModel(getPrimaryPlatformLlmProvider(), undefined),
@@ -339,6 +396,7 @@ function buildPrepFromProfile(input: {
 
 function resolveSafeAssistantFallbackReplyMessage(input: {
   language: string;
+  clientMessage?: string | null;
   customMessage?: string | null;
 }): string {
   const fallbackText = resolveAssistantFallbackReplyMessage(input);
@@ -352,6 +410,7 @@ function resolveSafeAssistantFallbackReplyMessage(input: {
 
   const defaultFallback = resolveAssistantFallbackReplyMessage({
     language: input.language,
+    clientMessage: input.clientMessage,
     customMessage: null,
   });
   const safeDefault = sanitizeWorkerFacingReply(defaultFallback, {
@@ -360,7 +419,7 @@ function resolveSafeAssistantFallbackReplyMessage(input: {
 
   return (
     safeDefault.text ??
-    "Thanks for your message. I am checking this and will help you right here in this chat."
+    "I am checking the details now and will respond with the next step."
   );
 }
 
@@ -433,8 +492,13 @@ async function prepareAutoReplyContext(input: {
       ? await resolveConversationContactId(input.admin, input.conversationId)
       : null;
 
-  const [conversationHistory, knowledgeEntries, crmSnapshot, conversationMemory] =
-    await Promise.all([
+  const [
+    conversationHistory,
+    knowledgeEntries,
+    crmSnapshot,
+    conversationMemory,
+    bookingContext,
+  ] = await Promise.all([
       input.conversationHistory ??
         (input.conversationId
           ? fetchConversationHistory(
@@ -452,6 +516,10 @@ async function prepareAutoReplyContext(input: {
       input.conversationId
         ? loadConversationMemory(input.admin, input.conversationId)
         : Promise.resolve(null),
+      buildFastBookingReplyContext({
+        businessId: input.businessId,
+        clientMessage: input.clientMessage,
+      }),
     ]);
 
   const trimmedHistory = trimConversationHistory(
@@ -469,6 +537,7 @@ async function prepareAutoReplyContext(input: {
     profile,
     conversationSummary: conversationMemory?.aiSummary ?? null,
     crmContext,
+    bookingContext,
   });
 
   return {
@@ -482,6 +551,7 @@ async function prepareAutoReplyContext(input: {
       conversationHistory: trimmedHistory,
       conversationSummary: conversationMemory?.aiSummary ?? null,
       crmContext,
+      bookingContext,
       profile,
       systemPrompt: voice.systemPrompt,
       provider: voice.provider,
@@ -520,6 +590,7 @@ export async function generateFastAssistantReply(input: {
     profile: prep.profile,
     conversationSummary: prep.conversationSummary,
     crmContext: prep.crmContext,
+    bookingContext: prep.bookingContext,
   });
 
   const reply = await generateAssistantReplyWithFallback({
@@ -548,6 +619,7 @@ export async function generateFastAssistantReply(input: {
 
     const fallbackText = resolveSafeAssistantFallbackReplyMessage({
       language: voice.language,
+      clientMessage: prep.clientMessage,
       customMessage: prep.fallbackReplyMessage,
     });
 
@@ -573,6 +645,7 @@ export async function generateFastAssistantReply(input: {
 
   const fallbackText = resolveSafeAssistantFallbackReplyMessage({
     language: voice.language,
+    clientMessage: prep.clientMessage,
     customMessage: prep.fallbackReplyMessage,
   });
   const safeReply = sanitizeWorkerFacingReply(reply.data.text, {

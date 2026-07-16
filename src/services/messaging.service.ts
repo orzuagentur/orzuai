@@ -402,6 +402,15 @@ export async function processChannelAutoReply(input: {
     });
   }
 
+  await enqueueAiOrchestrationJob({
+    businessId,
+    channel,
+    conversationId,
+    clientMessage,
+  }).catch((error) => {
+    console.error("[messaging] failed to enqueue CRM orchestration", error);
+  });
+
   const voiceDecision = await shouldUseVoiceAutoReply({
     admin,
     businessId,
@@ -487,15 +496,6 @@ export async function processChannelAutoReply(input: {
   await incrementMessagingAnalytics(admin, businessId, channel, {
     totalMessages: 1,
     aiReplies: 1,
-  });
-
-  await enqueueAiOrchestrationJob({
-    businessId,
-    channel,
-    conversationId,
-    clientMessage,
-  }).catch((error) => {
-    console.error("[messaging] failed to enqueue CRM orchestration", error);
   });
 }
 

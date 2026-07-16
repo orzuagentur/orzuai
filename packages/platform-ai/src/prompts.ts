@@ -60,10 +60,10 @@ export const DEFAULT_PLATFORM_PROMPTS: Record<PlatformPromptKey, string> = {
   ].join("\n"),
   guard_fallback: JSON.stringify({
     English:
-      "Thanks for your message. I am checking this and will help you right here in this chat.",
+      "I am checking the details now and will respond with the next step.",
     Russian:
-      "Спасибо! Я проверяю это и помогу вам прямо здесь в чате.",
-    Uzbek: "Xabaringiz uchun rahmat. Men buni tekshiryapman va shu yerda yordam beraman.",
+      "Проверяю детали и сразу дам следующий точный шаг.",
+    Uzbek: "Tafsilotlarni tekshiryapman va keyingi aniq qadamni yuboraman.",
   }),
 };
 

@@ -1,5 +1,5 @@
 export const DEFAULT_CUSTOMER_REPLY_FALLBACK =
-  "Thanks for your message. I am checking this and will help you right here in this chat.";
+  "I am checking the details now and will respond with the next step.";
 
 const MAX_CUSTOMER_REPLY_LENGTH = 4000;
 
