@@ -1,7 +1,9 @@
 import "server-only";
 
+import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   AGENT_TOOL_BY_NAME,
   AGENT_TOOL_NAMES,
@@ -1034,6 +1036,14 @@ async function executePlanOnContact(input: {
         skippedDuplicates,
       }),
     );
+
+    if (actionsApplied.length > 0) {
+      revalidatePath(DASHBOARD_ROUTES.contacts);
+
+      if (actionsApplied.some((action) => action.startsWith("Booking confirmed"))) {
+        revalidatePath(DASHBOARD_ROUTES.calendar);
+      }
+    }
 
     return {
       success: true,

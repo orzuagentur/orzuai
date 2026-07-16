@@ -372,11 +372,21 @@ async function syncEventToGoogle(input: {
   startDateTime: string;
   endDateTime: string;
   timeZone: string;
-}): Promise<{ googleEventId: string | null; htmlLink: string | null }> {
+}): Promise<{
+  googleEventId: string | null;
+  htmlLink: string | null;
+  attempted: boolean;
+  error: string | null;
+}> {
   const google = await getGoogleConnectionForBusiness(input.businessId);
 
   if (!google) {
-    return { googleEventId: null, htmlLink: null };
+    return {
+      googleEventId: null,
+      htmlLink: null,
+      attempted: false,
+      error: null,
+    };
   }
 
   const created = await createGoogleCalendarEvent(
@@ -392,12 +402,19 @@ async function syncEventToGoogle(input: {
   );
 
   if (!created.success || !created.event) {
-    return { googleEventId: null, htmlLink: null };
+    return {
+      googleEventId: null,
+      htmlLink: null,
+      attempted: true,
+      error: created.error ?? "Could not create Google Calendar event.",
+    };
   }
 
   return {
     googleEventId: created.event.id,
     htmlLink: created.event.htmlLink ?? null,
+    attempted: true,
+    error: null,
   };
 }
 
@@ -415,11 +432,21 @@ export async function createCalendarEventForBusiness(input: {
   customerName?: string;
   customerEmail?: string;
   isBooking?: boolean;
-}): Promise<{ success: boolean; message?: string; eventId?: string }> {
+}): Promise<{
+  success: boolean;
+  message?: string;
+  eventId?: string;
+  googleEventId?: string | null;
+  googleHtmlLink?: string | null;
+  googleSyncAttempted?: boolean;
+  googleSyncError?: string | null;
+}> {
   const admin = createAdminClient();
 
   let googleEventId: string | null = null;
   let googleHtmlLink: string | null = null;
+  let googleSyncAttempted = false;
+  let googleSyncError: string | null = null;
 
   if (input.syncToGoogle !== false) {
     const synced = await syncEventToGoogle({
@@ -432,6 +459,8 @@ export async function createCalendarEventForBusiness(input: {
     });
     googleEventId = synced.googleEventId;
     googleHtmlLink = synced.htmlLink;
+    googleSyncAttempted = synced.attempted;
+    googleSyncError = synced.error;
   }
 
   const { data, error } = await admin.from("calendar_events").insert({
@@ -458,7 +487,14 @@ export async function createCalendarEventForBusiness(input: {
   }
 
   revalidatePath(DASHBOARD_ROUTES.calendar);
-  return { success: true, eventId: data?.id };
+  return {
+    success: true,
+    eventId: data?.id,
+    googleEventId,
+    googleHtmlLink,
+    googleSyncAttempted,
+    googleSyncError,
+  };
 }
 
 export async function updateCalendarEventForBusiness(input: {

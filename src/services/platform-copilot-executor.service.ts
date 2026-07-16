@@ -8,9 +8,12 @@ import { isMessagingIntegrationChannel } from "@/features/integrations";
 import type { IntegrationChannelId } from "@/features/integrations";
 import { KNOWLEDGE_CATEGORIES } from "@/types/knowledge.types";
 import { generateBusinessCalendarFromKnowledge } from "@/services/business-calendar-setup.service";
+import { createCalendarEventForBusiness } from "@/services/calendar-events.service";
 import { sendChatMessage } from "@/services/chat.service";
 import { updateChannelAiEnabled } from "@/services/channel-workspace.service";
 import { deleteContact } from "@/services/contacts.service";
+import { createCrmDeal } from "@/services/crm-deals.service";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createKnowledgeEntry,
   deleteKnowledgeEntry,
@@ -297,6 +300,99 @@ export async function executePlatformCopilotAction(input: {
       return {
         success: true,
         message: `ИИ на канале ${channel} ${action.params.enabled ? "включён" : "выключен"}.`,
+      };
+    }
+
+    case "create_crm_deal": {
+      const admin = createAdminClient();
+      const { data: contact } = await admin
+        .from("contacts")
+        .select("id, name")
+        .eq("business_id", business.id)
+        .eq("id", action.params.contactId)
+        .maybeSingle();
+
+      if (!contact) {
+        return {
+          success: false,
+          message: "Контакт для сделки не найден в этом бизнесе.",
+        };
+      }
+
+      const result = await createCrmDeal({
+        contactId: action.params.contactId,
+        title: action.params.title,
+        value: action.params.value,
+        currency: action.params.currency,
+        stage: action.params.stage,
+        expectedCloseDate: action.params.expectedCloseDate,
+        notes: action.params.notes,
+        isPrimary: action.params.isPrimary,
+      });
+
+      if (!result.success) {
+        return { success: false, message: result.error.message };
+      }
+
+      revalidatePath(DASHBOARD_ROUTES.contacts);
+
+      const dealsHref = result.data?.dealId
+        ? `${DASHBOARD_ROUTES.contacts}?tab=deals&deal=${result.data.dealId}`
+        : `${DASHBOARD_ROUTES.contacts}?tab=deals`;
+
+      return {
+        success: true,
+        message: `Сделка «${action.params.title}» создана для ${contact.name}.`,
+        navigateTo: dealsHref,
+        navigateLabel: "Открыть сделки",
+      };
+    }
+
+    case "create_calendar_event": {
+      const start = new Date(action.params.startDateTime);
+      const end = new Date(action.params.endDateTime);
+
+      if (
+        Number.isNaN(start.getTime()) ||
+        Number.isNaN(end.getTime()) ||
+        end.getTime() <= start.getTime()
+      ) {
+        return {
+          success: false,
+          message: "Время события некорректно: окончание должно быть позже начала.",
+        };
+      }
+
+      const result = await createCalendarEventForBusiness({
+        businessId: business.id,
+        title: action.params.title,
+        description: action.params.description,
+        location: action.params.location,
+        startDateTime: start.toISOString(),
+        endDateTime: end.toISOString(),
+        timeZone: action.params.timeZone,
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          message: result.message ?? "Не удалось создать событие календаря.",
+        };
+      }
+
+      revalidatePath(DASHBOARD_ROUTES.calendar);
+
+      const syncMessage = result.googleSyncError
+        ? `Событие создано в OrzuX, но Google Calendar не принял синхронизацию: ${result.googleSyncError}`
+        : result.googleEventId
+          ? "Событие создано в OrzuX и Google Calendar."
+          : "Событие создано в OrzuX. Google Calendar не подключён.";
+
+      return {
+        success: true,
+        message: syncMessage,
+        navigateTo: DASHBOARD_ROUTES.calendar,
+        navigateLabel: "Открыть календарь",
       };
     }
 

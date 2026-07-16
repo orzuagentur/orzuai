@@ -12,7 +12,6 @@ import {
   type AiProvider,
   type AiProviderAvailability,
 } from "@/features/ai-management/providers";
-import { AI_PLATFORM_STRUCTURE } from "@/features/ai-management/structure";
 import type {
   AiManagementOverview,
   AiProviderQueueItem,
@@ -62,7 +61,7 @@ export async function fetchAiManagementOverviewAction(): Promise<AiManagementOve
   return {
     providerQueue: buildQueueItems(queue, availability),
     providerAvailability: availability,
-    structure: AI_PLATFORM_STRUCTURE,
+    structure: [],
   };
 }
 

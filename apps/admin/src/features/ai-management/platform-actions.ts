@@ -17,6 +17,17 @@ import {
 } from "@orzu/platform-ai";
 import { requirePlatformAdmin } from "@/lib/supabase/server";
 import { deleteSecret, getSecret, setSecret } from "@orzu/secrets/server";
+import type {
+  AiCredentialView,
+  AiPlatformManagementData,
+  AiUseCaseCardView,
+} from "@/features/ai-management/platform-view-types";
+
+export type {
+  AiCredentialView,
+  AiPlatformManagementData,
+  AiUseCaseCardView,
+} from "@/features/ai-management/platform-view-types";
 
 const credentialSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -61,7 +72,7 @@ function mapCredential(row: CredentialRow): PlatformAiCredentialRecord {
   return {
     id: row.id,
     name: row.name,
-    provider: row.provider,
+    provider: row.provider as PlatformAiCredentialRecord["provider"],
     secretKeyName: row.secret_key_name,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -73,7 +84,7 @@ function mapUseCase(row: UseCaseRow): PlatformAiUseCaseConfigRecord {
   return {
     useCaseId: row.use_case_id,
     credentialId: row.credential_id,
-    provider: row.provider,
+    provider: row.provider as PlatformAiUseCaseConfigRecord["provider"],
     model: row.model,
     updatedAt: row.updated_at,
   };
@@ -87,28 +98,12 @@ async function isSecretConfigured(
   return Boolean(value?.trim());
 }
 
-export type AiCredentialView = PlatformAiCredentialRecord & {
-  configured: boolean;
-};
-
-export type AiUseCaseCardView = {
-  definition: (typeof PLATFORM_AI_USE_CASES)[number];
-  config: PlatformAiUseCaseConfigRecord | null;
-  availableProviders: string[];
-  availableModels: ReturnType<typeof getModelsForProvider>;
-  selectedCredentialConfigured: boolean;
-};
-
-export type AiPlatformManagementData = {
-  credentials: AiCredentialView[];
-  useCaseCards: AiUseCaseCardView[];
-  categories: typeof PLATFORM_AI_USE_CASE_CATEGORIES;
-};
-
 function revalidateAiManagementPaths() {
   revalidatePath("/ai-management");
   revalidatePath("/ai-management/credentials");
   revalidatePath("/ai-management/use-cases");
+  revalidatePath("/ai-management/structure");
+  revalidatePath("/ai-management/prompts");
 }
 
 export async function fetchAiPlatformManagementAction(): Promise<AiPlatformManagementData> {

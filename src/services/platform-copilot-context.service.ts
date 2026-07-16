@@ -10,6 +10,8 @@ import { getWhatsAppConnection } from "@/services/whatsapp.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getGmailConnection } from "@/services/gmail-integration.service";
+import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
+import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 
 export async function buildPlatformCopilotContextBlock(
@@ -20,12 +22,16 @@ export async function buildPlatformCopilotContextBlock(
   const [
     contactsResult,
     conversationsResult,
+    dealsResult,
+    calendarEventsResult,
     knowledgeResult,
     aiSettingsResult,
     whatsappConnection,
     telegramConnection,
     websiteFormConnection,
     gmailConnection,
+    googleCalendarConnection,
+    bookingSetup,
     websiteKnowledgeSync,
   ] = await Promise.all([
     admin
@@ -43,6 +49,19 @@ export async function buildPlatformCopilotContextBlock(
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(20),
     admin
+      .from("crm_deals")
+      .select("id, contact_id, title, value, currency, stage, status, created_at")
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    admin
+      .from("calendar_events")
+      .select("id, title, start_at, end_at, timezone, google_event_id, is_booking")
+      .eq("business_id", businessId)
+      .gte("start_at", new Date().toISOString())
+      .order("start_at", { ascending: true })
+      .limit(20),
+    admin
       .from("knowledge_base")
       .select("id, title, category")
       .eq("business_id", businessId)
@@ -56,6 +75,8 @@ export async function buildPlatformCopilotContextBlock(
     getTelegramConnection(businessId),
     getWebsiteFormConnection(businessId),
     getGmailConnection(businessId),
+    getGoogleCalendarConnection(businessId),
+    getBusinessBookingSetup(businessId),
     getWebsiteKnowledgeSync(businessId),
   ]);
 
@@ -93,6 +114,26 @@ export async function buildPlatformCopilotContextBlock(
     category: row.category,
   }));
 
+  const deals = (dealsResult.data ?? []).map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    title: row.title,
+    value: row.value,
+    currency: row.currency,
+    stage: row.stage,
+    status: row.status,
+  }));
+
+  const calendarEvents = (calendarEventsResult.data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    startAt: row.start_at,
+    endAt: row.end_at,
+    timeZone: row.timezone,
+    syncedToGoogle: Boolean(row.google_event_id),
+    isBooking: row.is_booking,
+  }));
+
   const channelAi = MESSAGING_INTEGRATION_CHANNELS.map((channel) => {
     const connected = isChannelConnectedForWorkspace(channel, channelStatuses);
     const setting = (aiSettingsResult.data ?? []).find(
@@ -110,6 +151,13 @@ export async function buildPlatformCopilotContextBlock(
     {
       contacts,
       conversations,
+      deals,
+      calendar: {
+        googleConnected: googleCalendarConnection?.status === "connected",
+        accountEmail: googleCalendarConnection?.googleAccountEmail ?? null,
+        timeZone: bookingSetup?.bookingTimezone ?? "UTC",
+        upcomingEvents: calendarEvents,
+      },
       knowledgeBaseEntries: knowledge,
       channels: channelAi,
       knowledgeEntryCount: knowledge.length,

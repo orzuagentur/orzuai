@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { ContactRecordHub } from "@/components/contacts/ContactRecordHub";
+import { ContactsRealtimeRefresh } from "@/components/contacts/ContactsRealtimeRefresh";
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { getActiveMessagingChannelIds } from "@/features/integrations";
@@ -135,16 +136,19 @@ async function ContactsPageContent({ searchParams }: ContactsPageProps) {
     : [false, false];
 
   return (
-    <ContactRecordHub
-      activeTab={activeTab}
-      listData={listData}
-      leadsData={leadsData}
-      dealsData={dealsData}
-      pipelineData={pipelineData}
-      leadsPipelineData={leadsPipelineData}
-      visibleChannelIds={visibleChannelIds}
-      voiceInboxEnabled={voiceInboxEnabled}
-      smsInboxEnabled={smsInboxEnabled}
-    />
+    <>
+      {business ? <ContactsRealtimeRefresh businessId={business.id} /> : null}
+      <ContactRecordHub
+        activeTab={activeTab}
+        listData={listData}
+        leadsData={leadsData}
+        dealsData={dealsData}
+        pipelineData={pipelineData}
+        leadsPipelineData={leadsPipelineData}
+        visibleChannelIds={visibleChannelIds}
+        voiceInboxEnabled={voiceInboxEnabled}
+        smsInboxEnabled={smsInboxEnabled}
+      />
+    </>
   );
 }

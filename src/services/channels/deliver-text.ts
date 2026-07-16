@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendTelegramTextMessage } from "@/lib/telegram/client";
+import { hasTwilioApiCredentials, sendTwilioSms } from "@/lib/twilio/client";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import {
   getCachedTelegramDeliveryConnection,
@@ -8,6 +9,12 @@ import {
 } from "@/services/channels/connection-cache";
 import { deliverEmailTextMessage, deliverFacebookMessengerTextMessage } from "@/services/channels/deliver-email";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
+import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
+import {
+  getTwilioConnection,
+  resolveTwilioCredentialsForBusiness,
+} from "@/services/twilio-integration.service";
+import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -84,6 +91,46 @@ export async function deliverChannelTextMessage(input: {
       subject: input.emailSubject?.trim() || "Message from your business",
       content: input.content,
     });
+  }
+
+  if (input.channel === "sms") {
+    if (!(await isPlatformFeatureAllowed(input.businessId, "sms"))) {
+      return { success: false, error: "SMS is disabled for this business." };
+    }
+
+    const settings = await getVoiceAgentSettings(input.businessId);
+    const from = settings.phoneNumber?.trim();
+
+    if (!settings.smsEnabled || !from) {
+      return { success: false, error: "SMS is not configured for this line." };
+    }
+
+    const credentials = await resolveTwilioCredentialsForBusiness(
+      await getTwilioConnection(input.businessId),
+    );
+
+    if (!hasTwilioApiCredentials(credentials)) {
+      return { success: false, error: "Twilio credentials missing." };
+    }
+
+    try {
+      const providerMessageId = await sendTwilioSms({
+        credentials,
+        from,
+        to: input.recipientId,
+        body: input.content,
+      });
+
+      return { success: true, providerMessageId };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message.slice(0, 200)
+            : "Unable to send SMS.",
+      };
+    }
   }
 
   if (input.channel === "facebook_messenger") {

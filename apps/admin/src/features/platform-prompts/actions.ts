@@ -109,6 +109,7 @@ function groupPromptRows(rows: PlatformPromptRecord[]): PlatformPromptGroup[] {
 
 function revalidatePromptPaths(): void {
   revalidatePath("/ai-management/prompts");
+  revalidatePath("/ai-management/structure");
 }
 
 export async function fetchPlatformPromptsAction(): Promise<{

@@ -15,7 +15,10 @@ import {
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
-import { insertChannelMessage } from "@/services/messaging.service";
+import {
+  insertChannelMessage,
+  scheduleInboundMessageProcessing,
+} from "@/services/messaging.service";
 import { getMessageRepository } from "@/repositories/message.repository";
 
 export async function handleInboundTwilioSms(input: {
@@ -63,11 +66,23 @@ export async function handleInboundTwilioSms(input: {
     return;
   }
 
-  await insertInboundChannelMessage(admin, {
+  const inserted = await insertInboundChannelMessage(admin, {
     conversationId: context.conversationId,
     channel: "sms",
     content: text,
     externalMessageId: input.messageSid,
+  });
+
+  if (!inserted || inserted.isDuplicate) {
+    return;
+  }
+
+  await scheduleInboundMessageProcessing({
+    admin,
+    businessId: input.businessId,
+    channel: "sms",
+    conversationId: context.conversationId,
+    clientMessage: text,
   });
 }
 

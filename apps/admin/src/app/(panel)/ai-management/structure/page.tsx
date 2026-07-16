@@ -1,5 +1,5 @@
 import { AiManagementStructurePanel } from "@/components/AiManagementStructurePanel";
-import { fetchAiManagementOverviewAction } from "@/features/ai-management/actions";
+import { fetchAiStructureLiveAction } from "@/features/ai-management/structure-actions";
 
 export const metadata = {
   title: "Структура AI | OrzuX Admin",
@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default async function AiManagementStructurePage() {
-  const overview = await fetchAiManagementOverviewAction();
+  const data = await fetchAiStructureLiveAction();
 
-  return <AiManagementStructurePanel sections={overview.structure} />;
+  return <AiManagementStructurePanel data={data} />;
 }

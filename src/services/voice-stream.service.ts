@@ -24,6 +24,7 @@ import {
 import {
   loadPhoneVoiceSettings,
 } from "@/services/voice-phone-tts.service";
+import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
 
 const MAX_STREAM_TURNS = 24;
@@ -86,6 +87,63 @@ async function getOrCreateStreamSession(input: {
     ...created,
     turns: [] as VoiceCallSessionTurn[],
   };
+}
+
+function normalizeCallerPhone(phoneNumber?: string | null): string | null {
+  const normalized = phoneNumber?.trim();
+
+  if (!normalized || normalized === "stream" || normalized === "unknown") {
+    return null;
+  }
+
+  return normalized;
+}
+
+function scheduleVoiceStreamOrchestration(input: {
+  businessId: string;
+  callSid: string;
+  callerPhone?: string | null;
+  clientMessage: string;
+  conversationHistory: VoiceCallSessionTurn[];
+}): void {
+  const callerPhone = normalizeCallerPhone(input.callerPhone);
+
+  if (callerPhone) {
+    void scheduleVoiceTurnOrchestration({
+      businessId: input.businessId,
+      callerPhone,
+      clientMessage: input.clientMessage,
+      conversationHistory: input.conversationHistory,
+    });
+    return;
+  }
+
+  void (async () => {
+    const callLog = await getVoiceRepository().findCallLogByExternalCallId(
+      input.callSid,
+    );
+    const resolvedPhone = normalizeCallerPhone(callLog?.phone_number);
+
+    if (!resolvedPhone) {
+      return;
+    }
+
+    await scheduleVoiceTurnOrchestration({
+      businessId: input.businessId,
+      callerPhone: resolvedPhone,
+      clientMessage: input.clientMessage,
+      conversationHistory: input.conversationHistory,
+    });
+  })().catch((error) => {
+    console.warn(
+      "[voice-stream] background orchestration failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        callSid: input.callSid,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  });
 }
 
 export async function getVoiceStreamSessionContext(input: {
@@ -222,6 +280,14 @@ export async function generateVoiceStreamReply(input: {
     turnCount: session.turn_count + 1,
   });
 
+  scheduleVoiceStreamOrchestration({
+    businessId: input.businessId,
+    callSid: input.callSid,
+    callerPhone: callLog?.phone_number,
+    clientMessage: input.userMessage,
+    conversationHistory: updatedTurns,
+  });
+
   return {
     text: assistantText,
     endCall: session.turn_count + 1 >= MAX_STREAM_TURNS,
@@ -311,6 +377,14 @@ export async function* generateVoiceStreamReplyStream(input: {
     turnCount: session.turn_count + 1,
   });
 
+  scheduleVoiceStreamOrchestration({
+    businessId: input.businessId,
+    callSid: input.callSid,
+    callerPhone: callLog?.phone_number,
+    clientMessage: input.userMessage,
+    conversationHistory: updatedTurns,
+  });
+
   yield {
     type: "done",
     text: assistantText,
@@ -350,6 +424,15 @@ export async function appendVoiceStreamSessionTurn(input: {
     turns,
     turnCount: Math.max(session.turn_count, Math.ceil(turns.length / 2)),
   });
+
+  if (input.role === "user") {
+    scheduleVoiceStreamOrchestration({
+      businessId: input.businessId,
+      callSid: input.callSid,
+      clientMessage: input.content,
+      conversationHistory: turns,
+    });
+  }
 }
 
 export async function handleVoiceStreamLifecycle(input: {

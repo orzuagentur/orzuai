@@ -1,7 +1,14 @@
 import { z } from "zod";
 
+import { DEAL_CURRENCIES } from "@/lib/deal-currency";
 import { KNOWLEDGE_CATEGORIES } from "@/types/knowledge.types";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
+import { PIPELINE_STAGES } from "@/types/contact.types";
+
+const dealCurrencyCodes = DEAL_CURRENCIES.map((entry) => entry.code) as [
+  string,
+  ...string[],
+];
 
 export const PLATFORM_COPILOT_MODES = ["chat", "full_access"] as const;
 
@@ -15,6 +22,8 @@ export const COPILOT_ACTION_TYPES = [
   "delete_contact",
   "send_message",
   "toggle_channel_ai",
+  "create_crm_deal",
+  "create_calendar_event",
   "web_research_kb",
 ] as const;
 
@@ -29,6 +38,8 @@ export const FULL_ACCESS_ACTION_TYPES = new Set<CopilotActionType>([
   "delete_contact",
   "send_message",
   "toggle_channel_ai",
+  "create_crm_deal",
+  "create_calendar_event",
   "web_research_kb",
   "navigate",
 ]);
@@ -95,6 +106,35 @@ export const copilotToggleChannelActionSchema = copilotActionBaseSchema.extend({
   }),
 });
 
+export const copilotCreateCrmDealActionSchema =
+  copilotActionBaseSchema.extend({
+    type: z.literal("create_crm_deal"),
+    params: z.object({
+      contactId: z.string().uuid(),
+      title: z.string().trim().min(1).max(200),
+      value: z.number().min(0).max(999999999).optional().nullable(),
+      currency: z.enum(dealCurrencyCodes).optional(),
+      stage: z.enum(PIPELINE_STAGES).optional(),
+      expectedCloseDate: z.string().trim().max(32).optional().nullable(),
+      notes: z.string().trim().max(2000).optional().nullable(),
+      isPrimary: z.boolean().optional(),
+      contactName: z.string().trim().max(200).optional(),
+    }),
+  });
+
+export const copilotCreateCalendarEventActionSchema =
+  copilotActionBaseSchema.extend({
+    type: z.literal("create_calendar_event"),
+    params: z.object({
+      title: z.string().trim().min(1).max(200),
+      description: z.string().trim().max(10000).optional(),
+      location: z.string().trim().max(500).optional(),
+      startDateTime: z.string().trim().min(1).max(80),
+      endDateTime: z.string().trim().min(1).max(80),
+      timeZone: z.string().trim().min(1).max(80).default("UTC"),
+    }),
+  });
+
 export const copilotWebResearchActionSchema = copilotActionBaseSchema.extend({
   type: z.literal("web_research_kb"),
   params: z.object({
@@ -111,6 +151,8 @@ export const copilotActionSchema = z.discriminatedUnion("type", [
   copilotDeleteContactActionSchema,
   copilotSendMessageActionSchema,
   copilotToggleChannelActionSchema,
+  copilotCreateCrmDealActionSchema,
+  copilotCreateCalendarEventActionSchema,
   copilotWebResearchActionSchema,
 ]);
 

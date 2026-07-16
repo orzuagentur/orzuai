@@ -39,7 +39,7 @@ export function buildPlatformCopilotAgentInstruction(
 ): string {
   const modeLine =
     mode === "full_access"
-      ? "Mode: FULL ACCESS — you may propose real platform actions (contacts, messages, knowledge base, channels, calendar). Every action still needs user confirmation via button."
+      ? "Mode: FULL ACCESS — you may propose real platform actions (CRM deals, calendar events, contacts, messages, knowledge base, channels). Every action still needs user confirmation via button."
       : "Mode: CHAT — answer questions and navigate. For write/delete/send actions, explain what you would do and propose switching to Full Access mode, or only propose navigate actions.";
 
   return [
@@ -57,14 +57,18 @@ export function buildPlatformCopilotAgentInstruction(
     "- delete_contact",
     "- send_message: send text to a customer conversation (use conversationId from context)",
     `- toggle_channel_ai: enable/disable AI on channels (${MESSAGING_INTEGRATION_CHANNELS.join(", ")})`,
+    "- create_crm_deal: create a CRM deal for an existing contactId from context",
+    "- create_calendar_event: create an OrzuX calendar event; it syncs to Google Calendar when connected",
     "- web_research_kb: search the internet and create knowledge base entries",
     "",
     "When user asks to message a client:",
     "1. Find the best matching contact/conversation in context",
     "2. Draft the message",
     "3. Propose send_message action with conversationId and content",
-  "",
+    "",
     "When user asks about calendar/booking setup — propose setup_calendar even if knowledge base is sparse.",
+    "When user asks to create a specific calendar event or meeting, propose create_calendar_event with ISO start/end and an IANA timeZone. If the date/time is ambiguous, ask one short clarifying question.",
+    "When user asks to create a deal, lead opportunity, sale, or CRM pipeline item, find the best matching contact in context and propose create_crm_deal. If no contact matches, ask which contact to use instead of inventing a contactId.",
     "When user asks to build knowledge base — ask at most 1-2 short clarifying questions in reply, then propose web_research_kb or create_knowledge_entry actions.",
     "",
     "Route catalog:",
@@ -89,6 +93,8 @@ export function buildPlatformCopilotAgentInstruction(
     "- actions array can be empty",
     "- every action needs clear label and summary for confirmation",
     "- use real IDs from context only — never invent UUIDs",
+    "- create_crm_deal.contactId must be a contact id from Business context",
+    "- create_calendar_event must include startDateTime/endDateTime as ISO strings and timeZone like Europe/Berlin",
     "- max 4 quickReplies, max 6 actions",
     "- be concise in reply (2-5 sentences)",
   ].join("\n");
@@ -114,6 +120,7 @@ export function buildPlatformCopilotAgentPrompt(input: {
     historyBlock,
     `Current page: ${input.currentPath}`,
     `Copilot mode: ${input.mode}`,
+    `Current time: ${new Date().toISOString()}`,
     "",
     "Business context:",
     input.contextBlock,

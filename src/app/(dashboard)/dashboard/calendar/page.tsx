@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CalendarNotificationsMarkRead } from "@/components/google-calendar/CalendarNotificationsMarkRead";
+import { CalendarRealtimeRefresh } from "@/components/orzux-calendar/CalendarRealtimeRefresh";
 import { OrzuxCalendar } from "@/components/orzux-calendar/OrzuxCalendar";
 import { getCurrentUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -94,6 +95,7 @@ async function CalendarPageContent() {
   return (
     <>
       <CalendarNotificationsMarkRead />
+      <CalendarRealtimeRefresh businessId={business.id} />
       <OrzuxCalendar
         events={events}
         slots={availability.slots}
