@@ -14,6 +14,8 @@ export async function fetchNavBadgeCountsAction() {
         inboxUnread: 0,
         crmUnread: 0,
         calendarAiUnread: 0,
+        overdueTasks: 0,
+        upcomingEvents: 0,
         unreadByChannel: createEmptyUnreadByChannel(),
       },
     };
@@ -29,6 +31,8 @@ export async function fetchNavBadgeCountsAction() {
         inboxUnread: 0,
         crmUnread: 0,
         calendarAiUnread: 0,
+        overdueTasks: 0,
+        upcomingEvents: 0,
         unreadByChannel: createEmptyUnreadByChannel(),
       },
     };

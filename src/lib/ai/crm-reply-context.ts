@@ -2,12 +2,15 @@ import { AI_CONTEXT_LIMITS } from "@/lib/ai/context-window";
 
 export type CrmReplyContactSnapshot = {
   name: string;
+  email?: string | null;
+  phone?: string | null;
   pipelineStage: string | null;
   dealValue: number | null;
   leadScore: number | null;
   expectedCloseDate: string | null;
   aiSummary: string | null;
   openTaskCount: number;
+  customFields?: Record<string, unknown> | null;
 };
 
 export function buildCrmReplyContext(

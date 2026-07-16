@@ -217,6 +217,60 @@ async function sendFollowUpOnChannel(input: {
 }
 
 /** Schedule 24h/48h follow-up jobs after an AI reply is delivered. */
+/** Explicit orchestrator-driven follow-up (custom delay, day-1 slot). */
+export async function scheduleOrchestratorFollowUp(input: {
+  admin?: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  delayHours?: number;
+  contactName?: string | null;
+  reason?: string | null;
+}): Promise<void> {
+  if (!hasSupabaseEnv()) {
+    return;
+  }
+
+  if (!["whatsapp", "telegram", "website_forms"].includes(input.channel)) {
+    return;
+  }
+
+  const admin = input.admin ?? createAdminClient();
+  const delayHours = Math.max(1, Math.min(168, input.delayHours ?? 24));
+  const scheduledAt = new Date(Date.now() + delayHours * HOUR_MS).toISOString();
+  const contactName = input.contactName?.trim() || "there";
+  const content = (
+    input.reason?.trim() ||
+    "Following up on our conversation — happy to help with the next step."
+  ).slice(0, 2000);
+
+  const { error } = await admin.from("follow_up_jobs").upsert(
+    {
+      business_id: input.businessId,
+      conversation_id: input.conversationId,
+      channel: input.channel,
+      follow_up_day: 1,
+      scheduled_at: scheduledAt,
+      status: "pending",
+      last_outbound_content: content,
+      contact_name: contactName.slice(0, 200),
+      attempt_count: 0,
+      last_error: null,
+    },
+    { onConflict: "conversation_id,follow_up_day" },
+  );
+
+  if (error) {
+    console.warn(
+      "[follow-up-agent] orchestrator schedule failed",
+      JSON.stringify({
+        conversationId: input.conversationId,
+        error: error.message,
+      }),
+    );
+  }
+}
+
 export async function scheduleFollowUpJobsAfterAiReply(input: {
   admin?: MessagingDbClient;
   businessId: string;

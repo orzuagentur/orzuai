@@ -347,6 +347,9 @@ export const AI_ASSISTANT_MESSAGES = {
   crmUpdateModeEveryMessage: "Every message",
   crmUpdateModeIdle5Min: "After 5 minutes idle",
   crmUpdateModeOnResolve: "When conversation is resolved",
+  dataCollectionTitle: "Data Collection Fields",
+  dataCollectionDescription:
+    "Define what the AI must gather from customers. Niche presets seed defaults; the AI only asks for missing values and writes them into CRM.",
   byokTitle: "Your own AI API keys (BYOK)",
   byokDescription:
     "Optionally use your Gemini or OpenAI key for this business. If missing or invalid, OrzuX falls back to Platform AI included in your plan.",

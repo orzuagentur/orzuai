@@ -1,10 +1,22 @@
 import {
   executorAddInternalNoteActionSchema,
   executorAddNoteActionSchema,
+  executorCancelCalendarEventActionSchema,
   executorCreateCalendarEventActionSchema,
   executorCreateContactActionSchema,
   executorCreateDealActionSchema,
+  executorCreateLeadActionSchema,
   executorCreateTaskActionSchema,
+  executorGetBookingStatusActionSchema,
+  executorListUpcomingActionSchema,
+  executorRequestHumanActionSchema,
+  executorRescheduleCalendarEventActionSchema,
+  executorScheduleEventReminderActionSchema,
+  executorScheduleFollowUpActionSchema,
+  executorSendCustomerMessageActionSchema,
+  executorUpdateCollectedFieldsActionSchema,
+  executorUpdateDealStageActionSchema,
+  executorUpdateTaskStatusActionSchema,
 } from "@/types/agent-executor.types";
 
 import type { AgentToolDefinition, AgentToolName } from "./types";
@@ -20,6 +32,18 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
       "Use when no contact exists and the customer shares name plus phone or email.",
     executorHint: "Only when conversation has no linked contact.",
     schema: executorCreateContactActionSchema,
+  },
+  {
+    name: "create_lead",
+    permission: "canUpdateContact",
+    customerVisible: true,
+    runsWithoutContact: true,
+    description:
+      "Create a new lead contact (alias of create_contact with pipeline new).",
+    orchestratorHint:
+      "Use for new inbound leads when capturing name/contact details for CRM.",
+    executorHint: "Maps to create_contact with pipelineStage=new by default.",
+    schema: executorCreateLeadActionSchema,
   },
   {
     name: "create_task",
@@ -75,6 +99,129 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     executorHint:
       "Deterministic booking: code resolves conflicts and sends confirmation email.",
     schema: executorCreateCalendarEventActionSchema,
+  },
+  {
+    name: "list_upcoming_for_contact",
+    permission: "canCreateCalendarEvent",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "List upcoming bookings/events for this contact.",
+    orchestratorHint:
+      "Use when the customer asks what is booked, scheduled, or upcoming.",
+    executorHint: "Returns upcoming calendar_events matched by email/name.",
+    schema: executorListUpcomingActionSchema,
+  },
+  {
+    name: "get_booking_status",
+    permission: "canCreateCalendarEvent",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "Get status of the next or specified booking/event.",
+    orchestratorHint:
+      "Use when the customer asks about booking/order/appointment status.",
+    executorHint: "Looks up calendar_events by eventId or next upcoming match.",
+    schema: executorGetBookingStatusActionSchema,
+  },
+  {
+    name: "reschedule_calendar_event",
+    permission: "canCreateCalendarEvent",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description: "Reschedule an existing calendar booking/event.",
+    orchestratorHint:
+      "Use when the customer wants to change date/time of an existing booking.",
+    executorHint: "Calls updateCalendarEventForBusiness (+ Google if linked).",
+    schema: executorRescheduleCalendarEventActionSchema,
+  },
+  {
+    name: "cancel_calendar_event",
+    permission: "canCreateCalendarEvent",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description: "Cancel an existing calendar booking/event.",
+    orchestratorHint:
+      "Use when the customer wants to cancel a booking/appointment.",
+    executorHint: "Calls deleteCalendarEventForBusiness (+ Google if linked).",
+    schema: executorCancelCalendarEventActionSchema,
+  },
+  {
+    name: "schedule_event_reminder",
+    permission: "canCreateCalendarEvent",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "Schedule a proactive reminder before an upcoming event.",
+    orchestratorHint:
+      "Use after booking or when the customer wants a reminder before the visit.",
+    executorHint: "Writes event_reminder_jobs; cron sends the message.",
+    schema: executorScheduleEventReminderActionSchema,
+  },
+  {
+    name: "update_collected_fields",
+    permission: "canUpdateContact",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description:
+      "Save data-collection answers into CRM and contacts.custom_fields.collection.",
+    orchestratorHint:
+      "Use whenever the customer provides values for configured collection fields. Do not re-ask known fields.",
+    executorHint: "Merges answers into CRM columns via crmMap + collection map.",
+    schema: executorUpdateCollectedFieldsActionSchema,
+  },
+  {
+    name: "update_task_status",
+    permission: "canCreateTask",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "Mark a CRM task open or done.",
+    orchestratorHint:
+      "Use when a follow-up task should be closed or reopened.",
+    executorHint: "Updates crm_tasks status by id or latest matching title.",
+    schema: executorUpdateTaskStatusActionSchema,
+  },
+  {
+    name: "update_deal_stage",
+    permission: "canCreateDeal",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description: "Move a CRM deal to a new pipeline stage.",
+    orchestratorHint:
+      "Use when the sales stage changes (qualified, proposal, won, lost).",
+    executorHint: "Updates crm_deals + syncs primary deal to contact.",
+    schema: executorUpdateDealStageActionSchema,
+  },
+  {
+    name: "schedule_follow_up",
+    permission: "canCreateTask",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "Schedule an automatic outbound follow-up message.",
+    orchestratorHint:
+      "Use when the customer should be nudged later and no booking was made.",
+    executorHint: "Writes follow_up_jobs with custom delayHours (default 24).",
+    schema: executorScheduleFollowUpActionSchema,
+  },
+  {
+    name: "send_customer_message",
+    permission: "canSendProactiveMessage",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description:
+      "Send a proactive customer message on the conversation channel.",
+    orchestratorHint:
+      "Use for confirmations, status answers, or reminders the customer asked for now. Do not spam.",
+    executorHint: "sendChannelAutoReplyText + insertChannelMessage (ai).",
+    schema: executorSendCustomerMessageActionSchema,
+  },
+  {
+    name: "request_human",
+    permission: "canRequestHuman",
+    customerVisible: false,
+    runsWithoutContact: false,
+    description: "Escalate to a human manager after customer confirmation.",
+    orchestratorHint:
+      "Use only when the customer clearly wants a human, or after handoffConfirmed.",
+    executorHint: "Creates ai_human_requests + owner notification.",
+    schema: executorRequestHumanActionSchema,
   },
 ];
 

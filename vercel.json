@@ -47,6 +47,14 @@
     {
       "path": "/api/cron/gmail-watch-renew",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/google-calendar-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/event-reminders",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -11,7 +11,12 @@ import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunic
 import { AiLanguageSelect } from "@/components/ai-assistant/AiLanguageSelect";
 import { AiReplyWaitSelect } from "@/components/ai-assistant/AiReplyWaitSelect";
 import { BusinessAiKeysPanel } from "@/components/ai-assistant/BusinessAiKeysPanel";
+import { DataCollectionFieldsEditor } from "@/components/ai-assistant/DataCollectionFieldsEditor";
 import { SalesAgentRulesPanel } from "@/components/ai-assistant/SalesAgentRulesPanel";
+import {
+  type CollectionNiche,
+  type DataCollectionField,
+} from "@/lib/ai/data-collection";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -63,6 +68,7 @@ type AgentPermissions = Pick<
   | "canNotifyOwner"
   | "canNotifyOnActions"
   | "canSummarizeActionsInChat"
+  | "canSendProactiveMessage"
   | "canReply"
 >;
 
@@ -98,8 +104,13 @@ const CRM_PERMISSION_ROWS: Array<{
   },
   {
     key: "canCreateCalendarEvent",
-    label: "Create Google Calendar events",
-    description: "Bookings when Google Calendar is connected.",
+    label: "Manage calendar bookings",
+    description: "Create, reschedule, cancel, and schedule event reminders.",
+  },
+  {
+    key: "canSendProactiveMessage",
+    label: "Send proactive customer messages",
+    description: "Status updates and reminders outside the main auto-reply.",
   },
 ];
 
@@ -158,6 +169,12 @@ export function AiAssistantEditPanel({
   const [crmUpdateMode, setCrmUpdateMode] = useState<CrmUpdateMode>(
     profile.crmUpdateMode ?? "every_message",
   );
+  const [collectionNiche, setCollectionNiche] = useState<CollectionNiche>(
+    profile.collectionNiche ?? "generic",
+  );
+  const [dataCollectionFields, setDataCollectionFields] = useState<
+    DataCollectionField[]
+  >(profile.dataCollectionFields ?? []);
   const [permissions, setPermissions] = useState<AgentPermissions>({
     canReply: profile.canReply,
     canCreateTask: profile.canCreateTask,
@@ -170,6 +187,7 @@ export function AiAssistantEditPanel({
     canNotifyOwner: profile.canNotifyOwner,
     canNotifyOnActions: profile.canNotifyOnActions,
     canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
+    canSendProactiveMessage: profile.canSendProactiveMessage ?? true,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
@@ -195,6 +213,8 @@ export function AiAssistantEditPanel({
         scheduleTimezone,
         scheduleSlots,
         crmUpdateMode,
+        collectionNiche,
+        dataCollectionFields,
         ...permissions,
       });
 
@@ -245,6 +265,8 @@ export function AiAssistantEditPanel({
         scheduleTimezone,
         scheduleSlots,
         crmUpdateMode,
+        collectionNiche,
+        dataCollectionFields,
         ...nextPermissions,
       });
 
@@ -431,6 +453,21 @@ export function AiAssistantEditPanel({
                   {AI_ASSISTANT_MESSAGES.crmUpdateModeOnResolve}
                 </option>
               </select>
+            </div>
+
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <Label>{AI_ASSISTANT_MESSAGES.dataCollectionTitle}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {AI_ASSISTANT_MESSAGES.dataCollectionDescription}
+                </p>
+              </div>
+              <DataCollectionFieldsEditor
+                niche={collectionNiche}
+                fields={dataCollectionFields}
+                onNicheChange={setCollectionNiche}
+                onFieldsChange={setDataCollectionFields}
+              />
             </div>
 
             <div className="space-y-3 rounded-lg border p-4">

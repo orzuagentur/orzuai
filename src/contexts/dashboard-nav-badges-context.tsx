@@ -22,6 +22,8 @@ const DEFAULT_COUNTS: DashboardNavBadgeCounts = {
   inboxUnread: 0,
   crmUnread: 0,
   calendarAiUnread: 0,
+  overdueTasks: 0,
+  upcomingEvents: 0,
   unreadByChannel: createEmptyUnreadByChannel(),
 };
 

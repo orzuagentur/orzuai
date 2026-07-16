@@ -1405,6 +1405,60 @@ export type Database = {
           },
         ];
       };
+      event_reminder_jobs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          contact_id: string | null;
+          event_id: string;
+          channel: MessagingChannel;
+          hours_before: number;
+          scheduled_at: string;
+          message_body: string;
+          status: string;
+          attempt_count: number;
+          max_attempts: number;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          contact_id?: string | null;
+          event_id: string;
+          channel: MessagingChannel;
+          hours_before?: number;
+          scheduled_at: string;
+          message_body?: string;
+          status?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          contact_id?: string | null;
+          event_id?: string;
+          channel?: MessagingChannel;
+          hours_before?: number;
+          scheduled_at?: string;
+          message_body?: string;
+          status?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       canned_responses: {
         Row: {
           id: string;
@@ -3290,6 +3344,9 @@ export type Database = {
           can_notify_owner: boolean;
           can_notify_on_actions: boolean;
           can_summarize_actions_in_chat: boolean;
+          collection_niche: string;
+          data_collection_fields: Json;
+          can_send_proactive_message: boolean;
           voice_reply_enabled: boolean;
           elevenlabs_voice_id: string | null;
           elevenlabs_voice_name: string | null;
@@ -3320,6 +3377,9 @@ export type Database = {
           can_notify_owner?: boolean;
           can_notify_on_actions?: boolean;
           can_summarize_actions_in_chat?: boolean;
+          collection_niche?: string;
+          data_collection_fields?: Json;
+          can_send_proactive_message?: boolean;
           voice_reply_enabled?: boolean;
           elevenlabs_voice_id?: string | null;
           elevenlabs_voice_name?: string | null;
@@ -3350,6 +3410,9 @@ export type Database = {
           can_notify_owner?: boolean;
           can_notify_on_actions?: boolean;
           can_summarize_actions_in_chat?: boolean;
+          collection_niche?: string;
+          data_collection_fields?: Json;
+          can_send_proactive_message?: boolean;
           voice_reply_enabled?: boolean;
           elevenlabs_voice_id?: string | null;
           elevenlabs_voice_name?: string | null;
@@ -4231,6 +4294,12 @@ export type Database = {
           p_limit?: number;
         };
         Returns: Database["public"]["Tables"]["follow_up_jobs"]["Row"][];
+      };
+      claim_event_reminder_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["event_reminder_jobs"]["Row"][];
       };
       claim_voice_post_call_jobs: {
         Args: {

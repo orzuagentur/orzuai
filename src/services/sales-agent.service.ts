@@ -155,7 +155,7 @@ function buildPlannedActions(
   }
 
   if (settings.autoTaskEnabled && averageScore >= settings.autoTaskThreshold) {
-    actions.push("Create high-intent CRM task (if enabled separately)");
+    actions.push("Create high-intent CRM task");
   }
 
   if (settings.autoDealEnabled && averageScore >= settings.autoDealThreshold) {
@@ -360,5 +360,16 @@ export async function processSalesAgentRules(input: {
     settings,
     conversationId: input.conversationId,
     channel: input.channel,
+  });
+
+  // High-intent CRM task (uses updated lead_score + keyword signal).
+  const { processHighIntentTaskRule } = await import(
+    "@/services/high-intent-task.service"
+  );
+  await processHighIntentTaskRule({
+    admin: input.admin,
+    businessId: input.businessId,
+    contactId: input.contactId,
+    message: input.message,
   });
 }

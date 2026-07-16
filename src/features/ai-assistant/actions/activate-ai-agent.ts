@@ -51,6 +51,9 @@ export async function activateAiAgentAction(): Promise<{
     canNotifyOwner: profile.canNotifyOwner,
     canNotifyOnActions: profile.canNotifyOnActions,
     canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
+    canSendProactiveMessage: profile.canSendProactiveMessage,
+    collectionNiche: profile.collectionNiche,
+    dataCollectionFields: profile.dataCollectionFields,
   });
 
   if (!saved.success) {

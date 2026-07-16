@@ -181,22 +181,24 @@ function parseGoogleEventDateTimes(event: GoogleCalendarEvent): {
 export async function syncGoogleCalendarEventsForBusiness(
   businessId: string,
   options?: { revalidate?: boolean },
-): Promise<{ synced: number; syncError?: string }> {
+): Promise<{ synced: number; removed: number; syncError?: string }> {
   const result = await getGoogleCalendarEventsForBusiness(businessId);
 
   if (!result) {
-    return { synced: 0 };
+    return { synced: 0, removed: 0 };
   }
 
   if (result.syncError) {
-    return { synced: 0, syncError: result.syncError };
+    return { synced: 0, removed: 0, syncError: result.syncError };
   }
 
   const admin = createAdminClient();
   let synced = 0;
+  const seenGoogleIds = new Set<string>();
 
   for (const event of result.events) {
     const { startAt, endAt, isAllDay } = parseGoogleEventDateTimes(event);
+    seenGoogleIds.add(event.id);
 
     const { data: existing } = await admin
       .from("calendar_events")
@@ -241,11 +243,36 @@ export async function syncGoogleCalendarEventsForBusiness(
     }
   }
 
+  // Delete reconciliation: remove local google_sync rows no longer present in Google.
+  let removed = 0;
+  const { data: localGoogleRows } = await admin
+    .from("calendar_events")
+    .select("id, google_event_id")
+    .eq("business_id", businessId)
+    .eq("source", "google_sync")
+    .not("google_event_id", "is", null);
+
+  for (const row of localGoogleRows ?? []) {
+    if (!row.google_event_id || seenGoogleIds.has(row.google_event_id)) {
+      continue;
+    }
+
+    const { error } = await admin
+      .from("calendar_events")
+      .delete()
+      .eq("id", row.id)
+      .eq("business_id", businessId);
+
+    if (!error) {
+      removed += 1;
+    }
+  }
+
   if (options?.revalidate) {
     revalidatePath(DASHBOARD_ROUTES.calendar);
   }
 
-  return { synced, syncError: result.syncError };
+  return { synced, removed, syncError: result.syncError };
 }
 
 export function mergeCalendarEvents(input: {

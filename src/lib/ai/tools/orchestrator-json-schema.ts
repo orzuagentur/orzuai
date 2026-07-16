@@ -52,7 +52,7 @@ export const ORCHESTRATOR_PLAN_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      maxItems: 5,
+      maxItems: 10,
       items: {
         type: "object",
         additionalProperties: false,
@@ -78,6 +78,46 @@ export const ORCHESTRATOR_PLAN_JSON_SCHEMA = {
           resourceId: { type: "string" },
           bookingPageId: { type: "string" },
           pipelineStage: { type: "string", enum: [...PIPELINE_STAGES] },
+          formAnswers: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            description:
+              "Booking form fields as strings (guestCount, partySize, firstName, lastName, email, phone, notes, etc.).",
+          },
+          answers: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            description:
+              "Key/value answers for update_collected_fields (data collection field keys).",
+          },
+          delayHours: {
+            type: "number",
+            description: "Hours until follow-up for schedule_follow_up (1–168).",
+          },
+          reason: {
+            type: "string",
+            description: "Reason for request_human, cancel_calendar_event, or schedule_follow_up.",
+          },
+          eventId: { type: "string", description: "Calendar event UUID." },
+          taskId: { type: "string", description: "CRM task UUID." },
+          dealId: { type: "string", description: "CRM deal UUID." },
+          status: {
+            type: "string",
+            enum: ["open", "done"],
+            description: "Task status for update_task_status.",
+          },
+          hoursBefore: {
+            type: "number",
+            description: "Hours before event for schedule_event_reminder.",
+          },
+          message: {
+            type: "string",
+            description: "Optional reminder message body.",
+          },
+          limit: {
+            type: "number",
+            description: "Max events for list_upcoming_for_contact.",
+          },
         },
       },
     },

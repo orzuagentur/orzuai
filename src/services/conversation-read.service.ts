@@ -62,8 +62,50 @@ export type DashboardNavBadgeCounts = {
   inboxUnread: number;
   crmUnread: number;
   calendarAiUnread: number;
+  overdueTasks: number;
+  upcomingEvents: number;
   unreadByChannel: Record<MessagingChannel, number>;
 };
+
+async function countOverdueAndUpcoming(
+  businessId: string,
+): Promise<{ overdueTasks: number; upcomingEvents: number }> {
+  const admin = createAdminClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const upcomingUntil = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+
+  const [
+    { count: overdueCrm },
+    { count: overdueCalendarTasks },
+    { count: upcomingEvents },
+  ] = await Promise.all([
+    admin
+      .from("crm_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .eq("status", "open")
+      .lt("due_at", nowIso)
+      .not("due_at", "is", null),
+    admin
+      .from("calendar_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .eq("status", "open")
+      .lt("due_at", nowIso),
+    admin
+      .from("calendar_events")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .gte("start_at", nowIso)
+      .lte("start_at", upcomingUntil),
+  ]);
+
+  return {
+    overdueTasks: (overdueCrm ?? 0) + (overdueCalendarTasks ?? 0),
+    upcomingEvents: upcomingEvents ?? 0,
+  };
+}
 
 export async function getDashboardNavBadgeCounts(
   businessId: string,
@@ -73,6 +115,8 @@ export async function getDashboardNavBadgeCounts(
     inboxUnread: 0,
     crmUnread: 0,
     calendarAiUnread: 0,
+    overdueTasks: 0,
+    upcomingEvents: 0,
     unreadByChannel: createEmptyUnreadByChannel(),
   };
 
@@ -158,15 +202,17 @@ export async function getDashboardNavBadgeCounts(
   }
 
   const admin = createAdminClient();
-  const calendarAiUnread = await countUnreadCalendarNotifications(
-    admin,
-    businessId,
-  );
+  const [calendarAiUnread, agenda] = await Promise.all([
+    countUnreadCalendarNotifications(admin, businessId),
+    countOverdueAndUpcoming(businessId),
+  ]);
 
   return {
     inboxUnread: sumUnreadByChannel(empty.unreadByChannel),
     crmUnread: unreadContactIds.size,
     calendarAiUnread,
+    overdueTasks: agenda.overdueTasks,
+    upcomingEvents: agenda.upcomingEvents,
     unreadByChannel: empty.unreadByChannel,
   };
 }

@@ -9,6 +9,8 @@ export type AgentToolProfile = {
   canAddNote: boolean;
   canAddInternalNote: boolean;
   canCreateCalendarEvent: boolean;
+  canRequestHuman: boolean;
+  canSendProactiveMessage: boolean;
 };
 
 export type ToolPermissionKey = keyof AgentToolProfile;

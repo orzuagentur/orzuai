@@ -19,6 +19,12 @@ import {
   getChannelConnectionStatuses,
 } from "@/services/channel-workspace.service";
 import { getActiveMessagingChannelIds } from "@/features/integrations";
+import {
+  isCollectionNiche,
+  parseDataCollectionFields,
+  type CollectionNiche,
+  type DataCollectionField,
+} from "@/lib/ai/data-collection";
 import type {
   AiAssistantProfileData,
   CrmUpdateMode,
@@ -38,7 +44,11 @@ function parseCrmUpdateMode(value: unknown): CrmUpdateMode {
 }
 
 const PROFILE_SELECT =
-  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, crm_update_mode, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
+  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, crm_update_mode, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
+
+function parseCollectionNiche(value: unknown): CollectionNiche {
+  return isCollectionNiche(value) ? value : "generic";
+}
 
 function parseScheduleSlots(value: unknown): AgentScheduleSlot[] {
   const parsed = agentScheduleSlotsSchema.safeParse(value);
@@ -73,6 +83,9 @@ function mapProfileRow(row: {
   can_notify_owner?: boolean | null;
   can_notify_on_actions?: boolean | null;
   can_summarize_actions_in_chat?: boolean | null;
+  can_send_proactive_message?: boolean | null;
+  collection_niche?: string | null;
+  data_collection_fields?: unknown;
   voice_reply_enabled?: boolean | null;
   elevenlabs_voice_id?: string | null;
   elevenlabs_voice_name?: string | null;
@@ -100,6 +113,9 @@ function mapProfileRow(row: {
     canNotifyOwner: row.can_notify_owner ?? true,
     canNotifyOnActions: row.can_notify_on_actions ?? true,
     canSummarizeActionsInChat: row.can_summarize_actions_in_chat ?? true,
+    canSendProactiveMessage: row.can_send_proactive_message ?? true,
+    collectionNiche: parseCollectionNiche(row.collection_niche),
+    dataCollectionFields: parseDataCollectionFields(row.data_collection_fields),
     voiceReplyEnabled: row.voice_reply_enabled ?? false,
     elevenlabsVoiceId: row.elevenlabs_voice_id?.trim() || null,
     elevenlabsVoiceName: row.elevenlabs_voice_name?.trim() || null,
@@ -132,6 +148,9 @@ export function getDefaultAiAssistantProfile(
     canNotifyOwner: true,
     canNotifyOnActions: true,
     canSummarizeActionsInChat: true,
+    canSendProactiveMessage: true,
+    collectionNiche: "generic",
+    dataCollectionFields: [] as DataCollectionField[],
     voiceReplyEnabled: false,
     elevenlabsVoiceId: null,
     elevenlabsVoiceName: null,
@@ -237,6 +256,9 @@ export async function saveAiAssistantProfile(
       can_notify_owner: parsed.data.canNotifyOwner,
       can_notify_on_actions: parsed.data.canNotifyOnActions,
       can_summarize_actions_in_chat: parsed.data.canSummarizeActionsInChat,
+      can_send_proactive_message: parsed.data.canSendProactiveMessage,
+      collection_niche: parsed.data.collectionNiche,
+      data_collection_fields: parsed.data.dataCollectionFields,
     },
     { onConflict: "business_id" },
   );

@@ -11,6 +11,8 @@ export type ContactCustomFields = {
   notes?: string;
   location?: string;
   additionalContacts?: AdditionalContactEntry[];
+  /** AI data-collection answers (namespaced). */
+  collection?: Record<string, string>;
 };
 
 export const PIPELINE_STAGES = [

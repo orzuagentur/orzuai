@@ -79,6 +79,7 @@ function buildOrchestratorPrompt(input: {
   bookableResourcesText?: string;
   bookingPagesText?: string;
   availabilityText?: string;
+  collectionContext?: string;
   outputMode?: "tools" | "json";
 }): string {
   const outputMode = input.outputMode ?? "json";
@@ -105,6 +106,7 @@ function buildOrchestratorPrompt(input: {
           email: input.contact.email,
           company: input.contact.customFields.company ?? null,
           location: input.contact.customFields.location ?? null,
+          collection: input.contact.customFields.collection ?? null,
           pipelineStage: input.contact.pipelineStage,
           dealValue: input.contact.dealValue,
           tags: input.contact.tags,
@@ -133,6 +135,15 @@ function buildOrchestratorPrompt(input: {
     "- If booking is enabled and the customer gave usable date/time details, plan create_calendar_event.",
     "- Do not use clientSummary to say a booking is confirmed unless create_calendar_event is planned.",
     "- Never write that a manager/staff member will check availability, confirm, contact, or answer later.",
+    "- Prefer update_collected_fields when the customer provides data-collection values.",
+    "- Prefer schedule_follow_up when a later nudge is useful; use request_human only after clear customer confirmation.",
+    "- Prefer create_lead for new inbound lead capture (same as create_contact with pipeline new).",
+    "- Prefer list_upcoming_for_contact / get_booking_status when the customer asks about bookings or order status.",
+    "- Prefer reschedule_calendar_event / cancel_calendar_event for changes to existing bookings.",
+    "- Prefer schedule_event_reminder after booking or when the customer wants a pre-visit reminder.",
+    "- Prefer update_task_status / update_deal_stage when CRM state should change.",
+    "- Prefer send_customer_message only for explicit confirmations/status the customer needs now — never spam.",
+    "- Do not plan create_deal or create_calendar_event while required data-collection fields are still missing (unless the customer already gave those values in this turn via update_collected_fields).",
     "",
     "Analyze the customer's latest message for agent routing and CRM actions.",
     `Current time: ${new Date().toISOString()}`,
@@ -147,10 +158,13 @@ function buildOrchestratorPrompt(input: {
       ? ["Current CRM contact:", contactSection, ""].join("\n")
       : [
           "No CRM contact linked to this conversation.",
-          "If the customer shares a name (and ideally phone or email), plan create_contact with those fields.",
+          "If the customer shares a name (and ideally phone or email), plan create_contact or create_lead with those fields.",
           "Otherwise return empty actions.",
           "",
         ].join("\n"),
+    input.collectionContext?.trim()
+      ? [input.collectionContext.trim(), ""].join("\n")
+      : "",
     "",
     input.calendarBookingEnabled
       ? [
@@ -193,6 +207,7 @@ function buildOrchestratorPrompt(input: {
     "Manager escalation (owner is notified in the background — never mention this to the customer):",
     "- managerAlert true: suspicious, abusive, legal threat, very angry, sensitive, or outside what AI can safely handle. The conversational agent keeps helping the customer.",
     "- handoffConfirmed true ONLY when the customer clearly agreed to speak with a human (said yes after being asked, or explicitly insisted connect me to a manager now).",
+    "- If handoffConfirmed, also plan request_human with a short reason.",
     "- If the customer asks for a manager/person but has NOT confirmed yet: managerAlert false, handoffConfirmed false. Use add_internal_note if useful. The chat agent should ask one short confirmation question.",
     "- humanReason: one short sentence for the owner notification only (never copy to clientSummary).",
     "- Prefer solving the request yourself. Escalation is a last resort.",
@@ -205,9 +220,9 @@ function buildOrchestratorPrompt(input: {
     "- booking intent when customer asks for open times: answer in clientSummary using the availability list; do not invent slots",
     "- booking intent without calendar configured: create_task only to capture the request until calendar is set up",
     "- booking/support intent: create_task and add_note only when calendar booking is not configured or time is completely unknown",
-    "- sales intent: prefer create_deal, create_task, add_note",
-    "- registration intent: create_contact when no contact exists, plus contactUpdates.pipelineStage=new",
-    "- general/none: add_note, add_internal_note, and contactUpdates only when customer shares new details",
+    "- sales intent: prefer create_deal, create_task, add_note when required collection fields are complete",
+    "- registration intent: create_contact/create_lead when no contact exists, plus contactUpdates.pipelineStage=new",
+    "- general/none: add_note, add_internal_note, update_collected_fields, and contactUpdates only when customer shares new details",
     "- add_internal_note: team-only context for managers (not sent to customer). Use for impatience, owner requests, or internal observations.",
     "- Do not invent contact data. Omit uncertain fields.",
     "- create_calendar_event requires summary, startDateTime, endDateTime, timeZone, optional description, resourceName, bookingPageId, formAnswers (guestCount, partySize, etc.). Use ISO date-times.",
@@ -279,6 +294,7 @@ async function requestOrchestratorViaTools(input: {
   bookableResourcesText?: string;
   bookingPagesText?: string;
   availabilityText?: string;
+  collectionContext?: string;
 }): Promise<OrchestratorRunResult | null> {
   const providers = (await getPlatformAiFallbackProviders("orchestrator")).filter(
     (provider) => {
@@ -413,6 +429,7 @@ async function requestOrchestratorJson(input: {
   bookableResourcesText?: string;
   bookingPagesText?: string;
   availabilityText?: string;
+  collectionContext?: string;
 }): Promise<
   | { success: true; text: string; usedProvider?: string }
   | { success: false; errorMessage: string; attemptedProviders: string[] }
@@ -455,6 +472,7 @@ export async function runAutoReplyOrchestrator(input: {
   bookableResourcesText?: string;
   bookingPagesText?: string;
   availabilityText?: string;
+  collectionContext?: string;
 }): Promise<OrchestratorRunResult> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
     return {
@@ -485,6 +503,7 @@ export async function runAutoReplyOrchestrator(input: {
     bookableResourcesText,
     bookingPagesText,
     availabilityText,
+    collectionContext: input.collectionContext,
   };
 
   const toolAttempt = await requestOrchestratorViaTools(promptInput);

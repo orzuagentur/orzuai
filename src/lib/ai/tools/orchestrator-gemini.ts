@@ -104,6 +104,72 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
     enum: PIPELINE_ENUM,
     description: "Pipeline stage for create_contact.",
   },
+  formAnswers: {
+    type: SchemaType.OBJECT,
+    description:
+      "Booking form fields as strings (guestCount, partySize, firstName, lastName, email, phone, notes, etc.).",
+    properties: {
+      guestCount: { type: SchemaType.STRING },
+      partySize: { type: SchemaType.STRING },
+      firstName: { type: SchemaType.STRING },
+      lastName: { type: SchemaType.STRING },
+      email: { type: SchemaType.STRING },
+      phone: { type: SchemaType.STRING },
+      notes: { type: SchemaType.STRING },
+    },
+  },
+  answers: {
+    type: SchemaType.OBJECT,
+    description:
+      "Key/value answers for update_collected_fields (field keys from data collection schema).",
+    properties: {
+      name: { type: SchemaType.STRING },
+      phone: { type: SchemaType.STRING },
+      email: { type: SchemaType.STRING },
+      guestCount: { type: SchemaType.STRING },
+      budget: { type: SchemaType.STRING },
+      checkIn: { type: SchemaType.STRING },
+      checkOut: { type: SchemaType.STRING },
+    },
+  },
+  delayHours: {
+    type: SchemaType.NUMBER,
+    description: "Hours until follow-up for schedule_follow_up (1–168).",
+  },
+  reason: {
+    type: SchemaType.STRING,
+    description: "Reason for request_human, cancel_calendar_event, or schedule_follow_up.",
+  },
+  eventId: {
+    type: SchemaType.STRING,
+    description: "Calendar event UUID.",
+  },
+  taskId: {
+    type: SchemaType.STRING,
+    description: "CRM task UUID.",
+  },
+  dealId: {
+    type: SchemaType.STRING,
+    description: "CRM deal UUID.",
+  },
+  status: {
+    type: SchemaType.STRING,
+    format: "enum",
+    enum: ["open", "done"],
+    description: "Task status for update_task_status.",
+  },
+  hoursBefore: {
+    type: SchemaType.NUMBER,
+    description: "Hours before event for schedule_event_reminder.",
+  },
+  message: {
+    type: SchemaType.STRING,
+    description: "Optional reminder message body.",
+  },
+  limit: {
+    type: SchemaType.NUMBER,
+    description: "Max events for list_upcoming_for_contact.",
+  },
 };
 
 export const ORCHESTRATOR_PLAN_FUNCTION: FunctionDeclaration = {
@@ -166,7 +232,7 @@ export const ORCHESTRATOR_PLAN_FUNCTION: FunctionDeclaration = {
       },
       actions: {
         type: SchemaType.ARRAY,
-        description: "Up to 5 concrete CRM/calendar actions.",
+        description: "Up to 10 concrete CRM/calendar actions.",
         items: {
           type: SchemaType.OBJECT,
           properties: orchestratorActionProperties,

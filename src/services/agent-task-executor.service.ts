@@ -36,6 +36,24 @@ import {
 } from "@/utils/contact-additional-contacts";
 import { createAiCalendarEventNotification } from "@/services/business-notifications.service";
 import { createAiCalendarBooking } from "@/services/ai-calendar-booking.service";
+import { createAiHumanRequest } from "@/services/ai-human-request.service";
+import { scheduleOrchestratorFollowUp } from "@/services/follow-up-agent.service";
+import {
+  createCalendarTaskForBusiness,
+  deleteCalendarEventForBusiness,
+  updateCalendarEventForBusiness,
+} from "@/services/calendar-events.service";
+import {
+  findUpcomingEventsForContact,
+  scheduleEventReminderJob,
+} from "@/services/event-reminder.service";
+import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
+import { insertChannelMessage } from "@/services/messaging.service";
+import {
+  mapCollectedAnswersToContactUpdates,
+  mergeCollectionAnswersIntoCustomFields,
+  type DataCollectionField,
+} from "@/lib/ai/data-collection";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
@@ -69,6 +87,18 @@ function parseCustomFields(value: unknown): ContactCustomFields {
 
   const record = value as Record<string, unknown>;
   const additionalContacts = parseAdditionalContacts(record.additionalContacts);
+  const collectionRaw = record.collection;
+  const collection: Record<string, string> = {};
+
+  if (collectionRaw && typeof collectionRaw === "object" && !Array.isArray(collectionRaw)) {
+    for (const [key, entry] of Object.entries(
+      collectionRaw as Record<string, unknown>,
+    )) {
+      if (typeof entry === "string" && entry.trim()) {
+        collection[key] = entry.trim();
+      }
+    }
+  }
 
   return {
     company:
@@ -85,6 +115,7 @@ function parseCustomFields(value: unknown): ContactCustomFields {
         : undefined,
     additionalContacts:
       additionalContacts.length > 0 ? additionalContacts : undefined,
+    collection: Object.keys(collection).length > 0 ? collection : undefined,
   };
 }
 
@@ -463,7 +494,702 @@ async function applyCreateTask(
     actionType: "create_task",
   });
 
+  if (dueAt) {
+    const due = new Date(dueAt);
+    if (!Number.isNaN(due.getTime())) {
+      const start = due.toISOString();
+      const end = new Date(due.getTime() + 30 * 60 * 1000).toISOString();
+      void createCalendarTaskForBusiness({
+        businessId,
+        title,
+        description: `CRM follow-up for contact ${contactId}`,
+        startDateTime: start,
+        endDateTime: end,
+        dueAt: start,
+        syncToGoogle: false,
+      }).catch((err) => {
+        console.warn(
+          "[agent-executor] calendar task mirror failed",
+          err instanceof Error ? err.message : err,
+        );
+      });
+    }
+  }
+
   return `Task created: ${title}`;
+}
+
+async function applyUpdateCollectedFields(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "update_collected_fields" }>,
+  fields: DataCollectionField[],
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string[]> {
+  const mapped = mapCollectedAnswersToContactUpdates(fields, action.answers);
+  const contactUpdates: ExecutorContactUpdates = {};
+  if (mapped.name) contactUpdates.name = mapped.name;
+  if (mapped.email) contactUpdates.email = mapped.email;
+  if (mapped.phone) contactUpdates.phone = mapped.phone;
+  if (mapped.company) contactUpdates.company = mapped.company;
+  if (mapped.location) contactUpdates.location = mapped.location;
+  if (mapped.dealValue !== undefined) contactUpdates.dealValue = mapped.dealValue;
+  if (mapped.expectedCloseDate) {
+    contactUpdates.expectedCloseDate = mapped.expectedCloseDate;
+  }
+
+  const applied: string[] = [];
+
+  if (Object.keys(contactUpdates).length > 0) {
+    applied.push(
+      ...(await applyContactUpdates(
+        admin,
+        businessId,
+        contact,
+        contactUpdates,
+        idempotencyContext,
+      )),
+    );
+  }
+
+  if (Object.keys(mapped.collectionAnswers).length === 0) {
+    return applied;
+  }
+
+  const fingerprint = JSON.stringify(mapped.collectionAnswers);
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "update_collected_fields",
+    actionFingerprint: fingerprint,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return applied;
+  }
+
+  const refreshed = await loadContactSnapshot(admin, businessId, contact.id);
+  const baseCustom = (refreshed ?? contact).customFields as unknown as Record<
+    string,
+    unknown
+  >;
+  const nextCustom = mergeCollectionAnswersIntoCustomFields(
+    baseCustom,
+    mapped.collectionAnswers,
+  );
+
+  const { error } = await admin
+    .from("contacts")
+    .update({
+      custom_fields: nextCustom as Database["public"]["Tables"]["contacts"]["Update"]["custom_fields"],
+    })
+    .eq("id", contact.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "update_collected_fields",
+  });
+
+  applied.push(
+    `Collected fields: ${Object.keys(mapped.collectionAnswers).join(", ")}`,
+  );
+  return applied;
+}
+
+async function applyScheduleFollowUp(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "schedule_follow_up" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+    channel?: MessagingChannel;
+  },
+): Promise<string | null> {
+  if (!idempotencyContext.conversationId || !idempotencyContext.channel) {
+    return null;
+  }
+
+  const delayHours = action.delayHours ?? 24;
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "schedule_follow_up",
+    actionFingerprint: `${delayHours}|${action.reason ?? ""}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  await scheduleOrchestratorFollowUp({
+    admin,
+    businessId,
+    conversationId: idempotencyContext.conversationId,
+    channel: idempotencyContext.channel,
+    delayHours,
+    contactName: contact.name,
+    reason: action.reason,
+  });
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "schedule_follow_up",
+  });
+
+  return `Follow-up scheduled in ${delayHours}h`;
+}
+
+async function applyRequestHuman(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "request_human" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+    channel?: MessagingChannel;
+  },
+): Promise<string | null> {
+  if (!idempotencyContext.conversationId || !idempotencyContext.channel) {
+    return null;
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "request_human",
+    actionFingerprint: action.reason,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const created = await createAiHumanRequest({
+    admin,
+    businessId,
+    conversationId: idempotencyContext.conversationId,
+    channel: idempotencyContext.channel,
+    contactId: contact.id,
+    contactName: contact.name,
+    reason: action.reason,
+    messagePreview: idempotencyContext.clientMessage,
+  });
+
+  if (!created) {
+    return null;
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "request_human",
+  });
+
+  return `Human requested: ${action.reason}`;
+}
+
+async function applyListUpcoming(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "list_upcoming_for_contact" }>,
+): Promise<string | null> {
+  const events = await findUpcomingEventsForContact({
+    admin,
+    businessId,
+    contactName: contact.name,
+    contactEmail: contact.email,
+    limit: action.limit ?? 5,
+  });
+
+  if (events.length === 0) {
+    return "Upcoming: none found for this contact";
+  }
+
+  return `Upcoming: ${events
+    .map(
+      (event) =>
+        `${event.title} @ ${event.startAt} (id:${event.id}${event.isBooking ? ", booking" : ""})`,
+    )
+    .join("; ")}`;
+}
+
+async function applyGetBookingStatus(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "get_booking_status" }>,
+): Promise<string | null> {
+  if (action.eventId) {
+    const { data } = await admin
+      .from("calendar_events")
+      .select("id, title, start_at, end_at, is_booking")
+      .eq("id", action.eventId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (!data) {
+      return "Booking status: event not found";
+    }
+
+    const started = new Date(data.start_at).getTime() <= Date.now();
+    return `Booking status: ${data.title} ${started ? "started/past" : "upcoming"} ${data.start_at} → ${data.end_at} (id:${data.id})`;
+  }
+
+  const upcoming = await findUpcomingEventsForContact({
+    admin,
+    businessId,
+    contactName: contact.name,
+    contactEmail: contact.email,
+    limit: 1,
+  });
+
+  if (upcoming.length === 0) {
+    return "Booking status: no upcoming booking found";
+  }
+
+  const next = upcoming[0]!;
+  return `Booking status: next is ${next.title} at ${next.startAt} (id:${next.id})`;
+}
+
+async function resolveContactEventId(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  eventId?: string,
+): Promise<{ id: string; title: string; startAt: string; endAt: string } | null> {
+  if (eventId) {
+    const { data } = await admin
+      .from("calendar_events")
+      .select("id, title, start_at, end_at")
+      .eq("id", eventId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id,
+      title: data.title,
+      startAt: data.start_at,
+      endAt: data.end_at,
+    };
+  }
+
+  const upcoming = await findUpcomingEventsForContact({
+    admin,
+    businessId,
+    contactName: contact.name,
+    contactEmail: contact.email,
+    limit: 1,
+  });
+  const next = upcoming[0];
+  return next
+    ? {
+        id: next.id,
+        title: next.title,
+        startAt: next.startAt,
+        endAt: next.endAt,
+      }
+    : null;
+}
+
+async function applyRescheduleCalendarEvent(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "reschedule_calendar_event" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  const target = await resolveContactEventId(
+    admin,
+    businessId,
+    contact,
+    action.eventId,
+  );
+  if (!target) {
+    return "Reschedule failed: no matching event";
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "reschedule_calendar_event",
+    actionFingerprint: `${target.id}|${action.startDateTime}|${action.endDateTime}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const updated = await updateCalendarEventForBusiness({
+    businessId,
+    eventId: target.id,
+    title: action.summary,
+    startDateTime: action.startDateTime,
+    endDateTime: action.endDateTime,
+    timeZone: action.timeZone,
+  });
+
+  if (!updated.success) {
+    return `Reschedule failed: ${updated.message ?? "unknown error"}`;
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "reschedule_calendar_event",
+  });
+
+  return `Rescheduled: ${action.summary ?? target.title} → ${action.startDateTime}`;
+}
+
+async function applyCancelCalendarEvent(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "cancel_calendar_event" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  const target = await resolveContactEventId(
+    admin,
+    businessId,
+    contact,
+    action.eventId,
+  );
+  if (!target) {
+    return "Cancel failed: no matching event";
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "cancel_calendar_event",
+    actionFingerprint: target.id,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const deleted = await deleteCalendarEventForBusiness({
+    businessId,
+    eventId: target.id,
+  });
+
+  if (!deleted.success) {
+    return `Cancel failed: ${deleted.message ?? "unknown error"}`;
+  }
+
+  await admin
+    .from("event_reminder_jobs")
+    .update({ status: "cancelled", last_error: action.reason ?? "cancelled" })
+    .eq("event_id", target.id)
+    .eq("business_id", businessId)
+    .eq("status", "pending");
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "cancel_calendar_event",
+  });
+
+  return `Cancelled: ${target.title}${action.reason ? ` (${action.reason})` : ""}`;
+}
+
+async function applyUpdateTaskStatus(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "update_task_status" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  let taskId = action.taskId;
+
+  if (!taskId && action.title?.trim()) {
+    const { data } = await admin
+      .from("crm_tasks")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("contact_id", contactId)
+      .ilike("title", action.title.trim())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    taskId = data?.id;
+  }
+
+  if (!taskId) {
+    const { data } = await admin
+      .from("crm_tasks")
+      .select("id, title")
+      .eq("business_id", businessId)
+      .eq("contact_id", contactId)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    taskId = data?.id;
+  }
+
+  if (!taskId) {
+    return "Task status update failed: no task found";
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "update_task_status",
+    actionFingerprint: `${taskId}|${action.status}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const { error } = await admin
+    .from("crm_tasks")
+    .update({ status: action.status })
+    .eq("id", taskId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "update_task_status",
+  });
+
+  return `Task ${action.status}: ${taskId}`;
+}
+
+async function applyUpdateDealStage(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "update_deal_stage" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  let dealId = action.dealId;
+
+  if (!dealId) {
+    let query = admin
+      .from("crm_deals")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (action.title?.trim()) {
+      query = admin
+        .from("crm_deals")
+        .select("id")
+        .eq("business_id", businessId)
+        .eq("contact_id", contactId)
+        .ilike("title", action.title.trim())
+        .order("created_at", { ascending: false })
+        .limit(1);
+    } else {
+      query = admin
+        .from("crm_deals")
+        .select("id")
+        .eq("business_id", businessId)
+        .eq("contact_id", contactId)
+        .eq("is_primary", true)
+        .limit(1);
+    }
+
+    const { data } = await query.maybeSingle();
+    dealId = data?.id;
+  }
+
+  if (!dealId) {
+    return "Deal stage update failed: no deal found";
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "update_deal_stage",
+    actionFingerprint: `${dealId}|${action.stage}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const { error } = await admin
+    .from("crm_deals")
+    .update({
+      stage: action.stage,
+      status: mapDealStatus(action.stage),
+    })
+    .eq("id", dealId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await admin
+    .from("contacts")
+    .update({ pipeline_stage: action.stage })
+    .eq("id", contactId)
+    .eq("business_id", businessId);
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "update_deal_stage",
+  });
+
+  return `Deal stage → ${action.stage}`;
+}
+
+async function applySendCustomerMessage(
+  admin: MessagingDbClient,
+  businessId: string,
+  action: Extract<ExecutorAction, { type: "send_customer_message" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+    channel?: MessagingChannel;
+  },
+): Promise<string | null> {
+  if (!idempotencyContext.conversationId || !idempotencyContext.channel) {
+    return null;
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "send_customer_message",
+    actionFingerprint: action.content.slice(0, 120),
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const sent = await sendChannelAutoReplyText({
+    admin,
+    businessId,
+    channel: idempotencyContext.channel,
+    conversationId: idempotencyContext.conversationId,
+    text: action.content,
+  });
+
+  if (!sent.success || !sent.sentText) {
+    return `Send failed: ${sent.error ?? "unknown"}`;
+  }
+
+  await insertChannelMessage(admin, {
+    conversationId: idempotencyContext.conversationId,
+    channel: idempotencyContext.channel,
+    content: sent.sentText,
+    senderType: "ai",
+    aiGenerated: true,
+    emailSubject: sent.emailSubject,
+  });
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "send_customer_message",
+  });
+
+  return "Customer message sent";
+}
+
+async function applyScheduleEventReminder(
+  admin: MessagingDbClient,
+  businessId: string,
+  contact: ContactSnapshot,
+  action: Extract<ExecutorAction, { type: "schedule_event_reminder" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+    channel?: MessagingChannel;
+  },
+): Promise<string | null> {
+  if (!idempotencyContext.conversationId || !idempotencyContext.channel) {
+    return null;
+  }
+
+  const target = await resolveContactEventId(
+    admin,
+    businessId,
+    contact,
+    action.eventId,
+  );
+  if (!target) {
+    return "Event reminder failed: no upcoming event";
+  }
+
+  const hoursBefore = action.hoursBefore ?? 24;
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "schedule_event_reminder",
+    actionFingerprint: `${target.id}|${hoursBefore}`,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const scheduled = await scheduleEventReminderJob({
+    admin,
+    businessId,
+    conversationId: idempotencyContext.conversationId,
+    channel: idempotencyContext.channel,
+    contactId: contact.id,
+    eventId: target.id,
+    eventStartAt: target.startAt,
+    hoursBefore,
+    messageBody: action.message,
+    eventTitle: target.title,
+  });
+
+  if (!scheduled.success) {
+    return `Event reminder failed: ${scheduled.message ?? "unknown"}`;
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "schedule_event_reminder",
+  });
+
+  return `Event reminder scheduled ${hoursBefore}h before (${target.title})`;
 }
 
 async function hasRecentDeal(
@@ -737,10 +1463,23 @@ async function applyExecutorPlan(
     contactId?: string;
     contactName?: string;
   },
+  options?: {
+    dataCollectionFields?: DataCollectionField[];
+    requiredComplete?: boolean;
+  },
 ): Promise<{ applied: string[]; skipped: string[] }> {
   const applied: string[] = [];
   const skipped: string[] = [];
   const allowed = getAllowedActionTypes();
+  const collectionFields = options?.dataCollectionFields ?? [];
+  let requiredComplete = options?.requiredComplete ?? true;
+
+  const collectionActions = plan.actions.filter(
+    (action) => action.type === "update_collected_fields",
+  );
+  const otherActions = plan.actions.filter(
+    (action) => action.type !== "update_collected_fields",
+  );
 
   if (plan.contactUpdates && Object.keys(plan.contactUpdates).length > 0) {
     applied.push(
@@ -754,8 +1493,49 @@ async function applyExecutorPlan(
     );
   }
 
-  for (const action of plan.actions) {
+  let workingContact =
+    (await loadContactSnapshot(admin, businessId, contact.id)) ?? contact;
+
+  for (const action of collectionActions) {
+    if (action.type !== "update_collected_fields") continue;
+    const results = await applyUpdateCollectedFields(
+      admin,
+      businessId,
+      workingContact,
+      action,
+      collectionFields,
+      idempotencyContext,
+    );
+    if (results.length > 0) {
+      applied.push(...results);
+      workingContact =
+        (await loadContactSnapshot(admin, businessId, contact.id)) ??
+        workingContact;
+      requiredComplete = true;
+      logAgentToolAudit({
+        tool: action.type,
+        businessId,
+        conversationId: idempotencyContext.conversationId,
+        contactId: contact.id,
+        success: true,
+        label: results.join("; "),
+      });
+    } else {
+      skipped.push(formatSkippedDuplicate(action.type));
+    }
+  }
+
+  for (const action of otherActions) {
     if (!allowed.has(action.type)) {
+      continue;
+    }
+
+    // Soft gate: delay deal/booking until required collection is complete.
+    if (
+      !requiredComplete &&
+      (action.type === "create_deal" || action.type === "create_calendar_event")
+    ) {
+      skipped.push(`${action.type} (waiting for required data)`);
       continue;
     }
 
@@ -765,7 +1545,7 @@ async function applyExecutorPlan(
       result = await applyCreateTask(
         admin,
         businessId,
-        contact.id,
+        workingContact.id,
         action,
         idempotencyContext,
       );
@@ -773,16 +1553,20 @@ async function applyExecutorPlan(
       result = await applyCreateDeal(
         admin,
         businessId,
-        contact.id,
+        workingContact.id,
         action,
         idempotencyContext,
       );
     } else if (action.type === "add_note") {
-      const refreshed = await loadContactSnapshot(admin, businessId, contact.id);
+      const refreshed = await loadContactSnapshot(
+        admin,
+        businessId,
+        workingContact.id,
+      );
       result = await applyAddNote(
         admin,
         businessId,
-        refreshed ?? contact,
+        refreshed ?? workingContact,
         action,
         idempotencyContext,
       );
@@ -798,7 +1582,84 @@ async function applyExecutorPlan(
       result = await applyCreateCalendarEvent(
         admin,
         businessId,
-        contact,
+        workingContact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "schedule_follow_up") {
+      result = await applyScheduleFollowUp(
+        admin,
+        businessId,
+        workingContact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "request_human") {
+      result = await applyRequestHuman(
+        admin,
+        businessId,
+        workingContact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "list_upcoming_for_contact") {
+      result = await applyListUpcoming(
+        admin,
+        businessId,
+        workingContact,
+        action,
+      );
+    } else if (action.type === "get_booking_status") {
+      result = await applyGetBookingStatus(
+        admin,
+        businessId,
+        workingContact,
+        action,
+      );
+    } else if (action.type === "reschedule_calendar_event") {
+      result = await applyRescheduleCalendarEvent(
+        admin,
+        businessId,
+        workingContact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "cancel_calendar_event") {
+      result = await applyCancelCalendarEvent(
+        admin,
+        businessId,
+        workingContact,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "update_task_status") {
+      result = await applyUpdateTaskStatus(
+        admin,
+        businessId,
+        workingContact.id,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "update_deal_stage") {
+      result = await applyUpdateDealStage(
+        admin,
+        businessId,
+        workingContact.id,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "send_customer_message") {
+      result = await applySendCustomerMessage(
+        admin,
+        businessId,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "schedule_event_reminder") {
+      result = await applyScheduleEventReminder(
+        admin,
+        businessId,
+        workingContact,
         action,
         idempotencyContext,
       );
@@ -873,6 +1734,8 @@ async function executePlanOnContact(input: {
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
   suppressRunLog?: boolean;
+  dataCollectionFields?: DataCollectionField[];
+  requiredComplete?: boolean;
 }): Promise<AgentExecutorResult> {
   const planIdempotencyKey = buildExecutorPlanIdempotencyKey({
     conversationId: input.conversationId,
@@ -905,6 +1768,10 @@ async function executePlanOnContact(input: {
         channel: input.channel as MessagingChannel,
         contactId: input.contactId,
         contactName: input.contact.name,
+      },
+      {
+        dataCollectionFields: input.dataCollectionFields,
+        requiredComplete: input.requiredComplete,
       },
     );
 
@@ -1089,15 +1956,30 @@ export async function applyCreateContactFromPlan(input: {
   businessId: string;
   conversationId: string;
   channel: MessagingChannel;
-  action: Extract<ExecutorAction, { type: "create_contact" }>;
+  action: Extract<
+    ExecutorAction,
+    { type: "create_contact" | "create_lead" }
+  >;
   clientMessage: string;
 }): Promise<{ contactId: string; label: string } | null> {
+  const normalized: Extract<ExecutorAction, { type: "create_contact" }> = {
+    type: "create_contact",
+    name: input.action.name,
+    phone: input.action.phone,
+    email: input.action.email,
+    company: input.action.company,
+    pipelineStage:
+      input.action.type === "create_lead"
+        ? (input.action.pipelineStage ?? "new")
+        : input.action.pipelineStage,
+  };
+
   return applyCreateContact(
     input.admin,
     input.businessId,
     input.conversationId,
     input.channel,
-    input.action,
+    normalized,
     input.clientMessage,
   );
 }
@@ -1113,6 +1995,8 @@ export async function applyPreparedExecutorPlan(input: {
   routingMethod?: AgentRoutingMethod | null;
   plan: ExecutorPlan;
   suppressRunLog?: boolean;
+  dataCollectionFields?: DataCollectionField[];
+  requiredComplete?: boolean;
 }): Promise<AgentExecutorResult> {
   const contact = await loadContactSnapshot(
     input.admin,
@@ -1143,5 +2027,7 @@ export async function applyPreparedExecutorPlan(input: {
     routingMethod: input.routingMethod,
     plan: input.plan,
     suppressRunLog: input.suppressRunLog,
+    dataCollectionFields: input.dataCollectionFields,
+    requiredComplete: input.requiredComplete,
   });
 }

@@ -46,12 +46,14 @@ function getNavBadgeCount(
     return counts.inboxUnread;
   }
 
-  if (itemId === "contacts") {
-    return counts.crmUnread;
+  if (itemId === "calendar") {
+    return (
+      counts.calendarAiUnread + counts.overdueTasks + counts.upcomingEvents
+    );
   }
 
-  if (itemId === "calendar") {
-    return counts.calendarAiUnread;
+  if (itemId === "contacts") {
+    return counts.crmUnread + counts.overdueTasks;
   }
 
   return 0;

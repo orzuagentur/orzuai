@@ -63,6 +63,14 @@ import {
   ensurePlatformPromptsLoaded,
   touchPlatformPromptUsage,
 } from "@/services/platform-prompts.service";
+import {
+  computeCollectionGaps,
+  formatCollectionGapsForPrompt,
+  isCollectionNiche,
+  parseDataCollectionFields,
+  type CollectionNiche,
+  type DataCollectionField,
+} from "@/lib/ai/data-collection";
 import { filterExecutorPlanByProfile } from "@/lib/ai/tools";
 import type { ExecutorPlan } from "@/types/agent-executor.types";
 import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
@@ -234,7 +242,7 @@ export async function resolveAssistantProfile(
   const { data } = await admin
     .from("ai_assistant_profile")
     .select(
-      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat",
+      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields",
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -258,6 +266,13 @@ export async function resolveAssistantProfile(
       canNotifyOwner: data.can_notify_owner ?? true,
       canNotifyOnActions: data.can_notify_on_actions ?? true,
       canSummarizeActionsInChat: data.can_summarize_actions_in_chat ?? true,
+      canSendProactiveMessage: data.can_send_proactive_message ?? true,
+      collectionNiche: (isCollectionNiche(data.collection_niche)
+        ? data.collection_niche
+        : "generic") as CollectionNiche,
+      dataCollectionFields: parseDataCollectionFields(
+        data.data_collection_fields,
+      ) as DataCollectionField[],
     };
   }
 
@@ -279,6 +294,8 @@ export async function resolveAssistantProfile(
     can_notify_owner: defaults.canNotifyOwner,
     can_notify_on_actions: defaults.canNotifyOnActions,
     can_summarize_actions_in_chat: defaults.canSummarizeActionsInChat,
+    collection_niche: defaults.collectionNiche,
+    data_collection_fields: defaults.dataCollectionFields,
   });
 
   return { ...defaults, fallbackReplyMessage: null };
@@ -321,7 +338,7 @@ async function fetchCrmReplySnapshot(
     admin
       .from("contacts")
       .select(
-        "name, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date",
+        "name, email, phone_number, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date, custom_fields",
       )
       .eq("id", contactId)
       .eq("business_id", businessId)
@@ -340,12 +357,18 @@ async function fetchCrmReplySnapshot(
 
   return {
     name: contact.name,
+    email: contact.email,
+    phone: contact.phone_number,
     pipelineStage: contact.pipeline_stage,
     dealValue: contact.deal_value,
     leadScore: contact.lead_score,
     expectedCloseDate: contact.expected_close_date,
     aiSummary: contact.ai_summary,
     openTaskCount: openTaskCount ?? 0,
+    customFields:
+      contact.custom_fields && typeof contact.custom_fields === "object"
+        ? (contact.custom_fields as Record<string, unknown>)
+        : null,
   };
 }
 
@@ -363,6 +386,7 @@ function assembleAutoReplySystemPrompt(input: {
   bookingContext: string;
   knowledgeGuidance?: string;
   actionOutcomeContext?: string;
+  collectionContext?: string;
 }): string {
   const sections = [input.baseSystemPrompt];
   const summarySection = formatConversationSummaryForSystemPrompt(
@@ -376,6 +400,10 @@ function assembleAutoReplySystemPrompt(input: {
 
   if (crmSection) {
     sections.push(crmSection);
+  }
+
+  if (input.collectionContext?.trim()) {
+    sections.push(input.collectionContext.trim());
   }
 
   if (input.knowledgeGuidance?.trim()) {
@@ -400,6 +428,7 @@ function buildPrepFromProfile(input: {
   bookingContext: string;
   knowledgeGuidance?: string;
   actionOutcomeContext?: string;
+  collectionContext?: string;
 }): {
   systemPrompt: string;
   provider: AiProvider;
@@ -414,6 +443,7 @@ function buildPrepFromProfile(input: {
       bookingContext: input.bookingContext,
       knowledgeGuidance: input.knowledgeGuidance,
       actionOutcomeContext: input.actionOutcomeContext,
+      collectionContext: input.collectionContext,
     }),
     provider: getPrimaryPlatformLlmProvider(),
     model: resolveLlmModel(getPrimaryPlatformLlmProvider(), undefined),
@@ -625,12 +655,28 @@ async function prepareAutoReplyContext(input: {
 
   const crmContext = buildCrmReplyContext(crmSnapshot);
   const knowledgeGuidance = buildKnowledgeGuidance(trimmedKnowledge.length);
+  const collectionGaps = computeCollectionGaps({
+    niche: profile.collectionNiche ?? "generic",
+    storedFields: profile.dataCollectionFields ?? [],
+    contact: crmSnapshot
+      ? {
+          name: crmSnapshot.name,
+          email: crmSnapshot.email,
+          phone: crmSnapshot.phone,
+          dealValue: crmSnapshot.dealValue,
+          expectedCloseDate: crmSnapshot.expectedCloseDate,
+          customFields: crmSnapshot.customFields,
+        }
+      : null,
+  });
+  const collectionContext = formatCollectionGapsForPrompt(collectionGaps);
   const voice = buildPrepFromProfile({
     profile,
     conversationSummary: conversationMemory?.aiSummary ?? null,
     crmContext,
     bookingContext,
     knowledgeGuidance,
+    collectionContext,
   });
 
   return {
@@ -929,6 +975,28 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     bookableResourcesText,
     bookingPagesText,
     availabilityText,
+    collectionContext: formatCollectionGapsForPrompt(
+      computeCollectionGaps({
+        niche: profile.collectionNiche ?? "generic",
+        storedFields: profile.dataCollectionFields ?? [],
+        contact: contact
+          ? {
+              name: contact.name,
+              email: contact.email,
+              phone: contact.phoneNumber,
+              company: contact.customFields.company,
+              location: contact.customFields.location,
+              dealValue: contact.dealValue,
+              expectedCloseDate: contact.expectedCloseDate,
+              collection: contact.customFields.collection,
+              customFields: contact.customFields as unknown as Record<
+                string,
+                unknown
+              >,
+            }
+          : null,
+      }),
+    ),
   });
 
   if (!orchestrationResult.success) {
@@ -975,10 +1043,15 @@ export async function runAutoReplyBackgroundOrchestration(input: {
 
   if (!resolvedContactId) {
     const createContactAction = permittedPlan.actions.find(
-      (action) => action.type === "create_contact",
+      (action) =>
+        action.type === "create_contact" || action.type === "create_lead",
     );
 
-    if (createContactAction?.type === "create_contact") {
+    if (
+      createContactAction &&
+      (createContactAction.type === "create_contact" ||
+        createContactAction.type === "create_lead")
+    ) {
       const created = await applyCreateContactFromPlan({
         admin: input.admin,
         businessId: input.businessId,
@@ -1002,11 +1075,35 @@ export async function runAutoReplyBackgroundOrchestration(input: {
 
   const executorPlan = {
     ...permittedPlan,
-    actions: permittedPlan.actions.filter((action) => action.type !== "create_contact"),
+    actions: permittedPlan.actions.filter(
+      (action) =>
+        action.type !== "create_contact" && action.type !== "create_lead",
+    ),
   };
 
   let executorResult: Awaited<ReturnType<typeof applyPreparedExecutorPlan>> | null =
     null;
+
+  const collectionGapsForExec = computeCollectionGaps({
+    niche: profile.collectionNiche ?? "generic",
+    storedFields: profile.dataCollectionFields ?? [],
+    contact: contact
+      ? {
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phoneNumber,
+          company: contact.customFields.company,
+          location: contact.customFields.location,
+          dealValue: contact.dealValue,
+          expectedCloseDate: contact.expectedCloseDate,
+          collection: contact.customFields.collection,
+          customFields: contact.customFields as unknown as Record<
+            string,
+            unknown
+          >,
+        }
+      : null,
+  });
 
   if (resolvedContactId != null) {
     executorResult = await applyPreparedExecutorPlan({
@@ -1020,6 +1117,8 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       routingMethod: "none",
       plan: executorPlan,
       suppressRunLog: true,
+      dataCollectionFields: collectionGapsForExec.fields,
+      requiredComplete: collectionGapsForExec.requiredComplete,
     });
 
     if (contactCreationLabel && executorResult) {

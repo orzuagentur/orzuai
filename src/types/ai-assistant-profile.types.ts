@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { isCommunicationStyleId } from "@/features/ai-assistant/communication-styles";
+import {
+  COLLECTION_NICHES,
+  dataCollectionFieldsSchema,
+  type CollectionNiche,
+  type DataCollectionField,
+} from "@/lib/ai/data-collection";
 import { isValidAiReplyLanguage, REPLY_WAIT_MS_OPTIONS } from "@/lib/ai/languages";
 import { agentScheduleSlotsSchema } from "@/types/ai-assistant-schedule.types";
 import type { VoiceReplyMode } from "@/types/elevenlabs.types";
@@ -60,6 +66,9 @@ export const saveAiAssistantProfileSchema = z.object({
   canNotifyOwner: z.boolean().default(true),
   canNotifyOnActions: z.boolean().default(true),
   canSummarizeActionsInChat: z.boolean().default(true),
+  canSendProactiveMessage: z.boolean().default(true),
+  collectionNiche: z.enum(COLLECTION_NICHES).default("generic"),
+  dataCollectionFields: dataCollectionFieldsSchema.default([]),
 }).refine((data) => !data.scheduleEnabled || data.scheduleSlots.length > 0, {
   message: "Add at least one time range when schedule is enabled.",
   path: ["scheduleSlots"],
@@ -91,6 +100,9 @@ export type AiAssistantProfileData = {
   canNotifyOwner: boolean;
   canNotifyOnActions: boolean;
   canSummarizeActionsInChat: boolean;
+  canSendProactiveMessage: boolean;
+  collectionNiche: CollectionNiche;
+  dataCollectionFields: DataCollectionField[];
   voiceReplyEnabled: boolean;
   elevenlabsVoiceId: string | null;
   elevenlabsVoiceName: string | null;
