@@ -13,6 +13,8 @@ export const geminiKnowledgeContextSchema = z.object({
   title: z.string().trim().min(1).max(200),
   content: z.string().trim().min(1).max(5000),
   category: z.string().trim().min(1).max(100),
+  citation: z.string().trim().min(1).max(40).optional(),
+  id: z.string().uuid().optional(),
 });
 
 export const geminiConversationMessageSchema = z.object({

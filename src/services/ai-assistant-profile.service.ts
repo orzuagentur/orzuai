@@ -21,16 +21,24 @@ import {
 import { getActiveMessagingChannelIds } from "@/features/integrations";
 import type {
   AiAssistantProfileData,
+  CrmUpdateMode,
   SaveAiAssistantProfileInput,
 } from "@/types/ai-assistant-profile.types";
-import { saveAiAssistantProfileSchema } from "@/types/ai-assistant-profile.types";
+import {
+  isCrmUpdateMode,
+  saveAiAssistantProfileSchema,
+} from "@/types/ai-assistant-profile.types";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 import { agentScheduleSlotsSchema } from "@/types/ai-assistant-schedule.types";
 import { saveVoiceAgentSettingsSchema } from "@/types/elevenlabs.types";
 import type { SaveVoiceAgentSettingsInput } from "@/types/elevenlabs.types";
 
+function parseCrmUpdateMode(value: unknown): CrmUpdateMode {
+  return isCrmUpdateMode(value) ? value : "every_message";
+}
+
 const PROFILE_SELECT =
-  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
+  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, crm_update_mode, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
 
 function parseScheduleSlots(value: unknown): AgentScheduleSlot[] {
   const parsed = agentScheduleSlotsSchema.safeParse(value);
@@ -53,6 +61,7 @@ function mapProfileRow(row: {
   schedule_enabled?: boolean | null;
   schedule_timezone?: string | null;
   schedule_slots?: unknown;
+  crm_update_mode?: string | null;
   can_reply?: boolean | null;
   can_create_task?: boolean | null;
   can_create_deal?: boolean | null;
@@ -79,6 +88,7 @@ function mapProfileRow(row: {
     scheduleEnabled: row.schedule_enabled ?? false,
     scheduleTimezone: row.schedule_timezone?.trim() || "UTC",
     scheduleSlots: parseScheduleSlots(row.schedule_slots),
+    crmUpdateMode: parseCrmUpdateMode(row.crm_update_mode),
     canReply: row.can_reply ?? true,
     canCreateTask: row.can_create_task ?? true,
     canCreateDeal: row.can_create_deal ?? true,
@@ -110,6 +120,7 @@ export function getDefaultAiAssistantProfile(
     scheduleEnabled: false,
     scheduleTimezone: "UTC",
     scheduleSlots: [],
+    crmUpdateMode: "every_message",
     canReply: true,
     canCreateTask: true,
     canCreateDeal: true,
@@ -214,6 +225,7 @@ export async function saveAiAssistantProfile(
       schedule_enabled: parsed.data.scheduleEnabled,
       schedule_timezone: parsed.data.scheduleTimezone,
       schedule_slots: parsed.data.scheduleSlots,
+      crm_update_mode: parsed.data.crmUpdateMode,
       can_reply: parsed.data.canReply,
       can_create_task: parsed.data.canCreateTask,
       can_create_deal: parsed.data.canCreateDeal,

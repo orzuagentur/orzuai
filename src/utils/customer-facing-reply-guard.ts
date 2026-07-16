@@ -1,5 +1,5 @@
 export const DEFAULT_CUSTOMER_REPLY_FALLBACK =
-  "I am checking the details now and will respond with the next step.";
+  "I can help with that right here. What exact detail should I handle next?";
 
 const MAX_CUSTOMER_REPLY_LENGTH = 4000;
 

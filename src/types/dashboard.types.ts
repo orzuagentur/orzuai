@@ -91,6 +91,7 @@ export type TeamAnalyticsMetrics = {
   slaCompliancePercent: number;
   slaTargetMinutes: number;
   sampledConversations: number;
+  avgHandoffAcceptMinutes: number | null;
 };
 
 export type RevenueMetrics = {

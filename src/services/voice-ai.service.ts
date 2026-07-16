@@ -2,6 +2,10 @@ import "server-only";
 
 import { buildVoiceSystemPrompt } from "@/lib/voice/prompts";
 import {
+  buildCrmReplyContext,
+  type CrmReplyContactSnapshot,
+} from "@/lib/ai/crm-reply-context";
+import {
   ensurePlatformPromptsLoaded,
   getPlatformPromptContent,
 } from "@/services/platform-prompts.service";
@@ -20,6 +24,7 @@ import { isVoiceStreamEnabled, getVoiceStreamWsUrl } from "@/lib/voice/stream-co
 import { buildMediaStreamConnectTwiml } from "@/lib/voice/stream-twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
+import { getConversationRepository } from "@/repositories/conversation.repository";
 import {
   getVoiceRepository,
   type VoiceCallSessionTurn,
@@ -34,6 +39,7 @@ import {
   type LlmAiProvider,
 } from "@orzu/platform-ai";
 import { generateTextWithFallback } from "@/services/llm.service";
+import { loadConversationMemory } from "@/services/conversation-memory.service";
 import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
@@ -62,10 +68,14 @@ import {
   hasOpenAiEnv,
   streamOpenAiText,
 } from "@/services/openai.service";
+import type { Database } from "@/types/database.types";
 import type { VoiceAgentSettings } from "@/types/voice-agent.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Hard cap on AI voice turns per call session (gather + stream). */
 const MAX_VOICE_TURNS = 8;
-const MAX_VOICE_HISTORY_TURNS = 6;
+/** Prompt history uses the same 8-turn window as the call turn cap. */
+const MAX_VOICE_HISTORY_TURNS = MAX_VOICE_TURNS;
 const MAX_VOICE_PROMPT_CHARS = 3500;
 const MAX_KNOWLEDGE_ENTRIES = 12;
 const MAX_KNOWLEDGE_CONTENT_CHARS = 400;
@@ -118,7 +128,9 @@ async function loadBusinessContext(
       communicationStyle: profile?.communication_style,
     }),
     knowledgeContext: knowledgeEntries.slice(0, knowledgeLimit).map((entry) => ({
-      category: entry.category ?? "",
+      id: entry.id,
+      citation: entry.citation,
+      category: entry.category?.trim() || "General",
       title: entry.title,
       content: entry.content.slice(0, knowledgeChars),
     })),
@@ -173,6 +185,92 @@ async function resolveStreamVoiceLlm(
   return { ...legacy, apiKey: null };
 }
 
+async function fetchCrmReplySnapshot(
+  admin: SupabaseClient<Database>,
+  businessId: string,
+  contactId: string,
+): Promise<CrmReplyContactSnapshot | null> {
+  const [{ data: contact }, { count: openTaskCount }] = await Promise.all([
+    admin
+      .from("contacts")
+      .select(
+        "name, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date",
+      )
+      .eq("id", contactId)
+      .eq("business_id", businessId)
+      .maybeSingle(),
+    admin
+      .from("crm_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("contact_id", contactId)
+      .eq("business_id", businessId)
+      .eq("status", "open"),
+  ]);
+
+  if (!contact) {
+    return null;
+  }
+
+  return {
+    name: contact.name,
+    pipelineStage: contact.pipeline_stage,
+    dealValue: contact.deal_value,
+    leadScore: contact.lead_score,
+    expectedCloseDate: contact.expected_close_date,
+    aiSummary: contact.ai_summary,
+    openTaskCount: openTaskCount ?? 0,
+  };
+}
+
+async function loadVoiceCallerMemoryContext(input: {
+  businessId: string;
+  callerPhone: string;
+}): Promise<{
+  conversationSummary: string | null;
+  crmContext: string | null;
+}> {
+  const admin = getVoiceRepository().client;
+  const conversationRepo = getConversationRepository(admin);
+  const contactId = await conversationRepo.findContactIdByPhone(
+    input.businessId,
+    input.callerPhone,
+  );
+
+  if (!contactId) {
+    return { conversationSummary: null, crmContext: null };
+  }
+
+  const [{ data: latestConversation }, crmSnapshot] = await Promise.all([
+    admin
+      .from("conversations")
+      .select("id")
+      .eq("business_id", input.businessId)
+      .eq("contact_id", contactId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    fetchCrmReplySnapshot(admin, input.businessId, contactId),
+  ]);
+
+  let conversationSummary: string | null = null;
+
+  if (latestConversation?.id) {
+    const memory = await loadConversationMemory(
+      admin,
+      latestConversation.id,
+      input.businessId,
+    );
+    conversationSummary = memory?.aiSummary ?? null;
+  }
+
+  const crmContext = buildCrmReplyContext(crmSnapshot);
+
+  return {
+    conversationSummary,
+    crmContext: crmContext || null,
+  };
+}
+
 async function prepareVoiceAiReply(input: {
   businessId: string;
   userMessage: string;
@@ -182,6 +280,7 @@ async function prepareVoiceAiReply(input: {
   settings: VoiceAgentSettings;
   callObjective?: string | null;
   streamMode?: boolean;
+  callerPhone?: string | null;
 }) {
   await ensurePlatformPromptsLoaded();
 
@@ -199,6 +298,14 @@ async function prepareVoiceAiReply(input: {
         apiKey: null as string | null,
       };
 
+  const callerPhone = input.callerPhone?.trim() || null;
+  const memoryContext = callerPhone
+    ? await loadVoiceCallerMemoryContext({
+        businessId: input.businessId,
+        callerPhone,
+      })
+    : { conversationSummary: null, crmContext: null };
+
   const systemPrompt = buildVoiceSystemPrompt({
     businessName: context.businessName,
     systemPrompt: context.systemPrompt,
@@ -210,6 +317,8 @@ async function prepareVoiceAiReply(input: {
     direction: input.direction,
     triggerReason: input.triggerReason,
     realtime: input.streamMode,
+    conversationSummary: memoryContext.conversationSummary,
+    crmContext: memoryContext.crmContext,
   });
 
   const conversationPrompt = buildVoiceConversationPrompt({
@@ -244,6 +353,7 @@ export async function buildVoiceStreamLlmConfig(input: {
   triggerReason?: string | null;
   settings: VoiceAgentSettings;
   callObjective?: string | null;
+  callerPhone?: string | null;
 }): Promise<VoiceStreamLlmConfig> {
   const prepared = await prepareVoiceAiReply({
     businessId: input.businessId,
@@ -254,6 +364,7 @@ export async function buildVoiceStreamLlmConfig(input: {
     settings: input.settings,
     callObjective: input.callObjective,
     streamMode: true,
+    callerPhone: input.callerPhone,
   });
 
   const openaiApiKey =
@@ -277,6 +388,7 @@ export async function* generateVoiceAiReplyStream(input: {
   triggerReason?: string | null;
   settings: VoiceAgentSettings;
   callObjective?: string | null;
+  callerPhone?: string | null;
 }): AsyncGenerator<VoiceAiStreamChunk, void, void> {
   const prepared = await prepareVoiceAiReply({
     ...input,
@@ -383,6 +495,7 @@ export async function generateVoiceAiReply(input: {
   triggerReason?: string | null;
   settings: VoiceAgentSettings;
   callObjective?: string | null;
+  callerPhone?: string | null;
 }): Promise<{ success: true; text: string } | { success: false; message: string }> {
   const prepared = await prepareVoiceAiReply(input);
 
@@ -687,6 +800,7 @@ export async function handleVoiceGatherInput(input: {
     triggerReason: input.triggerReason,
     settings,
     callObjective: callLog?.custom_prompt,
+    callerPhone: input.callerPhone,
   });
 
   const assistantText = reply.success

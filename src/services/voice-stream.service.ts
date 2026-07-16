@@ -194,6 +194,7 @@ export async function getVoiceStreamSessionContext(input: {
     triggerReason: input.triggerReason,
     settings,
     callObjective,
+    callerPhone: callLog?.phone_number,
   });
 
   return {
@@ -251,6 +252,7 @@ export async function generateVoiceStreamReply(input: {
     triggerReason: input.triggerReason,
     settings,
     callObjective: callLog?.custom_prompt,
+    callerPhone: callLog?.phone_number,
   });
 
   if (!reply.success) {
@@ -342,6 +344,7 @@ export async function* generateVoiceStreamReplyStream(input: {
       triggerReason: input.triggerReason,
       settings,
       callObjective: callLog?.custom_prompt,
+      callerPhone: callLog?.phone_number,
     })) {
       if (chunk.type === "delta") {
         yield chunk;

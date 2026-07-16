@@ -41,6 +41,16 @@ export function TeamAnalyticsPanel({ metrics }: TeamAnalyticsPanelProps) {
               {metrics.slaCompliancePercent}%
             </p>
           </div>
+          <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+            <p className="text-xs text-muted-foreground">
+              {ANALYTICS_MESSAGES.avgHandoffAccept}
+            </p>
+            <p className="mt-1 text-xl font-semibold tabular-nums">
+              {metrics.avgHandoffAcceptMinutes == null
+                ? "—"
+                : `${metrics.avgHandoffAcceptMinutes} min`}
+            </p>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {metrics.aiReplies} AI replies · {metrics.clientMessages} customer

@@ -24,6 +24,7 @@ import {
   type AdditionalContactEntry,
 } from "@/utils/contact-additional-contacts";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
+import { parseAgentRunAction } from "@/lib/ai/agent-run-actions";
 import type {
   ContactActionResult,
   ContactCustomFields,
@@ -1012,12 +1013,57 @@ export async function getContactProfile(
         createdAt: conversation.updated_at,
       });
     }
-
-    timeline.sort(
-      (left, right) =>
-        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-    );
   }
+
+  const { data: agentRuns } = await supabase
+    .from("agent_runs")
+    .select("id, actions, success, created_at, channel")
+    .eq("contact_id", contactId)
+    .eq("business_id", businessId)
+    .eq("success", true)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  for (const run of agentRuns ?? []) {
+    const actions = Array.isArray(run.actions)
+      ? run.actions.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const channel = isMessagingChannel(run.channel)
+      ? run.channel
+      : contact.channel;
+
+    for (const [index, action] of actions.entries()) {
+      const parsed = parseAgentRunAction(action);
+
+      if (parsed.kind !== "executed") {
+        continue;
+      }
+
+      const label = parsed.label.trim();
+
+      if (!label) {
+        continue;
+      }
+
+      const content = label.startsWith("AI:")
+        ? label
+        : `AI: ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+
+      timeline.push({
+        id: `crm-${run.id}-${index}`,
+        activityType: "crm_action",
+        content,
+        channel,
+        createdAt: run.created_at,
+        aiGenerated: true,
+      });
+    }
+  }
+
+  timeline.sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
 
   const [tasks, deals] = await Promise.all([
     listCrmTasksForContact(contactId),

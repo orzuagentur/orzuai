@@ -132,6 +132,7 @@ export type Database = {
           stripe_subscription_id: string | null;
           subscription_addons: Json;
           twilio_wallet_balance_cents: number;
+          prefer_customer_ai_keys: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -151,6 +152,7 @@ export type Database = {
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
           twilio_wallet_balance_cents?: number;
+          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -170,6 +172,7 @@ export type Database = {
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
           twilio_wallet_balance_cents?: number;
+          prefer_customer_ai_keys?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1332,6 +1335,72 @@ export type Database = {
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      follow_up_jobs: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          follow_up_day: number;
+          scheduled_at: string;
+          status: string;
+          last_outbound_content: string;
+          contact_name: string;
+          attempt_count: number;
+          max_attempts: number;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id: string;
+          channel: MessagingChannel;
+          follow_up_day: number;
+          scheduled_at: string;
+          status?: string;
+          last_outbound_content?: string;
+          contact_name?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string;
+          channel?: MessagingChannel;
+          follow_up_day?: number;
+          scheduled_at?: string;
+          status?: string;
+          last_outbound_content?: string;
+          contact_name?: string;
+          attempt_count?: number;
+          max_attempts?: number;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_jobs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "follow_up_jobs_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
             referencedColumns: ["id"];
           },
         ];
@@ -3132,6 +3201,12 @@ export type Database = {
           reason: string;
           message_preview: string;
           created_at: string;
+          status: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+          escalate_count: number;
+          last_escalated_at: string | null;
+          resolved_at: string | null;
         };
         Insert: {
           id?: string;
@@ -3143,6 +3218,12 @@ export type Database = {
           reason: string;
           message_preview?: string;
           created_at?: string;
+          status?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          escalate_count?: number;
+          last_escalated_at?: string | null;
+          resolved_at?: string | null;
         };
         Update: {
           id?: string;
@@ -3154,6 +3235,12 @@ export type Database = {
           reason?: string;
           message_preview?: string;
           created_at?: string;
+          status?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          escalate_count?: number;
+          last_escalated_at?: string | null;
+          resolved_at?: string | null;
         };
         Relationships: [
           {
@@ -3190,6 +3277,7 @@ export type Database = {
           schedule_enabled: boolean;
           schedule_timezone: string;
           schedule_slots: Json;
+          crm_update_mode: string;
           fallback_reply_message: string | null;
           can_reply: boolean;
           can_create_task: boolean;
@@ -3219,6 +3307,7 @@ export type Database = {
           schedule_enabled?: boolean;
           schedule_timezone?: string;
           schedule_slots?: Json;
+          crm_update_mode?: string;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;
@@ -3248,6 +3337,7 @@ export type Database = {
           schedule_enabled?: boolean;
           schedule_timezone?: string;
           schedule_slots?: Json;
+          crm_update_mode?: string;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;
@@ -3389,6 +3479,8 @@ export type Database = {
           auto_qualify_pipeline: boolean;
           auto_task_enabled: boolean;
           auto_task_threshold: number;
+          auto_deal_enabled: boolean;
+          auto_deal_threshold: number;
           sentiment_analysis_enabled: boolean;
           follow_up_agent_enabled: boolean;
           updated_at: string;
@@ -3400,6 +3492,8 @@ export type Database = {
           auto_qualify_pipeline?: boolean;
           auto_task_enabled?: boolean;
           auto_task_threshold?: number;
+          auto_deal_enabled?: boolean;
+          auto_deal_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
           updated_at?: string;
@@ -3411,6 +3505,8 @@ export type Database = {
           auto_qualify_pipeline?: boolean;
           auto_task_enabled?: boolean;
           auto_task_threshold?: number;
+          auto_deal_enabled?: boolean;
+          auto_deal_threshold?: number;
           sentiment_analysis_enabled?: boolean;
           follow_up_agent_enabled?: boolean;
           updated_at?: string;
@@ -3420,6 +3516,38 @@ export type Database = {
             foreignKeyName: "business_ai_config_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_ai_provider_keys: {
+        Row: {
+          business_id: string;
+          provider: string;
+          api_key_encrypted: string;
+          api_key_preview: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          business_id: string;
+          provider: string;
+          api_key_encrypted: string;
+          api_key_preview?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          business_id?: string;
+          provider?: string;
+          api_key_encrypted?: string;
+          api_key_preview?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_ai_provider_keys_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },
@@ -4097,6 +4225,12 @@ export type Database = {
           p_limit?: number;
         };
         Returns: Database["public"]["Tables"]["ai_orchestration_jobs"]["Row"][];
+      };
+      claim_follow_up_jobs: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Database["public"]["Tables"]["follow_up_jobs"]["Row"][];
       };
       claim_voice_post_call_jobs: {
         Args: {

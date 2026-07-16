@@ -47,6 +47,8 @@ export async function getAutomationsPageData(input?: {
         autoQualifyPipeline: true,
         autoTaskEnabled: false,
         autoTaskThreshold: 75,
+        autoDealEnabled: false,
+        autoDealThreshold: 70,
         sentimentAnalysisEnabled: true,
       },
       followUpAgent: { enabled: true, sentCount: 0 },

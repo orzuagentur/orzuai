@@ -2,6 +2,11 @@ import "server-only";
 
 import { estimateTokensFromText } from "@/lib/ai/cost";
 import type { AiProvider } from "@/lib/ai/constants";
+import { ORCHESTRATOR_PLAN_TOOL_NAME } from "@/lib/ai/tools/orchestrator-gemini";
+import {
+  ORCHESTRATOR_CLAUDE_TOOL_CHOICE,
+  ORCHESTRATOR_CLAUDE_TOOLS,
+} from "@/lib/ai/tools/orchestrator-json-schema";
 import { buildAssistantSystemInstruction } from "@/lib/gemini/prompts";
 import type {
   GeminiServiceResult,
@@ -133,6 +138,110 @@ export async function generateClaudeText(
     data: { text: result.text, model: result.model },
     usage: result.usage,
     provider: "claude",
+  };
+}
+
+export type ClaudeOrchestratorToolResult =
+  | { success: true; data: { args: unknown; model: string }; usage?: ClaudeUsage }
+  | {
+      success: false;
+      error: { code: "MISSING_CONFIG" | "GENERATION_FAILED"; message: string };
+    };
+
+export async function generateClaudeOrchestratorToolPlan(input: {
+  model?: string;
+  apiKey?: string;
+  systemInstruction: string;
+  prompt: string;
+}): Promise<ClaudeOrchestratorToolResult> {
+  if (!hasClaudeEnv() && !input.apiKey) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: "Anthropic API key missing." },
+    };
+  }
+
+  const apiKey = input.apiKey?.trim() || getClaudeApiKey();
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: "Anthropic API key missing." },
+    };
+  }
+
+  const model = input.model ?? "claude-3-5-haiku-latest";
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2048,
+      temperature: 0.2,
+      system: input.systemInstruction,
+      messages: [{ role: "user", content: input.prompt }],
+      tools: ORCHESTRATOR_CLAUDE_TOOLS,
+      tool_choice: ORCHESTRATOR_CLAUDE_TOOL_CHOICE,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message:
+          body.slice(0, 300) || `Anthropic request failed (${response.status}).`,
+      },
+    };
+  }
+
+  const payload = (await response.json()) as {
+    content?: Array<{
+      type?: string;
+      name?: string;
+      input?: unknown;
+    }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
+    model?: string;
+  };
+
+  const toolBlock = payload.content?.find(
+    (block) =>
+      block.type === "tool_use" && block.name === ORCHESTRATOR_PLAN_TOOL_NAME,
+  );
+
+  if (!toolBlock?.input) {
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message: "Claude returned no plan_orchestration tool_use block.",
+      },
+    };
+  }
+
+  const promptText = `${input.systemInstruction}\n${input.prompt}`;
+
+  return {
+    success: true,
+    data: {
+      args: toolBlock.input,
+      model: payload.model ?? model,
+    },
+    usage: {
+      inputTokens:
+        payload.usage?.input_tokens ?? estimateTokensFromText(promptText),
+      outputTokens:
+        payload.usage?.output_tokens ??
+        estimateTokensFromText(JSON.stringify(toolBlock.input)),
+    },
   };
 }
 

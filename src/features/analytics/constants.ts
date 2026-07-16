@@ -184,6 +184,7 @@ export const ANALYTICS_MESSAGES = {
   teamDescription: "Human team replies and SLA compliance on first response.",
   teamReplies: "Team replies",
   slaCompliance: "SLA compliance",
+  avgHandoffAccept: "Avg handoff accept",
   revenueTitle: "Revenue",
   revenueDescription: "Pipeline and won revenue from CRM deal values.",
   pipelineValue: "Open pipeline",

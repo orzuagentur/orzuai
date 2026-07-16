@@ -8,7 +8,7 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
     count === 1 ? "1 contact" : `${count} contacts`,
   aiTitle: "AI",
   aiDescription:
-    "AI Assistant replies to customers on this channel when enabled. AI Agents are optional for routing and automations.",
+    "AI Assistant replies to customers on this channel when enabled. Background workers update CRM — they do not send separate chat replies.",
   aiEnabledLabel: "AI auto-replies",
   aiEnabledOn: "AI auto-replies are enabled for this channel.",
   aiEnabledOff: "AI auto-replies are disabled for this channel.",
@@ -17,11 +17,11 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   aiSystemPromptLabel: "Business instructions",
   aiSystemPromptHint:
     "Tell the assistant how to represent your business. Used for incoming messages on this channel.",
-  aiModelLabel: "AI model",
+  aiModelLabel: "AI model (platform-managed)",
   aiModelLegacyHint:
-    "Consider switching to Gemini 2.5 Flash for better speed and quality.",
+    "Channel model/provider settings are ignored. Replies use the platform AI configuration.",
   aiProviderMissing:
-    "Selected AI provider is not configured. Add the API key to your environment.",
+    "Platform AI is not configured. Ask an admin to set provider keys.",
   aiLanguageLabel: "Reply language",
   aiTestTitle: "Test reply",
   aiTestDescription:
@@ -32,6 +32,8 @@ export const CHANNEL_WORKSPACE_MESSAGES = {
   aiGeminiMissing:
     "Gemini is not configured. Add GEMINI_API_KEY to enable AI replies.",
   aiKnowledgeHint: "Add FAQs and policies in Knowledge Base to improve answers.",
+  aiInstagramUnsupported:
+    "Instagram DM is not supported. Auto-reply and follow-ups are available on WhatsApp, Telegram, website chat, and forms.",
   analyticsTitle: "Analytics",
   analyticsDescription: "Performance metrics for this channel.",
   notConnectedHint:

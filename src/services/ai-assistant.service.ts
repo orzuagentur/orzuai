@@ -34,8 +34,27 @@ import {
 } from "@/services/business-calendar-setup.service";
 import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
 import { getFollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import { getSalesAgentSettings } from "@/services/sales-agent.service";
+import { getBusinessAiKeySettings } from "@/services/business-ai-keys.service";
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
+
+const EMPTY_SALES_AGENT = {
+  salesAgentEnabled: false,
+  bantThreshold: 70,
+  autoQualifyPipeline: true,
+  autoTaskEnabled: false,
+  autoTaskThreshold: 75,
+  autoDealEnabled: false,
+  autoDealThreshold: 70,
+  sentimentAnalysisEnabled: true,
+} as const;
+
+const EMPTY_BUSINESS_AI_KEYS = {
+  preferCustomerAiKeys: false,
+  geminiKeyPreview: null,
+  openaiKeyPreview: null,
+} as const;
 
 const MESSAGING_CHANNELS = AI_AGENT_CHANNELS;
 
@@ -123,6 +142,8 @@ export async function getAiAssistantPageData(
         bookingPageCount: 0,
       },
       followUpAgent: { enabled: false, sentCount: 0 },
+      salesAgent: { ...EMPTY_SALES_AGENT },
+      businessAiKeys: { ...EMPTY_BUSINESS_AI_KEYS },
       agentRuns: {
         runsToday: 0,
         runsLast30Days: 0,
@@ -155,6 +176,8 @@ export async function getAiAssistantPageData(
     aiActivity,
     workerReadiness,
     followUpAgent,
+    salesAgent,
+    businessAiKeys,
     agentRuns,
   ] = await Promise.all([
     getChannelConnectionStatuses(businessId),
@@ -171,6 +194,8 @@ export async function getAiAssistantPageData(
     getAgentAiActivity(businessId, 1),
     getAiWorkerReadiness(businessId),
     getFollowUpAgentSettings(businessId),
+    getSalesAgentSettings(businessId),
+    getBusinessAiKeySettings(businessId),
     getAgentRunsMetrics(businessId),
   ]);
 
@@ -226,6 +251,8 @@ export async function getAiAssistantPageData(
     aiActivity,
     workerReadiness,
     followUpAgent,
+    salesAgent,
+    businessAiKeys,
     agentRuns,
   };
 }

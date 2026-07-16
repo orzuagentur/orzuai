@@ -30,5 +30,22 @@ export type SalesAgentSettings = {
   autoQualifyPipeline: boolean;
   autoTaskEnabled: boolean;
   autoTaskThreshold: number;
+  autoDealEnabled: boolean;
+  autoDealThreshold: number;
   sentimentAnalysisEnabled: boolean;
+};
+
+export type SalesAgentRuleTestResult = {
+  success: boolean;
+  message?: string;
+  averageScore?: number;
+  evaluation?: {
+    budget: number;
+    authority: number;
+    need: number;
+    timeline: number;
+    summary: string;
+    suggestedAction: string;
+  };
+  plannedActions?: string[];
 };

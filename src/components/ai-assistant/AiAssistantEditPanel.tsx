@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
@@ -9,6 +10,8 @@ import { AiAgentScheduleEditor } from "@/components/ai-assistant/AiAgentSchedule
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import { AiLanguageSelect } from "@/components/ai-assistant/AiLanguageSelect";
 import { AiReplyWaitSelect } from "@/components/ai-assistant/AiReplyWaitSelect";
+import { BusinessAiKeysPanel } from "@/components/ai-assistant/BusinessAiKeysPanel";
+import { SalesAgentRulesPanel } from "@/components/ai-assistant/SalesAgentRulesPanel";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { saveAiAssistantProfileAction } from "@/features/ai-assistant/actions/save-ai-assistant-profile";
 import { saveFollowUpAgentSettingsAction } from "@/features/ai-assistant/actions/save-follow-up-agent-settings";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
@@ -28,13 +32,22 @@ import {
   isCommunicationStyleId,
   type CommunicationStyleId,
 } from "@/features/ai-assistant/communication-styles";
-import type { AiAssistantProfileData } from "@/types/ai-assistant-profile.types";
+import type {
+  AiAssistantProfileData,
+  CrmUpdateMode,
+} from "@/types/ai-assistant-profile.types";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
+import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
+import type { SalesAgentSettings } from "@/types/ai-usage.types";
+import type { BusinessAiKeySettings } from "@/services/business-ai-keys.service";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
 type AiAssistantEditPanelProps = {
   profile: AiAssistantProfileData;
   followUpAgent: FollowUpAgentSettings;
+  workerReadiness: AiWorkerReadiness;
+  salesAgent: SalesAgentSettings;
+  businessAiKeys: BusinessAiKeySettings;
   onBack?: () => void;
 };
 
@@ -120,6 +133,9 @@ const ALERT_PERMISSION_ROWS: Array<{
 export function AiAssistantEditPanel({
   profile,
   followUpAgent,
+  workerReadiness,
+  salesAgent,
+  businessAiKeys,
   onBack,
 }: AiAssistantEditPanelProps) {
   const router = useRouter();
@@ -139,6 +155,9 @@ export function AiAssistantEditPanel({
   const [scheduleSlots, setScheduleSlots] = useState<AgentScheduleSlot[]>(
     profile.scheduleSlots,
   );
+  const [crmUpdateMode, setCrmUpdateMode] = useState<CrmUpdateMode>(
+    profile.crmUpdateMode ?? "every_message",
+  );
   const [permissions, setPermissions] = useState<AgentPermissions>({
     canReply: profile.canReply,
     canCreateTask: profile.canCreateTask,
@@ -156,6 +175,12 @@ export function AiAssistantEditPanel({
   const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
   const [deactivateStep, setDeactivateStep] = useState(0);
 
+  const showCalendarBookingWarning =
+    permissions.canCreateCalendarEvent &&
+    !workerReadiness.googleCalendarConnected &&
+    workerReadiness.resourceCount === 0 &&
+    workerReadiness.bookingPageCount === 0;
+
   async function handleSave() {
     setIsSaving(true);
 
@@ -169,6 +194,7 @@ export function AiAssistantEditPanel({
         scheduleEnabled,
         scheduleTimezone,
         scheduleSlots,
+        crmUpdateMode,
         ...permissions,
       });
 
@@ -218,6 +244,7 @@ export function AiAssistantEditPanel({
         scheduleEnabled,
         scheduleTimezone,
         scheduleSlots,
+        crmUpdateMode,
         ...nextPermissions,
       });
 
@@ -378,6 +405,34 @@ export function AiAssistantEditPanel({
               onSlotsChange={setScheduleSlots}
             />
 
+            <div className="space-y-2">
+              <Label htmlFor="crm-update-mode">
+                {AI_ASSISTANT_MESSAGES.crmUpdateModeLabel}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {AI_ASSISTANT_MESSAGES.crmUpdateModeDescription}
+              </p>
+              <select
+                id="crm-update-mode"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={crmUpdateMode}
+                disabled={isSaving}
+                onChange={(event) =>
+                  setCrmUpdateMode(event.target.value as CrmUpdateMode)
+                }
+              >
+                <option value="every_message">
+                  {AI_ASSISTANT_MESSAGES.crmUpdateModeEveryMessage}
+                </option>
+                <option value="idle_5min">
+                  {AI_ASSISTANT_MESSAGES.crmUpdateModeIdle5Min}
+                </option>
+                <option value="on_resolve">
+                  {AI_ASSISTANT_MESSAGES.crmUpdateModeOnResolve}
+                </option>
+              </select>
+            </div>
+
             <div className="space-y-3 rounded-lg border p-4">
               <div>
                 <Label>{AI_ASSISTANT_MESSAGES.followUpAgentTitle}</Label>
@@ -409,6 +464,17 @@ export function AiAssistantEditPanel({
                   {AI_ASSISTANT_MESSAGES.agentPermissionsHint}
                 </p>
               </div>
+              {showCalendarBookingWarning ? (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+                  <p>{AI_ASSISTANT_MESSAGES.calendarBookingRequiresConnect}</p>
+                  <Link
+                    href={DASHBOARD_ROUTES.integrations}
+                    className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
+                  >
+                    Integrations
+                  </Link>
+                </div>
+              ) : null}
               {renderPermissionGroup(
                 AI_ASSISTANT_MESSAGES.agentPermissionsCrmTitle,
                 CRM_PERMISSION_ROWS,
@@ -467,6 +533,9 @@ export function AiAssistantEditPanel({
             </div>
           </CardContent>
         </Card>
+
+        <SalesAgentRulesPanel initialSettings={salesAgent} />
+        <BusinessAiKeysPanel initialSettings={businessAiKeys} />
       </div>
     </div>
   );

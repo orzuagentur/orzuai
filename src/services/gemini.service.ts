@@ -11,6 +11,11 @@ import {
   GEMINI_SAFETY_SETTINGS,
   mapConversationHistoryToGeminiContents,
 } from "@/lib/gemini/prompts";
+import {
+  ORCHESTRATOR_GEMINI_TOOL_CONFIG,
+  ORCHESTRATOR_GEMINI_TOOLS,
+  extractOrchestratorToolArgs,
+} from "@/lib/ai/tools/orchestrator-gemini";
 import { getGeminiDefaultModel, hasGeminiEnv } from "@/lib/env";
 import type {
   GeminiServiceResult,
@@ -224,5 +229,101 @@ export async function generateAssistantReply(
     };
   } catch (error) {
     return mapGeminiError(error);
+  }
+}
+
+export type GeminiOrchestratorToolResult =
+  | { success: true; data: { args: unknown; model: string } }
+  | {
+      success: false;
+      error: {
+        code:
+          | "VALIDATION_ERROR"
+          | "MISSING_CONFIG"
+          | "GENERATION_FAILED"
+          | "CONTENT_BLOCKED"
+          | "EMPTY_RESPONSE";
+        message: string;
+      };
+    };
+
+function toOrchestratorToolError(
+  result: GeminiServiceResult,
+): GeminiOrchestratorToolResult {
+  if (result.success) {
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message: "Unexpected Gemini text response for orchestrator tools.",
+      },
+    };
+  }
+
+  return result;
+}
+
+/** Native Gemini function calling for CRM orchestration plans. */
+export async function generateOrchestratorToolPlan(input: {
+  model?: string;
+  apiKey?: string;
+  systemInstruction: string;
+  prompt: string;
+}): Promise<GeminiOrchestratorToolResult> {
+  if (!hasGeminiEnv() && !input.apiKey) {
+    return toOrchestratorToolError(missingConfigError());
+  }
+
+  const systemInstruction = input.systemInstruction.trim();
+  const prompt = input.prompt.trim();
+
+  if (!systemInstruction || !prompt) {
+    return toOrchestratorToolError(
+      validationError("Orchestrator prompt is required."),
+    );
+  }
+
+  if (prompt.length > 12_000 || systemInstruction.length > 8_000) {
+    return toOrchestratorToolError(
+      validationError("Orchestrator prompt exceeds maximum length."),
+    );
+  }
+
+  const modelName = resolveModelName(input.model);
+
+  try {
+    const model = getGeminiModel({
+      model: modelName,
+      systemInstruction,
+      apiKey: input.apiKey,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      tools: ORCHESTRATOR_GEMINI_TOOLS,
+      toolConfig: ORCHESTRATOR_GEMINI_TOOL_CONFIG,
+      generationConfig: {
+        ...GEMINI_GENERATION,
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+      },
+      safetySettings: [...GEMINI_SAFETY_SETTINGS],
+    });
+
+    const args = extractOrchestratorToolArgs(result.response);
+
+    if (!args) {
+      return toOrchestratorToolError(emptyResponseError());
+    }
+
+    return {
+      success: true,
+      data: {
+        args,
+        model: modelName,
+      },
+    };
+  } catch (error) {
+    return toOrchestratorToolError(mapGeminiError(error));
   }
 }

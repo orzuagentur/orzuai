@@ -29,6 +29,14 @@ type ContactMessagesTableProps = {
 };
 
 function getSenderLabel(entry: ContactTimelineEntry): string {
+  if (entry.activityType === "crm_action") {
+    return CONTACTS_MESSAGES.crmActionActivity;
+  }
+
+  if (entry.activityType === "internal_note") {
+    return CONTACTS_MESSAGES.internalNoteActivity;
+  }
+
   if (entry.senderType === "client") {
     return "Customer";
   }
@@ -50,8 +58,11 @@ export function ContactMessagesTable({
   conversationId,
 }: ContactMessagesTableProps) {
   const recentMessages = messages
-    .filter((entry) => entry.activityType === "message")
-    .slice(0, 2);
+    .filter(
+      (entry) =>
+        entry.activityType === "message" || entry.activityType === "crm_action",
+    )
+    .slice(0, 8);
 
   const inboxHref = conversationId
     ? `${DASHBOARD_ROUTES.chats}/${channel}?conversation=${conversationId}`
@@ -103,12 +114,18 @@ export function ContactMessagesTable({
                   {getSenderLabel(entry)}
                 </ContactCrmTableCell>
                 <ContactCrmTableCell>
-                  <Link
-                    href={inboxHref}
-                    className="line-clamp-2 text-muted-foreground transition-colors hover:text-foreground [overflow-wrap:anywhere] [word-break:break-word]"
-                  >
-                    {entry.content}
-                  </Link>
+                  {entry.activityType === "crm_action" ? (
+                    <span className="line-clamp-2 text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
+                      {entry.content}
+                    </span>
+                  ) : (
+                    <Link
+                      href={inboxHref}
+                      className="line-clamp-2 text-muted-foreground transition-colors hover:text-foreground [overflow-wrap:anywhere] [word-break:break-word]"
+                    >
+                      {entry.content}
+                    </Link>
+                  )}
                 </ContactCrmTableCell>
               </ContactCrmTableRow>
             ))}

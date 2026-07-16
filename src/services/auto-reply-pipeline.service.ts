@@ -39,7 +39,10 @@ import {
   applyCreateContactFromPlan,
   loadContactSnapshot,
 } from "@/services/agent-task-executor.service";
-import { reportAgentActions } from "@/services/agent-action-reporting.service";
+import {
+  buildCustomerFacingActionSummary,
+  reportAgentActions,
+} from "@/services/agent-action-reporting.service";
 import {
   isLikelyBookingOrOrderMessage,
   resolveAssistantFallbackReplyMessage,
@@ -93,6 +96,8 @@ export type AutoReplyGenerationSuccess = {
   model: string;
   isFallback?: boolean;
   language: string;
+  /** True when CRM/calendar worker actions already ran in this turn. */
+  orchestrationCompleted?: boolean;
 };
 
 export type AutoReplyGenerationFailure = {
@@ -115,6 +120,7 @@ type AutoReplyPrep = {
   conversationSummary: string | null;
   crmContext: string;
   bookingContext: string;
+  knowledgeGuidance: string;
   profile: Awaited<ReturnType<typeof resolveAssistantProfile>>;
   systemPrompt: string;
   provider: AiProvider;
@@ -128,11 +134,12 @@ type AutoReplyPrep = {
 async function fetchConversationHistory(
   admin: MessagingDbClient,
   conversationId: string,
+  businessId: string,
   limit: number = AI_CONTEXT_LIMITS.defaultHistoryMessages,
 ): Promise<ConversationTurn[]> {
   const messageRepo = getMessageRepository(admin);
   const visibleMessages = [
-    ...(await messageRepo.listForAiHistory(conversationId, limit)),
+    ...(await messageRepo.listForAiHistory(conversationId, businessId, limit)),
   ].reverse();
   const outboundMessageIds = visibleMessages
     .filter((message) => message.sender_type !== "client")
@@ -166,9 +173,11 @@ function mapKnowledgeForLlm(
   entries: Awaited<ReturnType<typeof retrieveKnowledgeForMessage>>,
 ) {
   return entries.map((entry) => ({
+    id: entry.id,
+    citation: entry.citation,
     title: entry.title,
     content: entry.content,
-    category: entry.category ?? "",
+    category: entry.category ?? "General",
   }));
 }
 
@@ -200,8 +209,8 @@ async function buildFastBookingReplyContext(input: {
     return [
       "Live booking/order context for this customer message:",
       calendarBookingEnabled
-        ? "Calendar booking is enabled. If the customer gave a usable date/time or date range, say the booking is being created now. Do not make the customer wait for a manager."
-        : "Calendar booking is not configured. Ask only for the missing date/time/contact detail and capture the request without promising a manager callback.",
+        ? "Calendar booking is enabled. If date/time is clear, the system books in this turn — confirm the outcome when action results are provided. If date/time is missing, ask exactly one clear question."
+        : "Calendar booking is not configured yet. Ask only for the missing date/time/contact detail, capture the request as a task, and never promise a manager callback.",
       "Use live availability below to answer whether a slot is open. State price only when pricing exists in business knowledge or conversation context; never invent price.",
       availabilityText.trim(),
       bookingPagesText.trim(),
@@ -278,8 +287,12 @@ export async function resolveAssistantProfile(
 async function resolveConversationContactId(
   admin: MessagingDbClient,
   conversationId: string,
+  businessId: string,
 ): Promise<string | null> {
-  return getConversationRepository(admin).findContactId(conversationId);
+  return getConversationRepository(admin).findContactId(
+    conversationId,
+    businessId,
+  );
 }
 
 async function fetchBusinessSubscriptionPlan(
@@ -348,6 +361,8 @@ function assembleAutoReplySystemPrompt(input: {
   conversationSummary: string | null;
   crmContext: string;
   bookingContext: string;
+  knowledgeGuidance?: string;
+  actionOutcomeContext?: string;
 }): string {
   const sections = [input.baseSystemPrompt];
   const summarySection = formatConversationSummaryForSystemPrompt(
@@ -363,8 +378,16 @@ function assembleAutoReplySystemPrompt(input: {
     sections.push(crmSection);
   }
 
+  if (input.knowledgeGuidance?.trim()) {
+    sections.push(input.knowledgeGuidance.trim());
+  }
+
   if (input.bookingContext.trim()) {
     sections.push(input.bookingContext.trim());
+  }
+
+  if (input.actionOutcomeContext?.trim()) {
+    sections.push(input.actionOutcomeContext.trim());
   }
 
   return sections.join("\n\n");
@@ -375,6 +398,8 @@ function buildPrepFromProfile(input: {
   conversationSummary: string | null;
   crmContext: string;
   bookingContext: string;
+  knowledgeGuidance?: string;
+  actionOutcomeContext?: string;
 }): {
   systemPrompt: string;
   provider: AiProvider;
@@ -387,6 +412,8 @@ function buildPrepFromProfile(input: {
       conversationSummary: input.conversationSummary,
       crmContext: input.crmContext,
       bookingContext: input.bookingContext,
+      knowledgeGuidance: input.knowledgeGuidance,
+      actionOutcomeContext: input.actionOutcomeContext,
     }),
     provider: getPrimaryPlatformLlmProvider(),
     model: resolveLlmModel(getPrimaryPlatformLlmProvider(), undefined),
@@ -419,8 +446,63 @@ function resolveSafeAssistantFallbackReplyMessage(input: {
 
   return (
     safeDefault.text ??
-    "I am checking the details now and will respond with the next step."
+    "I can help with that right here. What exact detail should I handle next?"
   );
+}
+
+function looksLikePassiveWaitingReply(text: string): boolean {
+  return [
+    /checking availability/i,
+    /checking the details/i,
+    /being created now/i,
+    /will (get back|follow up|respond|confirm later)/i,
+    /biroz kuting/i,
+    /проверяю[\s\S]{0,80}(доступ|брон|детал)/i,
+    /ожидайте/i,
+    /tekshir(yapman|aman)/i,
+  ].some((pattern) => pattern.test(text));
+}
+
+function buildKnowledgeGuidance(knowledgeCount: number): string {
+  if (knowledgeCount > 0) {
+    return [
+      "Business knowledge for this message is available in the knowledge context with citation labels (KB-…).",
+      "Answer prices, services, hours, and policies only from those cited entries.",
+      "Never invent prices or services that are not present there.",
+    ].join(" ");
+  }
+
+  return [
+    "No matching business knowledge was found for this message.",
+    "Do not invent prices, services, or policies.",
+    "Answer only from conversation context, or ask one short clarifying question about what they need.",
+  ].join(" ");
+}
+
+function buildActionOutcomeContext(input: {
+  actionsApplied: string[];
+  clientSummary: string | null;
+  language: string;
+  agentName: string;
+}): string {
+  const confirmation =
+    buildCustomerFacingActionSummary({
+      agentName: input.agentName,
+      language: input.language,
+      actionsApplied: input.actionsApplied,
+      clientSummary: input.clientSummary ?? undefined,
+    }) ?? input.clientSummary;
+
+  return [
+    "Worker actions already completed for this customer turn:",
+    input.actionsApplied.length > 0
+      ? input.actionsApplied.join("; ")
+      : "Orchestration completed with no CRM/calendar writes.",
+    confirmation
+      ? `Confirmed outcome to tell the customer:\n${confirmation}`
+      : "If details are still missing, ask exactly one clear question. Do not say you are checking or waiting.",
+    "Confirm the outcome clearly in your reply. Never say you are still checking, waiting, or that a manager will follow up.",
+  ].join("\n");
 }
 
 async function ensureChannelAiSettingsRow(
@@ -489,7 +571,11 @@ async function prepareAutoReplyContext(input: {
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
   const contactId =
     input.conversationId != null
-      ? await resolveConversationContactId(input.admin, input.conversationId)
+      ? await resolveConversationContactId(
+          input.admin,
+          input.conversationId,
+          input.businessId,
+        )
       : null;
 
   const [
@@ -504,6 +590,7 @@ async function prepareAutoReplyContext(input: {
           ? fetchConversationHistory(
               input.admin,
               input.conversationId,
+              input.businessId,
               historyLimit,
             )
           : Promise.resolve([])),
@@ -514,7 +601,11 @@ async function prepareAutoReplyContext(input: {
       }),
       fetchCrmReplySnapshot(input.admin, input.businessId, contactId),
       input.conversationId
-        ? loadConversationMemory(input.admin, input.conversationId)
+        ? loadConversationMemory(
+            input.admin,
+            input.conversationId,
+            input.businessId,
+          )
         : Promise.resolve(null),
       buildFastBookingReplyContext({
         businessId: input.businessId,
@@ -533,11 +624,13 @@ async function prepareAutoReplyContext(input: {
   );
 
   const crmContext = buildCrmReplyContext(crmSnapshot);
+  const knowledgeGuidance = buildKnowledgeGuidance(trimmedKnowledge.length);
   const voice = buildPrepFromProfile({
     profile,
     conversationSummary: conversationMemory?.aiSummary ?? null,
     crmContext,
     bookingContext,
+    knowledgeGuidance,
   });
 
   return {
@@ -552,6 +645,7 @@ async function prepareAutoReplyContext(input: {
       conversationSummary: conversationMemory?.aiSummary ?? null,
       crmContext,
       bookingContext,
+      knowledgeGuidance,
       profile,
       systemPrompt: voice.systemPrompt,
       provider: voice.provider,
@@ -564,7 +658,7 @@ async function prepareAutoReplyContext(input: {
   };
 }
 
-/** Reply first with the single AI Agent profile. */
+/** Reply first with the single AI Agent profile. Booking/order turns run CRM first. */
 export async function generateFastAssistantReply(input: {
   admin: MessagingDbClient;
   businessId: string;
@@ -573,6 +667,8 @@ export async function generateFastAssistantReply(input: {
   conversationId?: string | null;
   conversationHistory?: ConversationTurn[];
   requireAiEnabled?: boolean;
+  /** Dry-run / suggest-reply: never write CRM/calendar before generating text. */
+  skipWorkerActions?: boolean;
 }): Promise<AutoReplyGenerationResult> {
   const prepared = await prepareAutoReplyContext(input);
 
@@ -586,11 +682,61 @@ export async function generateFastAssistantReply(input: {
     return { success: false, reason: "ai_disabled" };
   }
 
+  let orchestrationCompleted = false;
+  let actionOutcomeContext = "";
+  let preferredConfirmation: string | null = null;
+
+  const shouldActBeforeReply =
+    !input.skipWorkerActions &&
+    Boolean(prep.conversationId) &&
+    isLikelyBookingOrOrderMessage(prep.clientMessage) &&
+    (prep.profile.canCreateCalendarEvent ||
+      prep.profile.canCreateTask ||
+      prep.profile.canCreateDeal);
+
+  if (shouldActBeforeReply && prep.conversationId) {
+    try {
+      const cycle = await runAutoReplyBackgroundOrchestration({
+        admin: prep.admin,
+        businessId: prep.businessId,
+        channel: prep.channel,
+        conversationId: prep.conversationId,
+        clientMessage: prep.clientMessage,
+        language: prep.profile.language,
+      });
+
+      orchestrationCompleted = cycle.completed;
+
+      if (cycle.actionsApplied.length > 0 || cycle.clientSummary) {
+        preferredConfirmation = buildCustomerFacingActionSummary({
+          agentName: prep.profile.name,
+          language: prep.profile.language,
+          actionsApplied: cycle.actionsApplied,
+          clientSummary: cycle.clientSummary ?? undefined,
+        });
+        actionOutcomeContext = buildActionOutcomeContext({
+          actionsApplied: cycle.actionsApplied,
+          clientSummary: cycle.clientSummary,
+          language: prep.profile.language,
+          agentName: prep.profile.name,
+        });
+      }
+    } catch (error) {
+      console.warn(
+        "[auto-reply-pipeline] inline worker actions failed; falling back to reply-first",
+        error instanceof Error ? error.message : "unknown",
+      );
+      orchestrationCompleted = false;
+    }
+  }
+
   const voice = buildPrepFromProfile({
     profile: prep.profile,
     conversationSummary: prep.conversationSummary,
     crmContext: prep.crmContext,
     bookingContext: prep.bookingContext,
+    knowledgeGuidance: prep.knowledgeGuidance,
+    actionOutcomeContext,
   });
 
   const reply = await generateAssistantReplyWithFallback({
@@ -617,11 +763,15 @@ export async function generateFastAssistantReply(input: {
       }),
     );
 
-    const fallbackText = resolveSafeAssistantFallbackReplyMessage({
-      language: voice.language,
-      clientMessage: prep.clientMessage,
-      customMessage: prep.fallbackReplyMessage,
-    });
+    const fallbackText =
+      (preferredConfirmation &&
+        sanitizeWorkerFacingReply(preferredConfirmation, { fallback: null })
+          .text) ||
+      resolveSafeAssistantFallbackReplyMessage({
+        language: voice.language,
+        clientMessage: prep.clientMessage,
+        customMessage: prep.fallbackReplyMessage,
+      });
 
     return {
       success: true,
@@ -632,6 +782,7 @@ export async function generateFastAssistantReply(input: {
       model: voice.model,
       language: voice.language,
       isFallback: true,
+      orchestrationCompleted,
     };
   }
 
@@ -664,6 +815,21 @@ export async function generateFastAssistantReply(input: {
     );
   }
 
+  let finalText = safeReply.text ?? fallbackText;
+
+  if (
+    preferredConfirmation &&
+    (safeReply.rewritten || looksLikePassiveWaitingReply(finalText))
+  ) {
+    const safeConfirmation = sanitizeWorkerFacingReply(preferredConfirmation, {
+      fallback: null,
+    });
+
+    if (safeConfirmation.text) {
+      finalText = safeConfirmation.text;
+    }
+  }
+
   void touchPlatformPromptUsage(
     ["assistant_system", "guard_fallback"],
     prep.admin,
@@ -671,13 +837,14 @@ export async function generateFastAssistantReply(input: {
 
   return {
     success: true,
-    text: safeReply.text ?? fallbackText,
+    text: finalText,
     matchedAgentId: null,
     matchedAgentName: prep.profile.name,
     provider: reply.usedProvider ?? voice.provider,
     model: reply.data.model,
     language: voice.language,
-    isFallback: safeReply.rewritten,
+    isFallback: safeReply.rewritten && !preferredConfirmation,
+    orchestrationCompleted,
   };
 }
 
@@ -690,9 +857,13 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   clientMessage: string;
   language: string;
   sendFollowUp?: (text: string) => Promise<{ success: boolean }>;
-}): Promise<void> {
+}): Promise<{
+  completed: boolean;
+  actionsApplied: string[];
+  clientSummary: string | null;
+}> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
-    return;
+    return { completed: false, actionsApplied: [], clientSummary: null };
   }
 
   const subscriptionPlan = await fetchBusinessSubscriptionPlan(
@@ -707,12 +878,14 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   const conversationHistory = await fetchConversationHistory(
     input.admin,
     input.conversationId,
+    input.businessId,
     historyLimit,
   );
 
   const contactId = await resolveConversationContactId(
     input.admin,
     input.conversationId,
+    input.businessId,
   );
 
   let contact =
@@ -774,7 +947,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       conversationId: input.conversationId,
     });
-    return;
+    return { completed: false, actionsApplied: [], clientSummary: null };
   }
 
   const orchestration = orchestrationResult.data;
@@ -812,6 +985,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
         conversationId: input.conversationId,
         channel: input.channel,
         action: createContactAction,
+        clientMessage: input.clientMessage,
       });
 
       if (created) {
@@ -885,6 +1059,8 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       contactId: resolvedContactId,
       message: input.clientMessage,
+      conversationId: input.conversationId,
+      channel: input.channel,
     }).catch((error) => {
       console.warn(
         "[auto-reply-pipeline]",
@@ -896,7 +1072,10 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     });
   }
 
-  if (executorResult?.actionsApplied.length) {
+  const actionsApplied = executorResult?.actionsApplied ?? [];
+  const clientSummary = executorResult?.clientSummary?.trim() || null;
+
+  if (actionsApplied.length) {
     void touchPlatformPromptUsage(["executor"], input.admin);
     await reportAgentActions({
       admin: input.admin,
@@ -912,8 +1091,8 @@ export async function runAutoReplyBackgroundOrchestration(input: {
         canNotifyOwner: profile.canNotifyOwner,
         canSummarizeActionsInChat: profile.canSummarizeActionsInChat,
       },
-      actionsApplied: executorResult.actionsApplied,
-      clientSummary: executorResult.clientSummary,
+      actionsApplied,
+      clientSummary: clientSummary ?? undefined,
       sendFollowUp: input.sendFollowUp,
     });
   }
@@ -927,7 +1106,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       conversationId: input.conversationId,
     });
-    return;
+    return { completed: true, actionsApplied, clientSummary };
   }
 
   const handoffPlan = resolveManagerHandoffPlan({
@@ -942,7 +1121,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       conversationId: input.conversationId,
     });
-    return;
+    return { completed: true, actionsApplied, clientSummary };
   }
 
   await createAiHumanRequest({
@@ -962,14 +1141,14 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       conversationId: input.conversationId,
     });
-    return;
+    return { completed: true, actionsApplied, clientSummary };
   }
 
   const followUpText = buildHumanHandoffFollowUpMessage(input.language);
 
   const recentAiMessage = await getMessageRepository(
     input.admin,
-  ).findLatestAiMessage(input.conversationId);
+  ).findLatestAiMessage(input.conversationId, input.businessId);
 
   if (
     recentAiMessage?.content &&
@@ -981,7 +1160,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       businessId: input.businessId,
       conversationId: input.conversationId,
     });
-    return;
+    return { completed: true, actionsApplied, clientSummary };
   }
 
   const followUpResult = await input.sendFollowUp(followUpText);
@@ -998,6 +1177,8 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     businessId: input.businessId,
     conversationId: input.conversationId,
   });
+
+  return { completed: true, actionsApplied, clientSummary };
 }
 
 /** @deprecated Prefer generateFastAssistantReply for inbound auto-reply. */

@@ -26,7 +26,7 @@ export async function planPlatformCopilotActions(input: {
 
   const result = await generateTextWithFallback({
     businessId: input.businessId,
-    callType: "other",
+    callType: "platform_copilot",
     preferredProvider: "gemini",
     systemInstruction: buildPlatformCopilotAgentInstruction(input.mode),
     prompt: buildPlatformCopilotAgentPrompt({

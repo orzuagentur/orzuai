@@ -592,6 +592,24 @@ export async function updateConversationStatus(
     return { success: false, message: CHAT_MESSAGES.genericError };
   }
 
+  if (
+    parsed.data.status === "resolved" ||
+    parsed.data.status === "closed"
+  ) {
+    const { enqueueCrmOrchestrationOnResolve } = await import(
+      "@/services/ai-orchestration-queue.service"
+    );
+    void enqueueCrmOrchestrationOnResolve({
+      businessId,
+      conversationId: parsed.data.conversationId,
+    }).catch((error) => {
+      console.warn(
+        "[chat] on_resolve CRM orchestration enqueue failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    });
+  }
+
   revalidateChatPaths();
   return { success: true };
 }
@@ -1164,6 +1182,7 @@ export async function suggestConversationReply(
       content: message.content,
     })),
     requireAiEnabled: false,
+    skipWorkerActions: true,
   });
 
   if (!reply.success) {

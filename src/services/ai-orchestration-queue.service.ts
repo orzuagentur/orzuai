@@ -115,17 +115,29 @@ export async function getAiOrchestrationQueueLagMetrics(): Promise<AiOrchestrati
   };
 }
 
+const IDLE_CRM_DELAY_MS = 5 * 60 * 1000;
+
+export function buildIdleCrmOrchestrationIdempotencyKey(
+  conversationId: string,
+): string {
+  return `idle:${conversationId}`;
+}
+
 export async function enqueueAiOrchestrationJob(input: {
   businessId: string;
   channel: MessagingChannel;
   conversationId: string;
   clientMessage: string;
+  idempotencyKey?: string;
+  nextAttemptAt?: Date;
 }): Promise<{ enqueued: boolean; duplicate: boolean }> {
   const admin = createAdminClient();
-  const idempotencyKey = buildAiOrchestrationIdempotencyKey({
-    conversationId: input.conversationId,
-    clientMessage: input.clientMessage,
-  });
+  const idempotencyKey =
+    input.idempotencyKey ??
+    buildAiOrchestrationIdempotencyKey({
+      conversationId: input.conversationId,
+      clientMessage: input.clientMessage,
+    });
 
   const { error } = await admin.from("ai_orchestration_jobs").insert({
     business_id: input.businessId,
@@ -134,6 +146,7 @@ export async function enqueueAiOrchestrationJob(input: {
     client_message: input.clientMessage,
     idempotency_key: idempotencyKey,
     status: "pending",
+    next_attempt_at: (input.nextAttemptAt ?? new Date()).toISOString(),
   });
 
   if (error) {
@@ -146,6 +159,154 @@ export async function enqueueAiOrchestrationJob(input: {
 
   dispatchAiOrchestrationWorker("enqueue");
   return { enqueued: true, duplicate: false };
+}
+
+async function enqueueIdleCrmOrchestrationJob(input: {
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+}): Promise<{ enqueued: boolean; duplicate: boolean; deferred: boolean }> {
+  const admin = createAdminClient();
+  const idempotencyKey = buildIdleCrmOrchestrationIdempotencyKey(
+    input.conversationId,
+  );
+  const nextAttemptAt = new Date(Date.now() + IDLE_CRM_DELAY_MS).toISOString();
+
+  const { data: existing } = await admin
+    .from("ai_orchestration_jobs")
+    .select("id, status")
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+
+  if (existing?.id) {
+    await admin
+      .from("ai_orchestration_jobs")
+      .update({
+        business_id: input.businessId,
+        conversation_id: input.conversationId,
+        channel: input.channel,
+        client_message: input.clientMessage,
+        status: "pending",
+        attempt_count: 0,
+        last_error: null,
+        processed_at: null,
+        next_attempt_at: nextAttemptAt,
+      })
+      .eq("id", existing.id);
+
+    dispatchAiOrchestrationWorker("enqueue");
+    return { enqueued: true, duplicate: false, deferred: true };
+  }
+
+  const inserted = await enqueueAiOrchestrationJob({
+    ...input,
+    idempotencyKey,
+    nextAttemptAt: new Date(nextAttemptAt),
+  });
+
+  return { ...inserted, deferred: true };
+}
+
+/**
+ * Schedules CRM orchestration according to the business crm_update_mode.
+ * - every_message: enqueue immediately (default)
+ * - idle_5min: upsert conversation-scoped pending job delayed 5 minutes
+ * - on_resolve: no-op here; enqueue when conversation becomes resolved/closed
+ */
+export async function scheduleCrmOrchestration(input: {
+  businessId: string;
+  channel: MessagingChannel;
+  conversationId: string;
+  clientMessage: string;
+}): Promise<{
+  enqueued: boolean;
+  duplicate: boolean;
+  deferred: boolean;
+  skipped: boolean;
+  mode: "every_message" | "idle_5min" | "on_resolve";
+}> {
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("ai_assistant_profile")
+    .select("crm_update_mode")
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  const mode =
+    profile?.crm_update_mode === "idle_5min" ||
+    profile?.crm_update_mode === "on_resolve"
+      ? profile.crm_update_mode
+      : "every_message";
+
+  if (mode === "on_resolve") {
+    return {
+      enqueued: false,
+      duplicate: false,
+      deferred: false,
+      skipped: true,
+      mode,
+    };
+  }
+
+  if (mode === "idle_5min") {
+    const result = await enqueueIdleCrmOrchestrationJob(input);
+    return { ...result, skipped: false, mode };
+  }
+
+  const result = await enqueueAiOrchestrationJob(input);
+  return { ...result, deferred: false, skipped: false, mode };
+}
+
+export async function enqueueCrmOrchestrationOnResolve(input: {
+  businessId: string;
+  conversationId: string;
+}): Promise<{ enqueued: boolean; reason?: string }> {
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("ai_assistant_profile")
+    .select("crm_update_mode")
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (profile?.crm_update_mode !== "on_resolve") {
+    return { enqueued: false, reason: "mode_not_on_resolve" };
+  }
+
+  const { data: conversation } = await admin
+    .from("conversations")
+    .select("channel")
+    .eq("id", input.conversationId)
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (!conversation?.channel) {
+    return { enqueued: false, reason: "conversation_missing" };
+  }
+
+  const { data: lastClientMessage } = await admin
+    .from("messages")
+    .select("content")
+    .eq("conversation_id", input.conversationId)
+    .eq("sender_type", "client")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const clientMessage = lastClientMessage?.content?.trim();
+
+  if (!clientMessage) {
+    return { enqueued: false, reason: "no_client_message" };
+  }
+
+  const result = await enqueueAiOrchestrationJob({
+    businessId: input.businessId,
+    channel: conversation.channel,
+    conversationId: input.conversationId,
+    clientMessage,
+  });
+
+  return { enqueued: result.enqueued || result.duplicate };
 }
 
 function scheduleAiOrchestrationProcessingInProcess(): void {

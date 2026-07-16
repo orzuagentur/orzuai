@@ -131,9 +131,56 @@ async function resolveGenerationContext(input: {
   provider?: AiProvider;
   model?: string;
   apiKey?: string;
+  businessId?: string;
 }) {
   const provider = resolveProvider(input.provider);
   const model = resolveLlmModel(provider, input.model);
+
+  if (input.apiKey?.trim()) {
+    return {
+      provider,
+      apiKey: input.apiKey,
+      billingSource: "platform" as const,
+      model,
+    };
+  }
+
+  if (
+    input.businessId &&
+    (provider === "gemini" || provider === "openai")
+  ) {
+    try {
+      const {
+        businessPrefersCustomerAiKeys,
+        resolveBusinessAiProviderKey,
+      } = await import("@/services/business-ai-keys.service");
+
+      const prefersCustomer = await businessPrefersCustomerAiKeys(
+        input.businessId,
+      );
+
+      if (prefersCustomer) {
+        const customerKey = await resolveBusinessAiProviderKey(
+          input.businessId,
+          provider,
+        );
+
+        if (customerKey?.trim()) {
+          return {
+            provider,
+            apiKey: customerKey,
+            billingSource: "customer" as const,
+            model,
+          };
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "[llm] customer key resolve failed; falling back to platform",
+        error instanceof Error ? error.message : "unknown",
+      );
+    }
+  }
 
   return {
     provider,
@@ -214,7 +261,7 @@ async function runTextGeneration(input: {
 export async function generateAssistantReply(
   input: LlmAssistantInput,
 ): Promise<GeminiServiceResult> {
-  const { provider, apiKey, billingSource, model } =
+  let { provider, apiKey, billingSource, model } =
     await resolveGenerationContext(input);
 
   if (!isProviderReady(provider, apiKey)) {
@@ -244,12 +291,34 @@ export async function generateAssistantReply(
     }
   }
 
-  const result = await runAssistantGeneration({
+  let result = await runAssistantGeneration({
     provider,
     apiKey,
     model,
     generationInput: input,
   });
+
+  if (!result.success && billingSource === "customer" && !input.apiKey) {
+    console.warn(
+      "[llm] customer key generation failed; falling back to platform",
+      result.error.message,
+    );
+    provider = resolveProvider(input.provider);
+    apiKey = undefined;
+    billingSource = "platform";
+    model = resolveLlmModel(provider, input.model);
+
+    if (!isProviderReady(provider, apiKey)) {
+      return result;
+    }
+
+    result = await runAssistantGeneration({
+      provider,
+      apiKey,
+      model,
+      generationInput: input,
+    });
+  }
 
   if (!result.success) {
     return result;
@@ -282,7 +351,7 @@ export async function generateAssistantReply(
 export async function generateText(
   input: LlmTextInput,
 ): Promise<GeminiServiceResult> {
-  const { provider, apiKey, billingSource, model } =
+  let { provider, apiKey, billingSource, model } =
     await resolveGenerationContext(input);
 
   if (!isProviderReady(provider, apiKey)) {
@@ -312,12 +381,34 @@ export async function generateText(
     }
   }
 
-  const result = await runTextGeneration({
+  let result = await runTextGeneration({
     provider,
     apiKey,
     model,
     generationInput: input,
   });
+
+  if (!result.success && billingSource === "customer" && !input.apiKey) {
+    console.warn(
+      "[llm] customer key text generation failed; falling back to platform",
+      result.error.message,
+    );
+    provider = resolveProvider(input.provider);
+    apiKey = undefined;
+    billingSource = "platform";
+    model = resolveLlmModel(provider, input.model);
+
+    if (!isProviderReady(provider, apiKey)) {
+      return result;
+    }
+
+    result = await runTextGeneration({
+      provider,
+      apiKey,
+      model,
+      generationInput: input,
+    });
+  }
 
   if (!result.success) {
     return result;

@@ -2,6 +2,11 @@ import "server-only";
 
 import { estimateTokensFromText } from "@/lib/ai/cost";
 import type { AiProvider } from "@/lib/ai/constants";
+import { ORCHESTRATOR_PLAN_TOOL_NAME } from "@/lib/ai/tools/orchestrator-gemini";
+import {
+  ORCHESTRATOR_OPENAI_TOOL_CHOICE,
+  ORCHESTRATOR_OPENAI_TOOLS,
+} from "@/lib/ai/tools/orchestrator-json-schema";
 import { buildAssistantSystemInstruction } from "@/lib/gemini/prompts";
 import type {
   GeminiServiceResult,
@@ -214,6 +219,122 @@ export async function generateOpenAiText(
     usage: result.usage,
     provider: "openai",
   };
+}
+
+export type OpenAiOrchestratorToolResult =
+  | { success: true; data: { args: unknown; model: string }; usage?: OpenAiUsage }
+  | {
+      success: false;
+      error: { code: "MISSING_CONFIG" | "GENERATION_FAILED"; message: string };
+    };
+
+export async function generateOpenAiOrchestratorToolPlan(input: {
+  model?: string;
+  apiKey?: string;
+  systemInstruction: string;
+  prompt: string;
+}): Promise<OpenAiOrchestratorToolResult> {
+  if (!hasOpenAiEnv() && !input.apiKey) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: "OpenAI API key missing." },
+    };
+  }
+
+  const apiKey = input.apiKey?.trim() || getOpenAiApiKey();
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: "OpenAI API key missing." },
+    };
+  }
+
+  const model = input.model ?? "gpt-4o-mini";
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: input.systemInstruction },
+        { role: "user", content: input.prompt },
+      ],
+      tools: ORCHESTRATOR_OPENAI_TOOLS,
+      tool_choice: ORCHESTRATOR_OPENAI_TOOL_CHOICE,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message: body.slice(0, 300) || `OpenAI request failed (${response.status}).`,
+      },
+    };
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{
+      message?: {
+        tool_calls?: Array<{
+          function?: { name?: string; arguments?: string };
+        }>;
+      };
+    }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    model?: string;
+  };
+
+  const toolCall = payload.choices?.[0]?.message?.tool_calls?.find(
+    (call) => call.function?.name === ORCHESTRATOR_PLAN_TOOL_NAME,
+  );
+  const rawArgs = toolCall?.function?.arguments?.trim();
+
+  if (!rawArgs) {
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message: "OpenAI returned no plan_orchestration tool call.",
+      },
+    };
+  }
+
+  try {
+    const args = JSON.parse(rawArgs) as unknown;
+    const promptText = `${input.systemInstruction}\n${input.prompt}`;
+
+    return {
+      success: true,
+      data: {
+        args,
+        model: payload.model ?? model,
+      },
+      usage: {
+        inputTokens:
+          payload.usage?.prompt_tokens ?? estimateTokensFromText(promptText),
+        outputTokens:
+          payload.usage?.completion_tokens ?? estimateTokensFromText(rawArgs),
+      },
+    };
+  } catch {
+    return {
+      success: false,
+      error: {
+        code: "GENERATION_FAILED",
+        message: "OpenAI tool arguments were not valid JSON.",
+      },
+    };
+  }
 }
 
 export async function generateOpenAiAssistantReply(

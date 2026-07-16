@@ -189,16 +189,16 @@ export function buildBookingFailureFollowUp(input: {
   if (language === "Russian") {
     return reason
       ? `Пока не получилось подтвердить бронь: ${reason}`
-      : "Пока не получилось подтвердить бронь. Я проверю другой доступный вариант здесь в чате.";
+      : "Пока не получилось подтвердить бронь. Предложу другой доступный вариант прямо здесь.";
   }
 
   if (language === "Uzbek") {
     return reason
       ? `Bronni tasdiqlab bo'lmadi: ${reason}`
-      : "Bronni hozircha tasdiqlab bo'lmadi. Shu chatda boshqa mos variantni tekshiraman.";
+      : "Bronni hozircha tasdiqlab bo'lmadi. Shu chatda boshqa mos variantni taklif qilaman.";
   }
 
   return reason
     ? `I could not confirm the booking yet: ${reason}`
-    : "I could not confirm the booking yet. I will keep checking the best available option here.";
+    : "I could not confirm the booking yet. I will offer another available option right here.";
 }

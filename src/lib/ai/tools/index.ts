@@ -15,6 +15,13 @@ export {
   formatOrchestratorToolCatalog,
 } from "./prompt";
 export { logAgentToolAudit } from "./audit";
+export {
+  ORCHESTRATOR_GEMINI_TOOL_CONFIG,
+  ORCHESTRATOR_GEMINI_TOOLS,
+  ORCHESTRATOR_PLAN_FUNCTION,
+  ORCHESTRATOR_PLAN_TOOL_NAME,
+  extractOrchestratorToolArgs,
+} from "./orchestrator-gemini";
 export type {
   AgentToolAuditEntry,
   AgentToolDefinition,

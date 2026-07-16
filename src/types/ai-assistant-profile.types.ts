@@ -8,6 +8,22 @@ import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 
 const replyWaitValues = REPLY_WAIT_MS_OPTIONS as [number, ...number[]];
 
+export type CrmUpdateMode = "every_message" | "idle_5min" | "on_resolve";
+
+export const CRM_UPDATE_MODES: CrmUpdateMode[] = [
+  "every_message",
+  "idle_5min",
+  "on_resolve",
+];
+
+export function isCrmUpdateMode(value: unknown): value is CrmUpdateMode {
+  return (
+    value === "every_message" ||
+    value === "idle_5min" ||
+    value === "on_resolve"
+  );
+}
+
 export const saveAiAssistantProfileSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(80),
   systemPrompt: z
@@ -30,6 +46,9 @@ export const saveAiAssistantProfileSchema = z.object({
   scheduleEnabled: z.boolean().default(false),
   scheduleTimezone: z.string().trim().min(1).max(64),
   scheduleSlots: agentScheduleSlotsSchema,
+  crmUpdateMode: z
+    .enum(["every_message", "idle_5min", "on_resolve"])
+    .default("every_message"),
   canReply: z.boolean().default(true),
   canCreateTask: z.boolean().default(true),
   canCreateDeal: z.boolean().default(true),
@@ -60,6 +79,7 @@ export type AiAssistantProfileData = {
   scheduleEnabled: boolean;
   scheduleTimezone: string;
   scheduleSlots: AgentScheduleSlot[];
+  crmUpdateMode: CrmUpdateMode;
   canReply: boolean;
   canCreateTask: boolean;
   canCreateDeal: boolean;

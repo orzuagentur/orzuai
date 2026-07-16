@@ -27,8 +27,9 @@ const SUMMARY_SYSTEM_INSTRUCTION = [
 export async function loadConversationMemory(
   admin: MessagingDbClient,
   conversationId: string,
+  businessId: string,
 ): Promise<ConversationMemorySnapshot | null> {
-  return getConversationRepository(admin).loadMemory(conversationId);
+  return getConversationRepository(admin).loadMemory(conversationId, businessId);
 }
 
 function shouldRefreshConversationSummary(
@@ -51,10 +52,12 @@ function shouldRefreshConversationSummary(
 async function fetchRecentMessagesForSummary(
   admin: MessagingDbClient,
   conversationId: string,
+  businessId: string,
   limit = 30,
 ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
   const messages = await getMessageRepository(admin).listMessagesForSummary(
     conversationId,
+    businessId,
     limit,
   );
 
@@ -102,7 +105,10 @@ export async function refreshConversationSummaryIfNeeded(input: {
   conversationId: string;
 }): Promise<string | null> {
   const conversationRepo = getConversationRepository(input.admin);
-  const memory = await conversationRepo.loadMemory(input.conversationId);
+  const memory = await conversationRepo.loadMemory(
+    input.conversationId,
+    input.businessId,
+  );
 
   if (!memory || !shouldRefreshConversationSummary(memory)) {
     return memory?.aiSummary ?? null;
@@ -111,6 +117,7 @@ export async function refreshConversationSummaryIfNeeded(input: {
   const messages = await fetchRecentMessagesForSummary(
     input.admin,
     input.conversationId,
+    input.businessId,
   );
 
   if (messages.length === 0) {
@@ -136,7 +143,7 @@ export async function refreshConversationSummaryIfNeeded(input: {
   const summary = result.data.text.trim().slice(0, AI_CONTEXT_LIMITS.maxSummaryChars);
   const now = new Date().toISOString();
 
-  await conversationRepo.updateMemorySummary(input.conversationId, {
+  await conversationRepo.updateMemorySummary(input.conversationId, input.businessId, {
     aiSummary: summary,
     aiSummaryUpdatedAt: now,
     aiSummaryMessageCount: memory.totalMessageCount,

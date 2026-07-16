@@ -42,8 +42,9 @@ export const VOICE_MESSAGES = {
   aiAssistantHint: "AI Voice is configured in Integrations.",
   openIntegrations: "Open AI Voice integration",
   aiTitle: "AI conversation",
+  // AI conversation uses up to 8 turns of history per call (see MAX_VOICE_TURNS in voice-ai.service).
   aiDescription:
-    "AI listens and responds on calls using your Knowledge Base and business instructions.",
+    "AI listens and responds on calls using your Knowledge Base, CRM context, and business instructions (up to 8 turns).",
   aiEnabled: "AI answers on phone calls",
   aiActive: "AI voice assistant active",
   aiInactive: "Static script only (AI off)",

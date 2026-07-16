@@ -44,7 +44,7 @@ export type UnifiedContactItem = {
   createdAt: string;
 };
 
-export type ContactActivityType = "message" | "internal_note";
+export type ContactActivityType = "message" | "internal_note" | "crm_action";
 
 export type ContactTimelineEntry = {
   id: string;

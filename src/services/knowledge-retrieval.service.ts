@@ -1,25 +1,37 @@
 import "server-only";
 
+import { createHash } from "crypto";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { rankKnowledgeEntries } from "@/lib/ai-assistant/knowledge-ranking";
-import { GEMINI_MAX_KNOWLEDGE_ENTRIES } from "@/lib/gemini/constants";
 import {
-  embedKnowledgeText,
-} from "@/services/knowledge-embedding.service";
+  buildKnowledgeCitation,
+  selectBestKnowledgeChunk,
+} from "@/lib/ai-assistant/knowledge-chunking";
+import { rankKnowledgeEntries } from "@/lib/ai-assistant/knowledge-ranking";
+import {
+  getRedisCacheValue,
+  setRedisCacheValue,
+} from "@/lib/cache/redis";
+import { GEMINI_MAX_KNOWLEDGE_ENTRIES } from "@/lib/gemini/constants";
+import { embedKnowledgeText } from "@/services/knowledge-embedding.service";
 import type { Database } from "@/types/database.types";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
 export type RetrievedKnowledgeEntry = {
+  id: string;
   title: string;
   content: string;
   category: string | null;
+  /** Short stable label for prompt grounding, e.g. KB-a1b2c3d4 */
+  citation: string;
 };
 
 const KNOWLEDGE_CANDIDATE_LIMIT = 200;
 const KNOWLEDGE_FALLBACK_LIMIT = 8;
 const VECTOR_MATCH_LIMIT = 40;
+const KNOWLEDGE_CACHE_TTL_SECONDS = 5 * 60;
 
 type VectorMatchRow = {
   id: string;
@@ -28,6 +40,22 @@ type VectorMatchRow = {
   category: string;
   similarity: number;
 };
+
+function toRetrievedEntry(input: {
+  id: string;
+  title: string;
+  content: string;
+  category: string | null;
+  query: string;
+}): RetrievedKnowledgeEntry {
+  return {
+    id: input.id,
+    title: input.title,
+    content: selectBestKnowledgeChunk(input.content, input.query),
+    category: input.category,
+    citation: buildKnowledgeCitation(input.id),
+  };
+}
 
 async function retrieveKnowledgeByEmbedding(input: {
   admin: MessagingDbClient;
@@ -54,11 +82,15 @@ async function retrieveKnowledgeByEmbedding(input: {
     return null;
   }
 
-  return (data as VectorMatchRow[]).map((entry) => ({
-    title: entry.title,
-    content: entry.content,
-    category: entry.category || null,
-  }));
+  return (data as VectorMatchRow[]).map((entry) =>
+    toRetrievedEntry({
+      id: entry.id,
+      title: entry.title,
+      content: entry.content,
+      category: entry.category || null,
+      query: input.query,
+    }),
+  );
 }
 
 async function retrieveKnowledgeByKeyword(input: {
@@ -70,13 +102,14 @@ async function retrieveKnowledgeByKeyword(input: {
   const limit = input.limit ?? GEMINI_MAX_KNOWLEDGE_ENTRIES;
   const { data } = await input.admin
     .from("knowledge_base")
-    .select("title, content, category, updated_at")
+    .select("id, title, content, category, updated_at")
     .eq("business_id", input.businessId)
     .order("updated_at", { ascending: false })
     .limit(KNOWLEDGE_CANDIDATE_LIMIT);
 
   const candidates =
     data?.map((entry) => ({
+      id: entry.id,
       title: entry.title,
       content: entry.content,
       category: entry.category,
@@ -89,37 +122,32 @@ async function retrieveKnowledgeByKeyword(input: {
 
   const ranked = rankKnowledgeEntries(candidates, input.query, limit);
 
-  if (ranked.length > 0) {
-    return ranked.map(({ title, content, category }) => ({
-      title,
-      content,
-      category,
-    }));
-  }
+  const source = ranked.length > 0
+    ? ranked
+    : candidates.slice(0, KNOWLEDGE_FALLBACK_LIMIT);
 
-  return candidates.slice(0, KNOWLEDGE_FALLBACK_LIMIT).map((entry) => ({
-    title: entry.title,
-    content: entry.content,
-    category: entry.category,
-  }));
+  return source.map((entry) =>
+    toRetrievedEntry({
+      id: entry.id,
+      title: entry.title,
+      content: entry.content,
+      category: entry.category,
+      query: input.query,
+    }),
+  );
 }
 
-function mergeKnowledgeResults(
-  vectorEntries: RetrievedKnowledgeEntry[],
-  keywordEntries: RetrievedKnowledgeEntry[],
+function buildKnowledgeCacheKey(
+  businessId: string,
+  query: string,
   limit: number,
-): RetrievedKnowledgeEntry[] {
-  const merged = new Map<string, RetrievedKnowledgeEntry>();
+): string {
+  const digest = createHash("sha256")
+    .update(`${businessId}:${query.trim().toLowerCase()}:${limit}`)
+    .digest("hex")
+    .slice(0, 24);
 
-  for (const entry of [...vectorEntries, ...keywordEntries]) {
-    const key = `${entry.title}::${entry.content.slice(0, 64)}`;
-
-    if (!merged.has(key)) {
-      merged.set(key, entry);
-    }
-  }
-
-  return [...merged.values()].slice(0, limit);
+  return `kb:retrieve:${digest}`;
 }
 
 export async function retrieveKnowledgeForMessage(input: {
@@ -135,14 +163,41 @@ export async function retrieveKnowledgeForMessage(input: {
     return retrieveKnowledgeByKeyword(input);
   }
 
-  const [vectorEntries, keywordEntries] = await Promise.all([
-    retrieveKnowledgeByEmbedding(input),
-    retrieveKnowledgeByKeyword(input),
-  ]);
+  const cacheKey = buildKnowledgeCacheKey(input.businessId, trimmedQuery, limit);
+  const cached = await getRedisCacheValue(cacheKey);
 
-  if (vectorEntries && vectorEntries.length > 0) {
-    return mergeKnowledgeResults(vectorEntries, keywordEntries, limit);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached) as RetrievedKnowledgeEntry[];
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.slice(0, limit);
+      }
+    } catch {
+      // Ignore corrupt cache and refresh below.
+    }
   }
 
-  return keywordEntries;
+  const vectorEntries = await retrieveKnowledgeByEmbedding(input);
+
+  // Vector hits are enough — skip the expensive 200-row keyword scan.
+  let results: RetrievedKnowledgeEntry[];
+
+  if (vectorEntries && vectorEntries.length >= limit) {
+    results = vectorEntries.slice(0, limit);
+  } else if (vectorEntries && vectorEntries.length > 0) {
+    results = vectorEntries.slice(0, limit);
+  } else {
+    results = await retrieveKnowledgeByKeyword(input);
+  }
+
+  if (results.length > 0) {
+    void setRedisCacheValue(
+      cacheKey,
+      JSON.stringify(results),
+      KNOWLEDGE_CACHE_TTL_SECONDS,
+    );
+  }
+
+  return results;
 }

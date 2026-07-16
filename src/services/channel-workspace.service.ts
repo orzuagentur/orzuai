@@ -13,10 +13,7 @@ import {
   buildIntegrationChannelStatuses,
   isChannelConnectedForWorkspace,
 } from "@/features/integrations/channel-status";
-import { resolveAiModel, type AiProvider } from "@/lib/ai/constants";
-import { getDefaultGeminiModel, hasGeminiEnv } from "@/lib/env";
-import { resolveGeminiModel } from "@/lib/gemini/constants";
-import { hasSupabaseEnv } from "@/lib/env";
+import { getDefaultGeminiModel, hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -180,40 +177,17 @@ async function ensureChannelAiSettings(
   });
 }
 
-function resolveStoredProvider(value: string | null | undefined): AiProvider {
-  if (value === "openai" || value === "claude" || value === "gemini") {
-    return value;
-  }
-
-  return "gemini";
-}
-
-async function syncStoredModelIfNeeded(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  businessId: string,
-  channel: AiAgentChannelId,
-  storedModel: string | null | undefined,
-): Promise<string> {
-  const resolved = resolveGeminiModel(storedModel);
-
-  if (storedModel && storedModel !== resolved) {
-    await supabase
-      .from("ai_settings")
-      .update({ model: resolved })
-      .eq("business_id", businessId)
-      .eq("channel", channel);
-  }
-
-  return resolved;
-}
-
+/**
+ * Per-channel provider/model UI is intentionally unwired; inbound replies use the
+ * platform LLM. provider/model/language/systemPrompt below are display-only leftovers
+ * for ChannelAiSettingsData compatibility — only ai_enabled drives channel behavior.
+ */
 export async function getChannelAiSettingsForBusiness(
   businessId: string,
   channel: AiAgentChannelId,
   isChannelConnected: boolean,
 ): Promise<ChannelAiSettingsData> {
   const defaultModel = getDefaultGeminiModel();
-
   const providerAvailability = getProviderAvailability();
 
   if (!hasSupabaseEnv()) {
@@ -238,31 +212,19 @@ export async function getChannelAiSettingsForBusiness(
 
   const { data } = await supabase
     .from("ai_settings")
-    .select("ai_enabled, provider, model, language, system_prompt")
+    .select("ai_enabled")
     .eq("business_id", businessId)
     .eq("channel", channel)
     .maybeSingle();
-
-  const provider = resolveStoredProvider(data?.provider);
-  const geminiModel = await syncStoredModelIfNeeded(
-    supabase,
-    businessId,
-    channel,
-    provider === "gemini" ? data?.model : data?.model,
-  );
-  const model =
-    provider === "gemini"
-      ? geminiModel
-      : resolveAiModel(provider, data?.model);
 
   return {
     hasBusiness: true,
     channel,
     aiEnabled: data?.ai_enabled ?? false,
-    provider,
-    model,
-    language: data?.language ?? DEFAULT_AI_LANGUAGE,
-    systemPrompt: data?.system_prompt ?? DEFAULT_AI_SYSTEM_PROMPT,
+    provider: "gemini",
+    model: defaultModel,
+    language: DEFAULT_AI_LANGUAGE,
+    systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
     isConfigured: Boolean(data),
     geminiConfigured: hasGeminiEnv(),
     providerAvailability,
@@ -538,6 +500,7 @@ export async function testChannelAiReply(
     clientMessage: parsed.data.testMessage,
     conversationHistory: [],
     requireAiEnabled: false,
+    skipWorkerActions: true,
   });
 
   if (!reply.success) {

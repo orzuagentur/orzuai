@@ -20,6 +20,12 @@ import { getMessagePreviewText } from "@/utils/chat-media";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
+const HANDOFF_SLA_ESCALATE_MS = 5 * 60 * 1000;
+const HANDOFF_SLA_MAX_ESCALATIONS = 3;
+
+const REQUEST_SELECT =
+  "id, business_id, conversation_id, contact_id, channel, contact_name, reason, message_preview, created_at";
+
 function mapRowToAiHumanRequest(row: {
   id: string;
   business_id: string;
@@ -51,10 +57,9 @@ export async function listAiHumanRequests(
 ): Promise<AiHumanRequest[]> {
   const { data, error } = await admin
     .from("ai_human_requests")
-    .select(
-      "id, business_id, conversation_id, contact_id, channel, contact_name, reason, message_preview, created_at",
-    )
+    .select(REQUEST_SELECT)
     .eq("business_id", businessId)
+    .eq("status", "pending")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -100,6 +105,9 @@ export async function createAiHumanRequest(input: {
     .select("id")
     .eq("business_id", input.businessId)
     .eq("conversation_id", input.conversationId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (existing) {
@@ -112,11 +120,15 @@ export async function createAiHumanRequest(input: {
         reason,
         message_preview: messagePreview,
         created_at: now,
+        status: "pending",
+        accepted_at: null,
+        accepted_by: null,
+        escalate_count: 0,
+        last_escalated_at: null,
+        resolved_at: null,
       })
       .eq("id", existing.id)
-      .select(
-        "id, business_id, conversation_id, contact_id, channel, contact_name, reason, message_preview, created_at",
-      )
+      .select(REQUEST_SELECT)
       .single();
 
     if (error || !data) {
@@ -169,10 +181,10 @@ export async function createAiHumanRequest(input: {
       contact_name: contactName,
       reason,
       message_preview: messagePreview,
+      status: "pending",
+      escalate_count: 0,
     })
-    .select(
-      "id, business_id, conversation_id, contact_id, channel, contact_name, reason, message_preview, created_at",
-    )
+    .select(REQUEST_SELECT)
     .single();
 
   if (error || !data) {
@@ -220,25 +232,36 @@ export async function dismissAiHumanRequest(input: {
   businessId: string;
   requestId: string;
 }): Promise<boolean> {
-  const { error, count } = await input.admin
+  const now = new Date().toISOString();
+
+  const { data, error } = await input.admin
     .from("ai_human_requests")
-    .delete({ count: "exact" })
+    .update({
+      status: "accepted",
+      accepted_at: now,
+      resolved_at: now,
+    })
     .eq("id", input.requestId)
-    .eq("business_id", input.businessId);
+    .eq("business_id", input.businessId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if ((count ?? 0) > 0) {
-    await resolveHumanRequestNotification({
-      admin: input.admin,
-      businessId: input.businessId,
-      requestId: input.requestId,
-    });
+  if (!data) {
+    return false;
   }
 
-  return (count ?? 0) > 0;
+  await resolveHumanRequestNotification({
+    admin: input.admin,
+    businessId: input.businessId,
+    requestId: input.requestId,
+  });
+
+  return true;
 }
 
 function buildManagerUnavailableMessage(language: string): string {
@@ -329,6 +352,7 @@ export async function declineAiHumanRequestWithNotice(input: {
     .select("id, conversation_id, channel")
     .eq("id", input.requestId)
     .eq("business_id", input.businessId)
+    .eq("status", "pending")
     .maybeSingle();
 
   if (!request) {
@@ -342,15 +366,181 @@ export async function declineAiHumanRequestWithNotice(input: {
     channel: request.channel as MessagingChannel,
   });
 
-  const removed = await dismissAiHumanRequest({
+  const now = new Date().toISOString();
+  const { data: declined, error } = await input.admin
+    .from("ai_human_requests")
+    .update({
+      status: "declined",
+      resolved_at: now,
+    })
+    .eq("id", input.requestId)
+    .eq("business_id", input.businessId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!declined) {
+    return { success: false, customerNotified };
+  }
+
+  await resolveHumanRequestNotification({
     admin: input.admin,
     businessId: input.businessId,
     requestId: input.requestId,
   });
 
   return {
-    success: removed,
+    success: true,
     customerNotified,
+  };
+}
+
+export async function escalateDueAiHumanRequests(): Promise<{
+  processed: number;
+  escalated: number;
+}> {
+  const admin = createAdminClient();
+  const threshold = new Date(Date.now() - HANDOFF_SLA_ESCALATE_MS).toISOString();
+
+  const { data: candidates, error } = await admin
+    .from("ai_human_requests")
+    .select(
+      "id, business_id, conversation_id, contact_id, channel, contact_name, reason, message_preview, escalate_count, last_escalated_at, created_at",
+    )
+    .eq("status", "pending")
+    .lt("escalate_count", HANDOFF_SLA_MAX_ESCALATIONS)
+    .lte("created_at", threshold)
+    .or(`last_escalated_at.is.null,last_escalated_at.lte.${threshold}`)
+    .order("created_at", { ascending: true })
+    .limit(50);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = candidates ?? [];
+  let escalated = 0;
+
+  for (const row of rows) {
+    const now = new Date().toISOString();
+    const nextCount = (row.escalate_count ?? 0) + 1;
+
+    scheduleAiHumanRequestPush({
+      businessId: row.business_id,
+      conversationId: row.conversation_id,
+      channel: row.channel as MessagingChannel,
+      contactName: row.contact_name,
+      reason: row.reason,
+      requestId: row.id,
+    });
+
+    await upsertHumanRequestNotification({
+      admin,
+      businessId: row.business_id,
+      conversationId: row.conversation_id,
+      channel: row.channel as MessagingChannel,
+      contactId: row.contact_id,
+      contactName: row.contact_name,
+      reason: row.reason,
+      messagePreview: row.message_preview,
+      requestId: row.id,
+    });
+
+    const { error: updateError } = await admin
+      .from("ai_human_requests")
+      .update({
+        last_escalated_at: now,
+        escalate_count: nextCount,
+        status: "pending",
+      })
+      .eq("id", row.id)
+      .eq("status", "pending");
+
+    if (updateError) {
+      console.error(
+        "[ai-human-request] failed to escalate request",
+        row.id,
+        updateError,
+      );
+      continue;
+    }
+
+    escalated += 1;
+    console.info(
+      "[ai-human-request]",
+      JSON.stringify({
+        action: "escalated",
+        requestId: row.id,
+        escalateCount: nextCount,
+      }),
+    );
+  }
+
+  return {
+    processed: rows.length,
+    escalated,
+  };
+}
+
+export async function getHandoffSlaMetrics(businessId: string): Promise<{
+  avgAcceptMinutes: number | null;
+  pendingCount: number;
+  acceptedCount: number;
+  escalatedCount: number;
+}> {
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("ai_human_requests")
+    .select("status, accepted_at, created_at, escalate_count")
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  let pendingCount = 0;
+  let acceptedCount = 0;
+  let escalatedCount = 0;
+  let acceptMinutesSum = 0;
+  let acceptSamples = 0;
+
+  for (const row of data ?? []) {
+    if (row.status === "pending") {
+      pendingCount += 1;
+    } else if (row.status === "accepted") {
+      acceptedCount += 1;
+    }
+
+    if ((row.escalate_count ?? 0) > 0) {
+      escalatedCount += 1;
+    }
+
+    if (row.status === "accepted" && row.accepted_at) {
+      const minutes =
+        (new Date(row.accepted_at).getTime() -
+          new Date(row.created_at).getTime()) /
+        60000;
+
+      if (Number.isFinite(minutes) && minutes >= 0) {
+        acceptMinutesSum += minutes;
+        acceptSamples += 1;
+      }
+    }
+  }
+
+  return {
+    avgAcceptMinutes:
+      acceptSamples > 0
+        ? Math.round((acceptMinutesSum / acceptSamples) * 10) / 10
+        : null,
+    pendingCount,
+    acceptedCount,
+    escalatedCount,
   };
 }
 

@@ -29,10 +29,11 @@ export function buildAssistantSystemInstruction({
   const knowledgeSection =
     knowledgeContext.length > 0
       ? knowledgeContext
-          .map(
-            (entry) =>
-              `- [${entry.category}] ${entry.title}\n${entry.content}`,
-          )
+          .map((entry) => {
+            const citation = entry.citation?.trim() || entry.title;
+            const category = entry.category?.trim() || "General";
+            return `- [${citation}] (${category}) ${entry.title}\n${entry.content}`;
+          })
           .join("\n\n")
       : "No additional business knowledge has been provided yet.";
 
@@ -41,6 +42,7 @@ export function buildAssistantSystemInstruction({
     "Respond clearly, helpfully, and concisely in a customer-friendly tone.",
     buildLanguageInstruction(language),
     "Use only the business knowledge and conversation context provided below.",
+    "When stating prices, services, or policies, ground them in the cited knowledge entries (labels like KB-…). Do not invent facts.",
     "If details are missing, ask one short clarifying question and keep helping in the chat.",
     "Do not promise that an owner, manager, staff member, or human will contact the customer unless the customer explicitly confirmed they want a human.",
     "Never invent prices, policies, or services that are not supported by the provided knowledge.",

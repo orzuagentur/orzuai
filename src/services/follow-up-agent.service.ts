@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/services/llm.service";
@@ -16,25 +18,33 @@ import { sendTelegramChatMessage } from "@/services/telegram.service";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import { assertFollowUpAgentAllowed } from "@/services/entitlement.service";
 import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
-import type { MessagingChannel } from "@/types/database.types";
+import type { Database, MessagingChannel } from "@/types/database.types";
 
 const HOUR_MS = 60 * 60 * 1000;
 const FOLLOW_UP_WINDOWS = [
   { day: 1 as const, hours: 24 },
   { day: 2 as const, hours: 48 },
 ] as const;
+const CLAIM_BATCH_SIZE = 50;
+
+type MessagingDbClient = SupabaseClient<Database>;
+
+type FollowUpJobRow = Database["public"]["Tables"]["follow_up_jobs"]["Row"];
 
 type FollowUpCandidate = {
+  jobId: string;
   conversationId: string;
   businessId: string;
   channel: MessagingChannel;
   followUpDay: 1 | 2;
   contactName: string;
   lastOutboundContent: string;
+  attemptCount: number;
+  maxAttempts: number;
 };
 
 async function isChannelConnected(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: MessagingDbClient,
   businessId: string,
   channel: MessagingChannel,
 ): Promise<boolean> {
@@ -70,7 +80,6 @@ async function isChannelConnected(
 }
 
 async function generateFollowUpMessage(input: {
-  admin: ReturnType<typeof createAdminClient>;
   businessId: string;
   contactName: string;
   channel: MessagingChannel;
@@ -117,7 +126,7 @@ async function generateFollowUpMessage(input: {
 }
 
 async function sendFollowUpOnChannel(input: {
-  admin: ReturnType<typeof createAdminClient>;
+  admin: MessagingDbClient;
   candidate: FollowUpCandidate;
   content: string;
 }): Promise<boolean> {
@@ -145,6 +154,7 @@ async function sendFollowUpOnChannel(input: {
       .from("conversations")
       .select("contact:contacts(phone_number)")
       .eq("id", candidate.conversationId)
+      .eq("business_id", candidate.businessId)
       .maybeSingle();
 
     const contact = Array.isArray(conversation?.contact)
@@ -206,115 +216,189 @@ async function sendFollowUpOnChannel(input: {
   return true;
 }
 
-async function listFollowUpCandidates(
-  admin: ReturnType<typeof createAdminClient>,
-): Promise<FollowUpCandidate[]> {
-  const now = Date.now();
-  const candidates: FollowUpCandidate[] = [];
-
-  const { data: conversations } = await admin
-    .from("conversations")
-    .select("id, business_id, channel, status, contact:contacts(name)")
-    .in("status", ["open", "pending", "active"])
-    .in("channel", ["whatsapp", "instagram", "telegram", "website_forms"])
-    .order("updated_at", { ascending: false })
-    .limit(200);
-
-  for (const conversation of conversations ?? []) {
-    const { data: messageRows } = await admin
-      .from("messages")
-      .select("sender_type, content, created_at")
-      .eq("conversation_id", conversation.id)
-      .order("created_at", { ascending: true });
-
-    const messages = messageRows ?? [];
-
-    if (messages.length === 0) {
-      continue;
-    }
-
-    const lastMessage = messages.at(-1);
-
-    if (!lastMessage || lastMessage.sender_type === "client") {
-      continue;
-    }
-
-    const lastOutboundAt = new Date(lastMessage.created_at).getTime();
-    const contact = Array.isArray(conversation.contact)
-      ? conversation.contact[0]
-      : conversation.contact;
-
-    for (const window of FOLLOW_UP_WINDOWS) {
-      const dueAt = lastOutboundAt + window.hours * HOUR_MS;
-
-      if (now < dueAt) {
-        continue;
-      }
-
-      const hasClientReplyAfter = messages.some(
-        (message) =>
-          message.sender_type === "client" &&
-          new Date(message.created_at).getTime() > lastOutboundAt,
-      );
-
-      if (hasClientReplyAfter) {
-        continue;
-      }
-
-      const { data: existingFollowUp } = await admin
-        .from("conversation_follow_ups")
-        .select("id")
-        .eq("conversation_id", conversation.id)
-        .eq("follow_up_day", window.day)
-        .maybeSingle();
-
-      if (existingFollowUp) {
-        continue;
-      }
-
-      const { data: aiSettings } = await admin
-        .from("ai_settings")
-        .select("ai_enabled")
-        .eq("business_id", conversation.business_id)
-        .eq("channel", conversation.channel)
-        .maybeSingle();
-
-      if (!aiSettings?.ai_enabled) {
-        continue;
-      }
-
-      const { data: followUpConfig } = await admin
-        .from("business_ai_config")
-        .select("follow_up_agent_enabled")
-        .eq("business_id", conversation.business_id)
-        .maybeSingle();
-
-      if (followUpConfig?.follow_up_agent_enabled === false) {
-        continue;
-      }
-
-      const connected = await isChannelConnected(
-        admin,
-        conversation.business_id,
-        conversation.channel,
-      );
-
-      if (!connected) {
-        continue;
-      }
-
-      candidates.push({
-        conversationId: conversation.id,
-        businessId: conversation.business_id,
-        channel: conversation.channel,
-        followUpDay: window.day,
-        contactName: contact?.name ?? "there",
-        lastOutboundContent: lastMessage.content,
-      });
-    }
+/** Schedule 24h/48h follow-up jobs after an AI reply is delivered. */
+export async function scheduleFollowUpJobsAfterAiReply(input: {
+  admin?: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+  channel: MessagingChannel;
+  outboundContent: string;
+  contactName?: string | null;
+}): Promise<void> {
+  if (!hasSupabaseEnv()) {
+    return;
   }
 
-  return candidates;
+  if (
+    !["whatsapp", "telegram", "website_forms"].includes(input.channel)
+  ) {
+    return;
+  }
+
+  const admin = input.admin ?? createAdminClient();
+
+  const [{ data: aiSettings }, { data: followUpConfig }, { data: alreadySent }] =
+    await Promise.all([
+      admin
+        .from("ai_settings")
+        .select("ai_enabled")
+        .eq("business_id", input.businessId)
+        .eq("channel", input.channel)
+        .maybeSingle(),
+      admin
+        .from("business_ai_config")
+        .select("follow_up_agent_enabled")
+        .eq("business_id", input.businessId)
+        .maybeSingle(),
+      admin
+        .from("conversation_follow_ups")
+        .select("follow_up_day")
+        .eq("conversation_id", input.conversationId)
+        .eq("business_id", input.businessId),
+    ]);
+
+  if (!aiSettings?.ai_enabled) {
+    return;
+  }
+
+  if (followUpConfig?.follow_up_agent_enabled === false) {
+    return;
+  }
+
+  const entitlement = await assertFollowUpAgentAllowed(input.businessId);
+
+  if (!entitlement.allowed) {
+    return;
+  }
+
+  const sentDays = new Set(
+    (alreadySent ?? []).map((row) => Number(row.follow_up_day)),
+  );
+  const now = Date.now();
+  const contactName = input.contactName?.trim() || "there";
+  const content = input.outboundContent.trim().slice(0, 2000);
+
+  for (const window of FOLLOW_UP_WINDOWS) {
+    if (sentDays.has(window.day)) {
+      continue;
+    }
+
+    const scheduledAt = new Date(now + window.hours * HOUR_MS).toISOString();
+
+    const { error } = await admin.from("follow_up_jobs").upsert(
+      {
+        business_id: input.businessId,
+        conversation_id: input.conversationId,
+        channel: input.channel,
+        follow_up_day: window.day,
+        scheduled_at: scheduledAt,
+        status: "pending",
+        last_outbound_content: content,
+        contact_name: contactName.slice(0, 200),
+        attempt_count: 0,
+        last_error: null,
+      },
+      { onConflict: "conversation_id,follow_up_day" },
+    );
+
+    if (error) {
+      console.warn(
+        "[follow-up-agent] schedule failed",
+        JSON.stringify({
+          conversationId: input.conversationId,
+          day: window.day,
+          error: error.message,
+        }),
+      );
+    }
+  }
+}
+
+/** Cancel pending follow-ups when the customer replies. */
+export async function cancelPendingFollowUpJobs(input: {
+  admin?: MessagingDbClient;
+  businessId: string;
+  conversationId: string;
+}): Promise<void> {
+  if (!hasSupabaseEnv()) {
+    return;
+  }
+
+  const admin = input.admin ?? createAdminClient();
+
+  await admin
+    .from("follow_up_jobs")
+    .update({
+      status: "cancelled",
+      last_error: "cancelled_by_client_reply",
+    })
+    .eq("business_id", input.businessId)
+    .eq("conversation_id", input.conversationId)
+    .eq("status", "pending");
+}
+
+async function markFollowUpJobRetry(
+  admin: MessagingDbClient,
+  job: FollowUpCandidate,
+  errorMessage: string,
+): Promise<void> {
+  const attemptCount = job.attemptCount + 1;
+  const exhausted = attemptCount >= job.maxAttempts;
+
+  const patch: Database["public"]["Tables"]["follow_up_jobs"]["Update"] = {
+    status: exhausted ? "failed" : "pending",
+    attempt_count: attemptCount,
+    last_error: errorMessage.slice(0, 500),
+  };
+
+  if (!exhausted) {
+    patch.scheduled_at = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  }
+
+  await admin
+    .from("follow_up_jobs")
+    .update(patch)
+    .eq("id", job.jobId)
+    .eq("business_id", job.businessId);
+}
+
+async function markFollowUpJobCompleted(
+  admin: MessagingDbClient,
+  job: FollowUpCandidate,
+): Promise<void> {
+  await admin
+    .from("follow_up_jobs")
+    .update({
+      status: "completed",
+      last_error: null,
+    })
+    .eq("id", job.jobId)
+    .eq("business_id", job.businessId);
+}
+
+async function claimDueFollowUpJobs(
+  admin: MessagingDbClient,
+): Promise<FollowUpCandidate[]> {
+  const { data, error } = await admin.rpc("claim_follow_up_jobs", {
+    p_limit: CLAIM_BATCH_SIZE,
+  });
+
+  if (error) {
+    console.error("[follow-up-agent] claim failed", error.message);
+    return [];
+  }
+
+  return ((data ?? []) as FollowUpJobRow[]).map((job) => ({
+    jobId: job.id,
+    conversationId: job.conversation_id,
+    businessId: job.business_id,
+    channel: job.channel,
+    followUpDay: (job.follow_up_day === 2 ? 2 : 1) as 1 | 2,
+    contactName: job.contact_name || "there",
+    lastOutboundContent: job.last_outbound_content,
+    attemptCount: job.attempt_count ?? 0,
+    maxAttempts: job.max_attempts ?? 3,
+  }));
 }
 
 export async function runDueConversationFollowUps(): Promise<{
@@ -326,11 +410,11 @@ export async function runDueConversationFollowUps(): Promise<{
   }
 
   const admin = createAdminClient();
-  const candidates = await listFollowUpCandidates(admin);
+  const jobs = await claimDueFollowUpJobs(admin);
   let sent = 0;
   const followUpAllowedByBusiness = new Map<string, boolean>();
 
-  for (const candidate of candidates) {
+  for (const candidate of jobs) {
     let allowed = followUpAllowedByBusiness.get(candidate.businessId);
 
     if (allowed === undefined) {
@@ -340,11 +424,64 @@ export async function runDueConversationFollowUps(): Promise<{
     }
 
     if (!allowed) {
+      await markFollowUpJobRetry(admin, candidate, "follow_up_not_allowed");
+      continue;
+    }
+
+    const { data: alreadySent } = await admin
+      .from("conversation_follow_ups")
+      .select("id")
+      .eq("conversation_id", candidate.conversationId)
+      .eq("follow_up_day", candidate.followUpDay)
+      .maybeSingle();
+
+    if (alreadySent) {
+      await markFollowUpJobCompleted(admin, candidate);
+      continue;
+    }
+
+    const { data: latestMessage } = await admin
+      .from("messages")
+      .select("sender_type")
+      .eq("conversation_id", candidate.conversationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestMessage?.sender_type === "client") {
+      await admin
+        .from("follow_up_jobs")
+        .update({
+          status: "cancelled",
+          last_error: "client_replied_before_send",
+        })
+        .eq("id", candidate.jobId);
+      continue;
+    }
+
+    if (candidate.channel === "instagram") {
+      await admin
+        .from("follow_up_jobs")
+        .update({
+          status: "cancelled",
+          last_error: "instagram_unsupported",
+        })
+        .eq("id", candidate.jobId);
+      continue;
+    }
+
+    const connected = await isChannelConnected(
+      admin,
+      candidate.businessId,
+      candidate.channel,
+    );
+
+    if (!connected) {
+      await markFollowUpJobRetry(admin, candidate, "channel_not_connected");
       continue;
     }
 
     const generated = await generateFollowUpMessage({
-      admin,
       businessId: candidate.businessId,
       contactName: candidate.contactName,
       channel: candidate.channel,
@@ -353,6 +490,7 @@ export async function runDueConversationFollowUps(): Promise<{
     });
 
     if (!generated) {
+      await markFollowUpJobRetry(admin, candidate, "generation_failed");
       continue;
     }
 
@@ -363,6 +501,7 @@ export async function runDueConversationFollowUps(): Promise<{
     });
 
     if (!delivered) {
+      await markFollowUpJobRetry(admin, candidate, "send_failed");
       continue;
     }
 
@@ -372,13 +511,17 @@ export async function runDueConversationFollowUps(): Promise<{
       follow_up_day: candidate.followUpDay,
     });
 
-    if (!error) {
-      sent += 1;
+    if (error && error.code !== "23505") {
+      await markFollowUpJobRetry(admin, candidate, error.message);
+      continue;
     }
+
+    await markFollowUpJobCompleted(admin, candidate);
+    sent += 1;
   }
 
   return {
-    processed: candidates.length,
+    processed: jobs.length,
     sent,
   };
 }

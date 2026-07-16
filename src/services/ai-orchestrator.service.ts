@@ -1,8 +1,21 @@
 import "server-only";
 
 import { formatOrchestratorToolCatalog } from "@/lib/ai/tools";
+import { estimateTokensFromText } from "@/lib/ai/cost";
+import type { AiProvider } from "@/lib/ai/constants";
 import { WORKER_ORCHESTRATOR_RULES } from "@/lib/ai/worker-behavior-prompt";
+import { hasClaudeEnv } from "@/services/claude.service";
+import { hasGeminiEnv } from "@/lib/env";
+import { hasOpenAiEnv } from "@/services/openai.service";
 import { generateTextWithFallback } from "@/services/llm.service";
+import { generateOrchestratorToolPlan } from "@/services/gemini.service";
+import { generateOpenAiOrchestratorToolPlan } from "@/services/openai.service";
+import { generateClaudeOrchestratorToolPlan } from "@/services/claude.service";
+import {
+  assertAiUsageAllowed,
+  logAiUsage,
+} from "@/services/ai-usage.service";
+import { getPlatformAiFallbackProviders } from "@/services/platform-ai-config.service";
 import {
   ensurePlatformPromptsLoaded,
   getPlatformPromptContent,
@@ -66,7 +79,9 @@ function buildOrchestratorPrompt(input: {
   bookableResourcesText?: string;
   bookingPagesText?: string;
   availabilityText?: string;
+  outputMode?: "tools" | "json";
 }): string {
+  const outputMode = input.outputMode ?? "json";
   const historySection =
     input.conversationHistory.length > 0
       ? input.conversationHistory
@@ -99,9 +114,19 @@ function buildOrchestratorPrompt(input: {
       )
     : null;
 
+  const outputInstruction =
+    outputMode === "tools"
+      ? [
+          "Call the plan_orchestration tool once with this shape:",
+          '{"intent":"general|booking|sales|support|registration|none","confidence":0.0,"managerAlert":false,"handoffConfirmed":false,"humanReason":"","contactUpdates":{},"actions":[],"clientSummary":""}',
+        ].join("\n")
+      : [
+          "Return JSON only with this shape:",
+          '{"intent":"general|booking|sales|support|registration|none","confidence":0.0,"managerAlert":false,"handoffConfirmed":false,"humanReason":"","contactUpdates":{},"actions":[],"clientSummary":""}',
+        ].join("\n");
+
   return [
     getPlatformPromptContent("orchestrator") || WORKER_ORCHESTRATOR_RULES,
-    WORKER_ORCHESTRATOR_RULES,
     "",
     "Critical runtime policy:",
     "- The AI is the worker. Never route normal booking/sales/support work to a manager.",
@@ -155,8 +180,7 @@ function buildOrchestratorPrompt(input: {
           "",
         ].join("\n")
       : "",
-    "Return JSON only with this shape:",
-    '{"intent":"general|booking|sales|support|registration|none","confidence":0.0,"managerAlert":false,"handoffConfirmed":false,"humanReason":"","contactUpdates":{},"actions":[],"clientSummary":""}',
+    outputInstruction,
     "",
     "Intent guide:",
     "- general: greetings, small talk, unclear intent",
@@ -189,6 +213,194 @@ function buildOrchestratorPrompt(input: {
     "- create_calendar_event requires summary, startDateTime, endDateTime, timeZone, optional description, resourceName, bookingPageId, formAnswers (guestCount, partySize, etc.). Use ISO date-times.",
     "- clientSummary: confirm bookings directly to the customer (I/we). State exact date, time, and resource. Never mention managers, escalation, queued bookings, or internal systems. Leave empty only when the main reply already covers it.",
   ].join("\n");
+}
+
+function logOrchestratorPlan(data: OrchestratorResponse, mode: "tools" | "json") {
+  console.info(
+    "[ai-orchestrator]",
+    JSON.stringify({
+      mode,
+      intent: data.intent,
+      confidence: data.confidence,
+      managerAlert: data.managerAlert,
+      handoffConfirmed: data.handoffConfirmed,
+      actionCount: data.actions.length,
+      hasContactUpdates: Boolean(
+        data.contactUpdates && Object.keys(data.contactUpdates).length > 0,
+      ),
+    }),
+  );
+}
+
+function validateOrchestratorObject(
+  parsed: unknown,
+  mode: "tools" | "json",
+  rawText?: string,
+): OrchestratorRunResult {
+  const validated = orchestratorResponseSchema.safeParse(parsed);
+
+  if (!validated.success) {
+    return {
+      success: false,
+      errorCode: "validation_failed",
+      errorMessage: "Orchestrator plan failed schema validation.",
+      rawText: rawText?.slice(0, 500),
+    };
+  }
+
+  logOrchestratorPlan(validated.data, mode);
+  return { success: true, data: validated.data };
+}
+
+function validateOrchestratorResponse(
+  rawText: string,
+): OrchestratorRunResult {
+  const parsed = parseJsonObject(rawText);
+
+  if (!parsed) {
+    return {
+      success: false,
+      errorCode: "invalid_json",
+      errorMessage: "Orchestrator returned invalid JSON.",
+      rawText: rawText.slice(0, 500),
+    };
+  }
+
+  return validateOrchestratorObject(parsed, "json", rawText);
+}
+
+async function requestOrchestratorViaTools(input: {
+  businessId: string;
+  message: string;
+  conversationHistory: ConversationTurn[];
+  contact: ContactSnapshot | null;
+  calendarBookingEnabled: boolean;
+  googleCalendarConnected: boolean;
+  bookableResourcesText?: string;
+  bookingPagesText?: string;
+  availabilityText?: string;
+}): Promise<OrchestratorRunResult | null> {
+  const providers = (await getPlatformAiFallbackProviders("orchestrator")).filter(
+    (provider) => {
+      if (provider === "gemini") {
+        return hasGeminiEnv();
+      }
+
+      if (provider === "openai") {
+        return hasOpenAiEnv();
+      }
+
+      return hasClaudeEnv();
+    },
+  );
+
+  if (providers.length === 0) {
+    return null;
+  }
+
+  const allowed = await assertAiUsageAllowed(input.businessId);
+
+  if (!allowed.allowed) {
+    return {
+      success: false,
+      errorCode: "llm_failed",
+      errorMessage: allowed.message,
+      attemptedProviders: providers,
+    };
+  }
+
+  const prompt = buildOrchestratorPrompt({ ...input, outputMode: "tools" });
+  const systemInstruction =
+    "You route customer messages and plan CRM updates for a business inbox. Always call plan_orchestration once. confidence is 0 to 1. Never invent contact details. Act autonomously — never plan manager callbacks. Use managerAlert for silent owner alerts; use handoffConfirmed only when the customer clearly wants a human.";
+
+  const attemptedProviders: AiProvider[] = [];
+
+  for (const provider of providers) {
+    attemptedProviders.push(provider);
+
+    const result =
+      provider === "openai"
+        ? await generateOpenAiOrchestratorToolPlan({
+            systemInstruction,
+            prompt,
+          })
+        : provider === "claude"
+          ? await generateClaudeOrchestratorToolPlan({
+              systemInstruction,
+              prompt,
+            })
+          : await generateOrchestratorToolPlan({
+              systemInstruction,
+              prompt,
+            });
+
+    if (!result.success) {
+      console.warn(
+        "[ai-orchestrator]",
+        JSON.stringify({
+          mode: "tools",
+          provider,
+          error: result.error.message,
+          code: result.error.code,
+        }),
+      );
+      continue;
+    }
+
+    const promptEstimate = estimateTokensFromText(
+      `${systemInstruction}\n${prompt}`,
+    );
+    const outputEstimate = estimateTokensFromText(
+      JSON.stringify(result.data.args),
+    );
+    const measuredUsage =
+      provider === "openai" || provider === "claude"
+        ? (result as {
+            usage?: { inputTokens: number; outputTokens: number };
+          }).usage
+        : undefined;
+
+    await logAiUsage({
+      businessId: input.businessId,
+      callType: "orchestrator",
+      provider,
+      model: result.data.model,
+      inputTokens: measuredUsage?.inputTokens ?? promptEstimate,
+      outputTokens: measuredUsage?.outputTokens ?? outputEstimate,
+      billingSource: "platform",
+    });
+
+    const validated = validateOrchestratorObject(result.data.args, "tools");
+
+    if (!validated.success) {
+      console.warn(
+        "[ai-orchestrator]",
+        JSON.stringify({
+          mode: "tools",
+          provider,
+          error: validated.errorMessage,
+          errorCode: validated.errorCode,
+        }),
+      );
+      continue;
+    }
+
+    return {
+      ...validated,
+      usedProvider: provider,
+    };
+  }
+
+  console.warn(
+    "[ai-orchestrator]",
+    JSON.stringify({
+      mode: "tools",
+      error: "all_tool_providers_failed",
+      attemptedProviders,
+    }),
+  );
+
+  return null;
 }
 
 async function requestOrchestratorJson(input: {
@@ -231,49 +443,6 @@ async function requestOrchestratorJson(input: {
   };
 }
 
-function validateOrchestratorResponse(
-  rawText: string,
-): OrchestratorRunResult | null {
-  const parsed = parseJsonObject(rawText);
-
-  if (!parsed) {
-    return {
-      success: false,
-      errorCode: "invalid_json",
-      errorMessage: "Orchestrator returned invalid JSON.",
-      rawText: rawText.slice(0, 500),
-    };
-  }
-
-  const validated = orchestratorResponseSchema.safeParse(parsed);
-
-  if (!validated.success) {
-    return {
-      success: false,
-      errorCode: "validation_failed",
-      errorMessage: "Orchestrator JSON failed schema validation.",
-      rawText: rawText.slice(0, 500),
-    };
-  }
-
-  console.info(
-    "[ai-orchestrator]",
-    JSON.stringify({
-      intent: validated.data.intent,
-      confidence: validated.data.confidence,
-      managerAlert: validated.data.managerAlert,
-      handoffConfirmed: validated.data.handoffConfirmed,
-      actionCount: validated.data.actions.length,
-      hasContactUpdates: Boolean(
-        validated.data.contactUpdates &&
-          Object.keys(validated.data.contactUpdates).length > 0,
-      ),
-    }),
-  );
-
-  return { success: true, data: validated.data };
-}
-
 export async function runAutoReplyOrchestrator(input: {
   businessId: string;
   message: string;
@@ -306,7 +475,7 @@ export async function runAutoReplyOrchestrator(input: {
 
   await ensurePlatformPromptsLoaded();
 
-  const firstAttempt = await requestOrchestratorJson({
+  const promptInput = {
     businessId: input.businessId,
     message: input.message,
     conversationHistory,
@@ -316,7 +485,21 @@ export async function runAutoReplyOrchestrator(input: {
     bookableResourcesText,
     bookingPagesText,
     availabilityText,
-  });
+  };
+
+  const toolAttempt = await requestOrchestratorViaTools(promptInput);
+
+  if (toolAttempt?.success) {
+    void touchPlatformPromptUsage(["orchestrator"]);
+    return toolAttempt;
+  }
+
+  // Usage limit / hard failure from the tools path — do not burn JSON fallback quota.
+  if (toolAttempt && !toolAttempt.success) {
+    return toolAttempt;
+  }
+
+  const firstAttempt = await requestOrchestratorJson(promptInput);
 
   if (!firstAttempt.success) {
     console.warn(
@@ -337,7 +520,7 @@ export async function runAutoReplyOrchestrator(input: {
 
   const validated = validateOrchestratorResponse(firstAttempt.text);
 
-  if (validated?.success) {
+  if (validated.success) {
     void touchPlatformPromptUsage(["orchestrator"]);
     return {
       ...validated,
@@ -345,46 +528,33 @@ export async function runAutoReplyOrchestrator(input: {
     };
   }
 
-  const retryAttempt = await requestOrchestratorJson({
-    businessId: input.businessId,
-    message: input.message,
-    conversationHistory,
-    contact: input.contact,
-    calendarBookingEnabled,
-    googleCalendarConnected,
-    bookableResourcesText,
-    bookingPagesText,
-    availabilityText,
-  });
+  const retryAttempt = await requestOrchestratorJson(promptInput);
 
   if (!retryAttempt.success) {
-    return validated ?? {
+    return {
       success: false,
-      errorCode: "llm_failed",
-      errorMessage: retryAttempt.errorMessage,
+      errorCode: validated.errorCode,
+      errorMessage: validated.errorMessage,
+      rawText: validated.rawText,
       attemptedProviders: retryAttempt.attemptedProviders,
     };
   }
 
   const retryValidated = validateOrchestratorResponse(retryAttempt.text);
 
-  if (retryValidated) {
-    if (retryValidated.success) {
-      void touchPlatformPromptUsage(["orchestrator"]);
-      return {
-        ...retryValidated,
-        usedProvider: retryAttempt.usedProvider,
-      };
-    }
-
-    return retryValidated;
+  if (retryValidated.success) {
+    void touchPlatformPromptUsage(["orchestrator"]);
+    return {
+      ...retryValidated,
+      usedProvider: retryAttempt.usedProvider,
+    };
   }
 
-  return validated ?? {
+  return {
     success: false,
-    errorCode: "invalid_json",
-    errorMessage: "Orchestrator returned invalid JSON after retry.",
-    rawText: retryAttempt.text.slice(0, 500),
+    errorCode: retryValidated.errorCode,
+    errorMessage: retryValidated.errorMessage,
+    rawText: retryValidated.rawText ?? retryAttempt.text.slice(0, 500),
   };
 }
 

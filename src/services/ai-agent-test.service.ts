@@ -95,6 +95,7 @@ export async function runAssistantAgentTest(input: {
     clientMessage: input.clientMessage,
     conversationHistory,
     requireAiEnabled: false,
+    skipWorkerActions: true,
   });
 
   if (!phase1.success) {

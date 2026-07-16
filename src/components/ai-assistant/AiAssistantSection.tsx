@@ -261,6 +261,9 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
             <AiAssistantEditPanel
               profile={data.assistantProfile}
               followUpAgent={data.followUpAgent}
+              workerReadiness={data.workerReadiness}
+              salesAgent={data.salesAgent}
+              businessAiKeys={data.businessAiKeys}
               onBack={() => setActiveTab("dashboard")}
             />
           </div>

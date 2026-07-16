@@ -24,6 +24,9 @@ export default async function AiAssistantSettingsPage() {
           <AiAssistantEditPanel
             profile={data.assistantProfile}
             followUpAgent={data.followUpAgent}
+            workerReadiness={data.workerReadiness}
+            salesAgent={data.salesAgent}
+            businessAiKeys={data.businessAiKeys}
           />
         </div>
       </div>

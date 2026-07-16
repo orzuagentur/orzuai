@@ -32,20 +32,22 @@ function resolveActionFallbackReplyMessage(input: {
   const language = input.language.trim().toLowerCase();
 
   if (language.includes("russian") || language === "ru") {
-    return "Проверяю доступность и оформляю бронь по вашим данным. Если выбранный вариант недоступен, сразу предложу ближайший свободный.";
+    return "Могу оформить бронь прямо здесь. Напишите точную дату и время — сразу подтвержу.";
   }
 
   if (language.includes("uzbek") || language === "uz") {
-    return "Ma'lumotlaringiz bo'yicha mavjud vaqtni tekshiryapman va bronni rasmiylashtiryapman. Agar tanlangan vaqt band bo'lsa, eng yaqin bo'sh variantni taklif qilaman.";
+    return "Bronni shu yerda rasmiylashtira olaman. Aniq sana va vaqtni yozing — darhol tasdiqlayman.";
   }
 
-  return "I am checking availability and creating the booking from your details now. If the selected option is unavailable, I will offer the nearest open slot.";
+  return "I can book this for you right here. Share the exact date and time, and I will confirm it.";
 }
 
 function isGenericWaitingFallback(message: string): boolean {
   return [
     /help you right here in (this )?chat/i,
     /checking this and will help/i,
+    /checking the details now/i,
+    /biroz kuting/i,
     /помогу[\s\S]{0,80}(здесь|чате|чат)/i,
     /проверяю[\s\S]{0,80}помогу/i,
     /shu yerda yordam beraman/i,
@@ -78,6 +80,6 @@ export function resolveAssistantFallbackReplyMessage(input: {
   return (
     FALLBACK_BY_LANGUAGE[language] ??
     FALLBACK_BY_LANGUAGE.English ??
-    "I am checking the details now and will respond with the next step."
+    "I can help with that right here. What exact detail should I handle next?"
   );
 }

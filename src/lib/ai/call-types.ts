@@ -12,6 +12,7 @@ export const AI_CALL_TYPES = [
   "voice",
   "voice_stt",
   "voice_tts",
+  "platform_copilot",
   "other",
 ] as const;
 

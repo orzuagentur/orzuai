@@ -178,11 +178,15 @@ export class ConversationRepository {
     return created.id;
   }
 
-  async findContactId(conversationId: string): Promise<string | null> {
+  async findContactId(
+    conversationId: string,
+    businessId: string,
+  ): Promise<string | null> {
     const { data, error } = await this.db
       .from("conversations")
       .select("contact_id")
       .eq("id", conversationId)
+      .eq("business_id", businessId)
       .maybeSingle();
 
     if (error) {
@@ -264,6 +268,7 @@ export class ConversationRepository {
 
   async loadMemory(
     conversationId: string,
+    businessId: string,
   ): Promise<ConversationMemorySnapshot | null> {
     const { data, error } = await this.db
       .from("conversations")
@@ -271,6 +276,7 @@ export class ConversationRepository {
         "ai_summary, ai_summary_updated_at, ai_summary_message_count, total_message_count",
       )
       .eq("id", conversationId)
+      .eq("business_id", businessId)
       .maybeSingle();
 
     if (error) {
@@ -291,6 +297,7 @@ export class ConversationRepository {
 
   async updateMemorySummary(
     conversationId: string,
+    businessId: string,
     input: {
       aiSummary: string;
       aiSummaryUpdatedAt: string;
@@ -304,7 +311,8 @@ export class ConversationRepository {
         ai_summary_updated_at: input.aiSummaryUpdatedAt,
         ai_summary_message_count: input.aiSummaryMessageCount,
       })
-      .eq("id", conversationId);
+      .eq("id", conversationId)
+      .eq("business_id", businessId);
 
     if (error) {
       throw new Error(error.message);

@@ -98,6 +98,7 @@ const EMPTY_TEAM_ANALYTICS: TeamAnalyticsMetrics = {
   slaCompliancePercent: 0,
   slaTargetMinutes: SLA_TARGET_MINUTES,
   sampledConversations: 0,
+  avgHandoffAcceptMinutes: null,
 };
 
 const EMPTY_REVENUE: RevenueMetrics = {
@@ -473,6 +474,42 @@ export async function getTeamAnalyticsMetrics(
   const slaCompliancePercent =
     measured > 0 ? Math.round((compliant / measured) * 100) : 0;
 
+  const thirtyDaysAgo = new Date(
+    Date.now() - 30 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data: handoffRows } = await supabase
+    .from("ai_human_requests")
+    .select("created_at, accepted_at")
+    .eq("business_id", businessId)
+    .eq("status", "accepted")
+    .not("accepted_at", "is", null)
+    .gte("accepted_at", thirtyDaysAgo);
+
+  let handoffMinutesSum = 0;
+  let handoffSamples = 0;
+
+  for (const row of handoffRows ?? []) {
+    if (!row.accepted_at) {
+      continue;
+    }
+
+    const minutes =
+      (new Date(row.accepted_at).getTime() -
+        new Date(row.created_at).getTime()) /
+      60000;
+
+    if (Number.isFinite(minutes) && minutes >= 0) {
+      handoffMinutesSum += minutes;
+      handoffSamples += 1;
+    }
+  }
+
+  const avgHandoffAcceptMinutes =
+    handoffSamples > 0
+      ? Math.round((handoffMinutesSum / handoffSamples) * 10) / 10
+      : null;
+
   return {
     teamReplies,
     aiReplies,
@@ -480,6 +517,7 @@ export async function getTeamAnalyticsMetrics(
     slaCompliancePercent,
     slaTargetMinutes: SLA_TARGET_MINUTES,
     sampledConversations: measured,
+    avgHandoffAcceptMinutes,
   };
 }
 

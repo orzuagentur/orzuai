@@ -150,10 +150,26 @@ export class MessageRepository {
 
   async listForAiHistory(
     conversationId: string,
+    businessId: string,
     limit: number,
   ): Promise<
     Array<{ id: string; sender_type: MessageSenderType; content: string }>
   > {
+    const { data: conversation, error: conversationError } = await this.db
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (conversationError) {
+      throw new Error(conversationError.message);
+    }
+
+    if (!conversation) {
+      return [];
+    }
+
     const { data, error } = await this.db
       .from("messages")
       .select("id, sender_type, content")
@@ -216,7 +232,23 @@ export class MessageRepository {
 
   async findLatestAiMessage(
     conversationId: string,
+    businessId: string,
   ): Promise<{ content: string; created_at: string } | null> {
+    const { data: conversation, error: conversationError } = await this.db
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (conversationError) {
+      throw new Error(conversationError.message);
+    }
+
+    if (!conversation) {
+      return null;
+    }
+
     const { data, error } = await this.db
       .from("messages")
       .select("content, created_at")
@@ -296,8 +328,24 @@ export class MessageRepository {
 
   async listMessagesForSummary(
     conversationId: string,
+    businessId: string,
     limit = 30,
   ): Promise<Array<{ sender_type: MessageSenderType; content: string }>> {
+    const { data: conversation, error: conversationError } = await this.db
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (conversationError) {
+      throw new Error(conversationError.message);
+    }
+
+    if (!conversation) {
+      return [];
+    }
+
     const { data, error } = await this.db
       .from("messages")
       .select("sender_type, content")

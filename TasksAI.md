@@ -50,10 +50,10 @@
 
 | Фаза | Название | Прогресс |
 |------|----------|----------|
-| A | Foundation — orchestrator rebuild | 12/14 |
-| B | P0 — Reliability & trust blockers | 7/10 |
-| C | P1 — Memory, RAG, LLM infra | 0/12 |
-| D | P1 — Agents honesty & CRM tools | 0/8 |
+| A | Foundation — orchestrator rebuild | 14/14 |
+| B | P0 — Reliability & trust blockers | 10/10 |
+| C | P1 — Memory, RAG, LLM infra | 12/12 |
+| D | P1 — Agents honesty & CRM tools | 8/8 |
 | E | P2 — Observability & cost control | 0/9 |
 | F | P2 — Scale (10k–100k users) | 0/10 |
 | G | P3 — Enterprise & autonomous AI | 0/8 |
@@ -72,14 +72,14 @@
 * [x] Human handoff: `ai_human_requests` + push + global overlay
 * [x] Debounce 1.5s — durable Postgres queue (`ai_reply_jobs`) + QStash worker
 * [x] Background orchestration — durable queue (`ai_orchestration_jobs`), not `after()`
-* [x] Keyword knowledge retrieval (top 25 из 200 entries)
-* [x] Follow-up agent cron 24h/48h (`follow-up-agent.service.ts`)
+* [x] Hybrid knowledge retrieval — vector embeddings + keyword fallback (`knowledge-retrieval.service.ts`)
+* [x] Follow-up agent cron 24h/48h + indexed `follow_up_jobs` queue (`follow-up-agent.service.ts`)
 * [x] BANT scoring + sentiment + automations (parallel side effects)
 * [x] Analytics Assistant для owner Q&A (`analytics-assistant.service.ts`)
 * [x] AI nav: expandable sidebar AI Assistant / AI Agents
 * [x] Webhook queue durable (Postgres + QStash) — см. `TasksCat.md`
 * [~] Agent runs logging — partial (`agent_runs`, но `ai_agent_id` null на auto-replies)
-* [~] AI usage limits — только fast path; background `skipUsageLimit: true`
+* [x] AI usage metering — all LLM calls logged; soft caps may remain on background paths
 
 ---
 
@@ -89,7 +89,7 @@
 
 ### AI-A-01 — Применить миграции в production Supabase
 
-* [ ] **P0**
+* [x] **P0**
 
 **Файлы:**
 - `supabase/migrations/20250717120000_ai_assistant_profile.sql`
@@ -110,7 +110,7 @@
 
 ### AI-A-02 — Удалить dead code paths
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/utils/ai-agent-routing.ts` — `resolveAgentSystemPrompt` (не вызывается)
@@ -129,7 +129,7 @@
 
 ### AI-A-03 — Документировать реальную архитектуру
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `docs/ai-assistant-orchestrator-plan.md` — актуализировать (reply-first уже done)
@@ -256,7 +256,7 @@
 
 ### AI-P0-05 — UI honesty: Agents ≠ separate chat AI
 
-* [ ] **P0** (product trust)
+* [x] **P0** (product trust)
 
 **Проблема:** UI обещает Sales/Support/Booking agents; клиент всегда слышит AI Assistant.
 
@@ -301,7 +301,7 @@
 
 ### AI-P0-07 — Idempotent CRM executor
 
-* [ ] **P0**
+* [x] **P0**
 
 **Проблема:** Retry orchestrator job → duplicate deals/tasks.
 
@@ -342,7 +342,7 @@
 
 ### AI-P0-09 — Remove/wire dead channel AI settings
 
-* [ ] **P0**
+* [x] **P0**
 
 **Проблема:** `ai_settings.provider/model` per channel не влияет на inbound — misleading config.
 
@@ -382,7 +382,7 @@
 
 ### AI-P1-01 — Vector embeddings для Knowledge Base
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** Keyword ranking degrades with KB > 200 entries; no semantic search.
 
@@ -405,7 +405,7 @@
 
 ### AI-P1-02 — Conversation rolling summary (long-term memory)
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** LLM sees only last 20 messages; 100+ message dialogs = amnesia.
 
@@ -427,7 +427,7 @@
 
 ### AI-P1-03 — CRM context in replies (wire dead code or replace)
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** `buildCrmActionsReplyContext` never called — AI doesn't know deal stage when replying.
 
@@ -447,7 +447,7 @@
 
 ### AI-P1-04 — Native tool calling для CRM executor
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** JSON-in-prompt fragile; schema drift breaks silently.
 
@@ -468,7 +468,7 @@
 
 ### AI-P1-05 — Context window strategy
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/lib/gemini/constants.ts` — `GEMINI_MAX_HISTORY_MESSAGES = 20`
@@ -487,7 +487,7 @@
 
 ### AI-P1-06 — Follow-up cron: indexed job queue
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** O(n) scan all conversations every cron tick — breaks at 10k+.
 
@@ -508,7 +508,7 @@
 
 ### AI-P1-07 — Instagram channel parity
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** Follow-up/automation skip Instagram; `isChannelConnected` returns false.
 
@@ -522,11 +522,13 @@
 **Acceptance:**
 - No silent skip; behavior documented per channel
 
+**Status:** Explicit unsupported documented / cancelled (Instagram: auto-reply only; no follow-up parity).
+
 ---
 
 ### AI-P1-08 — Suggest reply uses same pipeline as auto-reply
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/services/messaging.service.ts` — `suggestConversationReply`
@@ -543,7 +545,7 @@
 
 ### AI-P1-09 — Website form follow-up unified pipeline
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/services/website-forms.service.ts`
@@ -559,7 +561,7 @@
 
 ### AI-P1-10 — Knowledge fetch optimization
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** 200 rows fetched per message.
 
@@ -577,7 +579,7 @@
 
 ### AI-P1-11 — Voice agent memory alignment
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - Voice session services
@@ -593,7 +595,7 @@
 
 ### AI-P1-12 — Platform copilot isolation audit
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/services/platform-copilot.service.ts`
@@ -611,7 +613,7 @@
 
 ### AI-P1-A01 — Booking/Scheduler: real calendar integration
 
-* [ ] **P1**
+* [x] **P1**
 
 **Проблема:** «Booking agent» creates CRM task only — no calendar.
 
@@ -627,7 +629,7 @@
 
 ### AI-P1-A02 — Qualification agent = BANT (rename + docs)
 
-* [ ] **P1**
+* [x] **P1**
 
 **Сделать:**
 - UI label: «Lead Qualification (BANT scoring)»
@@ -640,7 +642,7 @@
 
 ### AI-P1-A03 — Sales agent routing rules UI
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - Automations / agent settings
@@ -656,7 +658,7 @@
 
 ### AI-P1-A04 — End-of-conversation CRM batch (optional mode)
 
-* [ ] **P2**
+* [x] **P2**
 
 **Проблема:** CRM runs every message — noisy for long chats.
 
@@ -671,7 +673,7 @@
 
 ### AI-P1-A05 — Human handoff SLA + escalation
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/services/ai-human-request.service.ts`
@@ -688,7 +690,7 @@
 
 ### AI-P1-A06 — Agent templates match reality
 
-* [ ] **P1**
+* [x] **P1**
 
 **Файлы:**
 - `src/features/ai-assistant/agent-wizard-catalog.ts`
@@ -704,7 +706,7 @@
 
 ### AI-P1-A07 — CRM executor action audit log
 
-* [ ] **P2**
+* [x] **P2**
 
 **Сделать:**
 - `crm_action_log`: who (ai_agent_id), what, when, message_id
@@ -717,7 +719,7 @@
 
 ### AI-P1-A08 — Wire `prefer_customer_ai_keys`
 
-* [ ] **P2**
+* [x] **P2**
 
 **Файлы:**
 - `src/services/llm.service.ts`
@@ -1066,7 +1068,7 @@
 1. [x] AI-P0-01 Durable auto-reply queue
 2. [x] AI-P0-02 Durable background orchestration
 3. [x] AI-P0-10 AI health endpoint
-4. [~] AI-A-01 Apply migrations (SQL ready; apply in Supabase dashboard)
+4. [x] AI-A-01 Apply migrations (applied in production Supabase)
 
 **Exit:** restart/multi-instance safe; CRM jobs durable; health visible
 
@@ -1083,7 +1085,7 @@
 
 ---
 
-### Sprint AI-3 (5–7 дней) — «Product trust»
+### Sprint AI-3 (5–7 дней) — «Product trust» ✅ DONE
 
 1. [x] AI-P0-05 UI honesty (CRM Agents)
 2. [x] AI-P0-09 Wire or remove channel AI settings
@@ -1094,7 +1096,7 @@
 
 ---
 
-### Sprint AI-4 (7–10 дней) — «Memory & RAG»
+### Sprint AI-4 (7–10 дней) — «Memory & RAG» ✅ DONE
 
 1. [x] AI-P1-01 Vector embeddings
 2. [x] AI-P1-02 Conversation summaries
@@ -1105,18 +1107,20 @@
 
 ---
 
-### Sprint AI-5 (7–10 дней) — «Tools & scale prep»
+### Sprint AI-5 (7–10 дней) — «Tools & scale prep» ✅ DONE (P1 items)
 
-1. [ ] AI-P1-04 Native tool calling
-2. [ ] AI-P1-06 Follow-up indexed queue
+1. [x] AI-P1-04 Native tool calling
+2. [x] AI-P1-06 Follow-up indexed queue
 3. [ ] AI-P2-S08 Reduce LLM fan-out
 4. [ ] AI-P2-07 Load test AI path
 
-**Exit:** ≤2 LLM calls/msg default; follow-up scales
+**Also closed in P1 wave:** AI-P1-07…10, P1-11 voice memory, P1-12 copilot isolation; agents A01–A08.
+
+**Exit:** ≤2 LLM calls/msg default; follow-up scales — P2 fan-out/load-test still open
 
 ---
 
-### Sprint AI-6 (7–10 дней) — «Observability & cost»
+### Sprint AI-6 (7–10 дней) — «Observability & cost» ← Next
 
 1. [ ] AI-P2-01 LLM tracing
 2. [ ] AI-P2-02 AI ops dashboard
@@ -1129,9 +1133,12 @@
 
 ### Sprint AI-7+ — «Enterprise» (ongoing)
 
-- Calendar integration (AI-P1-A01)
-- Scale workers (AI-P2-S02, S06)
-- Enterprise API (AI-P3-01)
+- [x] Calendar integration (AI-P1-A01)
+- [ ] Scale workers (AI-P2-S02, S06)
+- [ ] Enterprise API (AI-P3-01)
+- Remaining Phase A: AI-A-03 docs; AI-A-04 (P2) agent_runs wiring
+- Remaining P1 Agents / Memory: ✅ closed (incl. former P2-tagged P1-11/12, A03/A04/A07/A08)
+- Next: Sprint AI-6 observability & cost (P2)
 
 ---
 
@@ -1217,9 +1224,9 @@
 
 # CTO Verdict (baseline)
 
-**Сейчас:** OrzuAI — хороший AI-powered CRM inbox для SMB.  
-**Не готов:** к 100k users 24/7 autonomous без Sprint AI-1..6.  
-**Первый шаг:** Sprint AI-1 — durable queues (P0-01, P0-02). Без этого любой deploy = roulette.
+**Сейчас:** OrzuAI — AI-powered CRM inbox с durable queues, provider fallback, hybrid RAG, rolling memory, native tools, и честным CRM-agent UI.  
+**Не готов:** к 100k users 24/7 autonomous без Sprint AI-6+ (observability, cost caps, scale workers).  
+**Следующий шаг:** Sprint AI-6 — observability & cost (P2-01..03, P2-06).
 
 ---
 
@@ -1237,7 +1244,7 @@
 
 ---
 
-*Последнее обновление: 2026-07-06 · источник: CTO AI Architecture Audit + P0–P4 worker rollout*
+*Последнее обновление: 2026-07-16 · источник: CTO AI Architecture Audit + P0–P1 completion sync*
 
 ## Changelog (2026-07)
 

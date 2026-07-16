@@ -121,10 +121,10 @@ See `.env.example` → Load tests section for credentials.
 
 ### How AI works
 
-1. **AI Agents** — customer-facing autonomous agents per business. Each enabled agent talks on selected channels, detects intent without keywords, replies in chat, and updates CRM (tasks, deals, notes).
-2. **Unified loop** — inbound message → orchestrator (intent + CRM plan) → CRM actions → customer reply with context. No separate background-only agent layer.
-3. **Channel toggle** — enable or disable auto-reply per channel in **AI → Channels**. Legacy assistant profile is used only when no agent is enabled on the channel.
-4. **Workers** — `/api/workers/ai-reply-queue`, `/api/workers/ai-orchestration-queue`; health via `/api/cron/ai-health`.
-5. **Memory** — rolling conversation summary; semantic Knowledge Base search; CRM snapshot in replies.
+1. **One customer voice** — `ai_assistant_profile` replies to customers. BANT, follow-up, and CRM agents are background workers — they do not send separate chat voices.
+2. **Reply first, CRM after** — Phase 1: fast assistant reply (knowledge + memory + CRM snapshot) → send. Phase 2: durable `ai_orchestration_jobs` runs native tool calling (Gemini / OpenAI / Claude) → Zod-validated CRM executor.
+3. **Channel toggle** — per-channel `ai_enabled` only. Provider/model come from platform AI config, not per-channel settings.
+4. **Workers & queues** — `/api/workers/ai-reply-queue`, `/api/workers/ai-orchestration-queue`; follow-ups via `follow_up_jobs`; health via `/api/cron/ai-health`; handoff SLA via `/api/cron/ai-human-handoff-sla`.
+5. **Memory & RAG** — rolling conversation summary + hybrid vector/keyword Knowledge Base + short CRM context in replies.
 
 Product roadmap: `TASKS.md` · AI orchestration: `TasksAI.md` · Performance/reliability: `TasksCat.md`

@@ -8,7 +8,7 @@ import {
   isChannelAutoReplyEnabled,
 } from "@/services/auto-reply-pipeline.service";
 import type { AutoReplyGenerationFailure } from "@/services/auto-reply-pipeline.service";
-import { enqueueAiOrchestrationJob } from "@/services/ai-orchestration-queue.service";
+import { scheduleCrmOrchestration } from "@/services/ai-orchestration-queue.service";
 import { scheduleDebouncedChannelAutoReply } from "@/services/ai-reply-queue.service";
 import { maybeQueueImmediateHumanRequest } from "@/services/ai-human-request.service";
 import {
@@ -22,6 +22,10 @@ import { notifyAutoReplyError } from "@/services/auto-reply-inbox-status.service
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { retrieveKnowledgeForMessage } from "@/services/knowledge-retrieval.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
+import {
+  cancelPendingFollowUpJobs,
+  scheduleFollowUpJobsAfterAiReply,
+} from "@/services/follow-up-agent.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import {
   getMessageRepository,
@@ -402,14 +406,16 @@ export async function processChannelAutoReply(input: {
     });
   }
 
-  await enqueueAiOrchestrationJob({
-    businessId,
-    channel,
-    conversationId,
-    clientMessage,
-  }).catch((error) => {
-    console.error("[messaging] failed to enqueue CRM orchestration", error);
-  });
+  if (!reply.orchestrationCompleted) {
+    await scheduleCrmOrchestration({
+      businessId,
+      channel,
+      conversationId,
+      clientMessage,
+    }).catch((error) => {
+      console.error("[messaging] failed to enqueue CRM orchestration", error);
+    });
+  }
 
   const voiceDecision = await shouldUseVoiceAutoReply({
     admin,
@@ -497,6 +503,19 @@ export async function processChannelAutoReply(input: {
     totalMessages: 1,
     aiReplies: 1,
   });
+
+  void scheduleFollowUpJobsAfterAiReply({
+    admin,
+    businessId,
+    conversationId,
+    channel,
+    outboundContent: messageContent,
+  }).catch((error) => {
+    console.warn(
+      "[messaging] schedule follow-up jobs failed",
+      error instanceof Error ? error.message : "unknown",
+    );
+  });
 }
 
 export async function scheduleChannelAutoReply(input: {
@@ -521,6 +540,17 @@ export async function scheduleInboundMessageProcessing(input: {
     channel: input.channel,
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
+  });
+
+  void cancelPendingFollowUpJobs({
+    admin: input.admin,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+  }).catch((error) => {
+    console.warn(
+      "[messaging] cancel follow-up jobs failed",
+      error instanceof Error ? error.message : "unknown",
+    );
   });
 
   void maybeQueueImmediateHumanRequest({

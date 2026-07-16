@@ -28,6 +28,8 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
+import { scheduleCrmOrchestration } from "@/services/ai-orchestration-queue.service";
+import { scheduleFollowUpJobsAfterAiReply } from "@/services/follow-up-agent.service";
 import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
 import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import {
@@ -544,6 +546,36 @@ async function processWebsiteFormFollowUp(input: {
     totalMessages: 1,
     aiReplies: 1,
   });
+
+  if (!reply.orchestrationCompleted) {
+    await scheduleCrmOrchestration({
+      businessId,
+      channel: "website_forms",
+      conversationId,
+      clientMessage,
+    }).catch((error) => {
+      console.error(
+        "[website-forms] failed to enqueue CRM orchestration",
+        error,
+      );
+    });
+  }
+
+  if (outboundSent) {
+    void scheduleFollowUpJobsAfterAiReply({
+      admin,
+      businessId,
+      conversationId,
+      channel: "website_forms",
+      outboundContent: followUpText,
+      contactName: submission.name?.trim() || undefined,
+    }).catch((error) => {
+      console.warn(
+        "[website-forms] schedule follow-up jobs failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    });
+  }
 }
 
 export async function ingestWebsiteFormSubmission(

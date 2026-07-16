@@ -1,6 +1,6 @@
 # План: AI Assistant (лидер) + AI Agents (исполнители)
 
-> **2026-07 update:** В продакшене один **AI Agent** (`ai_assistant_profile`) — Phase 1 reply + Phase 2 orchestrator + code executor. Отдельные AI Agents и keyword routing **удалены**. BANT/lead scoring — post-step orchestrator, не inbound automations. Промпты — Admin CMS (`platform_prompts`) + tenant `system_prompt`. Observability — `agent_runs` (planned / executed / blocked / skipped).
+> **2026-07 update (current):** One **AI Agent** (`ai_assistant_profile`) is the only customer voice. **Reply-first**: Phase 1 `generateFastAssistantReply` → send; Phase 2 durable orchestrator with native `plan_orchestration` tools (Gemini/OpenAI/Claude) + JSON fallback → idempotent CRM executor. Hybrid RAG (embeddings + keyword fallback), rolling conversation summary, `follow_up_jobs` queue, human handoff SLA cron. BANT/follow-up are background workers, not separate chatbots.
 
 Цель: **один системный Gemini-ассистент** общается с клиентами 24/7. Специализированные агенты **не заменяют** его в чате — они **выполняют задачи** в CRM по его поручению.
 

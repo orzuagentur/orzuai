@@ -29,6 +29,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/ai-human-handoff-sla",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/voice-callbacks",
       "schedule": "*/1 * * * *"
     },

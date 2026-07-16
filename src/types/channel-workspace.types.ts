@@ -105,6 +105,8 @@ export type AiAssistantChannelEntry = {
 
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import type { BusinessAiKeySettings } from "@/services/business-ai-keys.service";
+import type { SalesAgentSettings } from "@/types/ai-usage.types";
 
 export type AiAssistantPageData = {
   hasBusiness: boolean;
@@ -134,6 +136,8 @@ export type AiAssistantPageData = {
   aiActivity: AgentActivityPoint[];
   workerReadiness: AiWorkerReadiness;
   followUpAgent: FollowUpAgentSettings;
+  salesAgent: SalesAgentSettings;
+  businessAiKeys: BusinessAiKeySettings;
   agentRuns: AgentRunsMetrics;
 };
 

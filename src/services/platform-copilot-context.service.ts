@@ -14,6 +14,31 @@ import { getGoogleCalendarConnection } from "@/services/google-calendar.service"
 import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 
+function maskPhone(phone: string | null | undefined): string | null {
+  const digits = (phone ?? "").replace(/\D/g, "");
+
+  if (!digits) {
+    return null;
+  }
+
+  if (digits.length <= 4) {
+    return `***${digits}`;
+  }
+
+  return `***${digits.slice(-4)}`;
+}
+
+function maskEmail(email: string | null | undefined): string | null {
+  const value = email?.trim() ?? "";
+
+  if (!value || !value.includes("@")) {
+    return null;
+  }
+
+  const domain = value.split("@").slice(1).join("@").trim();
+  return domain ? `***@${domain}` : null;
+}
+
 export async function buildPlatformCopilotContextBlock(
   businessId: string,
 ): Promise<string> {
@@ -91,8 +116,8 @@ export async function buildPlatformCopilotContextBlock(
   const contacts = (contactsResult.data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
-    phone: row.phone_number,
-    email: row.email,
+    phone: maskPhone(row.phone_number),
+    email: maskEmail(row.email),
     channel: row.channel,
   }));
 
@@ -104,7 +129,7 @@ export async function buildPlatformCopilotContextBlock(
       channel: row.channel,
       contactId: contact?.id ?? null,
       contactName: contact?.name ?? "Unknown",
-      phone: contact?.phone_number ?? null,
+      phone: maskPhone(contact?.phone_number ?? null),
     };
   });
 
@@ -154,7 +179,9 @@ export async function buildPlatformCopilotContextBlock(
       deals,
       calendar: {
         googleConnected: googleCalendarConnection?.status === "connected",
-        accountEmail: googleCalendarConnection?.googleAccountEmail ?? null,
+        accountEmail: maskEmail(
+          googleCalendarConnection?.googleAccountEmail ?? null,
+        ),
         timeZone: bookingSetup?.bookingTimezone ?? "UTC",
         upcomingEvents: calendarEvents,
       },

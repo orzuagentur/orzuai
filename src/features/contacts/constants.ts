@@ -114,6 +114,7 @@ export const CONTACTS_MESSAGES = {
   insightsFailed: "Unable to generate AI insights. Please try again.",
   insightsUnavailable: "AI insights require Gemini API configuration.",
   internalNoteActivity: "Internal note",
+  crmActionActivity: "AI CRM",
   hotLead: "Hot lead",
   warmLead: "Warm lead",
   coldLead: "Cold lead",

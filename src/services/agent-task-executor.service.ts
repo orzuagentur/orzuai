@@ -7,11 +7,8 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   AGENT_TOOL_BY_NAME,
   AGENT_TOOL_NAMES,
-  formatAllowedExecutorActionTypes,
-  formatExecutorToolCatalog,
   logAgentToolAudit,
 } from "@/lib/ai/tools";
-import { getPlatformPromptContent } from "@/services/platform-prompts.service";
 import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
 
 import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
@@ -22,14 +19,12 @@ import {
   recordCrmIdempotencyKey,
 } from "@/lib/crm/executor-idempotency";
 import { formatSkippedDuplicate } from "@/lib/ai/agent-run-actions";
-import { generateText } from "@/services/llm.service";
 import type {
   AgentExecutorResult,
   ExecutorAction,
   ExecutorContactUpdates,
   ExecutorPlan,
 } from "@/types/agent-executor.types";
-import { executorPlanSchema } from "@/types/agent-executor.types";
 import type { ContactCustomFields, PipelineStage } from "@/types/contact.types";
 import { PIPELINE_STAGES } from "@/types/contact.types";
 import type { Database, MessagingChannel } from "@/types/database.types";
@@ -45,11 +40,6 @@ import { getConversationRepository } from "@/repositories/conversation.repositor
 import { canonicalPhoneNumber, phoneDigitsOnly } from "@/utils/whatsapp";
 
 type MessagingDbClient = SupabaseClient<Database>;
-
-type ConversationTurn = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 export type ContactSnapshot = {
   id: string;
@@ -71,28 +61,6 @@ const GENERIC_CONTACT_NAMES = new Set([
   "user",
   "contact",
 ]);
-
-function parseJsonObject(text: string): unknown | null {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced?.[1]?.trim() ?? trimmed;
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const objectMatch = candidate.match(/\{[\s\S]*\}/);
-
-    if (!objectMatch) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(objectMatch[0]);
-    } catch {
-      return null;
-    }
-  }
-}
 
 function parseCustomFields(value: unknown): ContactCustomFields {
   if (!value || typeof value !== "object") {
@@ -204,70 +172,6 @@ const GENERIC_DEAL_TITLES = new Set([
   "inquiry",
 ]);
 
-function buildExecutorPrompt(input: {
-  contact: ContactSnapshot;
-  message: string;
-  conversationHistory: ConversationTurn[];
-  agent: RoutableAiAgent | null;
-}): string {
-  const historySection =
-    input.conversationHistory.length > 0
-      ? input.conversationHistory
-          .slice(-8)
-          .map(
-            (turn) =>
-              `${turn.role === "user" ? "Customer" : "Assistant"}: ${turn.content}`,
-          )
-          .join("\n")
-      : "No prior messages.";
-
-  const allowed = formatAllowedExecutorActionTypes();
-
-  return [
-    "Extract customer data and plan CRM updates from the latest message.",
-    input.agent
-      ? `Active AI agent: ${input.agent.name}.`
-      : "No specialized agent matched — only update contact profile when the customer shares new details.",
-    "",
-    "Current CRM contact:",
-    JSON.stringify(
-      {
-        name: input.contact.name,
-        phone: input.contact.phoneNumber,
-        alternatePhones:
-          input.contact.customFields.additionalContacts
-            ?.filter((entry) => entry.type === "phone")
-            .map((entry) => entry.value) ?? [],
-        email: input.contact.email,
-        company: input.contact.customFields.company ?? null,
-        location: input.contact.customFields.location ?? null,
-        pipelineStage: input.contact.pipelineStage,
-        dealValue: input.contact.dealValue,
-        tags: input.contact.tags,
-      },
-      null,
-      2,
-    ),
-    "",
-    "Recent conversation:",
-    historySection,
-    "",
-    "Latest customer message:",
-    input.message,
-    "",
-    `Allowed action types: ${allowed}`,
-    "",
-    "Tool guide:",
-    formatExecutorToolCatalog(),
-    "",
-    "Rules:",
-    getPlatformPromptContent("executor"),
-    "",
-    "Return JSON only:",
-    '{"contactUpdates":{"name":"...","email":"...","phone":"...","company":"..."},"actions":[{"type":"create_task","title":"...","dueAt":"2025-06-03T10:00:00Z"}],"clientSummary":"..."}',
-  ].join("\n");
-}
-
 export async function loadContactSnapshot(
   admin: MessagingDbClient,
   businessId: string,
@@ -351,7 +255,23 @@ async function applyContactUpdates(
   businessId: string,
   contact: ContactSnapshot,
   updates: ExecutorContactUpdates,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
 ): Promise<string[]> {
+  const fingerprint = JSON.stringify(updates);
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "contact_updates",
+    actionFingerprint: fingerprint,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return [];
+  }
+
   const applied: string[] = [];
   const patch: Database["public"]["Tables"]["contacts"]["Update"] = {};
   const customFields: ContactCustomFields = { ...contact.customFields };
@@ -434,6 +354,11 @@ async function applyContactUpdates(
   }
 
   if (Object.keys(patch).length === 0) {
+    await recordCrmIdempotencyKey(admin, {
+      businessId,
+      idempotencyKey,
+      actionType: "contact_updates",
+    });
     return applied;
   }
 
@@ -459,6 +384,12 @@ async function applyContactUpdates(
         updates.expectedCloseDate?.trim() ?? contact.expectedCloseDate,
     });
   }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "contact_updates",
+  });
 
   return applied;
 }
@@ -818,6 +749,7 @@ async function applyExecutorPlan(
         businessId,
         contact,
         plan.contactUpdates,
+        idempotencyContext,
       )),
     );
   }
@@ -927,36 +859,6 @@ async function logAgentRun(
     success: input.success,
     error_message: input.errorMessage ?? null,
   });
-}
-
-export async function planAgentCrmActions(input: {
-  businessId: string;
-  contact: ContactSnapshot;
-  message: string;
-  conversationHistory: ConversationTurn[];
-  agent: RoutableAiAgent | null;
-}): Promise<ExecutorPlan | null> {
-  const result = await generateText({
-    businessId: input.businessId,
-    callType: "crm_plan",
-    systemInstruction:
-      "You extract structured CRM data from customer messages. Reply with valid JSON only. Never invent contact details.",
-    prompt: buildExecutorPrompt(input),
-  });
-
-  if (!result.success) {
-    return null;
-  }
-
-  const parsed = parseJsonObject(result.data.text);
-
-  if (!parsed) {
-    return null;
-  }
-
-  const validated = executorPlanSchema.safeParse(parsed);
-
-  return validated.success ? validated.data : null;
 }
 
 async function executePlanOnContact(input: {
@@ -1093,6 +995,7 @@ async function applyCreateContact(
   conversationId: string,
   channel: MessagingChannel,
   action: Extract<ExecutorAction, { type: "create_contact" }>,
+  clientMessage: string,
 ): Promise<{ contactId: string; label: string } | null> {
   const name = action.name.trim();
 
@@ -1103,6 +1006,37 @@ async function applyCreateContact(
   const phone =
     action.phone?.trim() ||
     `pending:${conversationId.slice(0, 8)}`;
+  const fingerprint = [
+    name,
+    phone,
+    action.email?.trim() || "",
+    action.company?.trim() || "",
+    action.pipelineStage ?? "new",
+  ].join("|");
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId,
+    clientMessage,
+    actionType: "create_contact",
+    actionFingerprint: fingerprint,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    const { data: linked } = await admin
+      .from("conversations")
+      .select("contact_id")
+      .eq("id", conversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (linked?.contact_id) {
+      return {
+        contactId: linked.contact_id,
+        label: `Contact already linked: ${name}`,
+      };
+    }
+
+    return null;
+  }
 
   const customFields: ContactCustomFields = {};
 
@@ -1138,6 +1072,12 @@ async function applyCreateContact(
     throw new Error(linkError.message);
   }
 
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "create_contact",
+  });
+
   return {
     contactId: data.id,
     label: `Contact created: ${name}`,
@@ -1150,6 +1090,7 @@ export async function applyCreateContactFromPlan(input: {
   conversationId: string;
   channel: MessagingChannel;
   action: Extract<ExecutorAction, { type: "create_contact" }>;
+  clientMessage: string;
 }): Promise<{ contactId: string; label: string } | null> {
   return applyCreateContact(
     input.admin,
@@ -1157,6 +1098,7 @@ export async function applyCreateContactFromPlan(input: {
     input.conversationId,
     input.channel,
     input.action,
+    input.clientMessage,
   );
 }
 

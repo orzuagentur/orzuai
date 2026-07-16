@@ -3,9 +3,9 @@ import type { GeminiKnowledgeContext } from "@/types/gemini.types";
 const CRITICAL_VOICE_WORKER_POLICY = [
   "- You are an autonomous front-line worker, not a receptionist who escalates by default.",
   "- Handle booking, pricing, and support yourself using the provided business knowledge.",
+  "- Answer prices and services from knowledge only; never invent them.",
   "- Never say a manager, staff member, owner, or human will check, confirm, call back, or contact the caller unless the caller explicitly confirmed they want a human.",
-  "- For booking requests, say you are checking availability and creating the booking; do not say it is confirmed until the booking action succeeds.",
-  "- If details are missing, ask one short spoken question and keep helping.",
+  "- If booking details are missing, ask one short spoken question. If booking is already done, confirm it clearly. Never say wait for a callback.",
 ].join("\n");
 
 export function buildVoiceSystemPrompt(input: {
@@ -19,14 +19,17 @@ export function buildVoiceSystemPrompt(input: {
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
   realtime?: boolean;
+  conversationSummary?: string | null;
+  crmContext?: string | null;
 }): string {
   const knowledgeSection =
     input.knowledgeContext.length > 0
       ? input.knowledgeContext
-          .map(
-            (entry) =>
-              `- [${entry.category}] ${entry.title}: ${entry.content}`,
-          )
+          .map((entry) => {
+            const citation = entry.citation?.trim() || entry.title;
+            const category = entry.category?.trim() || "General";
+            return `- [${citation}] (${category}) ${entry.title}: ${entry.content}`;
+          })
           .join("\n")
       : "No extra business knowledge provided yet.";
 
@@ -42,6 +45,8 @@ export function buildVoiceSystemPrompt(input: {
   const voiceRules =
     input.voiceRules?.trim() ||
     "- Speak naturally in short sentences (1-3 sentences per reply).";
+  const conversationSummary = input.conversationSummary?.trim();
+  const crmContext = input.crmContext?.trim();
 
   return [
     `You are the AI voice assistant for ${input.businessName}.`,
@@ -53,6 +58,12 @@ export function buildVoiceSystemPrompt(input: {
     custom ? `\nVoice instructions:\n${custom}` : "",
     objective
       ? `\nCall objective for this conversation:\n${objective}\nTurn this into a professional, helpful phone conversation.`
+      : "",
+    conversationSummary
+      ? `\nPrior conversation summary (from chat/CRM history):\n${conversationSummary}`
+      : "",
+    crmContext
+      ? `\nCustomer CRM snapshot (use only when relevant):\n${crmContext}`
       : "",
     "\nBusiness instructions:",
     input.systemPrompt,
