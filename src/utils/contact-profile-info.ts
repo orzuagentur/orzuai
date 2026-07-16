@@ -1,3 +1,6 @@
+"use client";
+
+import { createElement } from "react";
 import {
   Building2Icon,
   CalendarIcon,
@@ -12,12 +15,12 @@ import {
 } from "lucide-react";
 
 import type { ContactProfileInfoRow } from "@/components/contacts/ContactProfileInfoTable";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { formatDealMoney } from "@/lib/deal-currency";
 import type { ContactProfileData, PipelineStage } from "@/types/contact.types";
 import type { AdditionalContactEntry } from "@/utils/contact-additional-contacts";
 import { formatContactIdentifier } from "@/utils/contact-display";
-import { formatRelativeTime } from "@/utils/dashboard";
 
 const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   new: CONTACTS_MESSAGES.pipelineNew,
@@ -34,7 +37,7 @@ function formatShortDate(isoDate: string): string {
     return "—";
   }
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -109,7 +112,7 @@ export function buildContactProfileInfoRows(
       icon: ClockIcon,
       label: CONTACTS_MESSAGES.lastContactLabel,
       value: contact.lastMessageAt
-        ? formatRelativeTime(contact.lastMessageAt)
+        ? createElement(RelativeTime, { value: contact.lastMessageAt })
         : "—",
     },
     {

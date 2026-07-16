@@ -22,11 +22,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { deleteCrmTaskAction } from "@/features/contacts/actions/delete-crm-task";
 import { updateCrmTaskStatusAction } from "@/features/contacts/actions/update-crm-task-status";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import type { CrmTaskItem } from "@/types/crm-task.types";
-import { formatRelativeTime } from "@/utils/dashboard";
 
 type ContactTasksTableProps = {
   contactId: string;
@@ -58,12 +58,12 @@ function sortTasks(tasks: CrmTaskItem[]): CrmTaskItem[] {
   });
 }
 
-function formatDueDate(dueAt: string | null): string {
+function formatDueDate(dueAt: string | null) {
   if (!dueAt) {
     return "—";
   }
 
-  return formatRelativeTime(dueAt);
+  return <RelativeTime value={dueAt} />;
 }
 
 export function ContactTasksTable({
@@ -199,7 +199,7 @@ export function ContactTasksTable({
                   {formatDueDate(task.dueAt)}
                 </ContactCrmTableCell>
                 <ContactCrmTableCell className="text-muted-foreground">
-                  {formatRelativeTime(task.createdAt)}
+                  <RelativeTime value={task.createdAt} />
                 </ContactCrmTableCell>
                 <ContactCrmTableCell className="text-right">
                   <Button

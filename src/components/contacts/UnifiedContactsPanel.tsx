@@ -7,6 +7,7 @@ import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   getChannelBadgeClassName,
@@ -21,7 +22,6 @@ import type {
 } from "@/types/contact.types";
 import { buildContactsHref } from "@/utils/contacts-url";
 import { formatContactIdentifier } from "@/utils/contact-display";
-import { formatRelativeTime } from "@/utils/dashboard";
 import {
   getLeadScoreBadgeClassName,
   getLeadScoreLabel,
@@ -182,7 +182,7 @@ export function UnifiedContactsPanel({
                     ) : null}
                     {contact.lastMessageAt ? (
                       <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
-                        {formatRelativeTime(contact.lastMessageAt)}
+                        <RelativeTime value={contact.lastMessageAt} />
                       </span>
                     ) : null}
                   </div>
@@ -237,7 +237,7 @@ export function UnifiedContactsPanel({
                 </p>
                 {contact.lastMessageAt ? (
                   <p className="text-caption text-muted-foreground/80">
-                    {formatRelativeTime(contact.lastMessageAt)}
+                    <RelativeTime value={contact.lastMessageAt} />
                   </p>
                 ) : null}
               </div>

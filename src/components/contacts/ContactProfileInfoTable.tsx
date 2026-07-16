@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2Icon,
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
 export type ContactProfileInfoRow = {
   icon: LucideIcon;
   label: string;
-  value: string;
+  value: ReactNode;
   href?: string;
 };
 
@@ -48,7 +49,7 @@ export function ContactProfileInfoTable({
                   </div>
                 </td>
                 <td className="px-3 py-2.5 font-medium [overflow-wrap:anywhere] [word-break:break-word]">
-                  {row.href ? (
+                  {row.href && typeof row.value === "string" ? (
                     <a
                       href={row.href}
                       className="text-primary hover:underline"

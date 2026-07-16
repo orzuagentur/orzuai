@@ -12,6 +12,7 @@ import {
   ContactCrmTableRow,
 } from "@/components/contacts/ContactCrmDataTable";
 import { Button } from "@/components/ui/button";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
   getChannelBadgeClassName,
@@ -20,7 +21,6 @@ import {
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import type { ContactTimelineEntry } from "@/types/contact.types";
 import type { MessagingChannel } from "@/types/database.types";
-import { formatRelativeTime } from "@/utils/dashboard";
 
 type ContactMessagesTableProps = {
   messages: ContactTimelineEntry[];
@@ -100,7 +100,7 @@ export function ContactMessagesTable({
             {recentMessages.map((entry) => (
               <ContactCrmTableRow key={entry.id}>
                 <ContactCrmTableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatRelativeTime(entry.createdAt)}
+                  <RelativeTime value={entry.createdAt} />
                 </ContactCrmTableCell>
                 <ContactCrmTableCell>
                   <span
