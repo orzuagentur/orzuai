@@ -18,7 +18,6 @@ import {
 import { requirePlatformAdmin } from "@/lib/supabase/server";
 import { deleteSecret, getSecret, setSecret } from "@orzu/secrets/server";
 import type {
-  AiCredentialView,
   AiPlatformManagementData,
   AiUseCaseCardView,
 } from "@/features/ai-management/platform-view-types";
