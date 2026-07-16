@@ -873,13 +873,14 @@ async function applyExecutorPlan(
     }
 
     if (result) {
+      const actionSucceeded = !result.startsWith("Booking not confirmed:");
       applied.push(result);
       logAgentToolAudit({
         tool: action.type,
         businessId,
         conversationId: idempotencyContext.conversationId,
         contactId: contact.id,
-        success: true,
+        success: actionSucceeded,
         label: result,
       });
     } else {
@@ -1005,6 +1006,10 @@ async function executePlanOnContact(input: {
       },
     );
 
+    const bookingFailed = actionsApplied.some((action) =>
+      action.startsWith("Booking not confirmed:"),
+    );
+
     const clientSummary = sanitizeCustomerFacingSummary(
       input.plan.clientSummary,
     ) ?? "";
@@ -1018,7 +1023,8 @@ async function executePlanOnContact(input: {
         clientMessage: input.clientMessage,
         routingMethod: input.routingMethod ?? null,
         actionsApplied,
-        success: true,
+        success: !bookingFailed,
+        errorMessage: bookingFailed ? "Booking not confirmed" : undefined,
       });
     }
 
@@ -1046,7 +1052,7 @@ async function executePlanOnContact(input: {
     }
 
     return {
-      success: true,
+      success: !bookingFailed,
       actionsApplied,
       skippedDuplicates,
       clientSummary,

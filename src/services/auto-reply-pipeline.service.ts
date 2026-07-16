@@ -337,6 +337,33 @@ function buildPrepFromProfile(input: {
   };
 }
 
+function resolveSafeAssistantFallbackReplyMessage(input: {
+  language: string;
+  customMessage?: string | null;
+}): string {
+  const fallbackText = resolveAssistantFallbackReplyMessage(input);
+  const safeFallback = sanitizeWorkerFacingReply(fallbackText, {
+    fallback: null,
+  });
+
+  if (safeFallback.text) {
+    return safeFallback.text;
+  }
+
+  const defaultFallback = resolveAssistantFallbackReplyMessage({
+    language: input.language,
+    customMessage: null,
+  });
+  const safeDefault = sanitizeWorkerFacingReply(defaultFallback, {
+    fallback: null,
+  });
+
+  return (
+    safeDefault.text ??
+    "Thanks for your message. I am checking this and will help you right here in this chat."
+  );
+}
+
 async function ensureChannelAiSettingsRow(
   admin: MessagingDbClient,
   businessId: string,
@@ -519,7 +546,7 @@ export async function generateFastAssistantReply(input: {
       }),
     );
 
-    const fallbackText = resolveAssistantFallbackReplyMessage({
+    const fallbackText = resolveSafeAssistantFallbackReplyMessage({
       language: voice.language,
       customMessage: prep.fallbackReplyMessage,
     });
@@ -544,7 +571,7 @@ export async function generateFastAssistantReply(input: {
     });
   }
 
-  const fallbackText = resolveAssistantFallbackReplyMessage({
+  const fallbackText = resolveSafeAssistantFallbackReplyMessage({
     language: voice.language,
     customMessage: prep.fallbackReplyMessage,
   });

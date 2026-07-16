@@ -112,6 +112,7 @@ function scheduleVoiceStreamOrchestration(input: {
     void scheduleVoiceTurnOrchestration({
       businessId: input.businessId,
       callerPhone,
+      callSid: input.callSid,
       clientMessage: input.clientMessage,
       conversationHistory: input.conversationHistory,
     });
@@ -131,6 +132,7 @@ function scheduleVoiceStreamOrchestration(input: {
     await scheduleVoiceTurnOrchestration({
       businessId: input.businessId,
       callerPhone: resolvedPhone,
+      callSid: input.callSid,
       clientMessage: input.clientMessage,
       conversationHistory: input.conversationHistory,
     });

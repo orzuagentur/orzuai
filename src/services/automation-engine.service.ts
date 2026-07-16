@@ -115,9 +115,10 @@ async function executeWorkflowAction(
   context: AutomationTriggerContext,
 ): Promise<{ success: boolean; detail?: string }> {
   const config = (workflow.config ?? { channels: [] }) as AutomationConfig;
-  const action = workflow.action_type as AutomationActionType;
+  const rawAction = workflow.action_type;
+  const action = rawAction as AutomationActionType;
 
-  if (action === "send_message") {
+  if (rawAction === "send_message") {
     void config;
     return {
       success: true,
@@ -154,7 +155,7 @@ async function executeWorkflowAction(
 
     return error
       ? { success: false, detail: error.message }
-      : { success: true, detail: `Stage → ${stage}` };
+      : { success: true, detail: `Stage -> ${stage}` };
   }
 
   if (action === "notify") {

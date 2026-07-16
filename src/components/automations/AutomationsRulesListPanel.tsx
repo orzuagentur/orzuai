@@ -73,7 +73,7 @@ export function AutomationsRulesListPanel({
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {rule.triggerSummary} → {rule.actionSummary}
+                    {rule.triggerSummary} -&gt; {rule.actionSummary}
                   </p>
                   <AutomationsChannelBadgeRow
                     channelStatuses={channelStatuses}
@@ -134,7 +134,7 @@ export function AutomationsRulesListPanel({
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {getTriggerLabel(workflow.triggerType)} →{" "}
+                      {getTriggerLabel(workflow.triggerType)} -&gt;{" "}
                       {getActionLabel(workflow.actionType)}
                     </p>
                     <AutomationsChannelBadgeRow

@@ -1,5 +1,5 @@
 export const DEFAULT_CUSTOMER_REPLY_FALLBACK =
-  "Thanks for your message — I'm on it and will help you right here in this chat.";
+  "Thanks for your message. I am checking this and will help you right here in this chat.";
 
 const MAX_CUSTOMER_REPLY_LENGTH = 4000;
 
@@ -8,7 +8,7 @@ const INTERNAL_REPLY_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bsystem (prompt|message|instruction|instructions)\b/i, reason: "system_prompt" },
   { pattern: /\bdeveloper (prompt|message|instruction|instructions)\b/i, reason: "developer_prompt" },
   { pattern: /\bhidden (prompt|message|instruction|instructions)\b/i, reason: "hidden_prompt" },
-  { pattern: /\binternal (prompt|message|instruction|instructions|note|notes)\b/i, reason: "internal_content" },
+  { pattern: /\binternal (prompt|message|instructions?|note|notes)\b/i, reason: "internal_content" },
   { pattern: /\bdo not reveal\b/i, reason: "policy_leak" },
   { pattern: /\bignore (all )?(previous|prior|above) instructions?\b/i, reason: "prompt_injection" },
   { pattern: /\bchain[- ]of[- ]thought\b/i, reason: "reasoning_leak" },
@@ -25,6 +25,12 @@ const INTERNAL_REPLY_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bdebug\b.*\b(json|payload|trace)\b/i, reason: "debug_payload" },
   { pattern: /^```/i, reason: "code_fence" },
   { pattern: /<\/?(system|developer|tool)>/i, reason: "xml_role_marker" },
+  { pattern: /\b(will|shall|i['\u2019]ll|we['\u2019]ll)\b.*\b(contact|connect|transfer|escalate|notify|forward|pass|send|share|ask)\b.*\b(you|manager|team|staff|human|owner)\b/i, reason: "delegation_promise" },
+  { pattern: /\b(will|shall|i['\u2019]ll|we['\u2019]ll)\b.*\b(check|verify|confirm)\b.*\b(with )?(manager|team|staff|owner|human)\b/i, reason: "manager_callback" },
+  { pattern: /\b(team member|manager|human agent|real person|staff|owner)\b.*\b(will|shall)\b/i, reason: "delegation_promise" },
+  { pattern: /(передам|передаю|передал|перешлю|сообщу|уведомлю)[\s\S]{0,140}(менеджер|менеджеру|администратор|сотрудник|специалист|команд[аеуы])/i, reason: "delegation_promise" },
+  { pattern: /(менеджер|администратор|сотрудник|специалист)[\s\S]{0,140}(проверит|подтвердит|свяжется|ответит|сообщит)/i, reason: "manager_callback" },
+  { pattern: /ожидайте[\s\S]{0,120}(ответ|провер|менеджер|администратор|сотрудник|специалист)/i, reason: "manager_callback" },
 ];
 
 function normalizeCustomerFacingText(value: string): string {
@@ -96,9 +102,10 @@ export function sanitizeCustomerFacingReply(
   }
 
   return {
-    text: options?.fallback === undefined
-      ? DEFAULT_CUSTOMER_REPLY_FALLBACK
-      : options.fallback,
+    text:
+      options?.fallback === undefined
+        ? DEFAULT_CUSTOMER_REPLY_FALLBACK
+        : options.fallback,
     blocked: true,
     reason: validation.reason,
   };

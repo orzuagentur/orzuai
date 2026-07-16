@@ -86,7 +86,7 @@ export function AutomationsRuleDetailPanel({
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold">{rule.name}</h2>
             <p className="truncate text-xs text-muted-foreground">
-              {rule.triggerSummary} → {rule.actionSummary}
+              {rule.triggerSummary} -&gt; {rule.actionSummary}
             </p>
           </div>
         </div>

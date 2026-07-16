@@ -26,11 +26,15 @@ import {
 import { logOrchestratorAgentRun } from "@/services/agent-run-log.service";
 import { orchestratorResponseToExecutorPlan } from "@/types/ai-orchestrator.types";
 import { getConversationRepository } from "@/repositories/conversation.repository";
-import type { VoiceCallSessionTurn } from "@/repositories/voice.repository";
+import {
+  getVoiceRepository,
+  type VoiceCallSessionTurn,
+} from "@/repositories/voice.repository";
 
 export async function scheduleVoiceTurnOrchestration(input: {
   businessId: string;
   callerPhone: string;
+  callSid?: string | null;
   clientMessage: string;
   conversationHistory: VoiceCallSessionTurn[];
 }): Promise<void> {
@@ -48,6 +52,7 @@ export async function scheduleVoiceTurnOrchestration(input: {
 async function runVoiceTurnOrchestration(input: {
   businessId: string;
   callerPhone: string;
+  callSid?: string | null;
   clientMessage: string;
   conversationHistory: VoiceCallSessionTurn[];
 }): Promise<void> {
@@ -134,7 +139,7 @@ async function runVoiceTurnOrchestration(input: {
     return;
   }
 
-  await applyPreparedExecutorPlan({
+  const executorResult = await applyPreparedExecutorPlan({
     admin,
     businessId: input.businessId,
     contactId,
@@ -148,4 +153,26 @@ async function runVoiceTurnOrchestration(input: {
       profile,
     ),
   });
+
+  if (
+    input.callSid?.trim() &&
+    executorResult.actionsApplied.some((action) =>
+      /^booking confirmed/i.test(action.trim()),
+    )
+  ) {
+    const repo = getVoiceRepository();
+    const callLog = await repo.findCallLogByExternalCallId(input.callSid);
+
+    await repo.insertCallEvent({
+      businessId: input.businessId,
+      callLogId: callLog?.id ?? null,
+      callSid: input.callSid,
+      eventType: "voice_live.booking.created",
+      actorType: "ai",
+      payload: {
+        contactId,
+        actionsApplied: executorResult.actionsApplied,
+      },
+    });
+  }
 }

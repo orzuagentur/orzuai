@@ -4,6 +4,16 @@ import { buildEffectiveAgentPrompt } from "@/features/ai-assistant/communication
 import { getPlatformPromptContent } from "@/services/platform-prompts.service";
 import type { AiAssistantProfileData } from "@/types/ai-assistant-profile.types";
 
+const CRITICAL_RUNTIME_WORKER_POLICY = [
+  "Critical runtime policy:",
+  "- You are the worker who handles booking, sales, and support yourself.",
+  "- Never say you will pass, forward, transfer, escalate, or send details to a manager, administrator, staff member, or team.",
+  "- Never say a manager/staff member will check availability, confirm, contact the customer, or answer later.",
+  "- If the customer gives booking dates/times/guest details, say you are checking availability and creating the booking here.",
+  "- Do not say the booking is confirmed until the system sends a follow-up after the booking action succeeds.",
+  "- If required details are missing, ask one short question and keep helping.",
+].join("\n");
+
 export function buildAssistantSystemPrompt(
   profile: Pick<
     AiAssistantProfileData,
@@ -18,6 +28,7 @@ export function buildAssistantSystemPrompt(
   return [
     `You are ${profile.name.trim()}, the AI agent for this business.`,
     getPlatformPromptContent("assistant_system"),
+    CRITICAL_RUNTIME_WORKER_POLICY,
     "",
     "Business instructions:",
     instructions,

@@ -709,6 +709,7 @@ export async function handleVoiceGatherInput(input: {
     void scheduleVoiceTurnOrchestration({
       businessId: input.businessId,
       callerPhone: input.callerPhone.trim(),
+      callSid: input.callSid,
       clientMessage: userSpeech,
       conversationHistory: updatedTurns,
     });

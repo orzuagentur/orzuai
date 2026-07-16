@@ -101,8 +101,16 @@ function buildOrchestratorPrompt(input: {
 
   return [
     getPlatformPromptContent("orchestrator") || WORKER_ORCHESTRATOR_RULES,
+    WORKER_ORCHESTRATOR_RULES,
+    "",
+    "Critical runtime policy:",
+    "- The AI is the worker. Never route normal booking/sales/support work to a manager.",
+    "- If booking is enabled and the customer gave usable date/time details, plan create_calendar_event.",
+    "- Do not use clientSummary to say a booking is confirmed unless create_calendar_event is planned.",
+    "- Never write that a manager/staff member will check availability, confirm, contact, or answer later.",
     "",
     "Analyze the customer's latest message for agent routing and CRM actions.",
+    `Current time: ${new Date().toISOString()}`,
     "",
     "Recent conversation:",
     historySection,

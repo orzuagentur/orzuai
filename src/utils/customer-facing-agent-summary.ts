@@ -14,7 +14,7 @@ const INTERNAL_SUMMARY_PATTERNS = [
   /\borchestrator\b/i,
   /\bnotified\b.*\b(team|manager)\b/i,
   /\bmanager\b.*\b(join|connect)\b/i,
-  /\bпередал\b.*\bменеджер/i,
+  /(передал|передам|передаю)[\s\S]{0,120}(менеджер|менеджеру|администратор|сотрудник|специалист)/i,
   /\bmenejerga yetkazdim\b/i,
 ];
 
@@ -25,17 +25,56 @@ const INTERNAL_ACTION_LABEL_PATTERNS = [
   /^crm\b/i,
 ];
 
+const BOOKING_SUCCESS_ACTION_PATTERNS = [
+  /^booking confirmed/i,
+  /^calendar event created/i,
+];
+
+const BOOKING_FAILURE_ACTION_PATTERNS = [
+  /^booking not confirmed:/i,
+  /^booking not created:/i,
+  /^could not create booking:/i,
+];
+
+const BOOKING_CONFIRMATION_SUMMARY_PATTERNS = [
+  /\b(booking|reservation|appointment)\b.*\b(confirmed|booked|scheduled)\b/i,
+  /(бронь|бронирование|запись|резерв)[\s\S]{0,120}(подтвержден|подтверждена|создан|создана|оформлен|оформлена|забронирован|забронирована)/i,
+  /(забронировал|забронировала|записал|записала|подтвердил|подтвердила)/i,
+];
+
 const CUSTOMER_VISIBLE_ACTION_PATTERNS = [
-  /calendar event created/i,
+  ...BOOKING_SUCCESS_ACTION_PATTERNS,
+  ...BOOKING_FAILURE_ACTION_PATTERNS,
   /task created:/i,
   /deal created:/i,
-  /appointment/i,
-  /booking confirmed/i,
   /contact created:/i,
 ];
 
 function normalizeText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
+}
+
+function stripBookingFailurePrefix(label: string): string {
+  return label.replace(/^booking not (confirmed|created):\s*/i, "").trim();
+}
+
+function hasBookingFailureWithoutSuccess(actionsApplied: string[]): boolean {
+  const hasFailure = actionsApplied.some((label) =>
+    BOOKING_FAILURE_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(label))),
+  );
+  const hasSuccess = actionsApplied.some((label) =>
+    BOOKING_SUCCESS_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(label))),
+  );
+
+  return hasFailure && !hasSuccess;
+}
+
+function summaryLooksLikeBookingConfirmation(summary: string): boolean {
+  const normalized = normalizeText(summary);
+
+  return BOOKING_CONFIRMATION_SUMMARY_PATTERNS.some((pattern) =>
+    pattern.test(normalized),
+  );
 }
 
 export function looksLikeInternalAgentSummary(text: string): boolean {
@@ -58,18 +97,22 @@ export function filterCustomerVisibleActionLabels(
       return false;
     }
 
-    return !INTERNAL_ACTION_LABEL_PATTERNS.some((pattern) =>
+    if (
+      INTERNAL_ACTION_LABEL_PATTERNS.some((pattern) =>
+        pattern.test(normalized),
+      )
+    ) {
+      return false;
+    }
+
+    return CUSTOMER_VISIBLE_ACTION_PATTERNS.some((pattern) =>
       pattern.test(normalized),
     );
   });
 }
 
 export function hasCustomerVisibleOutcome(actionsApplied: string[]): boolean {
-  const visible = filterCustomerVisibleActionLabels(actionsApplied);
-
-  return visible.some((label) =>
-    CUSTOMER_VISIBLE_ACTION_PATTERNS.some((pattern) => pattern.test(label)),
-  );
+  return filterCustomerVisibleActionLabels(actionsApplied).length > 0;
 }
 
 export function sanitizeCustomerFacingSummary(
@@ -115,9 +158,47 @@ export function shouldSendCustomerActionFollowUp(input: {
   const sanitizedSummary = sanitizeCustomerFacingSummary(input.clientSummary);
   const visibleActions = filterCustomerVisibleActionLabels(input.actionsApplied);
 
-  if (sanitizedSummary) {
+  if (
+    sanitizedSummary &&
+    !(
+      hasBookingFailureWithoutSuccess(input.actionsApplied) &&
+      summaryLooksLikeBookingConfirmation(sanitizedSummary)
+    )
+  ) {
     return true;
   }
 
   return visibleActions.length > 0 && hasCustomerVisibleOutcome(visibleActions);
+}
+
+export function buildBookingFailureFollowUp(input: {
+  language: string;
+  actionsApplied: string[];
+}): string | null {
+  const failureLabel = input.actionsApplied.find((label) =>
+    BOOKING_FAILURE_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(label))),
+  );
+
+  if (!failureLabel) {
+    return null;
+  }
+
+  const reason = stripBookingFailurePrefix(failureLabel);
+  const language = input.language.trim();
+
+  if (language === "Russian") {
+    return reason
+      ? `Пока не получилось подтвердить бронь: ${reason}`
+      : "Пока не получилось подтвердить бронь. Я проверю другой доступный вариант здесь в чате.";
+  }
+
+  if (language === "Uzbek") {
+    return reason
+      ? `Bronni tasdiqlab bo'lmadi: ${reason}`
+      : "Bronni hozircha tasdiqlab bo'lmadi. Shu chatda boshqa mos variantni tekshiraman.";
+  }
+
+  return reason
+    ? `I could not confirm the booking yet: ${reason}`
+    : "I could not confirm the booking yet. I will keep checking the best available option here.";
 }

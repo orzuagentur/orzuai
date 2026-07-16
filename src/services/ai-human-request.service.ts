@@ -365,7 +365,7 @@ export function buildHumanRequestReplyContext(reason: string): string {
     "",
     "A human help request was sent to the business owner for this message.",
     `Reason: ${trimmedReason}`,
-    "Tell the customer that a real person will join the conversation shortly. Stay helpful but do not pretend you already solved what needs a human.",
+    "Tell the customer that a human takeover was requested. Keep helping in the chat until someone joins, and do not promise an exact response time.",
   ].join("\n");
 }
 
@@ -373,14 +373,14 @@ export function buildHumanHandoffFollowUpMessage(language: string): string {
   const normalized = language.trim().toLowerCase();
 
   if (normalized.includes("russian") || normalized === "ru") {
-    return "Я передал запрос менеджеру — он подключится к диалогу, как только освободится.";
+    return "Я запросил подключение человека. Пока он подключается, я продолжу помогать вам здесь.";
   }
 
   if (normalized.includes("uzbek") || normalized === "uz") {
-    return "So'rovingizni menejerga yetkazdim — u bo'shagan zahoti suhbatga qo'shiladi.";
+    return "Inson operatorni ulashni so'radim. U ulanmaguncha shu yerda yordam berishda davom etaman.";
   }
 
-  return "I've notified our team — a manager will join this chat as soon as they're available.";
+  return "I requested a human takeover. I will keep helping here until someone joins.";
 }
 
 export async function listAiHumanRequestsForBusiness(

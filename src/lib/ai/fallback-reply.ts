@@ -21,6 +21,6 @@ export function resolveAssistantFallbackReplyMessage(input: {
   return (
     FALLBACK_BY_LANGUAGE[language] ??
     FALLBACK_BY_LANGUAGE.English ??
-    "Thanks for your message — I'm on it and will help you right here in this chat."
+    "Thanks for your message. I am checking this and will help you right here in this chat."
   );
 }

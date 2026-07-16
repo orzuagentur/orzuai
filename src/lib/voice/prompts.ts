@@ -1,5 +1,13 @@
 import type { GeminiKnowledgeContext } from "@/types/gemini.types";
 
+const CRITICAL_VOICE_WORKER_POLICY = [
+  "- You are an autonomous front-line worker, not a receptionist who escalates by default.",
+  "- Handle booking, pricing, and support yourself using the provided business knowledge.",
+  "- Never say a manager, staff member, owner, or human will check, confirm, call back, or contact the caller unless the caller explicitly confirmed they want a human.",
+  "- For booking requests, say you are checking availability and creating the booking; do not say it is confirmed until the booking action succeeds.",
+  "- If details are missing, ask one short spoken question and keep helping.",
+].join("\n");
+
 export function buildVoiceSystemPrompt(input: {
   businessName: string;
   systemPrompt: string;
@@ -27,7 +35,7 @@ export function buildVoiceSystemPrompt(input: {
       ? "You are calling a customer who just submitted a request on the business website. Confirm their request warmly and answer questions."
       : input.direction === "outbound"
         ? "You are making an outbound business call. Be polite and concise."
-        : "A customer called the business phone line. Help them as a phone receptionist.";
+        : "A customer called the business phone line. Help them as the business AI Agent.";
 
   const custom = input.customVoicePrompt?.trim();
   const objective = input.callObjective?.trim();
@@ -39,6 +47,7 @@ export function buildVoiceSystemPrompt(input: {
     `You are the AI voice assistant for ${input.businessName}.`,
     callContext,
     "Rules for phone conversation:",
+    CRITICAL_VOICE_WORKER_POLICY,
     voiceRules,
     `- Always respond in ${input.language}.`,
     custom ? `\nVoice instructions:\n${custom}` : "",

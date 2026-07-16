@@ -10,6 +10,7 @@ import {
 } from "@/services/push-notifications.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import {
+  buildBookingFailureFollowUp,
   filterCustomerVisibleActionLabels,
   messagesAreLikelyDuplicates,
   sanitizeCustomerFacingSummary,
@@ -37,6 +38,15 @@ export function buildCustomerFacingActionSummary(input: {
   actionsApplied: string[];
   clientSummary?: string;
 }): string | null {
+  const bookingFailure = buildBookingFailureFollowUp({
+    language: input.language,
+    actionsApplied: input.actionsApplied,
+  });
+
+  if (bookingFailure) {
+    return bookingFailure;
+  }
+
   const custom = sanitizeCustomerFacingSummary(input.clientSummary);
 
   if (custom) {
@@ -184,8 +194,7 @@ export async function reportAgentActions(input: {
     .maybeSingle();
 
   if (recentAiMessage?.content) {
-    const ageMs =
-      Date.now() - new Date(recentAiMessage.created_at).getTime();
+    const ageMs = Date.now() - new Date(recentAiMessage.created_at).getTime();
 
     if (
       ageMs < 2 * 60 * 1000 &&

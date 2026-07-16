@@ -214,12 +214,6 @@ export function AutomationCreateWizard({
                 {AUTOMATIONS_MESSAGES.workflowChannelsHint}
               </p>
             </div>
-            {actionType === "send_message" ? (
-              <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                Customer-facing AI messages are handled by the single AI Agent.
-                This automation action is kept only for legacy workflows.
-              </p>
-            ) : null}
             {actionType === "update_stage" ? (
               <div className="space-y-2">
                 <Label>{AUTOMATIONS_MESSAGES.workflowPipelineLabel}</Label>

@@ -8,7 +8,6 @@ export const AUTOMATION_TRIGGERS = [
 ] as const;
 
 export const AUTOMATION_ACTIONS = [
-  { id: "send_message", label: "Send AI message" },
   { id: "create_task", label: "Create CRM task" },
   { id: "update_stage", label: "Update pipeline stage" },
   { id: "notify", label: "Notify team" },
@@ -46,7 +45,7 @@ export const AUTOMATIONS_MESSAGES = {
   selectRule: "Select a rule to configure it.",
   selectRuleHint:
     "Rules run on every connected channel when AI is enabled in Inbox.",
-  configureAgentsLink: "Configure reply style in AI Agents",
+  configureAgentsLink: "Configure reply style in AI Agent",
   viewInboxLink: "View in Inbox",
   viewCrmLink: "View in CRM",
   liveBadge: "Live",
@@ -57,6 +56,8 @@ export const AUTOMATIONS_MESSAGES = {
   stackEnableFailed: "Unable to enable recommended automations.",
   saveFailed: "Unable to save automation.",
   noBusiness: "Business not found.",
+  noBusinessDescription:
+    "Create your business profile to run automations across inbox, CRM, and calendar.",
   activityTitle: "Recent automation activity",
   activityEmpty:
     "No automation events yet. Activity appears after follow-ups, qualifications, or tasks run.",
@@ -119,10 +120,9 @@ export const AUTOMATIONS_MESSAGES = {
   workflowToggleFailed: "Unable to update workflow.",
   workflowChannelsLabel: "Channels",
   workflowChannelsHint: "Leave empty to run on all connected channels.",
-  workflowAgentLabel: "AI agent (for Send message)",
   workflowPipelineLabel: "Pipeline stage",
   workflowTaskTitleLabel: "Task title",
   workflowTagLabel: "Tag name (trigger filter)",
   workflowNotifyLabel: "Notification title",
-  workflowDetailIntro: "Custom workflow — runs automatically when the trigger fires.",
+  workflowDetailIntro: "Custom workflow - runs automatically when the trigger fires.",
 } as const;

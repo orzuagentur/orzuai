@@ -614,7 +614,10 @@ export async function createVoicePostCallBooking(
   const events = await repo.listCallEvents(context.businessId, context.callLogId);
 
   if (
-    events.some((event) => event.event_type === "voice_post_call.booking.created")
+    events.some((event) =>
+      event.event_type === "voice_post_call.booking.created" ||
+      event.event_type === "voice_live.booking.created",
+    )
   ) {
     return {
       status: "completed",
