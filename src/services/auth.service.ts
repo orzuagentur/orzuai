@@ -14,7 +14,11 @@ import {
   VERIFICATION_MESSAGES,
 } from "@/features/auth/constants";
 import { BUSINESS_LOGOS_BUCKET } from "@/features/business/constants";
-import { hasResendEnv, hasSupabaseEnv } from "@/lib/env";
+import {
+  hasClientSupabaseEnv,
+  hasResendEnv,
+  hasSupabaseEnv,
+} from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -105,6 +109,10 @@ function isEmailNotVerifiedError(message: string): boolean {
 }
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
+  if (!hasClientSupabaseEnv()) {
+    return null;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

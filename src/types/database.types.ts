@@ -8,15 +8,7 @@ export type Json =
 
 export type AuthProvider = "google" | "email";
 
-export type KnowledgeCategory =
-  | "Services"
-  | "Pricing"
-  | "FAQ"
-  | "Business Hours"
-  | "Address"
-  | "Contact"
-  | "Policies"
-  | "Additional";
+export type KnowledgeCategory = string;
 
 export type WhatsappStatus = "connected" | "disconnected" | "pending";
 
@@ -251,6 +243,7 @@ export type Database = {
           category: KnowledgeCategory;
           source: string;
           source_url: string | null;
+          metadata: Record<string, unknown>;
           embedding: string | null;
           embedding_model: string | null;
           created_at: string;
@@ -264,6 +257,7 @@ export type Database = {
           category: KnowledgeCategory;
           source?: string;
           source_url?: string | null;
+          metadata?: Record<string, unknown>;
           embedding?: string | null;
           embedding_model?: string | null;
           created_at?: string;
@@ -277,6 +271,7 @@ export type Database = {
           category?: KnowledgeCategory;
           source?: string;
           source_url?: string | null;
+          metadata?: Record<string, unknown>;
           embedding?: string | null;
           embedding_model?: string | null;
           created_at?: string;
@@ -285,6 +280,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "knowledge_base_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      knowledge_categories: {
+        Row: {
+          id: string;
+          business_id: string;
+          name: string;
+          slug: string;
+          description: string;
+          layout_kind: string;
+          is_system: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          name: string;
+          slug: string;
+          description?: string;
+          layout_kind?: string;
+          is_system?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          name?: string;
+          slug?: string;
+          description?: string;
+          layout_kind?: string;
+          is_system?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_categories_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
@@ -3440,6 +3482,19 @@ export type Database = {
           language: string;
           system_prompt: string;
           ai_enabled: boolean;
+          channel_overrides_enabled: boolean;
+          reply_wait_ms: number | null;
+          can_create_task: boolean | null;
+          can_create_deal: boolean | null;
+          can_update_contact: boolean | null;
+          can_add_note: boolean | null;
+          can_add_internal_note: boolean | null;
+          can_create_calendar_event: boolean | null;
+          can_request_human: boolean | null;
+          can_notify_owner: boolean | null;
+          can_notify_on_actions: boolean | null;
+          can_summarize_actions_in_chat: boolean | null;
+          can_send_proactive_message: boolean | null;
           created_at: string;
           updated_at: string;
         };
@@ -3452,6 +3507,19 @@ export type Database = {
           language: string;
           system_prompt: string;
           ai_enabled?: boolean;
+          channel_overrides_enabled?: boolean;
+          reply_wait_ms?: number | null;
+          can_create_task?: boolean | null;
+          can_create_deal?: boolean | null;
+          can_update_contact?: boolean | null;
+          can_add_note?: boolean | null;
+          can_add_internal_note?: boolean | null;
+          can_create_calendar_event?: boolean | null;
+          can_request_human?: boolean | null;
+          can_notify_owner?: boolean | null;
+          can_notify_on_actions?: boolean | null;
+          can_summarize_actions_in_chat?: boolean | null;
+          can_send_proactive_message?: boolean | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3464,6 +3532,19 @@ export type Database = {
           language?: string;
           system_prompt?: string;
           ai_enabled?: boolean;
+          channel_overrides_enabled?: boolean;
+          reply_wait_ms?: number | null;
+          can_create_task?: boolean | null;
+          can_create_deal?: boolean | null;
+          can_update_contact?: boolean | null;
+          can_add_note?: boolean | null;
+          can_add_internal_note?: boolean | null;
+          can_create_calendar_event?: boolean | null;
+          can_request_human?: boolean | null;
+          can_notify_owner?: boolean | null;
+          can_notify_on_actions?: boolean | null;
+          can_summarize_actions_in_chat?: boolean | null;
+          can_send_proactive_message?: boolean | null;
           created_at?: string;
           updated_at?: string;
         };

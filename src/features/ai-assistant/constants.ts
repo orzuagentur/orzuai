@@ -43,6 +43,45 @@ export const AI_ASSISTANT_MESSAGES = {
   assistantEditBack: "Back to AI Agent",
   assistantEditSave: "Save agent",
   assistantEditSaved: "AI Agent settings saved.",
+  settingsTabBehavior: "Behavior",
+  settingsTabBehaviorHint:
+    "Name, instructions, language, style, and reply timing.",
+  settingsTabPermissions: "Permissions",
+  settingsTabPermissionsHint:
+    "What the AI may do in CRM, calendar, alerts, and chat.",
+  settingsTabDataCollection: "Data collection",
+  settingsTabDataCollectionHint:
+    "Required fields the AI gathers from customers by niche.",
+  settingsTabSchedule: "Schedule & follow-up",
+  settingsTabScheduleHint:
+    "Working hours, CRM update timing, and auto follow-ups.",
+  settingsTabSales: "Lead qualification",
+  settingsTabSalesHint: "BANT scoring, auto-task, and auto-deal rules.",
+  settingsTabActivation: "Activation",
+  settingsTabActivationHint: "Turn the AI Agent on or off for customer replies.",
+  settingsSaveTab: "Save changes",
+  settingsSaveHint: "Changes apply after you save. You’ll see a confirmation toast.",
+  settingsSavedBehavior: "Behavior saved — name, language, style, and instructions updated.",
+  settingsSavedPermissions: "Permissions saved — AI action access updated.",
+  settingsSavedDataCollection: "Data collection fields saved.",
+  settingsSavedSchedule: "Schedule and CRM timing saved.",
+  settingsSavedActivation: "Activation status updated.",
+  settingsFollowUpEnabled: "Follow-up worker enabled.",
+  settingsFollowUpDisabled: "Follow-up worker disabled.",
+  settingsAgentActivated: "AI Agent activated — customer replies are on.",
+  settingsAgentDeactivated: "AI Agent deactivated — customer replies are off.",
+  settingsDeactivateStep1: "Click again to confirm deactivation.",
+  settingsDeactivateStep2: "One more click to finally deactivate the agent.",
+  settingsPendingLanguage: (language: string) =>
+    `Language selected: ${language}. Click Save to apply.`,
+  settingsPendingStyle: (style: string) =>
+    `Style selected: ${style}. Click Save to apply.`,
+  settingsPendingReplyWait: (ms: number) =>
+    `Reply wait set to ${Math.round(ms / 1000)}s. Click Save to apply.`,
+  settingsPendingNiche: (niche: string) =>
+    `Niche selected: ${niche}. Click Save to apply fields.`,
+  settingsPendingCrmMode: (mode: string) =>
+    `CRM update mode: ${mode}. Click Save to apply.`,
   assistantNameLabel: "Agent name",
   assistantNamePlaceholder: "e.g. Anna from Orzu Clinic",
   assistantBehaviorLabel: "Behavior & instructions",
@@ -82,6 +121,13 @@ export const AI_ASSISTANT_MESSAGES = {
   channelAiEnabledSuccess: "AI Agent enabled for this channel.",
   channelAiDisabledSuccess: "AI Agent disabled for this channel.",
   channelAiToggleFailed: "Unable to update channel AI setting.",
+  channelAiBehaviorTitle: (channel: string) => `${channel} AI settings`,
+  channelAiBehaviorDescription:
+    "Permissions and reply wait for this channel only. After you save, the AI follows these rules on this channel.",
+  channelAiBehaviorBack: "Back to channels",
+  channelAiBehaviorSave: "Save",
+  channelAiBehaviorSaved: "Channel AI settings saved. The agent will use them on this channel.",
+  channelAiBehaviorSaveFailed: "Unable to save channel AI settings.",
   channelsTitle: "Channels",
   channelAgentActive: "AI Agent enabled on this channel",
   channelAgentInactive: "AI Agent off on this channel",
@@ -350,19 +396,6 @@ export const AI_ASSISTANT_MESSAGES = {
   dataCollectionTitle: "Data Collection Fields",
   dataCollectionDescription:
     "Define what the AI must gather from customers. Niche presets seed defaults; the AI only asks for missing values and writes them into CRM.",
-  byokTitle: "Your own AI API keys (BYOK)",
-  byokDescription:
-    "Optionally use your Gemini or OpenAI key for this business. If missing or invalid, OrzuX falls back to Platform AI included in your plan.",
-  byokPreferCustomerKeys: "Prefer my API keys over Platform AI",
-  byokGeminiKey: "Gemini API key",
-  byokOpenAiKey: "OpenAI API key",
-  byokKeyPlaceholder: "Paste a new key to replace…",
-  byokKeyConfigured: "Key saved",
-  byokKeyMissing: "Not configured",
-  byokSave: "Save API keys",
-  byokSaved: "API key settings saved.",
-  byokClearGemini: "Clear Gemini key",
-  byokClearOpenAi: "Clear OpenAI key",
   followUpAgentTitle: "Follow-up worker",
   followUpAgentDescription:
     "Background worker: send AI follow-ups at 24h and 48h when customers stop replying. Uses the same AI Agent voice.",

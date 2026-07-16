@@ -22,12 +22,10 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 type AiAssistantChannelRowProps = {
   settings: ChannelAiSettingsData;
-  onEdit: () => void;
 };
 
 export function AiAssistantChannelRow({
   settings,
-  onEdit,
 }: AiAssistantChannelRowProps) {
   const router = useRouter();
   const [isOn, setIsOn] = useState(settings.aiEnabled);
@@ -53,6 +51,10 @@ export function AiAssistantChannelRow({
     if (result.success) {
       router.refresh();
     }
+  }
+
+  function openChannelEdit() {
+    router.push(DASHBOARD_ROUTES.aiAssistantChannelSettings(settings.channel));
   }
 
   return (
@@ -108,7 +110,7 @@ export function AiAssistantChannelRow({
                   <Loader2Icon className="absolute inset-0 m-auto size-3 animate-spin text-white" />
                 ) : null}
               </button>
-              <Button type="button" size="sm" variant="outline" onClick={onEdit}>
+              <Button type="button" size="sm" variant="outline" onClick={openChannelEdit}>
                 <PencilIcon className="size-3.5" />
                 {AI_ASSISTANT_MESSAGES.assistantEdit}
               </Button>
@@ -136,25 +138,12 @@ type AiAssistantHubPanelProps = {
     settings: ChannelAiSettingsData;
   }>;
   enabledChannelCount: number;
-  onEdit?: () => void;
 };
 
 export function AiAssistantHubPanel({
   channels,
   enabledChannelCount,
-  onEdit,
 }: AiAssistantHubPanelProps) {
-  const router = useRouter();
-
-  function openAssistantEdit() {
-    if (onEdit) {
-      onEdit();
-      return;
-    }
-
-    router.push(DASHBOARD_ROUTES.aiAssistantSettings);
-  }
-
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
@@ -182,7 +171,6 @@ export function AiAssistantHubPanel({
             <AiAssistantChannelRow
               key={entry.channel}
               settings={entry.settings}
-              onEdit={openAssistantEdit}
             />
           ))}
         </div>

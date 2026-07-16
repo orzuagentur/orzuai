@@ -47,6 +47,11 @@ import {
   isLikelyBookingOrOrderMessage,
   resolveAssistantFallbackReplyMessage,
 } from "@/lib/ai/fallback-reply";
+import {
+  applyChannelBehaviorToProfilePermissions,
+  buildDefaultChannelAiBehavior,
+  mapChannelAiBehaviorRow,
+} from "@/lib/ai/channel-behavior";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 import { sanitizeWorkerFacingReply } from "@/lib/ai/worker-reply-safety";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
@@ -591,10 +596,28 @@ async function prepareAutoReplyContext(input: {
     };
   }
 
-  const [profile, subscriptionPlan] = await Promise.all([
+  const [profileBase, subscriptionPlan, channelBehaviorRow] = await Promise.all([
     resolveAssistantProfile(input.admin, input.businessId),
     fetchBusinessSubscriptionPlan(input.admin, input.businessId),
+    input.admin
+      .from("ai_settings")
+      .select(
+        "channel_overrides_enabled, reply_wait_ms, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message",
+      )
+      .eq("business_id", input.businessId)
+      .eq("channel", input.channel)
+      .maybeSingle()
+      .then((result) => result.data),
   ]);
+
+  const channelBehavior = mapChannelAiBehaviorRow(
+    channelBehaviorRow,
+    buildDefaultChannelAiBehavior(),
+  );
+  const profile = applyChannelBehaviorToProfilePermissions(
+    profileBase,
+    channelBehavior,
+  );
 
   await ensurePlatformPromptsLoaded(input.admin);
 
@@ -917,7 +940,25 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     input.businessId,
   );
   const historyLimit = resolveHistoryMessageLimit(subscriptionPlan);
-  const profile = await resolveAssistantProfile(input.admin, input.businessId);
+  const [profileBase, channelBehaviorRow] = await Promise.all([
+    resolveAssistantProfile(input.admin, input.businessId),
+    input.admin
+      .from("ai_settings")
+      .select(
+        "channel_overrides_enabled, reply_wait_ms, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message",
+      )
+      .eq("business_id", input.businessId)
+      .eq("channel", input.channel)
+      .maybeSingle()
+      .then((result) => result.data),
+  ]);
+  const profile = applyChannelBehaviorToProfilePermissions(
+    profileBase,
+    mapChannelAiBehaviorRow(
+      channelBehaviorRow,
+      buildDefaultChannelAiBehavior(),
+    ),
+  );
 
   await ensurePlatformPromptsLoaded(input.admin);
 

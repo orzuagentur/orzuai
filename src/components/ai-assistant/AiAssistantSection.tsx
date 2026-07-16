@@ -145,9 +145,7 @@ function KnowledgeTab({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
           <KnowledgeHubPanel
-            entries={data.knowledgeEntries}
-            allEntries={data.knowledgeAllEntries}
-            hasActiveFilters={data.knowledgeHasActiveFilters}
+            categories={data.knowledgeCategories}
             hasBusiness={data.hasBusiness}
             geminiConfigured={data.geminiConfigured}
             websiteKnowledgeSync={data.websiteKnowledgeSync}
@@ -232,7 +230,6 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
             <AiAssistantHubPanel
               channels={data.channels}
               enabledChannelCount={data.enabledChannelCount}
-              onEdit={() => setActiveTab("settings")}
             />
           </div>
         </div>
@@ -256,17 +253,13 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
 
       {activeTab === "settings" && data.assistantProfile ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <AgentSectionBackButton onBack={() => setActiveTab("dashboard")} />
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <AiAssistantEditPanel
-              profile={data.assistantProfile}
-              followUpAgent={data.followUpAgent}
-              workerReadiness={data.workerReadiness}
-              salesAgent={data.salesAgent}
-              businessAiKeys={data.businessAiKeys}
-              onBack={() => setActiveTab("dashboard")}
-            />
-          </div>
+          <AiAssistantEditPanel
+            profile={data.assistantProfile}
+            followUpAgent={data.followUpAgent}
+            workerReadiness={data.workerReadiness}
+            salesAgent={data.salesAgent}
+            onBack={() => setActiveTab("dashboard")}
+          />
         </div>
       ) : null}
     </div>

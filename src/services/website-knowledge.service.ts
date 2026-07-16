@@ -164,9 +164,14 @@ async function replaceWebsiteSyncKnowledge(
     content: string;
     category: string;
     sourceUrl: string;
+    metadata?: Record<string, string | undefined>;
   }>,
 ): Promise<number> {
   const admin = createAdminClient();
+  const { ensureKnowledgeCategoryForName } =
+    await import("@/services/knowledge-categories.service");
+  const { inferLayoutKindFromName } =
+    await import("@/types/knowledge-category.types");
 
   await admin
     .from("knowledge_base")
@@ -178,6 +183,16 @@ async function replaceWebsiteSyncKnowledge(
     return 0;
   }
 
+  const categoryNames = [...new Set(entries.map((entry) => entry.category))];
+  const resolvedNames = new Map<string, string>();
+
+  for (const name of categoryNames) {
+    const card = await ensureKnowledgeCategoryForName(businessId, name, {
+      layoutKind: inferLayoutKindFromName(name),
+    });
+    resolvedNames.set(name, card.name);
+  }
+
   const { data, error } = await admin
     .from("knowledge_base")
     .insert(
@@ -185,13 +200,10 @@ async function replaceWebsiteSyncKnowledge(
         business_id: businessId,
         title: entry.title,
         content: entry.content,
-        category: entry.category as
-          | "Services"
-          | "Pricing"
-          | "FAQ"
-          | "Business Hours",
+        category: resolvedNames.get(entry.category) ?? entry.category,
         source: "website_sync",
         source_url: entry.sourceUrl,
+        metadata: entry.metadata ?? {},
       })),
     )
     .select("id");

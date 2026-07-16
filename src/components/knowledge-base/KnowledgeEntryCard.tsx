@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { KNOWLEDGE_CATEGORY_META } from "@/features/knowledge-base/categories";
+import { KNOWLEDGE_CATEGORY_META, isKnowledgeCategory } from "@/features/knowledge-base/categories";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
 import { useDeleteKnowledgeEntry } from "@/hooks/use-delete-knowledge-entry";
 import { truncateKnowledgeContent } from "@/utils/knowledge";
@@ -52,7 +52,9 @@ export function KnowledgeEntryCard({
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="truncate text-base">{entry.title}</CardTitle>
               <Badge variant="secondary">
-                {KNOWLEDGE_CATEGORY_META[entry.category].label}
+                {isKnowledgeCategory(entry.category)
+                  ? KNOWLEDGE_CATEGORY_META[entry.category].label
+                  : entry.category}
               </Badge>
             {entry.source === "website_sync" ? (
               <Badge variant="outline">Website sync</Badge>

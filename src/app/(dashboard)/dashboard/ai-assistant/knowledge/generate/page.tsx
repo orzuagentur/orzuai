@@ -1,13 +1,8 @@
-import { KnowledgeGeneratePage } from "@/components/knowledge-base/KnowledgeGeneratePage";
-import { getAiAssistantPageData } from "@/services/ai-assistant.service";
+import { redirect } from "next/navigation";
 
-export default async function AiAssistantKnowledgeGeneratePage() {
-  const data = await getAiAssistantPageData();
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
-  return (
-    <KnowledgeGeneratePage
-      geminiConfigured={data.geminiConfigured}
-      hasBusiness={data.hasBusiness}
-    />
-  );
+/** AI generate studio removed — website scan fills category cards instead. */
+export default function AiAssistantKnowledgeGeneratePage() {
+  redirect(DASHBOARD_ROUTES.aiAssistantKnowledge);
 }

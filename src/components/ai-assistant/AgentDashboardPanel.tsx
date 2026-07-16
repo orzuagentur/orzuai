@@ -18,8 +18,6 @@ import {
 import { toast } from "sonner";
 
 import { AgentAiActivityChart } from "@/components/ai-assistant/AgentAiActivityChart";
-import { AiWorkerReadinessPanel } from "@/components/ai-assistant/AiWorkerReadinessPanel";
-import { AiAgentOpsPanel } from "@/components/ai-assistant/AiAgentOpsPanel";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -489,16 +487,6 @@ export function AgentDashboardPanel({
           </div>
         </DashboardActionCard>
       </div>
-
-      <AiWorkerReadinessPanel
-        readiness={data.workerReadiness}
-        summarizeActionsEnabled={profile?.canSummarizeActionsInChat ?? true}
-      />
-
-      <AiAgentOpsPanel
-        metrics={data.agentRuns}
-        recentRuns={data.recentAgentRuns}
-      />
 
       <AgentAiActivityChart initialPoints={aiActivity} initialDays={1} />
 

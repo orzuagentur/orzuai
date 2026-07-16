@@ -20,6 +20,7 @@ import {
   getChannelConnectionStatuses,
 } from "@/services/channel-workspace.service";
 import { listKnowledgeEntries, parseKnowledgeCategory } from "@/services/knowledge.service";
+import { listKnowledgeCategoryCards } from "@/services/knowledge-categories.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { listRecentAgentRuns, getAgentRunsMetrics } from "@/services/analytics-ai-ops.service";
 import {
@@ -123,6 +124,7 @@ export async function getAiAssistantPageData(
       assistantProfile: null,
       knowledgeEntries: [],
       knowledgeAllEntries: [],
+      knowledgeCategories: [],
       knowledgeHasActiveFilters: false,
       websiteKnowledgeSync: null,
       recentAgentRuns: [],
@@ -169,6 +171,7 @@ export async function getAiAssistantPageData(
     assistantProfile,
     knowledgeEntries,
     knowledgeAllEntries,
+    knowledgeCategories,
     websiteKnowledgeSync,
     recentAgentRuns,
     agentDashboardStats,
@@ -187,6 +190,7 @@ export async function getAiAssistantPageData(
       category: knowledgeCategory,
     }),
     listKnowledgeEntries(businessId),
+    listKnowledgeCategoryCards(businessId),
     getWebsiteKnowledgeSync(businessId),
     listRecentAgentRuns(businessId, 8),
     getAgentDashboardStats(businessId),
@@ -243,6 +247,7 @@ export async function getAiAssistantPageData(
     assistantProfile,
     knowledgeEntries,
     knowledgeAllEntries,
+    knowledgeCategories,
     knowledgeHasActiveFilters,
     websiteKnowledgeSync,
     recentAgentRuns,

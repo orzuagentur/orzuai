@@ -41,10 +41,14 @@ export const DASHBOARD_ROUTES = {
   integrations: "/dashboard/integrations",
   aiAssistant: "/dashboard/ai-assistant",
   aiAssistantChannels: "/dashboard/ai-assistant/channels",
+  aiAssistantChannelSettings: (channel: string) =>
+    `/dashboard/ai-assistant/channels/${channel}/settings`,
   aiAssistantKnowledge: "/dashboard/ai-assistant/knowledge",
   aiAssistantKnowledgeImport: "/dashboard/ai-assistant/knowledge/import",
   aiAssistantKnowledgeWebsite: "/dashboard/ai-assistant/knowledge/website",
   aiAssistantKnowledgeGenerate: "/dashboard/ai-assistant/knowledge/generate",
+  aiAssistantKnowledgeCategory: (slug: string) =>
+    `/dashboard/ai-assistant/knowledge/c/${encodeURIComponent(slug)}`,
   aiAssistantVoice: "/dashboard/ai-assistant/voice",
   aiAssistantSettings: "/dashboard/ai-assistant/settings",
   aiAssistantSection: "/dashboard/ai-assistant",

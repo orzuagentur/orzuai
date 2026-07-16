@@ -3,24 +3,21 @@ import "server-only";
 import { getGeminiModel } from "@/lib/gemini";
 import { GEMINI_SAFETY_SETTINGS } from "@/lib/gemini/prompts";
 import { getGeminiDefaultModel, hasGeminiEnv } from "@/lib/env";
-import type { KnowledgeCategory } from "@/types/database.types";
-import { KNOWLEDGE_CATEGORIES, resolveKnowledgeCategory } from "@/features/knowledge-base/categories";
+import { resolveKnowledgeCategory } from "@/features/knowledge-base/categories";
 import type { CrawledPage } from "@/lib/website-knowledge/crawler";
 import { truncateText } from "@/lib/website-knowledge/html-text";
+import type { KnowledgeEntryMetadata } from "@/types/knowledge-category.types";
 
 export type ExtractedKnowledgeEntry = {
   title: string;
   content: string;
-  category: KnowledgeCategory;
+  category: string;
   sourceUrl: string;
+  metadata: KnowledgeEntryMetadata;
 };
 
-const MAX_ENTRIES_PER_PAGE = 6;
-const MAX_TOTAL_ENTRIES = 80;
-
-function parseCategory(value: string): KnowledgeCategory {
-  return resolveKnowledgeCategory(value);
-}
+const MAX_ENTRIES_PER_PAGE = 10;
+const MAX_TOTAL_ENTRIES = 120;
 
 function parseGeminiJsonPayload(raw: string): ExtractedKnowledgeEntry[] {
   const cleaned = raw
@@ -34,6 +31,7 @@ function parseGeminiJsonPayload(raw: string): ExtractedKnowledgeEntry[] {
       title?: string;
       content?: string;
       category?: string;
+      price?: string;
     }>;
   };
 
@@ -44,12 +42,17 @@ function parseGeminiJsonPayload(raw: string): ExtractedKnowledgeEntry[] {
   return parsed.entries
     .filter((entry) => entry.title?.trim() && entry.content?.trim())
     .slice(0, MAX_ENTRIES_PER_PAGE)
-    .map((entry) => ({
-      title: entry.title!.trim().slice(0, 200),
-      content: entry.content!.trim().slice(0, 5000),
-      category: parseCategory(entry.category ?? "Services"),
-      sourceUrl: "",
-    }));
+    .map((entry) => {
+      const category = resolveKnowledgeCategory(entry.category ?? "Services");
+      const price = entry.price?.trim();
+      return {
+        title: entry.title!.trim().slice(0, 200),
+        content: entry.content!.trim().slice(0, 5000),
+        category,
+        sourceUrl: "",
+        metadata: price ? { price: price.slice(0, 80) } : {},
+      };
+    });
 }
 
 export async function extractKnowledgeEntriesFromPages(
@@ -69,21 +72,23 @@ export async function extractKnowledgeEntriesFromPages(
     }
 
     const prompt = [
-      "You extract structured business knowledge from a website page for an AI customer-support assistant.",
+      "You extract professional business knowledge from one website page for an AI customer-support agent.",
       `Website: ${siteUrl}`,
       `Page URL: ${page.url}`,
       `Page title: ${page.title}`,
       "",
       "Return ONLY valid JSON (no markdown) in this shape:",
-      '{"entries":[{"title":"short title","content":"factual details for AI","category":"Services|Pricing|Address|Contact|FAQ|Business Hours|Policies|Additional"}]}',
+      '{"entries":[{"title":"short title","content":"clear factual details","category":"Services|Pricing|FAQ|Business Hours|Address|Contact|Policies|Additional|or a specific custom category name","price":"optional price string"}]}',
       "Rules:",
-      `- Up to ${MAX_ENTRIES_PER_PAGE} entries per page.`,
-      "- Include company info, services, products, prices (if present), FAQ, articles, contacts, address, policies.",
-      "- Use only facts from the page text; do not invent data.",
-      `- category must be one of: ${KNOWLEDGE_CATEGORIES.join(", ")}.`,
+      `- Up to ${MAX_ENTRIES_PER_PAGE} high-quality entries from THIS page only.`,
+      "- Prefer spreadsheet-ready rows: one service/product/FAQ/fact per entry.",
+      "- For services/products include price in `price` when the page shows it.",
+      "- If the page has a clear topic not covered by standard categories (e.g. Team, Warranty, Shipping), invent a concise custom category name.",
+      "- Use only facts from the page; do not invent prices or claims.",
+      "- Write polished, customer-ready content (complete sentences, no HTML).",
       "",
       "Page text:",
-      truncateText(page.text, 9000),
+      truncateText(page.text, 10_000),
     ].join("\n");
 
     try {
@@ -112,7 +117,7 @@ export async function extractKnowledgeEntriesFromPages(
   const deduped = new Map<string, ExtractedKnowledgeEntry>();
 
   for (const entry of allEntries) {
-    const key = `${entry.sourceUrl}|${entry.title.toLowerCase()}`;
+    const key = `${entry.category.toLowerCase()}|${entry.title.toLowerCase()}`;
 
     if (!deduped.has(key)) {
       deduped.set(key, entry);

@@ -1,6 +1,6 @@
 import { AiAssistantEditPanel } from "@/components/ai-assistant/AiAssistantEditPanel";
-import { AiAssistantPageHeader } from "@/components/ai-assistant/AiAssistantShell";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { getAiAssistantPageData } from "@/services/ai-assistant.service";
 import { redirect } from "next/navigation";
 
@@ -12,24 +12,15 @@ export default async function AiAssistantSettingsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <AiAssistantPageHeader
-        title="Agent settings"
-        description="Configure name, prompt, permissions, schedule, and follow-up behavior."
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <AiAssistantEditPanel
+        profile={data.assistantProfile}
+        followUpAgent={data.followUpAgent}
+        workerReadiness={data.workerReadiness}
+        salesAgent={data.salesAgent}
         backHref={DASHBOARD_ROUTES.aiAssistant}
-        backLabel="Dashboard"
+        backLabel={AI_ASSISTANT_MESSAGES.assistantEditBack}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-          <AiAssistantEditPanel
-            profile={data.assistantProfile}
-            followUpAgent={data.followUpAgent}
-            workerReadiness={data.workerReadiness}
-            salesAgent={data.salesAgent}
-            businessAiKeys={data.businessAiKeys}
-          />
-        </div>
-      </div>
     </div>
   );
 }

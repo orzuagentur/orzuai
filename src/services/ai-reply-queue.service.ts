@@ -69,7 +69,27 @@ function getDebouncedDrainDelayMs(replyWaitMs: number): number {
 async function getBusinessReplyWaitMs(
   admin: MessagingDbClient,
   businessId: string,
+  channel?: MessagingChannel,
 ): Promise<number> {
+  if (channel) {
+    const { data: channelRow } = await admin
+      .from("ai_settings")
+      .select("channel_overrides_enabled, reply_wait_ms")
+      .eq("business_id", businessId)
+      .eq("channel", channel)
+      .maybeSingle();
+
+    if (
+      channelRow?.channel_overrides_enabled &&
+      channelRow.reply_wait_ms != null
+    ) {
+      const waitMs = channelRow.reply_wait_ms;
+      if (waitMs >= 1500 && waitMs <= 8000 && waitMs % 500 === 0) {
+        return waitMs;
+      }
+    }
+  }
+
   const { data } = await admin
     .from("ai_assistant_profile")
     .select("reply_wait_ms")
@@ -317,7 +337,11 @@ export async function scheduleDebouncedChannelAutoReply(
   let replyWaitMs = DEFAULT_AUTO_REPLY_DEBOUNCE_MS;
 
   try {
-    replyWaitMs = await getBusinessReplyWaitMs(admin, input.businessId);
+    replyWaitMs = await getBusinessReplyWaitMs(
+      admin,
+      input.businessId,
+      input.channel,
+    );
     await upsertAiReplyJob(admin, input, replyWaitMs);
   } catch (error) {
     const message = formatSupabaseError(error);
@@ -389,7 +413,11 @@ async function finalizeAiReplyJob(
   const now = new Date().toISOString();
 
   if (outcome === "requeued") {
-    const replyWaitMs = await getBusinessReplyWaitMs(admin, job.business_id);
+    const replyWaitMs = await getBusinessReplyWaitMs(
+      admin,
+      job.business_id,
+      job.channel,
+    );
 
     await admin
       .from("ai_reply_jobs")
@@ -416,7 +444,11 @@ async function finalizeAiReplyJob(
       (current?.pending_messages?.length ?? 0) > 0 || current?.needs_reprocess;
 
     if (hasPendingMessages) {
-      const replyWaitMs = await getBusinessReplyWaitMs(admin, job.business_id);
+      const replyWaitMs = await getBusinessReplyWaitMs(
+        admin,
+        job.business_id,
+        job.channel,
+      );
 
       await admin
         .from("ai_reply_jobs")

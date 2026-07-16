@@ -4,10 +4,11 @@ import type { KnowledgeCategory } from "./database.types";
 import {
   KNOWLEDGE_CATEGORIES,
 } from "@/features/knowledge-base/categories";
+import type { KnowledgeEntryMetadata } from "@/types/knowledge-category.types";
 
 export { KNOWLEDGE_CATEGORIES };
 
-export const knowledgeCategorySchema = z.enum(KNOWLEDGE_CATEGORIES);
+export const knowledgeCategorySchema = z.string().trim().min(1).max(80);
 
 export const knowledgeEntrySchema = z.object({
   title: z
@@ -18,9 +19,16 @@ export const knowledgeEntrySchema = z.object({
   content: z
     .string()
     .trim()
-    .min(10, "Content must be at least 10 characters.")
+    .min(1, "Content is required.")
     .max(5000, "Content must be at most 5000 characters."),
   category: knowledgeCategorySchema,
+  metadata: z
+    .object({
+      price: z.string().trim().max(80).optional(),
+      unit: z.string().trim().max(40).optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 export const updateKnowledgeEntrySchema = knowledgeEntrySchema.extend({
@@ -40,6 +48,7 @@ export type KnowledgeEntryData = {
   category: KnowledgeCategory;
   source: KnowledgeEntrySource;
   sourceUrl: string | null;
+  metadata: KnowledgeEntryMetadata;
   createdAt: string;
   updatedAt: string;
 };

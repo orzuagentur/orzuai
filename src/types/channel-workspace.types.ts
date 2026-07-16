@@ -24,13 +24,18 @@ import type {
   AgentRecentDialogue,
 } from "./agent-dashboard.types";
 import type { KnowledgeEntryData } from "./knowledge.types";
+import type { KnowledgeCategoryCard } from "./knowledge-category.types";
 import type { WebsiteKnowledgeSyncData } from "./website-knowledge.types";
 import type { AiAssistantTab } from "@/utils/ai-assistant-url";
 import type { AiAgentChannelId } from "@/features/integrations/constants";
 import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
-import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations/constants";
+import {
+  AI_AGENT_CHANNELS,
+  MESSAGING_INTEGRATION_CHANNELS,
+} from "@/features/integrations/constants";
 import type { AiCostMetrics } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
+import { REPLY_WAIT_MS_OPTIONS } from "@/lib/ai/languages";
 
 export type { MessagingChannel };
 
@@ -48,6 +53,32 @@ export const saveChannelAiSettingsSchema = z.object({
   aiEnabled: z.boolean(),
 });
 
+const replyWaitValues = REPLY_WAIT_MS_OPTIONS as [number, ...number[]];
+
+export const saveChannelAiBehaviorSchema = z.object({
+  channel: z.enum([
+    AI_AGENT_CHANNELS[0],
+    ...AI_AGENT_CHANNELS.slice(1),
+  ]),
+  replyWaitMs: z
+    .number()
+    .int()
+    .refine((value) => replyWaitValues.includes(value), {
+      message: "Select a reply wait time.",
+    }),
+  canCreateTask: z.boolean(),
+  canCreateDeal: z.boolean(),
+  canUpdateContact: z.boolean(),
+  canAddNote: z.boolean(),
+  canAddInternalNote: z.boolean(),
+  canCreateCalendarEvent: z.boolean(),
+  canRequestHuman: z.boolean(),
+  canNotifyOwner: z.boolean(),
+  canNotifyOnActions: z.boolean(),
+  canSummarizeActionsInChat: z.boolean(),
+  canSendProactiveMessage: z.boolean(),
+});
+
 export const testChannelAiReplySchema = z.object({
   channel: z.enum([
     MESSAGING_INTEGRATION_CHANNELS[0],
@@ -61,7 +92,27 @@ export const testChannelAiReplySchema = z.object({
 });
 
 export type SaveChannelAiSettingsInput = z.infer<typeof saveChannelAiSettingsSchema>;
+export type SaveChannelAiBehaviorInput = z.infer<typeof saveChannelAiBehaviorSchema>;
 export type TestChannelAiReplyInput = z.infer<typeof testChannelAiReplySchema>;
+
+export type ChannelAiBehaviorPermissions = {
+  canCreateTask: boolean;
+  canCreateDeal: boolean;
+  canUpdateContact: boolean;
+  canAddNote: boolean;
+  canAddInternalNote: boolean;
+  canCreateCalendarEvent: boolean;
+  canRequestHuman: boolean;
+  canNotifyOwner: boolean;
+  canNotifyOnActions: boolean;
+  canSummarizeActionsInChat: boolean;
+  canSendProactiveMessage: boolean;
+};
+
+export type ChannelAiBehaviorSettings = ChannelAiBehaviorPermissions & {
+  replyWaitMs: number;
+  overridesEnabled: boolean;
+};
 
 export type ChannelContactItem = {
   id: string;
@@ -96,6 +147,7 @@ export type ChannelAiSettingsData = {
   providerAvailability: AiProviderAvailability;
   isChannelConnected: boolean;
   defaultModel: string;
+  behavior: ChannelAiBehaviorSettings;
 };
 
 export type AiAssistantChannelEntry = {
@@ -128,6 +180,7 @@ export type AiAssistantPageData = {
   assistantProfile: AiAssistantProfileData | null;
   knowledgeEntries: KnowledgeEntryData[];
   knowledgeAllEntries: KnowledgeEntryData[];
+  knowledgeCategories: KnowledgeCategoryCard[];
   knowledgeHasActiveFilters: boolean;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
   recentAgentRuns: AgentRunListItem[];

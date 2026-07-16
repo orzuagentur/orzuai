@@ -6,7 +6,7 @@ export type CrawledPage = {
   text: string;
 };
 
-const MAX_PAGES = 32;
+const MAX_PAGES = 48;
 const MAX_DEPTH = 3;
 const FETCH_TIMEOUT_MS = 15_000;
 const FETCH_RETRIES = 2;

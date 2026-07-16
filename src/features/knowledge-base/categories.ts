@@ -63,20 +63,26 @@ export function isKnowledgeCategory(value: string): value is KnowledgeCategoryId
   return (KNOWLEDGE_CATEGORIES as readonly string[]).includes(value);
 }
 
-export function resolveKnowledgeCategory(value: string | undefined): KnowledgeCategoryId {
+export function resolveKnowledgeCategory(value: string | undefined): string {
   if (value && isKnowledgeCategory(value)) {
     return value;
   }
 
-  const normalized = value?.trim().toLowerCase() ?? "";
+  const trimmed = value?.trim();
+  if (trimmed && trimmed.length >= 2) {
+    const normalized = trimmed.toLowerCase();
 
-  if (/price|pricing|cost|tariff|rate/.test(normalized)) return "Pricing";
-  if (/address|location|office|branch|area/.test(normalized)) return "Address";
-  if (/contact|phone|email|support/.test(normalized)) return "Contact";
-  if (/faq|question/.test(normalized)) return "FAQ";
-  if (/hour|schedule|open|time/.test(normalized)) return "Business Hours";
-  if (/policy|terms|privacy|return|refund/.test(normalized)) return "Policies";
-  if (/service|product|offer/.test(normalized)) return "Services";
+    if (/price|pricing|cost|tariff|rate/.test(normalized)) return "Pricing";
+    if (/address|location|office|branch|area/.test(normalized)) return "Address";
+    if (/contact|phone|email|support/.test(normalized)) return "Contact";
+    if (/faq|question/.test(normalized)) return "FAQ";
+    if (/hour|schedule|open|time/.test(normalized)) return "Business Hours";
+    if (/policy|terms|privacy|return|refund/.test(normalized)) return "Policies";
+    if (/service|product|offer/.test(normalized)) return "Services";
+
+    // Preserve custom category names discovered from websites.
+    return trimmed.slice(0, 80);
+  }
 
   return "Additional";
 }

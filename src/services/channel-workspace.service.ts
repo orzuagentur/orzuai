@@ -14,6 +14,10 @@ import {
   isChannelConnectedForWorkspace,
 } from "@/features/integrations/channel-status";
 import { getDefaultGeminiModel, hasGeminiEnv, hasSupabaseEnv } from "@/lib/env";
+import {
+  buildDefaultChannelAiBehavior,
+  mapChannelAiBehaviorRow,
+} from "@/lib/ai/channel-behavior";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -37,11 +41,13 @@ import type {
   ChannelAnalyticsData,
   ChannelContactsData,
   ChannelWorkspaceSummary,
+  SaveChannelAiBehaviorInput,
   SaveChannelAiSettingsInput,
   TestChannelAiReplyInput,
 } from "@/types/channel-workspace.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  saveChannelAiBehaviorSchema,
   saveChannelAiSettingsSchema,
   testChannelAiReplySchema,
 } from "@/types/channel-workspace.types";
@@ -180,7 +186,8 @@ async function ensureChannelAiSettings(
 /**
  * Per-channel provider/model UI is intentionally unwired; inbound replies use the
  * platform LLM. provider/model/language/systemPrompt below are display-only leftovers
- * for ChannelAiSettingsData compatibility — only ai_enabled drives channel behavior.
+ * for ChannelAiSettingsData compatibility — ai_enabled + optional behavior overrides
+ * drive channel behavior.
  */
 export async function getChannelAiSettingsForBusiness(
   businessId: string,
@@ -189,6 +196,7 @@ export async function getChannelAiSettingsForBusiness(
 ): Promise<ChannelAiSettingsData> {
   const defaultModel = getDefaultGeminiModel();
   const providerAvailability = getProviderAvailability();
+  const defaultBehavior = buildDefaultChannelAiBehavior();
 
   if (!hasSupabaseEnv()) {
     return {
@@ -204,18 +212,51 @@ export async function getChannelAiSettingsForBusiness(
       providerAvailability,
       isChannelConnected,
       defaultModel,
+      behavior: defaultBehavior,
     };
   }
 
   const supabase = await createClient();
   await ensureChannelAiSettings(supabase, businessId, channel);
 
-  const { data } = await supabase
-    .from("ai_settings")
-    .select("ai_enabled")
-    .eq("business_id", businessId)
-    .eq("channel", channel)
-    .maybeSingle();
+  const [{ data }, profileResult] = await Promise.all([
+    supabase
+      .from("ai_settings")
+      .select(
+        "ai_enabled, channel_overrides_enabled, reply_wait_ms, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message",
+      )
+      .eq("business_id", businessId)
+      .eq("channel", channel)
+      .maybeSingle(),
+    supabase
+      .from("ai_assistant_profile")
+      .select(
+        "reply_wait_ms, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message",
+      )
+      .eq("business_id", businessId)
+      .maybeSingle(),
+  ]);
+
+  const profile = profileResult.data;
+  const profileFallback = buildDefaultChannelAiBehavior(
+    profile?.reply_wait_ms ?? defaultBehavior.replyWaitMs,
+  );
+  if (profile) {
+    profileFallback.canCreateTask = profile.can_create_task ?? true;
+    profileFallback.canCreateDeal = profile.can_create_deal ?? true;
+    profileFallback.canUpdateContact = profile.can_update_contact ?? true;
+    profileFallback.canAddNote = profile.can_add_note ?? true;
+    profileFallback.canAddInternalNote = profile.can_add_internal_note ?? true;
+    profileFallback.canCreateCalendarEvent =
+      profile.can_create_calendar_event ?? true;
+    profileFallback.canRequestHuman = profile.can_request_human ?? true;
+    profileFallback.canNotifyOwner = profile.can_notify_owner ?? true;
+    profileFallback.canNotifyOnActions = profile.can_notify_on_actions ?? true;
+    profileFallback.canSummarizeActionsInChat =
+      profile.can_summarize_actions_in_chat ?? true;
+    profileFallback.canSendProactiveMessage =
+      profile.can_send_proactive_message ?? true;
+  }
 
   return {
     hasBusiness: true,
@@ -230,6 +271,7 @@ export async function getChannelAiSettingsForBusiness(
     providerAvailability,
     isChannelConnected,
     defaultModel,
+    behavior: mapChannelAiBehaviorRow(data, profileFallback),
   };
 }
 
@@ -402,7 +444,7 @@ export async function getChannelContacts(
 }
 
 export async function getChannelAiSettings(
-  channel: MessagingIntegrationChannelId,
+  channel: AiAgentChannelId,
 ): Promise<ChannelAiSettingsData> {
   const businessId = await getOwnedBusinessId();
 
@@ -420,6 +462,7 @@ export async function getChannelAiSettings(
       providerAvailability: getProviderAvailability(),
       isChannelConnected: false,
       defaultModel: getDefaultGeminiModel(),
+      behavior: buildDefaultChannelAiBehavior(),
     };
   }
 
@@ -466,6 +509,61 @@ export async function saveChannelAiSettings(
   }
 
   revalidateChannelWorkspacePaths(parsed.data.channel);
+
+  return { success: true };
+}
+
+export async function saveChannelAiBehavior(
+  input: SaveChannelAiBehaviorInput,
+): Promise<{ success: boolean; message?: string }> {
+  const parsed = saveChannelAiBehaviorSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid settings.",
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId || !hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const supabase = await createClient();
+  await ensureChannelAiSettings(supabase, businessId, parsed.data.channel);
+
+  const { error } = await supabase
+    .from("ai_settings")
+    .update({
+      channel_overrides_enabled: true,
+      reply_wait_ms: parsed.data.replyWaitMs,
+      can_create_task: parsed.data.canCreateTask,
+      can_create_deal: parsed.data.canCreateDeal,
+      can_update_contact: parsed.data.canUpdateContact,
+      can_add_note: parsed.data.canAddNote,
+      can_add_internal_note: parsed.data.canAddInternalNote,
+      can_create_calendar_event: parsed.data.canCreateCalendarEvent,
+      can_request_human: parsed.data.canRequestHuman,
+      can_notify_owner: parsed.data.canNotifyOwner,
+      can_notify_on_actions: parsed.data.canNotifyOnActions,
+      can_summarize_actions_in_chat: parsed.data.canSummarizeActionsInChat,
+      can_send_proactive_message: parsed.data.canSendProactiveMessage,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("business_id", businessId)
+    .eq("channel", parsed.data.channel);
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.aiAssistant);
+  revalidatePath(DASHBOARD_ROUTES.aiAssistantChannels);
+  revalidatePath(
+    DASHBOARD_ROUTES.aiAssistantChannelSettings(parsed.data.channel),
+  );
 
   return { success: true };
 }

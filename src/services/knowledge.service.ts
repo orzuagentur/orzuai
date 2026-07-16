@@ -19,7 +19,6 @@ import type {
   KnowledgeSearchFilters,
   UpdateKnowledgeEntryResult,
 } from "@/types/knowledge.types";
-import { KNOWLEDGE_CATEGORIES } from "@/features/knowledge-base/categories";
 import {
   knowledgeEntrySchema,
   updateKnowledgeEntrySchema,
@@ -100,8 +99,8 @@ export async function listKnowledgeEntries(
     query = query.or(`title.ilike.${pattern},content.ilike.${pattern}`);
   }
 
-  if (filters.category && KNOWLEDGE_CATEGORIES.includes(filters.category)) {
-    query = query.eq("category", filters.category);
+  if (filters.category?.trim()) {
+    query = query.eq("category", filters.category.trim());
   }
 
   const { data, error } = await query;
@@ -152,6 +151,7 @@ export async function createKnowledgeEntry(
       title: parsed.data.title,
       content: parsed.data.content,
       category: parsed.data.category,
+      metadata: parsed.data.metadata ?? {},
     })
     .select("*")
     .single();
@@ -241,6 +241,7 @@ export async function bulkCreateKnowledgeEntries(
         title: entry.title,
         content: entry.content,
         category: entry.category,
+        metadata: entry.metadata ?? {},
       })),
     )
     .select("*");
@@ -321,6 +322,8 @@ export async function updateKnowledgeEntry(
       title: parsed.data.title,
       content: parsed.data.content,
       category: parsed.data.category,
+      metadata: parsed.data.metadata ?? {},
+      updated_at: new Date().toISOString(),
     })
     .eq("id", entryId)
     .eq("business_id", ownership.businessId)
@@ -401,11 +404,9 @@ export async function deleteKnowledgeEntry(
 export function parseKnowledgeCategory(
   value: string | undefined,
 ): KnowledgeCategory | "" {
-  if (!value) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
     return "";
   }
-
-  return KNOWLEDGE_CATEGORIES.includes(value as KnowledgeCategory)
-    ? (value as KnowledgeCategory)
-    : "";
+  return trimmed.slice(0, 80);
 }

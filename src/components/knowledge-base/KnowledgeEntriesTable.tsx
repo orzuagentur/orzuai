@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { KNOWLEDGE_CATEGORY_META } from "@/features/knowledge-base/categories";
+import { KNOWLEDGE_CATEGORY_META, isKnowledgeCategory } from "@/features/knowledge-base/categories";
 import { KNOWLEDGE_MESSAGES } from "@/features/knowledge-base/constants";
 import { useDeleteKnowledgeEntry } from "@/hooks/use-delete-knowledge-entry";
 import { truncateKnowledgeContent } from "@/utils/knowledge";
@@ -170,7 +170,9 @@ export function KnowledgeEntriesTable({
           </thead>
           <tbody>
             {sortedEntries.map((entry) => {
-              const categoryMeta = KNOWLEDGE_CATEGORY_META[entry.category];
+              const categoryMeta = isKnowledgeCategory(entry.category)
+                ? KNOWLEDGE_CATEGORY_META[entry.category]
+                : null;
 
               return (
                 <tr key={entry.id} className="border-b last:border-b-0">
@@ -179,9 +181,9 @@ export function KnowledgeEntriesTable({
                   </td>
                   <td className="px-4 py-3 align-top">
                     <span
-                      className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${categoryMeta.tone}`}
+                      className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${categoryMeta?.tone ?? "bg-slate-500/10 text-slate-700"}`}
                     >
-                      {categoryMeta.label}
+                      {categoryMeta?.label ?? entry.category}
                     </span>
                   </td>
                   <td className="max-w-[20rem] px-4 py-3 align-top text-muted-foreground">

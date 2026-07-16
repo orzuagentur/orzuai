@@ -3,14 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2Icon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  DatabaseIcon,
+  Loader2Icon,
+  MessageSquareIcon,
+  PowerIcon,
+  Settings2Icon,
+  ShieldIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AiAgentScheduleEditor } from "@/components/ai-assistant/AiAgentScheduleEditor";
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import { AiLanguageSelect } from "@/components/ai-assistant/AiLanguageSelect";
 import { AiReplyWaitSelect } from "@/components/ai-assistant/AiReplyWaitSelect";
-import { BusinessAiKeysPanel } from "@/components/ai-assistant/BusinessAiKeysPanel";
 import { DataCollectionFieldsEditor } from "@/components/ai-assistant/DataCollectionFieldsEditor";
 import { SalesAgentRulesPanel } from "@/components/ai-assistant/SalesAgentRulesPanel";
 import {
@@ -37,6 +46,8 @@ import {
   isCommunicationStyleId,
   type CommunicationStyleId,
 } from "@/features/ai-assistant/communication-styles";
+import { getNavSegmentActiveClassName } from "@/features/navigation/channel-rail-ui";
+import { cn } from "@/lib/utils";
 import type {
   AiAssistantProfileData,
   CrmUpdateMode,
@@ -44,7 +55,6 @@ import type {
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
-import type { BusinessAiKeySettings } from "@/services/business-ai-keys.service";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
 
 type AiAssistantEditPanelProps = {
@@ -52,9 +62,18 @@ type AiAssistantEditPanelProps = {
   followUpAgent: FollowUpAgentSettings;
   workerReadiness: AiWorkerReadiness;
   salesAgent: SalesAgentSettings;
-  businessAiKeys: BusinessAiKeySettings;
   onBack?: () => void;
+  backHref?: string;
+  backLabel?: string;
 };
+
+type SettingsTabId =
+  | "behavior"
+  | "permissions"
+  | "data-collection"
+  | "schedule"
+  | "sales"
+  | "activation";
 
 type AgentPermissions = Pick<
   AiAssistantProfileData,
@@ -71,6 +90,50 @@ type AgentPermissions = Pick<
   | "canSendProactiveMessage"
   | "canReply"
 >;
+
+const SETTINGS_TABS: Array<{
+  id: SettingsTabId;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    id: "behavior",
+    label: AI_ASSISTANT_MESSAGES.settingsTabBehavior,
+    description: AI_ASSISTANT_MESSAGES.settingsTabBehaviorHint,
+    icon: MessageSquareIcon,
+  },
+  {
+    id: "permissions",
+    label: AI_ASSISTANT_MESSAGES.settingsTabPermissions,
+    description: AI_ASSISTANT_MESSAGES.settingsTabPermissionsHint,
+    icon: ShieldIcon,
+  },
+  {
+    id: "data-collection",
+    label: AI_ASSISTANT_MESSAGES.settingsTabDataCollection,
+    description: AI_ASSISTANT_MESSAGES.settingsTabDataCollectionHint,
+    icon: DatabaseIcon,
+  },
+  {
+    id: "schedule",
+    label: AI_ASSISTANT_MESSAGES.settingsTabSchedule,
+    description: AI_ASSISTANT_MESSAGES.settingsTabScheduleHint,
+    icon: Settings2Icon,
+  },
+  {
+    id: "sales",
+    label: AI_ASSISTANT_MESSAGES.settingsTabSales,
+    description: AI_ASSISTANT_MESSAGES.settingsTabSalesHint,
+    icon: SparklesIcon,
+  },
+  {
+    id: "activation",
+    label: AI_ASSISTANT_MESSAGES.settingsTabActivation,
+    description: AI_ASSISTANT_MESSAGES.settingsTabActivationHint,
+    icon: PowerIcon,
+  },
+];
 
 const CRM_PERMISSION_ROWS: Array<{
   key: keyof AgentPermissions;
@@ -141,15 +204,41 @@ const ALERT_PERMISSION_ROWS: Array<{
   },
 ];
 
+const TABS_WITH_PROFILE_SAVE = new Set<SettingsTabId>([
+  "behavior",
+  "permissions",
+  "data-collection",
+  "schedule",
+]);
+
+function saveSuccessMessage(tab: SettingsTabId): string {
+  switch (tab) {
+    case "behavior":
+      return AI_ASSISTANT_MESSAGES.settingsSavedBehavior;
+    case "permissions":
+      return AI_ASSISTANT_MESSAGES.settingsSavedPermissions;
+    case "data-collection":
+      return AI_ASSISTANT_MESSAGES.settingsSavedDataCollection;
+    case "schedule":
+      return AI_ASSISTANT_MESSAGES.settingsSavedSchedule;
+    case "activation":
+      return AI_ASSISTANT_MESSAGES.settingsSavedActivation;
+    default:
+      return AI_ASSISTANT_MESSAGES.assistantEditSaved;
+  }
+}
+
 export function AiAssistantEditPanel({
   profile,
   followUpAgent,
   workerReadiness,
   salesAgent,
-  businessAiKeys,
   onBack,
+  backHref = DASHBOARD_ROUTES.aiAssistant,
+  backLabel = AI_ASSISTANT_MESSAGES.assistantEditBack,
 }: AiAssistantEditPanelProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("behavior");
   const [name, setName] = useState(profile.name);
   const [systemPrompt, setSystemPrompt] = useState(profile.systemPrompt);
   const [communicationStyle, setCommunicationStyle] = useState<CommunicationStyleId>(
@@ -199,7 +288,11 @@ export function AiAssistantEditPanel({
     workerReadiness.resourceCount === 0 &&
     workerReadiness.bookingPageCount === 0;
 
-  async function handleSave() {
+  const activeTabMeta =
+    SETTINGS_TABS.find((tab) => tab.id === activeTab) ?? SETTINGS_TABS[0]!;
+  const ActiveTabIcon = activeTabMeta.icon;
+
+  async function saveProfile(successMessage: string): Promise<boolean> {
     setIsSaving(true);
 
     try {
@@ -220,15 +313,19 @@ export function AiAssistantEditPanel({
 
       if (!result.success) {
         toast.error(result.message ?? "Unable to save assistant settings.");
-        return;
+        return false;
       }
 
-      toast.success(AI_ASSISTANT_MESSAGES.assistantEditSaved);
+      toast.success(successMessage);
       router.refresh();
-      onBack?.();
+      return true;
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleSaveCurrentTab() {
+    await saveProfile(saveSuccessMessage(activeTab));
   }
 
   async function handleFollowUpToggle(enabled: boolean) {
@@ -244,7 +341,11 @@ export function AiAssistantEditPanel({
         return;
       }
 
-      toast.success(AI_ASSISTANT_MESSAGES.followUpAgentSaved);
+      toast.success(
+        enabled
+          ? AI_ASSISTANT_MESSAGES.settingsFollowUpEnabled
+          : AI_ASSISTANT_MESSAGES.settingsFollowUpDisabled,
+      );
       router.refresh();
     } finally {
       setIsSaving(false);
@@ -276,7 +377,11 @@ export function AiAssistantEditPanel({
       }
 
       setPermissions(nextPermissions);
-      toast.success(AI_ASSISTANT_MESSAGES.assistantEditSaved);
+      toast.success(
+        nextPermissions.canReply
+          ? AI_ASSISTANT_MESSAGES.settingsAgentActivated
+          : AI_ASSISTANT_MESSAGES.settingsAgentDeactivated,
+      );
       router.refresh();
       return true;
     } finally {
@@ -299,6 +404,11 @@ export function AiAssistantEditPanel({
 
     if (deactivateStep < 2) {
       setDeactivateStep((current) => current + 1);
+      toast.message(
+        deactivateStep === 0
+          ? AI_ASSISTANT_MESSAGES.settingsDeactivateStep1
+          : AI_ASSISTANT_MESSAGES.settingsDeactivateStep2,
+      );
       return;
     }
 
@@ -350,26 +460,11 @@ export function AiAssistantEditPanel({
     );
   }
 
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 md:p-6">
-        {onBack ? (
-          <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={onBack}>
-            ← {AI_ASSISTANT_MESSAGES.assistantEditBack}
-          </Button>
-        ) : null}
-
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle>{AI_ASSISTANT_MESSAGES.assistantEditTitle}</CardTitle>
-            <CardDescription>
-              {AI_ASSISTANT_MESSAGES.assistantEditFormDescription}
-            </CardDescription>
-            <p className="text-sm text-muted-foreground">
-              {AI_ASSISTANT_MESSAGES.assistantReplyEngineNote}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
+  function renderTabContent() {
+    switch (activeTab) {
+      case "behavior":
+        return (
+          <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="assistant-name">
                 {AI_ASSISTANT_MESSAGES.assistantNameLabel}
@@ -389,10 +484,11 @@ export function AiAssistantEditPanel({
               </Label>
               <Textarea
                 id="assistant-behavior"
-                rows={8}
+                rows={14}
                 value={systemPrompt}
                 onChange={(event) => setSystemPrompt(event.target.value)}
                 placeholder={AI_ASSISTANT_MESSAGES.assistantBehaviorPlaceholder}
+                className="min-h-[18rem]"
               />
               <p className="text-xs text-muted-foreground">
                 {AI_ASSISTANT_MESSAGES.assistantBehaviorHint}
@@ -402,21 +498,89 @@ export function AiAssistantEditPanel({
             <AiCommunicationStyleSelect
               value={communicationStyle}
               disabled={isSaving}
-              onChange={setCommunicationStyle}
+              onChange={(value) => {
+                setCommunicationStyle(value);
+                toast.message(
+                  AI_ASSISTANT_MESSAGES.settingsPendingStyle(value),
+                );
+              }}
             />
 
             <AiReplyWaitSelect
               value={replyWaitMs}
               disabled={isSaving}
-              onChange={setReplyWaitMs}
+              onChange={(value) => {
+                setReplyWaitMs(value);
+                toast.message(
+                  AI_ASSISTANT_MESSAGES.settingsPendingReplyWait(value),
+                );
+              }}
             />
 
             <AiLanguageSelect
               value={language}
               disabled={isSaving}
-              onChange={setLanguage}
+              onChange={(value) => {
+                setLanguage(value);
+                toast.message(
+                  AI_ASSISTANT_MESSAGES.settingsPendingLanguage(value),
+                );
+              }}
             />
+          </div>
+        );
 
+      case "permissions":
+        return (
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.agentPermissionsHint}
+            </p>
+            {showCalendarBookingWarning ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+                <p>{AI_ASSISTANT_MESSAGES.calendarBookingRequiresConnect}</p>
+                <Link
+                  href={DASHBOARD_ROUTES.integrations}
+                  className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
+                >
+                  Integrations
+                </Link>
+              </div>
+            ) : null}
+            {renderPermissionGroup(
+              AI_ASSISTANT_MESSAGES.agentPermissionsCrmTitle,
+              CRM_PERMISSION_ROWS,
+            )}
+            {renderPermissionGroup(
+              AI_ASSISTANT_MESSAGES.agentPermissionsAlertsTitle,
+              ALERT_PERMISSION_ROWS,
+            )}
+          </div>
+        );
+
+      case "data-collection":
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.dataCollectionDescription}
+            </p>
+            <DataCollectionFieldsEditor
+              niche={collectionNiche}
+              fields={dataCollectionFields}
+              onNicheChange={(niche) => {
+                setCollectionNiche(niche);
+                toast.message(
+                  AI_ASSISTANT_MESSAGES.settingsPendingNiche(niche),
+                );
+              }}
+              onFieldsChange={setDataCollectionFields}
+            />
+          </div>
+        );
+
+      case "schedule":
+        return (
+          <div className="space-y-6">
             <AiAgentScheduleEditor
               enabled={scheduleEnabled}
               timezone={scheduleTimezone}
@@ -439,9 +603,13 @@ export function AiAssistantEditPanel({
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={crmUpdateMode}
                 disabled={isSaving}
-                onChange={(event) =>
-                  setCrmUpdateMode(event.target.value as CrmUpdateMode)
-                }
+                onChange={(event) => {
+                  const next = event.target.value as CrmUpdateMode;
+                  setCrmUpdateMode(next);
+                  toast.message(
+                    AI_ASSISTANT_MESSAGES.settingsPendingCrmMode(next),
+                  );
+                }}
               >
                 <option value="every_message">
                   {AI_ASSISTANT_MESSAGES.crmUpdateModeEveryMessage}
@@ -453,21 +621,6 @@ export function AiAssistantEditPanel({
                   {AI_ASSISTANT_MESSAGES.crmUpdateModeOnResolve}
                 </option>
               </select>
-            </div>
-
-            <div className="space-y-3 rounded-lg border p-4">
-              <div>
-                <Label>{AI_ASSISTANT_MESSAGES.dataCollectionTitle}</Label>
-                <p className="text-xs text-muted-foreground">
-                  {AI_ASSISTANT_MESSAGES.dataCollectionDescription}
-                </p>
-              </div>
-              <DataCollectionFieldsEditor
-                niche={collectionNiche}
-                fields={dataCollectionFields}
-                onNicheChange={setCollectionNiche}
-                onFieldsChange={setDataCollectionFields}
-              />
             </div>
 
             <div className="space-y-3 rounded-lg border p-4">
@@ -490,89 +643,159 @@ export function AiAssistantEditPanel({
                 />
               </label>
               <p className="text-xs text-muted-foreground">
-                {AI_ASSISTANT_MESSAGES.followUpAgentStats(followUpAgent.sentCount)}
+                {AI_ASSISTANT_MESSAGES.followUpAgentStats(
+                  followUpAgent.sentCount,
+                )}
               </p>
             </div>
+          </div>
+        );
 
-            <div className="space-y-4">
-              <div>
-                <Label>{AI_ASSISTANT_MESSAGES.agentPermissionsTitle}</Label>
-                <p className="text-xs text-muted-foreground">
-                  {AI_ASSISTANT_MESSAGES.agentPermissionsHint}
-                </p>
-              </div>
-              {showCalendarBookingWarning ? (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-                  <p>{AI_ASSISTANT_MESSAGES.calendarBookingRequiresConnect}</p>
-                  <Link
-                    href={DASHBOARD_ROUTES.integrations}
-                    className="mt-1 inline-block text-sm font-medium underline underline-offset-2"
-                  >
-                    Integrations
-                  </Link>
-                </div>
-              ) : null}
-              {renderPermissionGroup(
-                AI_ASSISTANT_MESSAGES.agentPermissionsCrmTitle,
-                CRM_PERMISSION_ROWS,
-              )}
-              {renderPermissionGroup(
-                AI_ASSISTANT_MESSAGES.agentPermissionsAlertsTitle,
-                ALERT_PERMISSION_ROWS,
-              )}
-            </div>
+      case "sales":
+        return <SalesAgentRulesPanel initialSettings={salesAgent} />;
 
-            <Card className="border-destructive/30 shadow-none">
-              <CardHeader>
-                <CardTitle className="text-base">Agent activation</CardTitle>
-                <CardDescription>
-                  Deactivating stops autonomous customer replies. CRM/calendar
-                  actions will not run until you activate the agent again.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Status: {permissions.canReply ? "Active" : "Deactivated"}
-                </p>
-                <Button
-                  type="button"
-                  variant={permissions.canReply ? "destructive" : "default"}
-                  disabled={isSaving}
-                  onClick={() => void handleDeactivateClick()}
+      case "activation":
+        return (
+          <div className="space-y-4">
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium">
+                Status:{" "}
+                <span
+                  className={
+                    permissions.canReply ? "text-emerald-600" : "text-destructive"
+                  }
                 >
-                  {permissions.canReply
-                    ? deactivateStep === 0
-                      ? "Deactivate agent"
-                      : deactivateStep === 1
-                        ? "Confirm deactivation"
-                        : "Final confirm"
-                    : "Activate agent"}
-                </Button>
+                  {permissions.canReply ? "Active" : "Deactivated"}
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Deactivating stops autonomous customer replies. CRM and calendar
+                actions will not run until you activate the agent again.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant={permissions.canReply ? "destructive" : "default"}
+              disabled={isSaving}
+              onClick={() => void handleDeactivateClick()}
+            >
+              {permissions.canReply
+                ? deactivateStep === 0
+                  ? "Deactivate agent"
+                  : deactivateStep === 1
+                    ? "Confirm deactivation"
+                    : "Final confirm"
+                : "Activate agent"}
+            </Button>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        {onBack ? (
+          <Button type="button" variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeftIcon className="size-4" />
+            {backLabel}
+          </Button>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <Link href={backHref}>
+              <ArrowLeftIcon className="size-4" />
+              {backLabel}
+            </Link>
+          </Button>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {AI_ASSISTANT_MESSAGES.assistantEditTitle}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {activeTabMeta.label}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[15rem_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col overflow-y-auto border-b bg-muted/10 lg:border-b-0 lg:border-r">
+          <nav className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:p-3">
+            {SETTINGS_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors lg:w-full",
+                    getNavSegmentActiveClassName(isActive),
+                  )}
+                >
+                  <Icon className="size-4 shrink-0 opacity-80" />
+                  <span className="font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="flex min-h-0 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+            <Card className="flex min-h-[calc(100vh-12rem)] flex-col shadow-none">
+              <CardHeader className="border-b">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                    <ActiveTabIcon className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg">{activeTabMeta.label}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {activeTabMeta.description}
+                    </CardDescription>
+                    {activeTab === "behavior" ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {AI_ASSISTANT_MESSAGES.assistantReplyEngineNote}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <div className="flex-1">{renderTabContent()}</div>
+
+                {TABS_WITH_PROFILE_SAVE.has(activeTab) ? (
+                  <div className="sticky bottom-0 -mx-4 mt-auto border-t bg-card px-4 py-4 md:-mx-6 md:px-6">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => void handleSaveCurrentTab()}
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2Icon className="size-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          AI_ASSISTANT_MESSAGES.settingsSaveTab
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        {AI_ASSISTANT_MESSAGES.settingsSaveHint}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" disabled={isSaving} onClick={() => void handleSave()}>
-                {isSaving ? (
-                  <>
-                    <Loader2Icon className="size-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  AI_ASSISTANT_MESSAGES.assistantEditSave
-                )}
-              </Button>
-              {onBack ? (
-                <Button type="button" variant="outline" disabled={isSaving} onClick={onBack}>
-                  Cancel
-                </Button>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-
-        <SalesAgentRulesPanel initialSettings={salesAgent} />
-        <BusinessAiKeysPanel initialSettings={businessAiKeys} />
+          </div>
+        </main>
       </div>
     </div>
   );
