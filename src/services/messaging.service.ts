@@ -440,14 +440,7 @@ export async function processChannelAutoReply(input: {
 
   // Chat auto-replies are always text. Voice is reserved for phone calls only.
   let messageContent = reply.text;
-  let sendResult: {
-    success: boolean;
-    error?: string;
-    emailSubject?: string;
-    sentText?: string;
-  };
-
-  sendResult = await sendChannelAutoReplyText({
+  const sendResult = await sendChannelAutoReplyText({
     admin,
     businessId,
     channel,
