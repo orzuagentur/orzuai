@@ -498,17 +498,14 @@ async function completeInboundTelegramMessage(input: {
     .eq("id", connection.id);
 
   if (!shouldDeferAutoReplyForInboundVoice(content)) {
-    void scheduleInboundMessageProcessing({
+    // Must await enqueue so the AI reply job is persisted before the webhook
+    // request ends. Drain itself stays deferred (after/QStash) — do not await LLM.
+    await scheduleInboundMessageProcessing({
       admin,
       businessId,
       channel: "telegram",
       conversationId,
       clientMessage: getMessagePlainText(content),
-    }).catch((error) => {
-      console.error(
-        "[telegram] scheduleInboundMessageProcessing failed",
-        error instanceof Error ? error.message : "unknown",
-      );
     });
   }
 }

@@ -918,17 +918,14 @@ async function completeInboundWhatsAppMessage(input: {
     .eq("id", connection.id);
 
   if (!shouldDeferAutoReplyForInboundVoice(content)) {
-    void scheduleInboundMessageProcessing({
+    // Must await enqueue so the AI reply job is persisted before the webhook
+    // request ends. Drain itself stays deferred (after/QStash) — do not await LLM.
+    await scheduleInboundMessageProcessing({
       admin,
       businessId,
       channel: "whatsapp",
       conversationId,
       clientMessage: getMessagePlainText(content),
-    }).catch((error) => {
-      console.error(
-        "[whatsapp] scheduleInboundMessageProcessing failed",
-        error instanceof Error ? error.message : "unknown",
-      );
     });
   }
 }

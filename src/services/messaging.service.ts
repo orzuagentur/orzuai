@@ -590,15 +590,12 @@ export async function scheduleInboundMessageProcessing(input: {
     console.error("[messaging] immediate human request failed", error);
   });
 
-  void scheduleChannelAutoReply({
+  // Await enqueue + drain scheduling so `after()` / QStash register while the
+  // request is still alive. Do not await the LLM itself.
+  await scheduleChannelAutoReply({
     businessId: input.businessId,
     channel: input.channel,
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
-  }).catch((error) => {
-    console.error(
-      "[messaging] scheduleChannelAutoReply failed",
-      error instanceof Error ? error.message : "unknown",
-    );
   });
 }

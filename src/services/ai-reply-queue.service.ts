@@ -5,6 +5,7 @@ import { createHash } from "crypto";
 import { claimAiReplyJobs } from "@/lib/queue/claim-jobs";
 import { dispatchAiReplyQueueWorker } from "@/lib/queue/qstash-ai-reply-worker";
 import { scheduleAfterResponse } from "@/lib/queue/schedule-deferred";
+import { sleep } from "@/lib/queue/sleep";
 import {
   getWorkerConcurrency,
   runWithConcurrency,
@@ -289,21 +290,23 @@ function scheduleDebouncedAiReplyDrain(replyWaitMs: number): void {
   });
 }
 
-export function dispatchAiReplyWorker(
+export async function dispatchAiReplyWorker(
   source: "enqueue" | "retry" = "enqueue",
   replyWaitMs: number = DEFAULT_AUTO_REPLY_DEBOUNCE_MS,
-): void {
+): Promise<{ qstashDispatched: boolean }> {
   scheduleDebouncedAiReplyDrain(replyWaitMs);
-  void dispatchAiReplyQueueWorker({
+  const result = await dispatchAiReplyQueueWorker({
     source,
     delaySeconds: Math.ceil(replyWaitMs / 1000) + 1,
-  }).then((result) => {
-    if (!result.dispatched) {
-      console.warn(
-        "[ai-reply-queue] QStash not configured; relying on deferred in-process drain and cron",
-      );
-    }
   });
+
+  if (!result.dispatched) {
+    console.warn(
+      "[ai-reply-queue] QStash not configured; relying on deferred in-process drain and cron",
+    );
+  }
+
+  return { qstashDispatched: result.dispatched };
 }
 
 export async function scheduleDebouncedChannelAutoReply(
@@ -374,9 +377,25 @@ export async function scheduleDebouncedChannelAutoReply(
 
   await notifyAutoReplyTyping(input.conversationId, true, typingContext);
 
-  // Always schedule a deferred/QStash drain. Do not await LLM inside the webhook —
-  // complex replies were timing out and leaving jobs stuck until a second message.
-  dispatchAiReplyWorker("enqueue", replyWaitMs);
+  // Register after()/QStash while the webhook request is still alive.
+  const { qstashDispatched } = await dispatchAiReplyWorker(
+    "enqueue",
+    replyWaitMs,
+  );
+
+  // Without QStash, after() alone is not always enough on cold serverless —
+  // drain inline after debounce so the first customer message still gets a reply.
+  if (!qstashDispatched) {
+    await sleep(getDebouncedDrainDelayMs(replyWaitMs));
+    try {
+      await drainAiReplyQueue();
+    } catch (error) {
+      console.error(
+        "[ai-reply-queue] inline drain failed after enqueue",
+        formatSupabaseError(error),
+      );
+    }
+  }
 }
 
 async function markAiReplyJobRetry(
