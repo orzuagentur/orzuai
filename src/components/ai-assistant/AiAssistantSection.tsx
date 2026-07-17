@@ -246,6 +246,7 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
             <AiVoiceAgentPanel
               profile={data.assistantProfile}
               elevenLabsConfigured={data.elevenLabsConfigured}
+              showPageHeader={false}
             />
           </div>
         </div>

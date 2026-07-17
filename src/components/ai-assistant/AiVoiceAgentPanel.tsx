@@ -2,10 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2Icon, PauseIcon, PlayIcon, SearchIcon, Volume2Icon } from "lucide-react";
+import {
+  Loader2Icon,
+  PauseIcon,
+  PlayIcon,
+  SearchIcon,
+  Volume2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AgentPowerToggle } from "@/components/ai-assistant/AgentPowerToggle";
+import { AiAssistantPageHeader } from "@/components/ai-assistant/AiAssistantShell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,8 +22,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { saveVoiceAgentSettingsAction } from "@/features/ai-assistant/actions/save-voice-agent-settings";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { cn } from "@/lib/utils";
 import type { AiAssistantProfileData } from "@/types/ai-assistant-profile.types";
 import type {
@@ -27,22 +35,23 @@ import type {
 type AiVoiceAgentPanelProps = {
   profile: AiAssistantProfileData;
   elevenLabsConfigured: boolean;
+  showPageHeader?: boolean;
 };
 
 const MODE_OPTIONS: Array<{
   value: VoiceReplyMode;
-  label: string;
-  description: string;
+  labelKey: "voiceAgentModeMirrorLabel" | "voiceAgentModeAlwaysLabel";
+  descriptionKey: "voiceAgentModeMirrorHint" | "voiceAgentModeAlwaysHint";
 }> = [
   {
     value: "mirror",
-    label: "When customer sends voice",
-    description: "Reply with voice only after a voice message.",
+    labelKey: "voiceAgentModeMirrorLabel",
+    descriptionKey: "voiceAgentModeMirrorHint",
   },
   {
     value: "always",
-    label: "Always reply with voice",
-    description: "Send voice notes on Telegram and WhatsApp for every AI reply.",
+    labelKey: "voiceAgentModeAlwaysLabel",
+    descriptionKey: "voiceAgentModeAlwaysHint",
   },
 ];
 
@@ -55,6 +64,7 @@ function formatVoiceMeta(voice: ElevenLabsVoiceSummary): string {
 export function AiVoiceAgentPanel({
   profile,
   elevenLabsConfigured,
+  showPageHeader = true,
 }: AiVoiceAgentPanelProps) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(profile.voiceReplyEnabled);
@@ -189,7 +199,7 @@ export function AiVoiceAgentPanel({
 
   async function handleSave() {
     if (enabled && !selectedVoiceId) {
-      toast.error("Select a voice before enabling voice replies.");
+      toast.error(AI_ASSISTANT_MESSAGES.voiceAgentSelectVoiceError);
       return;
     }
 
@@ -204,11 +214,13 @@ export function AiVoiceAgentPanel({
       });
 
       if (!result.success) {
-        toast.error(result.message ?? "Unable to save voice agent settings.");
+        toast.error(
+          result.message ?? AI_ASSISTANT_MESSAGES.voiceAgentSaveFailed,
+        );
         return;
       }
 
-      toast.success("Voice agent settings saved.");
+      toast.success(AI_ASSISTANT_MESSAGES.voiceAgentSaved);
       router.refresh();
     } finally {
       setIsSaving(false);
@@ -216,40 +228,61 @@ export function AiVoiceAgentPanel({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
-      <Card className="shadow-none">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <Volume2Icon className="size-5" />
-              Voice Agent
-            </CardTitle>
-            <CardDescription>
-              Let the AI Agent answer customers with ElevenLabs voice notes on
-              Telegram and WhatsApp.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium">
-              {enabled ? "Enabled" : "Disabled"}
-            </span>
-            <AgentPowerToggle
-              enabled={enabled}
-              disabled={!elevenLabsConfigured || isSaving}
-              onChange={setEnabled}
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {!elevenLabsConfigured ? (
-            <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-              Add <code className="text-foreground">ELEVENLABS_API_KEY</code> to
-              the server environment to load voices and send AI voice replies.
-            </div>
-          ) : null}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {showPageHeader ? (
+        <AiAssistantPageHeader
+          title={AI_ASSISTANT_MESSAGES.voiceAgentTitle}
+          description={AI_ASSISTANT_MESSAGES.voiceAgentDescription}
+          backHref={DASHBOARD_ROUTES.aiAssistant}
+          backLabel={AI_ASSISTANT_MESSAGES.voiceAgentBack}
+        />
+      ) : null}
 
-          <div className="space-y-3">
-            <Label>When to reply with voice</Label>
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 md:p-8">
+        {!elevenLabsConfigured ? (
+          <Card className="border-dashed shadow-none">
+            <CardContent className="py-4 text-sm text-muted-foreground">
+              {AI_ASSISTANT_MESSAGES.voiceAgentNotConfigured}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card className="shadow-none">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                <Volume2Icon className="size-4" />
+              </div>
+              <div className="space-y-1">
+                <CardTitle className="text-lg">
+                  {AI_ASSISTANT_MESSAGES.voiceAgentActivationTitle}
+                </CardTitle>
+                <CardDescription>
+                  {AI_ASSISTANT_MESSAGES.voiceAgentActivationHint}
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {enabled ? "Enabled" : "Disabled"}
+              </span>
+              <AgentPowerToggle
+                enabled={enabled}
+                disabled={!elevenLabsConfigured || isSaving}
+                onChange={setEnabled}
+              />
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle>{AI_ASSISTANT_MESSAGES.voiceAgentModeTitle}</CardTitle>
+            <CardDescription>
+              {AI_ASSISTANT_MESSAGES.voiceAgentModeHint}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="grid gap-3 md:grid-cols-2">
               {MODE_OPTIONS.map((option) => {
                 const active = voiceReplyMode === option.value;
@@ -258,117 +291,127 @@ export function AiVoiceAgentPanel({
                   <button
                     key={option.value}
                     type="button"
-                    disabled={!elevenLabsConfigured}
+                    disabled={!elevenLabsConfigured || isSaving}
                     onClick={() => setVoiceReplyMode(option.value)}
                     className={cn(
                       "rounded-xl border p-4 text-left transition-colors",
                       active
                         ? "border-primary bg-primary/5"
                         : "hover:bg-muted/30",
+                      (!elevenLabsConfigured || isSaving) &&
+                        "cursor-not-allowed opacity-60",
                     )}
                   >
-                    <p className="font-medium">{option.label}</p>
+                    <p className="font-medium">
+                      {AI_ASSISTANT_MESSAGES[option.labelKey]}
+                    </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {option.description}
+                      {AI_ASSISTANT_MESSAGES[option.descriptionKey]}
                     </p>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <Card className="shadow-none">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <Label>Choose AI voice</Label>
-                <p className="text-sm text-muted-foreground">
-                  Listen to samples and pick the voice your customers will hear.
-                </p>
+                <CardTitle>{AI_ASSISTANT_MESSAGES.voiceAgentPickerTitle}</CardTitle>
+                <CardDescription className="mt-1">
+                  {AI_ASSISTANT_MESSAGES.voiceAgentPickerHint}
+                </CardDescription>
               </div>
               {selectedVoiceName ? (
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                  Selected: {selectedVoiceName}
+                  {AI_ASSISTANT_MESSAGES.voiceAgentSelected(selectedVoiceName)}
                 </span>
               ) : null}
             </div>
-
+          </CardHeader>
+          <CardContent className="space-y-3">
             <div className="relative">
               <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name, accent, gender..."
+                placeholder={AI_ASSISTANT_MESSAGES.voiceAgentSearchPlaceholder}
                 className="pl-9"
-                disabled={!elevenLabsConfigured}
+                disabled={!elevenLabsConfigured || isSaving}
               />
             </div>
 
             {isLoadingVoices ? (
               <div className="flex items-center justify-center gap-2 rounded-xl border py-12 text-sm text-muted-foreground">
                 <Loader2Icon className="size-4 animate-spin" />
-                Loading ElevenLabs voices...
+                {AI_ASSISTANT_MESSAGES.voiceAgentLoading}
               </div>
             ) : voicesError ? (
               <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
                 {voicesError}
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {filteredVoices.map((voice) => {
-                  const selected = selectedVoiceId === voice.voiceId;
-                  const playing = playingVoiceId === voice.voiceId;
-                  const meta = formatVoiceMeta(voice);
+              <div className="max-h-[28rem] overflow-y-auto pr-1">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {filteredVoices.map((voice) => {
+                    const selected = selectedVoiceId === voice.voiceId;
+                    const playing = playingVoiceId === voice.voiceId;
+                    const meta = formatVoiceMeta(voice);
 
-                  return (
-                    <div
-                      key={voice.voiceId}
-                      className={cn(
-                        "rounded-xl border p-4 transition-colors",
-                        selected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "hover:bg-muted/20",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left"
-                          onClick={() => selectVoice(voice)}
-                        >
-                          <p className="font-medium">{voice.name}</p>
-                          {meta ? (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {meta}
-                            </p>
-                          ) : null}
-                          {voice.description ? (
-                            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                              {voice.description}
-                            </p>
-                          ) : null}
-                        </button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          disabled={!voice.previewUrl}
-                          onClick={() => togglePreview(voice)}
-                          aria-label={
-                            playing
-                              ? `Pause ${voice.name} preview`
-                              : `Play ${voice.name} preview`
-                          }
-                        >
-                          {playing ? (
-                            <PauseIcon className="size-4" />
-                          ) : (
-                            <PlayIcon className="size-4" />
-                          )}
-                        </Button>
+                    return (
+                      <div
+                        key={voice.voiceId}
+                        className={cn(
+                          "rounded-xl border p-4 transition-colors",
+                          selected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "hover:bg-muted/20",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 text-left"
+                            disabled={isSaving}
+                            onClick={() => selectVoice(voice)}
+                          >
+                            <p className="font-medium">{voice.name}</p>
+                            {meta ? (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {meta}
+                              </p>
+                            ) : null}
+                            {voice.description ? (
+                              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                                {voice.description}
+                              </p>
+                            ) : null}
+                          </button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            disabled={!voice.previewUrl || isSaving}
+                            onClick={() => togglePreview(voice)}
+                            aria-label={
+                              playing
+                                ? `Pause ${voice.name} preview`
+                                : `Play ${voice.name} preview`
+                            }
+                          >
+                            {playing ? (
+                              <PauseIcon className="size-4" />
+                            ) : (
+                              <PlayIcon className="size-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -377,29 +420,29 @@ export function AiVoiceAgentPanel({
             filteredVoices.length === 0 &&
             elevenLabsConfigured ? (
               <p className="text-sm text-muted-foreground">
-                No voices match your search.
+                {AI_ASSISTANT_MESSAGES.voiceAgentNoResults}
               </p>
             ) : null}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              disabled={isSaving || !elevenLabsConfigured}
-              onClick={() => void handleSave()}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2Icon className="size-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save voice settings"
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="sticky bottom-4 flex justify-end">
+          <Button
+            type="button"
+            disabled={isSaving || !elevenLabsConfigured}
+            onClick={() => void handleSave()}
+          >
+            {isSaving ? (
+              <>
+                <Loader2Icon className="size-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              AI_ASSISTANT_MESSAGES.voiceAgentSave
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -128,6 +128,34 @@ export const AI_ASSISTANT_MESSAGES = {
   channelAiBehaviorSave: "Save",
   channelAiBehaviorSaved: "Channel AI settings saved. The agent will use them on this channel.",
   channelAiBehaviorSaveFailed: "Unable to save channel AI settings.",
+  voiceAgentTitle: "Voice replies",
+  voiceAgentDescription:
+    "Send AI voice notes on Telegram and WhatsApp using ElevenLabs. Phone calls use the Voice integration.",
+  voiceAgentBack: "Dashboard",
+  voiceAgentActivationTitle: "Voice replies",
+  voiceAgentActivationHint:
+    "When enabled, the AI Agent can answer with voice notes instead of text on supported channels.",
+  voiceAgentModeTitle: "When to reply with voice",
+  voiceAgentModeHint:
+    "Choose whether voice notes are sent only after a customer voice message or on every reply.",
+  voiceAgentModeMirrorLabel: "When customer sends voice",
+  voiceAgentModeMirrorHint: "Reply with voice only after a voice message.",
+  voiceAgentModeAlwaysLabel: "Always reply with voice",
+  voiceAgentModeAlwaysHint:
+    "Send voice notes on Telegram and WhatsApp for every AI reply.",
+  voiceAgentPickerTitle: "AI voice",
+  voiceAgentPickerHint:
+    "Listen to samples and pick the voice your customers will hear.",
+  voiceAgentSelected: (name: string) => `Selected: ${name}`,
+  voiceAgentSearchPlaceholder: "Search by name, accent, gender…",
+  voiceAgentLoading: "Loading ElevenLabs voices…",
+  voiceAgentNoResults: "No voices match your search.",
+  voiceAgentNotConfigured:
+    "Add ELEVENLABS_API_KEY to the server environment to load voices and send AI voice replies.",
+  voiceAgentSave: "Save",
+  voiceAgentSaved: "Voice reply settings saved.",
+  voiceAgentSaveFailed: "Unable to save voice reply settings.",
+  voiceAgentSelectVoiceError: "Select a voice before enabling voice replies.",
   channelsTitle: "Channels",
   channelAgentActive: "AI Agent enabled on this channel",
   channelAgentInactive: "AI Agent off on this channel",
