@@ -103,7 +103,11 @@ export function BillingWhatsAppPanel({ data }: BillingWhatsAppPanelProps) {
       <ActivityChart
         data={chartData}
         title="WhatsApp message volume"
-        description="Messages per day over the last 30 days."
+        description="Messages per day over time. Use the clock to change the period."
+        valueNoun="messages"
+        initialDays={30}
+        strokeColor="rgb(37 211 102)"
+        fillId="billingWhatsappVolumeFill"
       />
 
     </div>

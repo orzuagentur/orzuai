@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3, MessageSquareIcon } from "lucide-react";
 
+import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,8 +56,6 @@ export function ChannelAnalyticsPanel({ data }: ChannelAnalyticsPanelProps) {
     },
   ];
 
-  const maxActivity = Math.max(...data.activity.map((point) => point.value), 1);
-
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <Card className="shadow-none">
@@ -107,35 +106,14 @@ export function ChannelAnalyticsPanel({ data }: ChannelAnalyticsPanelProps) {
         </CardContent>
       </Card>
 
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle className="text-base">
-            {CHANNEL_WORKSPACE_MESSAGES.activityTitle}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-36 items-end gap-2">
-            {data.activity.map((point) => (
-              <div
-                key={point.label}
-                className="flex min-w-0 flex-1 flex-col items-center gap-2"
-              >
-                <div
-                  className="w-full rounded-t-md bg-primary/80 transition-all"
-                  style={{
-                    height: `${Math.max(8, (point.value / maxActivity) * 100)}%`,
-                    minHeight: point.value > 0 ? "0.5rem" : "0.25rem",
-                  }}
-                  title={`${point.value} messages`}
-                />
-                <span className="text-[10px] text-muted-foreground">
-                  {point.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <ActivityChart
+        data={data.activity}
+        title={CHANNEL_WORKSPACE_MESSAGES.activityTitle}
+        description="Message volume over time. Use the clock to change the period."
+        valueNoun="messages"
+        initialDays={7}
+        fillId={`channel-${data.channel}-activityFill`}
+      />
 
       <Card className="shadow-none">
         <CardHeader>

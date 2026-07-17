@@ -7,6 +7,7 @@ import type { CannedResponseItem } from "@/types/canned-response.types";
 
 type EmailChatComposerProps = {
   conversationId: string;
+  contactId?: string | null;
   internalNote: string | null;
   subject: string;
   onSubjectChange: (value: string) => void;

@@ -121,7 +121,7 @@ export async function createCustomAutomation(
     return { success: false, message: error.message };
   }
 
-  revalidatePath(DASHBOARD_ROUTES.automations);
+  revalidatePath(DASHBOARD_ROUTES.overview);
   return { success: true, id: data.id };
 }
 
@@ -147,7 +147,7 @@ export async function toggleCustomAutomation(
     return { success: false, message: error.message };
   }
 
-  revalidatePath(DASHBOARD_ROUTES.automations);
+  revalidatePath(DASHBOARD_ROUTES.overview);
   return { success: true };
 }
 
@@ -172,6 +172,6 @@ export async function deleteCustomAutomation(
     return { success: false, message: error.message };
   }
 
-  revalidatePath(DASHBOARD_ROUTES.automations);
+  revalidatePath(DASHBOARD_ROUTES.overview);
   return { success: true };
 }

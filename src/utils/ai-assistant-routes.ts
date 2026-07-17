@@ -10,7 +10,7 @@ export function getAiAssistantTabPath(tab: AiAgentTab): string {
     case "knowledge":
       return DASHBOARD_ROUTES.aiAssistantKnowledge;
     case "voice":
-      return DASHBOARD_ROUTES.aiAssistantVoice;
+      return `${DASHBOARD_ROUTES.aiAssistantSettings}?tab=voice`;
     case "settings":
       return DASHBOARD_ROUTES.aiAssistantSettings;
     default:
@@ -28,7 +28,7 @@ export function resolveAiAgentTabFromPathname(pathname: string): AiAgentTab {
   }
 
   if (pathname.startsWith(DASHBOARD_ROUTES.aiAssistantVoice)) {
-    return "voice";
+    return "settings";
   }
 
   if (pathname.startsWith(DASHBOARD_ROUTES.aiAssistantSettings)) {

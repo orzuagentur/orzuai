@@ -241,15 +241,6 @@ export function InboxDetailsPanel({
                 </div>
               ) : null}
 
-              {contact.customFields.notes ? (
-                <p className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
-                  <span className="font-medium text-foreground">
-                    {CONTACTS_MESSAGES.notesLabel}:{" "}
-                  </span>
-                  {contact.customFields.notes}
-                </p>
-              ) : null}
-
               <Button variant="link" size="sm" className="h-auto p-0" asChild>
                 <Link href={crmHref}>{CHAT_MESSAGES.viewInCrm}</Link>
               </Button>

@@ -32,11 +32,19 @@ type PeriodBounds = {
 };
 
 function getPeriodBounds(period: AnalyticsPeriod): PeriodBounds {
-  if (period === "all") {
-    return { start: null, prevStart: null, prevEnd: null };
+  const now = new Date();
+
+  if (period === "24h") {
+    const start = new Date(now);
+    start.setHours(start.getHours() - 24);
+    const prevEnd = new Date(start);
+    prevEnd.setMilliseconds(prevEnd.getMilliseconds() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setHours(prevStart.getHours() - 24);
+    return { start, prevStart, prevEnd };
   }
 
-  const days = period === "7d" ? 7 : 30;
+  const days = period === "7d" ? 7 : period === "14d" ? 14 : 30;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - (days - 1));
@@ -52,14 +60,9 @@ function getPeriodBounds(period: AnalyticsPeriod): PeriodBounds {
 }
 
 function activityDaysForPeriod(period: AnalyticsPeriod): number {
-  if (period === "30d") {
-    return 30;
-  }
-
-  if (period === "all") {
-    return 30;
-  }
-
+  if (period === "24h") return 1;
+  if (period === "14d") return 14;
+  if (period === "30d") return 30;
   return 7;
 }
 
@@ -322,8 +325,8 @@ export async function getAnalyticsPulseData(
   }
 
   const bounds = getPeriodBounds(period);
-  const hasComparison = period !== "all";
-  const rangeEnd = hasComparison ? null : null;
+  const hasComparison = true;
+  const rangeEnd = null;
 
   const [
     newContacts,
@@ -495,11 +498,11 @@ export async function buildAnalyticsAttentionFeed(input: {
     items.push({
       id: "automations_ran_today",
       severity: "info",
-      title: ANALYTICS_MESSAGES.attentionAutomationsTitle(
+      title: ANALYTICS_MESSAGES.attentionAiActivityTitle(
         automationRunsToday ?? 0,
       ),
-      href: `${DASHBOARD_ROUTES.automations}?tab=activity`,
-      actionLabel: ANALYTICS_MESSAGES.attentionViewAutomations,
+      href: DASHBOARD_ROUTES.analytics,
+      actionLabel: ANALYTICS_MESSAGES.attentionViewAnalytics,
     });
   }
 

@@ -675,23 +675,12 @@ export function PlansManagerPanel({
                   })
                 }
               />
-              <NumberField
-                label="Automation rules"
-                value={editing.entitlements.maxAutomationRules}
-                onChange={(value) =>
-                  setEditing({
-                    ...editing,
-                    entitlements: { ...editing.entitlements, maxAutomationRules: value },
-                  })
-                }
-              />
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(
                 [
                   ["voiceAi", "Voice AI"],
-                  ["automations", "Automations"],
                   ["followUpAgent", "Follow-up agent"],
                   ["analyticsAiAsk", "Analytics AI Ask"],
                   ["gmailIntegration", "Gmail"],

@@ -13,7 +13,6 @@ import {
   ReceiptTextIcon,
   ShieldCheckIcon,
   WalletCardsIcon,
-  ZapIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -500,7 +499,7 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
       </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <UsageMetricCard
           title="AI replies"
           value={aiUsageLabel}
@@ -532,17 +531,6 @@ export function SubscriptionHub({ data, embedded = false }: SubscriptionHubProps
             data.usage.usedVoiceMinutes,
             data.usage.monthlyVoiceLimit,
           )}
-        />
-        <UsageMetricCard
-          title="Automations"
-          value={formatNumber(data.usage.automationCount)}
-          detail={formatQuota(
-            data.usage.automationCount,
-            data.usage.maxAutomations,
-            "automations",
-          )}
-          icon={ZapIcon}
-          percent={quotaPercent(data.usage.automationCount, data.usage.maxAutomations)}
         />
       </div>
 

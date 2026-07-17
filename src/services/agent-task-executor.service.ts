@@ -69,6 +69,7 @@ export type ContactSnapshot = {
   pipelineStage: PipelineStage;
   dealValue: number | null;
   expectedCloseDate: string | null;
+  aiSummary: string | null;
 };
 
 const GENERIC_CONTACT_NAMES = new Set([
@@ -211,7 +212,7 @@ export async function loadContactSnapshot(
   const { data } = await admin
     .from("contacts")
     .select(
-      "id, name, phone_number, email, tags, custom_fields, pipeline_stage, deal_value, expected_close_date",
+      "id, name, phone_number, email, tags, custom_fields, pipeline_stage, deal_value, expected_close_date, ai_summary",
     )
     .eq("id", contactId)
     .eq("business_id", businessId)
@@ -231,6 +232,7 @@ export async function loadContactSnapshot(
     pipelineStage: parsePipelineStage(data.pipeline_stage),
     dealValue: data.deal_value,
     expectedCloseDate: data.expected_close_date,
+    aiSummary: data.ai_summary?.trim() || null,
   };
 }
 
@@ -1305,10 +1307,21 @@ async function applyAddNote(
     notes: nextNotes.slice(0, 4000),
   };
 
+  const existingDescription = contact.aiSummary?.trim() ?? "";
+
+  // Prefer a fresh portrait for the CRM client description field; keep owner text
+  // if the new line is already covered.
+  const nextDescription =
+    existingDescription &&
+    existingDescription.toLowerCase().includes(noteLine.toLowerCase())
+      ? existingDescription
+      : noteLine.slice(0, 800);
+
   const { error } = await admin
     .from("contacts")
     .update({
       custom_fields: customFields as unknown as Record<string, string>,
+      ai_summary: nextDescription,
     })
     .eq("id", contact.id)
     .eq("business_id", businessId);

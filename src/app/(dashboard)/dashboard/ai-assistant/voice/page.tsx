@@ -1,19 +1,7 @@
-import { AiVoiceAgentPanel } from "@/components/ai-assistant/AiVoiceAgentPanel";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { getAiAssistantPageData } from "@/services/ai-assistant.service";
 import { redirect } from "next/navigation";
 
-export default async function AiAssistantVoicePage() {
-  const data = await getAiAssistantPageData();
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
-  if (!data.assistantProfile) {
-    redirect(DASHBOARD_ROUTES.aiAssistant);
-  }
-
-  return (
-    <AiVoiceAgentPanel
-      profile={data.assistantProfile}
-      elevenLabsConfigured={data.elevenLabsConfigured}
-    />
-  );
+export default function AiAssistantVoicePage() {
+  redirect(`${DASHBOARD_ROUTES.aiAssistantSettings}?tab=voice`);
 }

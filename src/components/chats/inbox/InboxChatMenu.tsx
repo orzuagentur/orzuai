@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  CameraIcon,
-  FileTextIcon,
   Loader2Icon,
   MoreHorizontalIcon,
   Trash2Icon,
@@ -31,10 +29,6 @@ import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { deleteContactAction } from "@/features/contacts/actions/delete-contact";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import type { ConversationDetail } from "@/types/chat.types";
-import {
-  downloadConversationScreenshot,
-  downloadConversationTranscript,
-} from "@/utils/export-conversation-screenshot";
 
 type InboxChatMenuProps = {
   conversation: ConversationDetail;
@@ -47,29 +41,6 @@ export function InboxChatMenu({
 }: InboxChatMenuProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-
-  async function handleExportScreenshot() {
-    setIsExporting(true);
-
-    try {
-      await downloadConversationScreenshot(conversation);
-      toast.success(CHAT_MESSAGES.exportChatSuccess);
-    } catch {
-      toast.error(CHAT_MESSAGES.exportChatFailed);
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
-  function handleExportTranscript() {
-    try {
-      downloadConversationTranscript(conversation);
-      toast.success(CHAT_MESSAGES.exportChatSuccess);
-    } catch {
-      toast.error(CHAT_MESSAGES.exportChatFailed);
-    }
-  }
 
   async function handleDeleteContact() {
     if (!conversation.contactId) {
@@ -107,30 +78,12 @@ export function InboxChatMenu({
             size="icon"
             className="size-8"
             aria-label={CHAT_MESSAGES.chatMenuLabel}
-            disabled={isExporting}
           >
-            {isExporting ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <MoreHorizontalIcon className="size-4" />
-            )}
+            <MoreHorizontalIcon className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>{CHAT_MESSAGES.chatMenuLabel}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              void handleExportScreenshot();
-            }}
-          >
-            <CameraIcon className="size-4" />
-            {CHAT_MESSAGES.exportChatScreenshot}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleExportTranscript}>
-            <FileTextIcon className="size-4" />
-            {CHAT_MESSAGES.exportChatTranscript}
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"

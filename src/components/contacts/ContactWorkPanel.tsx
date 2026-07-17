@@ -12,6 +12,7 @@ import {
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
+import { ContactClientDescriptionCard } from "@/components/contacts/ContactClientDescriptionCard";
 import { ContactDealsTable } from "@/components/contacts/ContactDealsTable";
 import { ContactMessagesTable } from "@/components/contacts/ContactMessagesTable";
 import { ContactTasksTable } from "@/components/contacts/ContactTasksTable";
@@ -28,7 +29,10 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { SMS_MESSAGES } from "@/features/sms/constants";
 import type { ContactProfileData } from "@/types/contact.types";
 import { cn } from "@/lib/utils";
-import { formatContactIdentifier } from "@/utils/contact-display";
+import {
+  canUseTwilioPhoneActions,
+  formatContactIdentifier,
+} from "@/utils/contact-display";
 import {
   getLeadScoreBadgeClassName,
   getLeadScoreLabel,
@@ -84,6 +88,7 @@ export function ContactWorkPanel({
   }
 
   const { contact } = profile;
+  const showTwilioPhoneActions = canUseTwilioPhoneActions(contact);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
@@ -122,34 +127,38 @@ export function ContactWorkPanel({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              asChild
-              aria-label={VOICE_MESSAGES.softphoneDialpadTitle}
-            >
-              <Link
-                href={`${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.identifier)}`}
-              >
-                <KeyboardIcon className="size-4" />
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              asChild
-              aria-label={SMS_MESSAGES.openThread}
-            >
-              <Link
-                href={`${DASHBOARD_ROUTES.chatsSms}?phone=${encodeURIComponent(contact.identifier)}`}
-              >
-                <MessageSquareIcon className="size-4" />
-              </Link>
-            </Button>
+            {showTwilioPhoneActions ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  asChild
+                  aria-label={VOICE_MESSAGES.softphoneDialpadTitle}
+                >
+                  <Link
+                    href={`${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.identifier)}`}
+                  >
+                    <KeyboardIcon className="size-4" />
+                  </Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  asChild
+                  aria-label={SMS_MESSAGES.openThread}
+                >
+                  <Link
+                    href={`${DASHBOARD_ROUTES.chatsSms}?phone=${encodeURIComponent(contact.identifier)}`}
+                  >
+                    <MessageSquareIcon className="size-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -199,6 +208,11 @@ export function ContactWorkPanel({
       </div>
 
       <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overflow-x-hidden px-6 py-5">
+        <ContactClientDescriptionCard
+          contactId={contact.id}
+          aiSummary={contact.aiSummary}
+          onRefresh={onRefresh}
+        />
         <ContactTasksTable
           contactId={contact.id}
           tasks={profile.tasks}

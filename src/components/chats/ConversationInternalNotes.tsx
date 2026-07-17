@@ -1,8 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2Icon, LockIcon, StickyNoteIcon } from "lucide-react";
+import { Loader2Icon, LockIcon, StickyNoteIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,37 +16,57 @@ type ConversationInternalNotesProps = {
   conversationId: string;
   initialNote: string | null;
   layout?: "default" | "compact";
+  onSaved?: (note: string | null) => void;
 };
 
 export function ConversationInternalNotes({
   conversationId,
   initialNote,
   layout = "default",
+  onSaved,
 }: ConversationInternalNotesProps) {
   const router = useRouter();
   const [note, setNote] = useState(initialNote ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
-  async function handleSave() {
+  useEffect(() => {
+    setNote(initialNote ?? "");
+  }, [conversationId, initialNote]);
+
+  async function persistNote(nextNote: string, successMessage: string) {
     setIsSaving(true);
 
     try {
       const result = await updateConversationInternalNoteAction({
         conversationId,
-        internalNote: note,
+        internalNote: nextNote,
       });
 
-      if (result.success) {
-        toast.success(CHAT_MESSAGES.internalNoteSaved);
-        router.refresh();
-        return;
+      if (!result.success) {
+        toast.error(result.message ?? CHAT_MESSAGES.genericError);
+        return false;
       }
 
-      toast.error(result.message ?? CHAT_MESSAGES.genericError);
+      const stored = nextNote.trim() || null;
+      setNote(nextNote);
+      onSaved?.(stored);
+      toast.success(successMessage);
+      router.refresh();
+      return true;
     } finally {
       setIsSaving(false);
     }
   }
+
+  async function handleSave() {
+    await persistNote(note, CHAT_MESSAGES.internalNoteSaved);
+  }
+
+  async function handleDelete() {
+    await persistNote("", CHAT_MESSAGES.internalNoteDeleted);
+  }
+
+  const hasNote = note.trim().length > 0;
 
   if (layout === "compact") {
     return (
@@ -80,29 +100,46 @@ export function ConversationInternalNotes({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder={CHAT_MESSAGES.internalNotesPlaceholder}
-            rows={6}
+            rows={5}
             className={cn(
-              "min-h-[140px] resize-y border-amber-200/70 bg-white/80 text-sm leading-relaxed",
+              "min-h-[120px] resize-y border-amber-200/70 bg-white/80 text-sm leading-relaxed",
               "placeholder:text-amber-900/35 focus-visible:border-amber-300 focus-visible:ring-amber-200/60",
               "dark:border-amber-900/40 dark:bg-amber-950/20 dark:placeholder:text-amber-100/30",
             )}
           />
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-amber-800/70 dark:text-amber-200/60">
               {CHAT_MESSAGES.internalNotesHint}
             </p>
-            <Button
-              type="button"
-              size="sm"
-              className="bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
-              disabled={isSaving}
-              onClick={() => {
-                void handleSave();
-              }}
-            >
-              {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              {CHAT_MESSAGES.internalNotesSave}
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasNote ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  disabled={isSaving}
+                  onClick={() => {
+                    void handleDelete();
+                  }}
+                >
+                  <Trash2Icon className="size-3.5" />
+                  {CHAT_MESSAGES.internalNotesDelete}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                className="bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+                disabled={isSaving}
+                onClick={() => {
+                  void handleSave();
+                }}
+              >
+                {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+                {CHAT_MESSAGES.internalNotesSave}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -130,18 +167,35 @@ export function ConversationInternalNotes({
           rows={2}
           className="resize-none bg-background"
         />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={isSaving}
-          onClick={() => {
-            void handleSave();
-          }}
-        >
-          {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-          {CHAT_MESSAGES.internalNotesSave}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isSaving}
+            onClick={() => {
+              void handleSave();
+            }}
+          >
+            {isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+            {CHAT_MESSAGES.internalNotesSave}
+          </Button>
+          {hasNote ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              disabled={isSaving}
+              onClick={() => {
+                void handleDelete();
+              }}
+            >
+              <Trash2Icon className="size-3.5" />
+              {CHAT_MESSAGES.internalNotesDelete}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

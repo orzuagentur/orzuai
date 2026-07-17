@@ -18,7 +18,6 @@ import {
 import { useAiAssistantChromeRegistration } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { AiAssistantEditPanel } from "@/components/ai-assistant/AiAssistantEditPanel";
 import { AiAssistantHubPanel } from "@/components/ai-assistant/AiAssistantHubPanel";
-import { AiVoiceAgentPanel } from "@/components/ai-assistant/AiVoiceAgentPanel";
 import { KnowledgeHubPanel } from "@/components/knowledge-base/KnowledgeHubPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -237,19 +236,6 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
 
       {activeTab === "knowledge" ? (
         <KnowledgeTab data={data} onBack={() => setActiveTab("dashboard")} />
-      ) : null}
-
-      {activeTab === "voice" && data.assistantProfile ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <AgentSectionBackButton onBack={() => setActiveTab("dashboard")} />
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <AiVoiceAgentPanel
-              profile={data.assistantProfile}
-              elevenLabsConfigured={data.elevenLabsConfigured}
-              showPageHeader={false}
-            />
-          </div>
-        </div>
       ) : null}
 
       {activeTab === "settings" && data.assistantProfile ? (

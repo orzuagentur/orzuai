@@ -1,107 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback } from "react";
-
-import { useAnalyticsChromeRegistration } from "@/components/analytics/analytics-chrome-context";
-import { AnalyticsChannelsPanel } from "@/components/analytics/AnalyticsChannelsPanel";
-import { AnalyticsAiOpsPanel } from "@/components/analytics/AnalyticsAiOpsPanel";
-import { AnalyticsPulsePanel } from "@/components/analytics/AnalyticsPulsePanel";
-import { AnalyticsSalesPanel } from "@/components/analytics/AnalyticsSalesPanel";
+import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import type { AnalyticsPageData } from "@/types/channel-workspace.types";
-import {
-  buildAnalyticsHref,
-  type AnalyticsPeriod,
-  type AnalyticsTab,
-} from "@/utils/analytics-url";
 
 type AnalyticsCommandCenterProps = {
   data: AnalyticsPageData;
 };
 
 export function AnalyticsCommandCenter({ data }: AnalyticsCommandCenterProps) {
-  const router = useRouter();
-
-  const handleTabChange = useCallback(
-    (tab: AnalyticsTab) => {
-      router.push(
-        buildAnalyticsHref({
-          tab,
-          period: data.activePeriod,
-          channel: tab === "channels" ? data.activeChannelId : null,
-        }),
-      );
-    },
-    [data.activeChannelId, data.activePeriod, router],
-  );
-
-  const handlePeriodChange = useCallback(
-    (period: AnalyticsPeriod) => {
-      router.push(
-        buildAnalyticsHref({
-          tab: data.activeTab,
-          period,
-          channel: data.activeTab === "channels" ? data.activeChannelId : null,
-        }),
-      );
-      router.refresh();
-    },
-    [data.activeChannelId, data.activeTab, router],
-  );
-
-  const handleClearChannel = useCallback(() => {
-    router.push(
-      buildAnalyticsHref({
-        tab: "channels",
-        period: data.activePeriod,
-        channel: null,
-      }),
-    );
-  }, [data.activePeriod, router]);
-
-  useAnalyticsChromeRegistration({
-    activeTab: data.activeTab,
-    onTabChange: handleTabChange,
-  });
-
   return (
     <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
-      {data.activeTab === "pulse" ? (
-        <AnalyticsPulsePanel
-          pulse={data.pulse}
-          activePeriod={data.activePeriod}
-          onPeriodChange={handlePeriodChange}
-        />
-      ) : null}
-
-      {data.activeTab === "channels" ? (
-        <AnalyticsChannelsPanel
-          data={data}
-          onClearChannel={handleClearChannel}
-        />
-      ) : null}
-
-      {data.activeTab === "sales" ? (
-        <AnalyticsSalesPanel
-          leadSources={data.leadSources}
-          crmFunnel={data.crmFunnel}
-          revenue={data.revenue}
-          sentiment={data.sentiment}
-        />
-      ) : null}
-
-      {data.activeTab === "ai_ops" ? (
-        <AnalyticsAiOpsPanel
-          aiPerformance={data.aiPerformance}
-          teamAnalytics={data.teamAnalytics}
-          responseTime={data.responseTime}
-          aiCost={data.aiCost}
-          agentStats={data.agentStats}
-          automationOps={data.automationOps}
-          agentRuns={data.agentRuns}
-          recentAgentRuns={data.recentAgentRuns}
-        />
-      ) : null}
+      <AnalyticsDashboard data={data} />
     </div>
   );
 }

@@ -17,12 +17,6 @@ function formatChannelLimit(maxMessagingChannels: number): string {
     : `${maxMessagingChannels} messaging channel${maxMessagingChannels === 1 ? "" : "s"}`;
 }
 
-function formatAutomationLimit(maxAutomationRules: number): string {
-  if (maxAutomationRules === 0) return "Automations not included";
-  if (isUnlimitedQuota(maxAutomationRules)) return "Unlimited automations";
-  return `Up to ${maxAutomationRules} automation rules`;
-}
-
 function buildPlanFeatures(planId: SubscriptionPlanId): string[] {
   const entitlements = getPlanEntitlements(planId);
 
@@ -33,7 +27,6 @@ function buildPlanFeatures(planId: SubscriptionPlanId): string[] {
     formatChannelLimit(entitlements.maxMessagingChannels),
     `${entitlements.maxTeamSeats} team seat${entitlements.maxTeamSeats === 1 ? "" : "s"}`,
     "Unified inbox + CRM + calendar",
-    formatAutomationLimit(entitlements.maxAutomationRules),
   ];
 
   if (entitlements.websiteKnowledgeSync) {
@@ -105,7 +98,7 @@ export const SUBSCRIPTION_PLANS: Record<
   },
   pro: {
     label: "Pro",
-    tagline: "Voice AI + full automation stack",
+    tagline: "Voice AI + full inbox and CRM stack",
     monthlyAiReplies: PLAN_ENTITLEMENTS.pro.monthlyAiReplies,
     priceMonthly: 129,
     highlighted: true,

@@ -79,7 +79,7 @@ const PLANS = [
     id: "starter",
     name: "OrzuX Starter",
     description:
-      "OrzuX Starter — unified AI inbox, CRM, and automations for growing local businesses. Billed monthly in USD.",
+      "OrzuX Starter — unified AI inbox and CRM for growing local businesses. Billed monthly in USD.",
     statementDescriptor: "ORZUX STARTER",
     unitAmount: 4900,
   },
@@ -87,7 +87,7 @@ const PLANS = [
     id: "pro",
     name: "OrzuX Pro",
     description:
-      "OrzuX Pro — Voice AI, full automation stack, Gmail integration, and advanced analytics. Billed monthly in USD.",
+      "OrzuX Pro — Voice AI, full inbox and CRM stack, Gmail integration, and advanced analytics. Billed monthly in USD.",
     statementDescriptor: "ORZUX PRO",
     unitAmount: 12900,
   },

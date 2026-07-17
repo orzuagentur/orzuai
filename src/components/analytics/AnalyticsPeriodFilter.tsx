@@ -12,9 +12,10 @@ type AnalyticsPeriodFilterProps = {
 };
 
 const PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
+  "24h": ANALYTICS_MESSAGES.period24h,
   "7d": ANALYTICS_MESSAGES.period7d,
+  "14d": ANALYTICS_MESSAGES.period14d,
   "30d": ANALYTICS_MESSAGES.period30d,
-  all: ANALYTICS_MESSAGES.periodAll,
 };
 
 export function AnalyticsPeriodFilter({
@@ -23,7 +24,7 @@ export function AnalyticsPeriodFilter({
   className,
 }: AnalyticsPeriodFilterProps) {
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {ANALYTICS_PERIODS.map((period) => (
         <Button
           key={period}

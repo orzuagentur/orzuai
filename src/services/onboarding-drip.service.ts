@@ -36,7 +36,7 @@ function getDripDashboardUrl(dripDay: OnboardingDripDay): string {
   }
 
   if (dripDay === 5) {
-    return `${base}${DASHBOARD_ROUTES.automations}`;
+    return `${base}${DASHBOARD_ROUTES.aiAssistant}`;
   }
 
   return `${base}${DASHBOARD_ROUTES.analytics}`;

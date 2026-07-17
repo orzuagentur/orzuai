@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { AnalyticsChromeProvider } from "@/components/analytics/analytics-chrome-context";
-import { AutomationsChromeProvider } from "@/components/automations/automations-chrome-context";
 import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-context";
 import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { CalendarChromeProvider } from "@/components/orzux-calendar/calendar-chrome-context";
@@ -111,38 +110,36 @@ export function DashboardShell({
                 <AiAssistantChromeProvider>
                   <CalendarChromeProvider>
                     <AnalyticsChromeProvider>
-                      <AutomationsChromeProvider>
-                        <DashboardProfileProvider userProfile={userProfile}>
-                          <PlatformCopilotProvider>
-                            <PlatformSupportProvider
-                              initialUnreadCount={supportUnreadCount}
-                            >
-                              <SidebarProvider>
-                                <AppSidebar
-                                  userProfile={userProfile}
-                                  googleCalendarConnected={googleCalendarConnected}
+                      <DashboardProfileProvider userProfile={userProfile}>
+                        <PlatformCopilotProvider>
+                          <PlatformSupportProvider
+                            initialUnreadCount={supportUnreadCount}
+                          >
+                            <SidebarProvider>
+                              <AppSidebar
+                                userProfile={userProfile}
+                                googleCalendarConnected={googleCalendarConnected}
+                              />
+                              <SidebarInset>
+                                <DashboardHeader />
+                                <PlatformAnnouncementsBanner
+                                  announcements={announcements}
                                 />
-                                <SidebarInset>
-                                  <DashboardHeader />
-                                  <PlatformAnnouncementsBanner
-                                    announcements={announcements}
-                                  />
-                                  <VoiceSoftphoneBarGate />
-                                  <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                                    {children}
-                                  </div>
-                                </SidebarInset>
-                              </SidebarProvider>
-                              <PlatformCopilotWidget />
-                              <PlatformSupportWidget />
-                              {onboardingProgress && !onboardingProgress.isComplete ? (
-                                <SetupProgressCard progress={onboardingProgress} />
-                              ) : null}
-                              <AiHumanRequestOverlay />
-                            </PlatformSupportProvider>
-                          </PlatformCopilotProvider>
-                        </DashboardProfileProvider>
-                      </AutomationsChromeProvider>
+                                <VoiceSoftphoneBarGate />
+                                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                                  {children}
+                                </div>
+                              </SidebarInset>
+                            </SidebarProvider>
+                            <PlatformCopilotWidget />
+                            <PlatformSupportWidget />
+                            {onboardingProgress && !onboardingProgress.isComplete ? (
+                              <SetupProgressCard progress={onboardingProgress} />
+                            ) : null}
+                            <AiHumanRequestOverlay />
+                          </PlatformSupportProvider>
+                        </PlatformCopilotProvider>
+                      </DashboardProfileProvider>
                     </AnalyticsChromeProvider>
                   </CalendarChromeProvider>
                 </AiAssistantChromeProvider>

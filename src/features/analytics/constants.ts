@@ -1,12 +1,17 @@
 export const ANALYTICS_MESSAGES = {
   pageTitle: "Analytics",
   pageDescription:
-    "Track conversations, pipeline health, and AI performance across your workspace.",
+    "Track messages, clients, deals, and platform calls across your workspace.",
+  dashboardTitle: "Business analytics",
+  dashboardDescription:
+    "One view for messages, new clients, deal outcomes, and voice calls.",
   tabPulse: "Overview",
   tabChannels: "Channels",
   tabSales: "CRM",
   tabAiOps: "AI",
+  period24h: "24 hours",
   period7d: "7 days",
+  period14d: "14 days",
   period30d: "30 days",
   periodAll: "All time",
   pulseTitle: "Overview",
@@ -23,11 +28,37 @@ export const ANALYTICS_MESSAGES = {
   pulseActivityTitle: "Message volume",
   pulseActivityDescription: (days: number) =>
     `Messages per day over the last ${days} day${days === 1 ? "" : "s"}.`,
+  chartMessagesTitle: "Messages processed",
+  chartMessagesDescription:
+    "Inbound and outbound conversation volume by channel.",
+  chartClientsTitle: "New clients",
+  chartClientsDescription: "Contacts created across messaging channels.",
+  chartDealsTitle: "Won vs lost",
+  chartDealsDescription:
+    "Deal outcomes over time. Hover a point to compare wins and losses.",
+  chartCallsTitle: "Platform calls",
+  chartCallsDescription:
+    "Voice calls through the platform over time. Filter by AI, manager, general, inbound, or outbound.",
+  chartCallsFilterAll: "All",
+  chartCallsFilterAi: "AI calls",
+  chartCallsFilterManager: "Manager",
+  chartCallsFilterGeneral: "General",
+  chartCallsFilterInbound: "Inbound",
+  chartCallsFilterOutbound: "Outbound",
+  chartCallsLegendAi: "AI calls",
+  chartCallsLegendManager: "Manager calls",
+  chartCallsLegendGeneral: "All platform calls",
+  chartCallsLegendInbound: "Inbound",
+  chartCallsLegendOutbound: "Outbound",
+  pipelineTitle: "Sales pipeline",
+  pipelineWon: "Won",
+  pipelineLost: "Lost",
+  pipelineOpen: "Open deals",
   attentionTitle: "Needs attention",
   attentionEmpty: "No urgent issues. Metrics update as new activity arrives.",
   attentionOpenInbox: "Open Inbox",
   attentionViewCrm: "View CRM",
-  attentionViewAutomations: "View Automations",
+  attentionViewAnalytics: "View Analytics",
   attentionConnectChannel: "Connect channel",
   attentionSlaTitle: (percent: number) =>
     `SLA compliance is ${percent}% — below target`,
@@ -38,8 +69,8 @@ export const ANALYTICS_MESSAGES = {
   attentionStaleNewDescription:
     "Review pipeline and follow up before leads go cold.",
   attentionChannelDisconnected: (label: string) => `${label} is not connected`,
-  attentionAutomationsTitle: (count: number) =>
-    `${count} automation run${count === 1 ? "" : "s"} today`,
+  attentionAiActivityTitle: (count: number) =>
+    `${count} AI workflow run${count === 1 ? "" : "s"} today`,
   attentionNegativeSentimentTitle: (percent: number) =>
     `${percent}% of analyzed contacts are negative`,
   attentionNegativeSentimentDescription:
@@ -76,15 +107,15 @@ export const ANALYTICS_MESSAGES = {
   viewChannelContacts: (count: number) =>
     `View ${count} contact${count === 1 ? "" : "s"}`,
   aiOpsPanelTitle: "AI performance",
-  aiOpsPanelDescription:
-    "How AI handles conversations, CRM actions, and automation runs.",
+  aiOpsPanelDescription: "How AI handles conversations and CRM actions.",
   aiOpsOperationsTitle: "Response performance",
   aiOpsOperationsDescription:
     "AI vs human replies, SLA compliance, and response speed.",
   aiOpsAgentsTitle: "AI agents",
   aiOpsAgentsDescription:
     "Rollup across all agents. Open any row for full per-agent analytics.",
-  aiOpsAgentsEmpty: "No AI agents yet. Create one in AI Agents to start tracking replies.",
+  aiOpsAgentsEmpty:
+    "No AI agents yet. Create one in AI Agents to start tracking replies.",
   aiOpsAgentsColumnName: "Agent",
   aiOpsAgentsColumnStatus: "Status",
   aiOpsAgentsColumnContacts: "Contacts",
@@ -93,15 +124,9 @@ export const ANALYTICS_MESSAGES = {
   aiOpsAgentOn: "On",
   aiOpsAgentOff: "Off",
   aiOpsViewAgent: "Details",
-  aiOpsAutomationsTitle: "Automations",
-  aiOpsAutomationsDescription:
-    "Custom workflow runs over the last 30 days.",
-  aiOpsAutomationsEmpty:
-    "No workflow runs yet. Create a custom workflow in Automations.",
   aiOpsRunsToday: "Runs today",
   aiOpsRuns30d: "Runs (30 days)",
   aiOpsSuccessRate: "Success rate",
-  aiOpsViewAutomations: "View Automations",
   aiOpsFailedRuns: (count: number) =>
     `${count} failed run${count === 1 ? "" : "s"} in the last 30 days`,
   aiOpsAgentRunsTitle: "CRM agent actions",
@@ -117,8 +142,7 @@ export const ANALYTICS_MESSAGES = {
     `${count} intent route${count === 1 ? "" : "s"}`,
   aiOpsAgentRunsKeywordCount: (count: number) =>
     `${count} keyword route${count === 1 ? "" : "s"}`,
-  aiOpsAgentRunsAssistantCount: (count: number) =>
-    `${count} assistant-only`,
+  aiOpsAgentRunsAssistantCount: (count: number) => `${count} assistant-only`,
   aiOpsAgentRunsNoActions: "No CRM fields changed",
   aiOpsAgentRunsFailed: "Failed",
   aiOpsAgentRunsAssistantOnly: "AI Agent",
@@ -133,7 +157,8 @@ export const ANALYTICS_MESSAGES = {
   aiAgentCallTime: "Call time",
   channelsTitle: "Channels",
   overviewTitle: "All channels",
-  overviewDescription: "Combined metrics across every connected messaging channel.",
+  overviewDescription:
+    "Combined metrics across every connected messaging channel.",
   channelNotConnected:
     "This channel is not connected yet. Connect it in Integrations to start collecting analytics.",
   goToIntegrations: "Connect channel",
@@ -171,8 +196,7 @@ export const ANALYTICS_MESSAGES = {
   newToQualified: "New → Qualified",
   qualifiedToWon: "Qualified → Won",
   aiCostTitle: "AI usage",
-  aiCostDescription:
-    "Platform AI replies included in your plan.",
+  aiCostDescription: "Platform AI replies included in your plan.",
   aiCostPlatformIncludedTitle: "Platform AI usage",
   aiCostPlatformIncludedDescription:
     "AI replies powered by OrzuX are included in your subscription.",

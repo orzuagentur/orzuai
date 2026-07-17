@@ -27,19 +27,19 @@ export const metadata: Metadata = {
     template: "%s | OrzuX",
   },
   description:
-    "OrzuX helps businesses reply to customers, manage CRM, automate follow-ups, and run an autonomous AI agent across messaging channels.",
+    "OrzuX helps businesses reply to customers, manage CRM, handle follow-ups, and run an autonomous AI agent across messaging channels.",
   keywords: [
     "OrzuX",
     "OrzuX",
     "AI communication platform",
     "AI inbox",
-    "customer service automation",
+    "customer service AI",
     "WhatsApp Business CRM",
-    "Instagram DM automation",
+    "Instagram DM inbox",
     "Telegram CRM",
     "AI voice agent",
-    "CRM automation",
-    "calendar booking automation",
+    "CRM platform",
+    "calendar booking",
   ],
   authors: [{ name: "OrzuX" }],
   creator: "OrzuX",
@@ -54,13 +54,13 @@ export const metadata: Metadata = {
     siteName: "OrzuX",
     title: "OrzuX | AI Business Communication Platform",
     description:
-      "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
+      "AI-powered inbox, CRM, calendar, and customer communication for modern businesses.",
   },
   twitter: {
     card: "summary_large_image",
     title: "OrzuX | AI Business Communication Platform",
     description:
-      "AI-powered inbox, CRM, automation, calendar, and customer communication for modern businesses.",
+      "AI-powered inbox, CRM, calendar, and customer communication for modern businesses.",
   },
   robots: {
     index: true,

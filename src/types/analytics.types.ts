@@ -1,5 +1,5 @@
 import type { ActivityDataPoint } from "@/types/dashboard.types";
-import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
+import type { AnalyticsPeriod } from "@/utils/analytics-url";
 
 export type PulseKpiId =
   | "new_contacts"
@@ -33,7 +33,6 @@ export type AnalyticsPulseData = {
 };
 
 export type AnalyticsPageMeta = {
-  activeTab: AnalyticsTab;
   activePeriod: AnalyticsPeriod;
   pulse: AnalyticsPulseData;
 };

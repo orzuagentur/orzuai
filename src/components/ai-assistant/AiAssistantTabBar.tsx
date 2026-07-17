@@ -6,7 +6,6 @@ import {
   BookOpenIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  Volume2Icon,
 } from "lucide-react";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -16,7 +15,7 @@ import type { AiAgentTab } from "@/types/agent-dashboard.types";
 import { getAiAssistantTabPath } from "@/utils/ai-assistant-routes";
 
 const HEADER_TABS: Array<{
-  id: Exclude<AiAgentTab, "dashboard">;
+  id: Exclude<AiAgentTab, "dashboard" | "voice">;
   label: string;
   shortLabel: string;
   icon: typeof Settings2Icon;
@@ -42,13 +41,6 @@ const HEADER_TABS: Array<{
     shortLabel: "Knowledge",
     icon: BookOpenIcon,
     href: DASHBOARD_ROUTES.aiAssistantKnowledge,
-  },
-  {
-    id: "voice",
-    label: "Voice",
-    shortLabel: "Voice",
-    icon: Volume2Icon,
-    href: DASHBOARD_ROUTES.aiAssistantVoice,
   },
 ];
 

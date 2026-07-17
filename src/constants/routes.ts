@@ -67,7 +67,6 @@ export const DASHBOARD_ROUTES = {
   settingsPush: "/dashboard/settings/push",
   settingsQuickReplies: "/dashboard/settings/quick-replies",
   settingsLanguage: "/dashboard/settings/language",
-  automations: "/dashboard/automations",
   marketplace: "/dashboard/integrations/marketplace",
   calendar: "/dashboard/calendar",
   team: "/dashboard/team",

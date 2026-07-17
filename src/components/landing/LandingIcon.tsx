@@ -28,7 +28,6 @@ export const LANDING_ICON_MAP: Record<LandingIconKey, LucideIcon> = {
   ai: BotIcon,
   analytics: BarChart3Icon,
   api: Code2Icon,
-  automations: WorkflowIcon,
   calendar: CalendarCheckIcon,
   chat: MessageSquareTextIcon,
   company: Building2Icon,

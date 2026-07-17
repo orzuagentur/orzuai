@@ -9,6 +9,7 @@ import {
   DatabaseIcon,
   Loader2Icon,
   MessageSquareIcon,
+  PhoneCallIcon,
   PowerIcon,
   Settings2Icon,
   ShieldIcon,
@@ -20,6 +21,7 @@ import { AiAgentScheduleEditor } from "@/components/ai-assistant/AiAgentSchedule
 import { AiCommunicationStyleSelect } from "@/components/ai-assistant/AiCommunicationStyleSelect";
 import { AiLanguageSelect } from "@/components/ai-assistant/AiLanguageSelect";
 import { AiReplyWaitSelect } from "@/components/ai-assistant/AiReplyWaitSelect";
+import { AiVoiceAgentPanel } from "@/components/ai-assistant/AiVoiceAgentPanel";
 import { DataCollectionFieldsEditor } from "@/components/ai-assistant/DataCollectionFieldsEditor";
 import { SalesAgentRulesPanel } from "@/components/ai-assistant/SalesAgentRulesPanel";
 import {
@@ -38,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { activateAiAgentAction } from "@/features/ai-assistant/actions/activate-ai-agent";
 import { saveAiAssistantProfileAction } from "@/features/ai-assistant/actions/save-ai-assistant-profile";
 import { saveFollowUpAgentSettingsAction } from "@/features/ai-assistant/actions/save-follow-up-agent-settings";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
@@ -56,16 +59,11 @@ import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
 import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
-
-type AiAssistantEditPanelProps = {
-  profile: AiAssistantProfileData;
-  followUpAgent: FollowUpAgentSettings;
-  workerReadiness: AiWorkerReadiness;
-  salesAgent: SalesAgentSettings;
-  onBack?: () => void;
-  backHref?: string;
-  backLabel?: string;
-};
+import type { TwilioPhoneNumberOption } from "@/types/twilio-integration.types";
+import type {
+  VoiceAgentSettings,
+  VoiceConnectionData,
+} from "@/types/voice-agent.types";
 
 type SettingsTabId =
   | "behavior"
@@ -73,7 +71,24 @@ type SettingsTabId =
   | "data-collection"
   | "schedule"
   | "sales"
+  | "voice"
   | "activation";
+
+type AiAssistantEditPanelProps = {
+  profile: AiAssistantProfileData;
+  followUpAgent: FollowUpAgentSettings;
+  workerReadiness: AiWorkerReadiness;
+  salesAgent: SalesAgentSettings;
+  elevenLabsConfigured?: boolean;
+  voiceConnection?: VoiceConnectionData | null;
+  voiceSettings?: VoiceAgentSettings | null;
+  availablePhoneNumbers?: TwilioPhoneNumberOption[];
+  initialTab?: SettingsTabId;
+  setupMode?: boolean;
+  onBack?: () => void;
+  backHref?: string;
+  backLabel?: string;
+};
 
 type AgentPermissions = Pick<
   AiAssistantProfileData,
@@ -128,11 +143,23 @@ const SETTINGS_TABS: Array<{
     icon: SparklesIcon,
   },
   {
+    id: "voice",
+    label: AI_ASSISTANT_MESSAGES.settingsTabVoice,
+    description: AI_ASSISTANT_MESSAGES.settingsTabVoiceHint,
+    icon: PhoneCallIcon,
+  },
+  {
     id: "activation",
     label: AI_ASSISTANT_MESSAGES.settingsTabActivation,
     description: AI_ASSISTANT_MESSAGES.settingsTabActivationHint,
     icon: PowerIcon,
   },
+];
+
+const SETUP_STEPS: Array<{ id: SettingsTabId; label: string }> = [
+  { id: "behavior", label: "1. Behavior" },
+  { id: "voice", label: "2. Voice calls" },
+  { id: "activation", label: "3. Activate" },
 ];
 
 const CRM_PERMISSION_ROWS: Array<{
@@ -233,12 +260,19 @@ export function AiAssistantEditPanel({
   followUpAgent,
   workerReadiness,
   salesAgent,
+  elevenLabsConfigured = false,
+  voiceConnection = null,
+  voiceSettings = null,
+  availablePhoneNumbers = [],
+  initialTab = "behavior",
+  setupMode = false,
   onBack,
   backHref = DASHBOARD_ROUTES.aiAssistant,
   backLabel = AI_ASSISTANT_MESSAGES.assistantEditBack,
 }: AiAssistantEditPanelProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<SettingsTabId>("behavior");
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
+  const [isSetupMode] = useState(setupMode);
   const [name, setName] = useState(profile.name);
   const [systemPrompt, setSystemPrompt] = useState(profile.systemPrompt);
   const [communicationStyle, setCommunicationStyle] = useState<CommunicationStyleId>(
@@ -279,8 +313,23 @@ export function AiAssistantEditPanel({
     canSendProactiveMessage: profile.canSendProactiveMessage ?? true,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const [followUpEnabled, setFollowUpEnabled] = useState(followUpAgent.enabled);
   const [deactivateStep, setDeactivateStep] = useState(0);
+
+  const requiredReady =
+    name.trim().length >= 1 &&
+    systemPrompt.trim().length >= 20 &&
+    Boolean(language) &&
+    Boolean(communicationStyle);
+
+  const missingRequired: string[] = [];
+  if (name.trim().length < 1) missingRequired.push("Agent name");
+  if (systemPrompt.trim().length < 20) {
+    missingRequired.push("Instructions (at least 20 characters)");
+  }
+  if (!language) missingRequired.push("Language");
+  if (!communicationStyle) missingRequired.push("Communication style");
 
   const showCalendarBookingWarning =
     permissions.canCreateCalendarEvent &&
@@ -391,13 +440,38 @@ export function AiAssistantEditPanel({
 
   async function handleDeactivateClick() {
     if (permissions.canReply === false) {
-      const reactivated = await saveWithPermissions({
-        ...permissions,
-        canReply: true,
-      });
+      if (!requiredReady) {
+        toast.error("Fill required Behavior fields before activating.");
+        setActiveTab("behavior");
+        return;
+      }
 
-      if (reactivated) {
+      setIsActivating(true);
+      try {
+        const saved = await saveProfile("Settings saved.");
+        if (!saved) {
+          return;
+        }
+
+        const result = await activateAiAgentAction();
+        if (!result.success) {
+          toast.error(result.message ?? "Unable to activate AI Agent.");
+          return;
+        }
+
+        setPermissions((current) => ({ ...current, canReply: true }));
+        toast.success(
+          result.enabledChannels > 0
+            ? `AI Agent activated on ${result.enabledChannels} channel(s).`
+            : AI_ASSISTANT_MESSAGES.settingsAgentActivated,
+        );
         setDeactivateStep(0);
+        router.refresh();
+        if (isSetupMode) {
+          router.push(DASHBOARD_ROUTES.aiAssistant);
+        }
+      } finally {
+        setIsActivating(false);
       }
       return;
     }
@@ -419,6 +493,14 @@ export function AiAssistantEditPanel({
 
     if (deactivated) {
       setDeactivateStep(0);
+    }
+  }
+
+  function goToNextSetupStep() {
+    const index = SETUP_STEPS.findIndex((step) => step.id === activeTab);
+    const next = SETUP_STEPS[index + 1];
+    if (next) {
+      setActiveTab(next.id);
     }
   }
 
@@ -654,6 +736,17 @@ export function AiAssistantEditPanel({
       case "sales":
         return <SalesAgentRulesPanel initialSettings={salesAgent} />;
 
+      case "voice":
+        return (
+          <AiVoiceAgentPanel
+            profile={profile}
+            elevenLabsConfigured={elevenLabsConfigured}
+            voiceConnection={voiceConnection}
+            voiceSettings={voiceSettings}
+            availablePhoneNumbers={availablePhoneNumbers}
+          />
+        );
+
       case "activation":
         return (
           <div className="space-y-4">
@@ -669,23 +762,84 @@ export function AiAssistantEditPanel({
                 </span>
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Deactivating stops autonomous customer replies. CRM and calendar
-                actions will not run until you activate the agent again.
+                {permissions.canReply
+                  ? "Deactivating stops autonomous customer replies. CRM and calendar actions will not run until you activate the agent again."
+                  : "Complete required Behavior settings, optionally configure Voice AI for calls, then activate the agent."}
               </p>
             </div>
+
+            {!permissions.canReply ? (
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm font-medium">Required before activation</p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {[
+                    {
+                      ok: name.trim().length >= 1,
+                      label: "Agent name",
+                    },
+                    {
+                      ok: systemPrompt.trim().length >= 20,
+                      label: "Instructions (20+ characters)",
+                    },
+                    {
+                      ok: Boolean(language),
+                      label: "Language",
+                    },
+                    {
+                      ok: Boolean(communicationStyle),
+                      label: "Communication style",
+                    },
+                  ].map((item) => (
+                    <li
+                      key={item.label}
+                      className={
+                        item.ok ? "text-emerald-700" : "text-amber-700"
+                      }
+                    >
+                      {item.ok ? "✓" : "○"} {item.label}
+                    </li>
+                  ))}
+                </ul>
+                {!requiredReady ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setActiveTab("behavior")}
+                  >
+                    Open Behavior settings
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
             <Button
               type="button"
               variant={permissions.canReply ? "destructive" : "default"}
-              disabled={isSaving}
+              disabled={
+                isSaving ||
+                isActivating ||
+                (!permissions.canReply && !requiredReady)
+              }
               onClick={() => void handleDeactivateClick()}
             >
-              {permissions.canReply
-                ? deactivateStep === 0
-                  ? "Deactivate agent"
-                  : deactivateStep === 1
-                    ? "Confirm deactivation"
-                    : "Final confirm"
-                : "Activate agent"}
+              {isActivating ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" />
+                  Activating...
+                </>
+              ) : permissions.canReply ? (
+                deactivateStep === 0 ? (
+                  "Deactivate agent"
+                ) : deactivateStep === 1 ? (
+                  "Confirm deactivation"
+                ) : (
+                  "Final confirm"
+                )
+              ) : (
+                "Activate agent"
+              )}
             </Button>
           </div>
         );
@@ -713,13 +867,47 @@ export function AiAssistantEditPanel({
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
-            {AI_ASSISTANT_MESSAGES.assistantEditTitle}
+            {isSetupMode
+              ? "Set up AI Agent"
+              : AI_ASSISTANT_MESSAGES.assistantEditTitle}
           </p>
           <p className="truncate text-xs text-muted-foreground">
             {activeTabMeta.label}
           </p>
         </div>
       </div>
+
+      {isSetupMode ? (
+        <div className="shrink-0 border-b bg-muted/20 px-4 py-3">
+          <div className="flex flex-wrap gap-2">
+            {SETUP_STEPS.map((step) => {
+              const isActive = activeTab === step.id;
+              const stepIndex = SETUP_STEPS.findIndex((item) => item.id === step.id);
+              const activeIndex = SETUP_STEPS.findIndex(
+                (item) => item.id === activeTab,
+              );
+              const isDone = activeIndex > stepIndex;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => setActiveTab(step.id)}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-xs transition-colors sm:text-sm",
+                    isActive
+                      ? "border-violet-200 bg-violet-50 font-medium text-violet-900"
+                      : isDone
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "bg-background text-muted-foreground hover:bg-muted/40",
+                  )}
+                >
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col overflow-y-auto border-b bg-muted/10 lg:border-b-0 lg:border-r">
@@ -769,25 +957,56 @@ export function AiAssistantEditPanel({
               <CardContent className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <div className="flex-1">{renderTabContent()}</div>
 
-                {TABS_WITH_PROFILE_SAVE.has(activeTab) ? (
+                {TABS_WITH_PROFILE_SAVE.has(activeTab) ||
+                (isSetupMode &&
+                  (activeTab === "behavior" || activeTab === "voice")) ? (
                   <div className="sticky bottom-0 -mx-4 mt-auto border-t bg-card px-4 py-4 md:-mx-6 md:px-6">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() => void handleSaveCurrentTab()}
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2Icon className="size-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          AI_ASSISTANT_MESSAGES.settingsSaveTab
-                        )}
-                      </Button>
+                      {TABS_WITH_PROFILE_SAVE.has(activeTab) ? (
+                        <Button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => void handleSaveCurrentTab()}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2Icon className="size-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            AI_ASSISTANT_MESSAGES.settingsSaveTab
+                          )}
+                        </Button>
+                      ) : null}
+                      {isSetupMode &&
+                      (activeTab === "behavior" || activeTab === "voice") ? (
+                        <Button
+                          type="button"
+                          variant={
+                            TABS_WITH_PROFILE_SAVE.has(activeTab)
+                              ? "secondary"
+                              : "default"
+                          }
+                          disabled={
+                            activeTab === "behavior" && !requiredReady
+                          }
+                          onClick={() => {
+                            if (activeTab === "behavior" && !requiredReady) {
+                              toast.error(
+                                `Required: ${missingRequired.join(", ")}`,
+                              );
+                              return;
+                            }
+                            goToNextSetupStep();
+                          }}
+                        >
+                          Continue
+                        </Button>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">
-                        {AI_ASSISTANT_MESSAGES.settingsSaveHint}
+                        {isSetupMode
+                          ? "Complete each step, then activate the agent."
+                          : AI_ASSISTANT_MESSAGES.settingsSaveHint}
                       </p>
                     </div>
                   </div>

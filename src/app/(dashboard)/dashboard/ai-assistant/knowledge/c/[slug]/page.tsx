@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
-import { KnowledgeCategorySpreadsheet } from "@/components/knowledge-base/KnowledgeCategorySpreadsheet";
+import { KnowledgeCategoryTables } from "@/components/knowledge-base/KnowledgeCategoryTables";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -67,7 +67,7 @@ export default async function KnowledgeCategoryPage({ params }: PageProps) {
           </div>
         </div>
 
-        <KnowledgeCategorySpreadsheet
+        <KnowledgeCategoryTables
           categoryName={category.name}
           layoutKind={category.layoutKind}
           entries={entries}

@@ -6,7 +6,6 @@ import {
   HeadphonesIcon,
   MessageSquareIcon,
   UsersIcon,
-  WorkflowIcon,
 } from "lucide-react";
 
 import type { ChannelBrandId } from "@/components/icons/channel-brand-icons";
@@ -29,7 +28,6 @@ const PLATFORM_SERVICE_DEFINITIONS: PlatformServiceDefinition[] = [
   { id: "orzu-ai", Icon: BotIcon },
   { id: "calendar", channel: "google_calendar" },
   { id: "crm", Icon: UsersIcon },
-  { id: "automations", Icon: WorkflowIcon },
   { id: "telephony-system", Icon: HeadphonesIcon },
   { id: "analytics", Icon: BarChart3Icon },
   { id: "calendar-app", Icon: CalendarIcon },

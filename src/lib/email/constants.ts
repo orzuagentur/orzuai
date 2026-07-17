@@ -38,5 +38,5 @@ export const PLATFORM_FEATURE_HIGHLIGHTS = [
   "Unified inbox for WhatsApp, Instagram, Telegram, and more",
   "AI assistant trained on your business knowledge",
   "CRM, deals, and customer context in one place",
-  "Automations and analytics to scale your team",
+  "Analytics to scale your team",
 ] as const;

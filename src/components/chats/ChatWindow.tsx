@@ -671,6 +671,7 @@ export function ChatWindow({
             {conversation.channel === "email" ? (
               <EmailChatComposer
                 conversationId={conversation.id}
+                contactId={conversation.contactId}
                 internalNote={conversation.internalNote}
                 subject={emailSubject}
                 onSubjectChange={setEmailSubject}
@@ -694,6 +695,7 @@ export function ChatWindow({
             ) : (
               <InboxChatComposer
                 conversationId={conversation.id}
+                contactId={conversation.contactId}
                 channel={conversation.channel}
                 internalNote={conversation.internalNote}
                 draft={draft}

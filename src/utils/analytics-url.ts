@@ -1,30 +1,15 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { isMessagingIntegrationChannel } from "@/features/integrations";
-import type { MessagingIntegrationChannelId } from "@/features/integrations/constants";
-import type { MessagingChannel } from "@/types/database.types";
 
-export const ANALYTICS_TABS = [
-  "pulse",
-  "channels",
-  "sales",
-  "ai_ops",
-] as const;
-
-export type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
-
-export const ANALYTICS_PERIODS = ["7d", "30d", "all"] as const;
+export const ANALYTICS_PERIODS = ["24h", "7d", "14d", "30d"] as const;
 
 export type AnalyticsPeriod = (typeof ANALYTICS_PERIODS)[number];
 
-export type AnalyticsUrlState = {
-  tab?: AnalyticsTab;
-  period?: AnalyticsPeriod;
-  channel?: MessagingChannel | null;
-};
+/** @deprecated Tabs removed — single analytics page. Kept for legacy URL redirects. */
+export type AnalyticsTab = "pulse" | "channels" | "sales" | "ai_ops";
 
-export function isAnalyticsTab(value: string): value is AnalyticsTab {
-  return (ANALYTICS_TABS as readonly string[]).includes(value);
-}
+export type AnalyticsUrlState = {
+  period?: AnalyticsPeriod;
+};
 
 export function isAnalyticsPeriod(value: string): value is AnalyticsPeriod {
   return (ANALYTICS_PERIODS as readonly string[]).includes(value);
@@ -33,16 +18,8 @@ export function isAnalyticsPeriod(value: string): value is AnalyticsPeriod {
 export function buildAnalyticsHref(state: AnalyticsUrlState = {}): string {
   const params = new URLSearchParams();
 
-  if (state.tab && state.tab !== "pulse") {
-    params.set("tab", state.tab);
-  }
-
   if (state.period && state.period !== "7d") {
     params.set("period", state.period);
-  }
-
-  if (state.tab === "channels" && state.channel) {
-    params.set("channel", state.channel);
   }
 
   const query = params.toString();
@@ -57,24 +34,21 @@ export function parseAnalyticsSearchParams(input: {
   period?: string;
   channel?: string;
 }): {
-  activeTab: AnalyticsTab;
   activePeriod: AnalyticsPeriod;
-  activeChannelId: MessagingChannel | null;
 } {
-  const activeTab =
-    input.tab && isAnalyticsTab(input.tab)
-      ? input.tab
-      : input.tab === "ask"
-        ? "pulse"
-        : "pulse";
+  if (input.period === "all") {
+    return { activePeriod: "30d" };
+  }
+
   const activePeriod =
     input.period && isAnalyticsPeriod(input.period) ? input.period : "7d";
-  const activeChannelId =
-    activeTab === "channels" &&
-    input.channel &&
-    isMessagingIntegrationChannel(input.channel as MessagingIntegrationChannelId)
-      ? (input.channel as MessagingChannel)
-      : null;
 
-  return { activeTab, activePeriod, activeChannelId };
+  return { activePeriod };
+}
+
+export function analyticsPeriodToDays(period: AnalyticsPeriod): 1 | 7 | 14 | 30 {
+  if (period === "24h") return 1;
+  if (period === "14d") return 14;
+  if (period === "30d") return 30;
+  return 7;
 }

@@ -1,21 +1,12 @@
 import "server-only";
 
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
-import { isChannelConnectedForWorkspace } from "@/features/integrations/channel-status";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { requireUser } from "@/services/auth.service";
-import {
-  getChannelAnalytics,
-  getChannelConnectionStatuses,
-} from "@/services/channel-workspace.service";
-import type {
-  AnalyticsPageData,
-  AnalyticsTotals,
-} from "@/types/channel-workspace.types";
-import { getAiCostMetrics } from "@/services/ai-usage.service";
-import type { AiCostMetrics } from "@/types/ai-usage.types";
+import { getChannelConnectionStatuses } from "@/services/channel-workspace.service";
+import type { AnalyticsPageData } from "@/types/channel-workspace.types";
 import type {
   ActivityDataPoint,
   AiPerformanceMetrics,
@@ -31,22 +22,19 @@ import type {
   TeamAnalyticsMetrics,
 } from "@/types/dashboard.types";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
-import type { AgentDashboardStats } from "@/types/agent-dashboard.types";
-import {
-  getAgentRunsMetrics,
-  getAutomationOpsMetrics,
-  listRecentAgentRuns,
-} from "@/services/analytics-ai-ops.service";
-import { getAgentDashboardStats } from "@/services/agent-dashboard.service";
 import {
   buildAnalyticsAttentionFeed,
   getAnalyticsPulseData,
 } from "@/services/analytics-pulse.service";
+import { getAnalyticsCallsSeries, getAnalyticsSeries } from "@/services/analytics-series.service";
 import {
   buildLastSevenDaysActivity,
   calculateConversionRate,
 } from "@/utils/dashboard";
-import { parseAnalyticsSearchParams } from "@/utils/analytics-url";
+import {
+  analyticsPeriodToDays,
+  parseAnalyticsSearchParams,
+} from "@/utils/analytics-url";
 
 const MESSAGING_CHANNELS = MESSAGING_INTEGRATION_CHANNELS;
 
@@ -80,15 +68,6 @@ const EMPTY_AI_PERFORMANCE: AiPerformanceMetrics = {
   delegatedSharePercent: 0,
 };
 
-const EMPTY_AI_COST: AiCostMetrics = {
-  totalCostUsd: 0,
-  monthCostUsd: 0,
-  totalReplies: 0,
-  monthReplies: 0,
-  avgCostPerReplyUsd: 0,
-  byProvider: [],
-};
-
 const SLA_TARGET_MINUTES = 60;
 
 const EMPTY_TEAM_ANALYTICS: TeamAnalyticsMetrics = {
@@ -107,21 +86,6 @@ const EMPTY_REVENUE: RevenueMetrics = {
   qualifiedPipelineValue: 0,
   openDealsCount: 0,
   avgDealSize: 0,
-};
-
-const EMPTY_AGENT_STATS: AgentDashboardStats = {
-  aiTextReplies: 0,
-  voiceAiReplies: 0,
-  voiceAiReplyMinutes: 0,
-  totalCallMinutes: 0,
-  contactsServed: 0,
-};
-
-const EMPTY_SENTIMENT: SentimentBreakdown = {
-  positive: 0,
-  neutral: 0,
-  negative: 0,
-  unknown: 0,
 };
 
 function createEmptyOverview(): DashboardOverview {
@@ -747,26 +711,6 @@ async function getOwnedBusinessId(): Promise<string | null> {
   return business?.id ?? null;
 }
 
-function buildTotals(
-  channels: AnalyticsPageData["channels"],
-): AnalyticsTotals {
-  return channels.reduce<AnalyticsTotals>(
-    (acc, entry) => ({
-      totalMessages: acc.totalMessages + entry.analytics.totalMessages,
-      totalContacts: acc.totalContacts + entry.analytics.totalContacts,
-      aiReplies: acc.aiReplies + entry.analytics.aiReplies,
-      activeConversations:
-        acc.activeConversations + entry.analytics.activeConversations,
-    }),
-    {
-      totalMessages: 0,
-      totalContacts: 0,
-      aiReplies: 0,
-      activeConversations: 0,
-    },
-  );
-}
-
 const EMPTY_PULSE = {
   kpis: [],
   activity: buildLastSevenDaysActivity([]),
@@ -774,72 +718,30 @@ const EMPTY_PULSE = {
   attention: [],
 };
 
-const EMPTY_AUTOMATION_OPS = {
-  runsToday: 0,
-  runsLast30Days: 0,
-  successRatePercent: 0,
-  failedRunsLast30Days: 0,
-  topTriggers: [],
-};
-
-const EMPTY_AGENT_RUNS = {
-  runsToday: 0,
-  runsLast30Days: 0,
-  successRatePercent: 0,
-  failedRunsLast30Days: 0,
-  intentRoutesLast30Days: 0,
-  keywordRoutesLast30Days: 0,
-  assistantOnlyLast30Days: 0,
-  actionsAppliedLast30Days: 0,
-  blockedActionsLast30Days: 0,
-  skippedDuplicatesLast30Days: 0,
-  bookingFailuresLast30Days: 0,
-};
-
 export async function getAnalyticsPageData(input?: {
   tab?: string;
   period?: string;
   channel?: string;
 }): Promise<AnalyticsPageData> {
-  const { activeTab, activePeriod, activeChannelId } =
-    parseAnalyticsSearchParams(input ?? {});
+  const { activePeriod } = parseAnalyticsSearchParams(input ?? {});
+  const chartDays = analyticsPeriodToDays(activePeriod);
 
   const businessId = await getOwnedBusinessId();
 
   if (!businessId || !hasSupabaseEnv()) {
     return {
       hasBusiness: false,
-      activeTab,
       activePeriod,
       pulse: EMPTY_PULSE,
-      activeChannelId,
       channelStatuses: {},
-      channels: [],
-      totals: {
-        totalMessages: 0,
-        totalContacts: 0,
-        aiReplies: 0,
-        activeConversations: 0,
-      },
-      aiPerformance: EMPTY_AI_PERFORMANCE,
-      leadSources: [],
-      responseTime: EMPTY_RESPONSE_TIME,
       crmFunnel: EMPTY_CRM_FUNNEL,
-      aiCost: EMPTY_AI_COST,
-      teamAnalytics: EMPTY_TEAM_ANALYTICS,
       revenue: EMPTY_REVENUE,
-      sentiment: EMPTY_SENTIMENT,
-      agentStats: EMPTY_AGENT_STATS,
-      automationOps: EMPTY_AUTOMATION_OPS,
-      agentRuns: EMPTY_AGENT_RUNS,
-      recentAgentRuns: [],
+      messageSeries: [],
+      clientSeries: [],
+      dealSeries: [],
+      callSeries: [],
     };
   }
-
-  const needsOverview = activeTab === "pulse";
-  const needsChannels = activeTab === "channels";
-  const needsCrm = activeTab === "sales";
-  const needsAi = activeTab === "ai_ops";
 
   const channelStatuses = await getChannelConnectionStatuses(businessId);
 
@@ -848,106 +750,41 @@ export async function getAnalyticsPageData(input?: {
     teamAnalytics,
     sentiment,
     crmFunnel,
-    leadSources,
     revenue,
-    aiPerformance,
-    responseTime,
-    aiCost,
-    automationOps,
-    agentRuns,
-    recentAgentRuns,
-    agentStats,
+    messageSeries,
+    clientSeries,
+    dealSeries,
+    callSeries,
   ] = await Promise.all([
-    needsOverview
-      ? getAnalyticsPulseData(businessId, activePeriod)
-      : Promise.resolve(EMPTY_PULSE),
-    needsOverview || needsAi
-      ? getTeamAnalyticsMetrics(businessId)
-      : Promise.resolve(EMPTY_TEAM_ANALYTICS),
-    needsOverview || needsCrm
-      ? getSentimentBreakdown(businessId)
-      : Promise.resolve(EMPTY_SENTIMENT),
-    needsOverview || needsCrm
-      ? getCrmFunnelMetrics(businessId)
-      : Promise.resolve(EMPTY_CRM_FUNNEL),
-    needsCrm
-      ? getLeadSourceAttribution(businessId)
-      : Promise.resolve([] as LeadSourceEntry[]),
-    needsCrm
-      ? getRevenueMetrics(businessId)
-      : Promise.resolve(EMPTY_REVENUE),
-    needsAi
-      ? getAiPerformanceMetrics(businessId)
-      : Promise.resolve(EMPTY_AI_PERFORMANCE),
-    needsAi
-      ? getResponseTimeMetrics(businessId)
-      : Promise.resolve(EMPTY_RESPONSE_TIME),
-    needsAi
-      ? getAiCostMetrics(businessId)
-      : Promise.resolve(EMPTY_AI_COST),
-    needsAi
-      ? getAutomationOpsMetrics(businessId)
-      : Promise.resolve(EMPTY_AUTOMATION_OPS),
-    needsAi
-      ? getAgentRunsMetrics(businessId)
-      : Promise.resolve(EMPTY_AGENT_RUNS),
-    needsAi
-      ? listRecentAgentRuns(businessId)
-      : Promise.resolve([]),
-    needsAi
-      ? getAgentDashboardStats(businessId)
-      : Promise.resolve(EMPTY_AGENT_STATS),
+    getAnalyticsPulseData(businessId, activePeriod),
+    getTeamAnalyticsMetrics(businessId),
+    getSentimentBreakdown(businessId),
+    getCrmFunnelMetrics(businessId),
+    getRevenueMetrics(businessId),
+    getAnalyticsSeries(businessId, "messages", chartDays),
+    getAnalyticsSeries(businessId, "clients", chartDays),
+    getAnalyticsSeries(businessId, "deals", chartDays),
+    getAnalyticsCallsSeries(businessId, chartDays),
   ]);
 
-  const attention =
-    needsOverview
-      ? await buildAnalyticsAttentionFeed({
-          businessId,
-          channelStatuses,
-          teamAnalytics,
-          sentiment,
-          crmFunnel,
-        })
-      : [];
-
-  const channels = needsChannels
-      ? await Promise.all(
-          MESSAGING_CHANNELS.map(async (channel) => {
-            const isChannelConnected = isChannelConnectedForWorkspace(
-              channel,
-              channelStatuses,
-            );
-            const analytics = await getChannelAnalytics(channel);
-
-            return {
-              channel,
-              analytics,
-              isChannelConnected,
-            };
-          }),
-        )
-      : [];
+  const attention = await buildAnalyticsAttentionFeed({
+    businessId,
+    channelStatuses,
+    teamAnalytics,
+    sentiment,
+    crmFunnel,
+  });
 
   return {
     hasBusiness: true,
-    activeTab,
     activePeriod,
     pulse: { ...pulseBase, attention },
-    activeChannelId,
     channelStatuses,
-    channels,
-    totals: buildTotals(channels),
-    aiPerformance,
-    leadSources,
-    responseTime,
     crmFunnel,
-    aiCost,
-    teamAnalytics,
     revenue,
-    sentiment,
-    agentStats,
-    automationOps,
-    agentRuns,
-    recentAgentRuns,
+    messageSeries,
+    clientSeries,
+    dealSeries,
+    callSeries,
   };
 }

@@ -21,7 +21,6 @@ export type LandingIconKey =
   | "ai"
   | "analytics"
   | "api"
-  | "automations"
   | "calendar"
   | "chat"
   | "company"
@@ -257,7 +256,7 @@ const EN: LandingCopy = {
   meta: {
     title: "OrzuX | Enterprise AI Communication Platform",
     description:
-      "OrzuX unifies AI inbox, voice, CRM, calendar, automations, analytics, and customer channels in one enterprise-ready workspace.",
+      "OrzuX unifies AI inbox, voice, CRM, calendar, analytics, and customer channels in one enterprise-ready workspace.",
   },
   skipToContent: "Skip to main content",
   header: {
@@ -319,12 +318,6 @@ const EN: LandingCopy = {
                 description: "Availability, public booking pages, reminders, and Google sync.",
                 href: "#platform",
                 icon: "calendar",
-              },
-              {
-                title: "Automations",
-                description: "Follow-ups, lead routing, SLA alerts, and lifecycle workflows.",
-                href: "#platform",
-                icon: "automations",
               },
             ],
           },
@@ -440,7 +433,7 @@ const EN: LandingCopy = {
         ],
         featured: {
           title: "Production-ready architecture",
-          description: "Designed for teams that need automation without losing operational control.",
+          description: "Designed for teams that need AI-assisted operations without losing control.",
           cta: "View architecture",
           href: "#architecture",
         },
@@ -460,7 +453,7 @@ const EN: LandingCopy = {
               },
               {
                 title: "Pricing",
-                description: "Start free, then scale by channels, seats, voice, and automation.",
+                description: "Start free, then scale by channels, seats, and voice.",
                 href: "#pricing",
                 icon: "pricing",
               },
@@ -555,7 +548,7 @@ const EN: LandingCopy = {
         label: "Instagram DM",
         customer: "Nova Studio",
         message: "Do you have monthly plans for teams?",
-        aiReply: "Yes. Starter covers one channel. Pro adds voice AI, automations, and advanced analytics.",
+        aiReply: "Yes. Starter covers one channel. Pro adds voice AI and advanced analytics.",
         intent: "Pricing question",
         deal: "Team plan - warm",
         nextStep: "Share Pro plan",
@@ -689,7 +682,7 @@ const EN: LandingCopy = {
       {
         id: "security",
         title: "Business-scoped data",
-        description: "Workspaces, channels, keys, conversations, and automations stay separated by business context.",
+        description: "Workspaces, channels, keys, and conversations stay separated by business context.",
         metric: "Scoped",
         detail: "Tenant-aware",
         icon: "security",
@@ -713,7 +706,7 @@ const EN: LandingCopy = {
     eyebrow: "Architecture",
     title: "From channel event to business outcome.",
     subtitle:
-      "OrzuX connects incoming messages, AI reasoning, CRM updates, calendar actions, automation rules, and analytics into one observable flow.",
+      "OrzuX connects incoming messages, AI reasoning, CRM updates, calendar actions, and analytics into one observable flow.",
     nodes: [
       { id: "channels", label: "Channels", caption: "DMs, calls, forms, email" },
       { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
@@ -736,7 +729,7 @@ const EN: LandingCopy = {
       {
         question: "Is OrzuX only a chatbot?",
         answer:
-          "No. The assistant can answer customers, but the platform also updates CRM records, books time, triggers automations, summarizes calls, creates follow-up tasks, and hands sensitive conversations to a human operator.",
+          "No. The assistant can answer customers, but the platform also updates CRM records, books time, summarizes calls, creates follow-up tasks, and hands sensitive conversations to a human operator.",
       },
       {
         question: "How does the AI learn my business?",
@@ -751,7 +744,7 @@ const EN: LandingCopy = {
       {
         question: "How does provider billing work?",
         answer:
-          "The OrzuX subscription covers the platform workspace, AI features, automation, and product usage. External providers such as WhatsApp, Twilio, telephony, or messaging gateways may still bill usage directly through your connected provider accounts.",
+          "The OrzuX subscription covers the platform workspace, AI features, and product usage. External providers such as WhatsApp, Twilio, telephony, or messaging gateways may still bill usage directly through your connected provider accounts.",
       },
     ],
   },
@@ -759,7 +752,7 @@ const EN: LandingCopy = {
     eyebrow: "Pricing",
     title: "Start with one channel. Scale into the full platform.",
     subtitle:
-      "Simple plans for teams moving from manual replies to AI-assisted communication, voice, CRM, booking, and automation.",
+      "Simple plans for teams moving from manual replies to AI-assisted communication, voice, CRM, and booking.",
     startCta: "Start free",
     freeLabel: "Free",
     perMonth: "/mo",
@@ -783,7 +776,7 @@ const EN: LandingCopy = {
   },
   footer: {
     tagline:
-      "Enterprise AI communication platform for inbox, voice, CRM, calendar, automation, and analytics.",
+      "Enterprise AI communication platform for inbox, voice, CRM, calendar, and analytics.",
     columns: [
       {
         title: "Platform",
@@ -822,7 +815,6 @@ const EN: LandingCopy = {
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },
     { id: "calendar", label: "Calendar", hint: "Booking - sync", liveLine: "4:30 PM reserved" },
     { id: "crm", label: "CRM", hint: "Contacts - deals", liveLine: "Hot lead created" },
-    { id: "automations", label: "Automations", hint: "Workflows", liveLine: "Follow-up in 24h" },
     { id: "telephony-system", label: "Phone System", hint: "SMS - monitor", liveLine: "SMS confirmation sent" },
     { id: "analytics", label: "Analytics", hint: "ROI - usage", liveLine: "78% AI handled" },
     { id: "calendar-app", label: "Calendar App", hint: "Events - tasks", liveLine: "Google sync OK" },
@@ -834,7 +826,7 @@ const RU: LandingCopy = {
   meta: {
     title: "OrzuX | Enterprise AI-платформа для коммуникаций",
     description:
-      "OrzuX объединяет AI inbox, голос, CRM, календарь, автоматизации, аналитику и клиентские каналы в одном рабочем пространстве.",
+      "OrzuX объединяет AI inbox, голос, CRM, календарь, аналитику и клиентские каналы в одном рабочем пространстве.",
   },
   skipToContent: "Перейти к основному содержимому",
   header: {
@@ -910,7 +902,7 @@ const RU: LandingCopy = {
         label: "Instagram DM",
         customer: "Nova Studio",
         message: "Есть месячные тарифы для команды?",
-        aiReply: "Да. Starter покрывает один канал. Pro добавляет Voice AI, автоматизации и расширенную аналитику.",
+        aiReply: "Да. Starter покрывает один канал. Pro добавляет Voice AI и расширенную аналитику.",
         intent: "Вопрос о цене",
         deal: "Team plan - warm",
         nextStep: "Показать Pro",
@@ -952,7 +944,7 @@ const RU: LandingCopy = {
     eyebrow: "Продуктовая платформа",
     title: "Все, что происходит после разговора, связано в одну систему.",
     subtitle:
-      "OrzuX показывает продукт сразу: это не еще один чатбот, а рабочий слой для коммуникаций, CRM, звонков, бронирований и автоматизаций.",
+      "OrzuX показывает продукт сразу: это не еще один чатбот, а рабочий слой для коммуникаций, CRM, звонков и бронирований.",
     cards: [
       { ...EN.platform.cards[0]!, title: "Единый Inbox", description: "Все каналы попадают в одно приоритетное пространство с назначениями, заметками и handoff.", metric: "Все каналы", detail: "Одна очередь" },
       { ...EN.platform.cards[1]!, title: "OrzuX Assistant", description: "AI отвечает на основе знаний бизнеса, помнит контекст клиента и уважает настройки каналов.", metric: "Grounded AI", detail: "Знает контекст" },
@@ -992,7 +984,7 @@ const RU: LandingCopy = {
       "Enterprise AI работает только тогда, когда команда понимает действия агента, контролирует поведение и сохраняет прозрачность провайдеров.",
     pillars: [
       { ...EN.enterprise.pillars[0]!, title: "Human handoff", description: "AI может остановиться, передать диалог или дать оператору ответить из той же карточки клиента.", metric: "Под контролем", detail: "Handoff встроен" },
-      { ...EN.enterprise.pillars[1]!, title: "Данные в рамках бизнеса", description: "Рабочие пространства, каналы, ключи, диалоги и автоматизации разделены по бизнес-контексту.", metric: "Scoped", detail: "Tenant-aware" },
+      { ...EN.enterprise.pillars[1]!, title: "Данные в рамках бизнеса", description: "Рабочие пространства, каналы, ключи и диалоги разделены по бизнес-контексту.", metric: "Scoped", detail: "Tenant-aware" },
       { ...EN.enterprise.pillars[2]!, title: "Операционная видимость", description: "Менеджеры видят объем AI, качество, состояние очереди и результаты по каналам.", metric: "Измеримо", detail: "AI ops" },
     ],
   },
@@ -1005,7 +997,7 @@ const RU: LandingCopy = {
     eyebrow: "Архитектура",
     title: "От события в канале до бизнес-результата.",
     subtitle:
-      "OrzuX связывает входящие сообщения, AI-логику, CRM, календарь, автоматизации и аналитику в один наблюдаемый поток.",
+      "OrzuX связывает входящие сообщения, AI-логику, CRM, календарь и аналитику в один наблюдаемый поток.",
     nodes: [
       { id: "channels", label: "Каналы", caption: "DM, звонки, формы, email" },
       { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
@@ -1027,7 +1019,7 @@ const RU: LandingCopy = {
       {
         question: "OrzuX - это только чатбот?",
         answer:
-          "Нет. AI отвечает, обновляет CRM, бронирует время, запускает автоматизации, резюмирует звонки и передает диалог человеку.",
+          "Нет. AI отвечает, обновляет CRM, бронирует время, резюмирует звонки и передает диалог человеку.",
       },
       {
         question: "Как AI узнает мой бизнес?",
@@ -1050,7 +1042,7 @@ const RU: LandingCopy = {
     eyebrow: "Тарифы",
     title: "Начните с одного канала. Дорастите до полной платформы.",
     subtitle:
-      "Понятные планы для команд, которые переходят от ручных ответов к AI-коммуникациям, голосу, CRM, бронированию и автоматизациям.",
+      "Понятные планы для команд, которые переходят от ручных ответов к AI-коммуникациям, голосу, CRM и бронированию.",
     startCta: "Начать бесплатно",
     freeLabel: "Бесплатно",
     perMonth: "/мес",
@@ -1074,7 +1066,7 @@ const RU: LandingCopy = {
   },
   footer: {
     tagline:
-      "Enterprise AI-платформа для inbox, голоса, CRM, календаря, автоматизаций и аналитики.",
+      "Enterprise AI-платформа для inbox, голоса, CRM, календаря и аналитики.",
     columns: [
       {
         title: "Платформа",
@@ -1113,7 +1105,6 @@ const RU: LandingCopy = {
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },
     { id: "calendar", label: "Calendar", hint: "Booking - sync", liveLine: "16:30 зарезервировано" },
     { id: "crm", label: "CRM", hint: "Contacts - deals", liveLine: "Hot lead создан" },
-    { id: "automations", label: "Automations", hint: "Workflows", liveLine: "Follow-up через 24ч" },
     { id: "telephony-system", label: "Phone System", hint: "SMS - monitor", liveLine: "SMS подтверждение" },
     { id: "analytics", label: "Analytics", hint: "ROI - usage", liveLine: "78% AI handled" },
     { id: "calendar-app", label: "Calendar App", hint: "Events - tasks", liveLine: "Google sync OK" },
@@ -1125,7 +1116,7 @@ const UZ: LandingCopy = {
   meta: {
     title: "OrzuX | Enterprise AI aloqa platformasi",
     description:
-      "OrzuX AI inbox, ovoz, CRM, taqvim, avtomatlashtirish, analitika va mijoz kanallarini bitta ish maydonida birlashtiradi.",
+      "OrzuX AI inbox, ovoz, CRM, taqvim, analitika va mijoz kanallarini bitta ish maydonida birlashtiradi.",
   },
   skipToContent: "Asosiy kontentga o'tish",
   header: {
@@ -1201,7 +1192,7 @@ const UZ: LandingCopy = {
         label: "Instagram DM",
         customer: "Nova Studio",
         message: "Jamoa uchun oylik tariflar bormi?",
-        aiReply: "Ha. Starter bitta kanalni qamraydi. Pro Voice AI, avtomatlashtirish va keng analitikani qo'shadi.",
+        aiReply: "Ha. Starter bitta kanalni qamraydi. Pro Voice AI va keng analitikani qo'shadi.",
         intent: "Pricing savoli",
         deal: "Team plan - warm",
         nextStep: "Pro tarifini ulashish",
@@ -1243,7 +1234,7 @@ const UZ: LandingCopy = {
     eyebrow: "Mahsulot platformasi",
     title: "Suhbat ortidagi hamma narsa ulangan.",
     subtitle:
-      "OrzuX mahsulotni darhol ko'rsatadi: bu yana bir chatbot emas, balki aloqa, CRM, qo'ng'iroq, bron va avtomatlashtirish uchun ish qatlami.",
+      "OrzuX mahsulotni darhol ko'rsatadi: bu yana bir chatbot emas, balki aloqa, CRM, qo'ng'iroq va bron uchun ish qatlami.",
     cards: [
       { ...EN.platform.cards[0]!, title: "Unified Inbox", description: "Barcha kanallar bitta ustuvor ish maydoniga kiradi: assignment, notes va handoff bilan.", metric: "Barcha kanallar", detail: "Bitta queue" },
       { ...EN.platform.cards[1]!, title: "OrzuX Assistant", description: "AI biznes bilimlari asosida javob beradi, mijoz kontekstini eslaydi va kanal nazoratiga rioya qiladi.", metric: "Grounded AI", detail: "Kontekstli" },
@@ -1283,7 +1274,7 @@ const UZ: LandingCopy = {
       "Enterprise AI agent nima qilganini ko'rish, xatti-harakatini boshqarish va providerlarni aniq saqlash mumkin bo'lganda ishlaydi.",
     pillars: [
       { ...EN.enterprise.pillars[0]!, title: "Human handoff", description: "AI to'xtashi, eskalatsiya qilishi yoki operatorga bir xil customer recorddan javob berishga ruxsat berishi mumkin.", metric: "Controlled", detail: "Handoff built in" },
-      { ...EN.enterprise.pillars[1]!, title: "Business-scoped data", description: "Workspace, kanal, kalit, suhbat va avtomatlashtirishlar biznes kontekst bo'yicha ajratiladi.", metric: "Scoped", detail: "Tenant-aware" },
+      { ...EN.enterprise.pillars[1]!, title: "Business-scoped data", description: "Workspace, kanal, kalit va suhbat biznes kontekst bo'yicha ajratiladi.", metric: "Scoped", detail: "Tenant-aware" },
       { ...EN.enterprise.pillars[2]!, title: "Operational visibility", description: "Menejerlar AI hajmi, sifat signallari, queue health va kanal natijalarini kuzatadi.", metric: "Measurable", detail: "AI ops" },
     ],
   },
@@ -1296,7 +1287,7 @@ const UZ: LandingCopy = {
     eyebrow: "Arxitektura",
     title: "Kanal eventidan biznes natijagacha.",
     subtitle:
-      "OrzuX kiruvchi xabarlar, AI reasoning, CRM, taqvim, avtomatlashtirish va analitikani bitta kuzatiladigan oqimga ulaydi.",
+      "OrzuX kiruvchi xabarlar, AI reasoning, CRM, taqvim va analitikani bitta kuzatiladigan oqimga ulaydi.",
     nodes: [
       { id: "channels", label: "Kanallar", caption: "DM, call, form, email" },
       { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
@@ -1318,7 +1309,7 @@ const UZ: LandingCopy = {
       {
         question: "OrzuX faqat chatbotmi?",
         answer:
-          "Yo'q. AI javob beradi, CRMni yangilaydi, vaqt bron qiladi, avtomatlashtirish ishga tushiradi, qo'ng'iroqlarni xulosalaydi va insonga handoff qiladi.",
+          "Yo'q. AI javob beradi, CRMni yangilaydi, vaqt bron qiladi, qo'ng'iroqlarni xulosalaydi va insonga handoff qiladi.",
       },
       {
         question: "AI biznesimni qanday o'rganadi?",
@@ -1341,7 +1332,7 @@ const UZ: LandingCopy = {
     eyebrow: "Narxlar",
     title: "Bitta kanaldan boshlang. To'liq platformagacha kengaying.",
     subtitle:
-      "Manual javoblardan AI-assisted communication, voice, CRM, booking va automationga o'tayotgan jamoalar uchun sodda planlar.",
+      "Manual javoblardan AI-assisted communication, voice, CRM va bookingga o'tayotgan jamoalar uchun sodda planlar.",
     startCta: "Bepul boshlash",
     freeLabel: "Bepul",
     perMonth: "/oy",
@@ -1365,7 +1356,7 @@ const UZ: LandingCopy = {
   },
   footer: {
     tagline:
-      "Inbox, voice, CRM, calendar, automation va analytics uchun Enterprise AI aloqa platformasi.",
+      "Inbox, voice, CRM, calendar va analytics uchun Enterprise AI aloqa platformasi.",
     columns: [
       {
         title: "Platforma",
@@ -1404,7 +1395,6 @@ const UZ: LandingCopy = {
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },
     { id: "calendar", label: "Calendar", hint: "Booking - sync", liveLine: "16:30 bron qilindi" },
     { id: "crm", label: "CRM", hint: "Contacts - deals", liveLine: "Hot lead yaratildi" },
-    { id: "automations", label: "Automations", hint: "Workflows", liveLine: "Follow-up 24 soatda" },
     { id: "telephony-system", label: "Phone System", hint: "SMS - monitor", liveLine: "SMS tasdiq yuborildi" },
     { id: "analytics", label: "Analytics", hint: "ROI - usage", liveLine: "78% AI handled" },
     { id: "calendar-app", label: "Calendar App", hint: "Events - tasks", liveLine: "Google sync OK" },

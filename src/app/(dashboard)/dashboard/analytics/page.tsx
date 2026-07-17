@@ -5,13 +5,11 @@ import { AnalyticsCommandCenter } from "@/components/analytics/AnalyticsCommandC
 import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPrompt";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
 import { ANALYTICS_MESSAGES } from "@/features/analytics/constants";
-import {
-  isMessagingIntegrationChannel,
-  type IntegrationChannelId,
-} from "@/features/integrations";
 import { getAnalyticsPageData } from "@/services/analytics.service";
-import type { MessagingChannel } from "@/types/database.types";
-import { buildAnalyticsHref } from "@/utils/analytics-url";
+import {
+  buildAnalyticsHref,
+  isAnalyticsPeriod,
+} from "@/utils/analytics-url";
 
 type AnalyticsPageProps = {
   searchParams: Promise<{
@@ -32,33 +30,21 @@ export default function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
 async function AnalyticsPageContent({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
 
-  if (params.tab === "ask") {
+  if (params.tab || params.channel) {
     redirect(
       buildAnalyticsHref({
-        tab: "pulse",
         period:
-          params.period === "30d" || params.period === "all"
+          params.period && isAnalyticsPeriod(params.period)
             ? params.period
-            : "7d",
+            : params.period === "all"
+              ? "30d"
+              : "7d",
       }),
     );
   }
 
-  if (
-    params.channel &&
-    !isMessagingIntegrationChannel(params.channel as IntegrationChannelId)
-  ) {
-    redirect(buildAnalyticsHref({ tab: "channels" }));
-  }
-
-  if (params.channel && !params.tab) {
-    redirect(
-      buildAnalyticsHref({
-        tab: "channels",
-        channel: params.channel as MessagingChannel,
-        period: params.period === "30d" || params.period === "all" ? params.period : "7d",
-      }),
-    );
+  if (params.period === "all") {
+    redirect(buildAnalyticsHref({ period: "30d" }));
   }
 
   const data = await getAnalyticsPageData(params);

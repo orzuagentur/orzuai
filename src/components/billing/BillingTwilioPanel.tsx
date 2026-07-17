@@ -449,12 +449,20 @@ export function BillingTwilioPanel({
         <ActivityChart
           data={data.callVolume}
           title="Call volume"
-          description="Calls per day over the last 30 days."
+          description="Calls per day over time. Use the clock to change the period."
+          valueNoun="calls"
+          initialDays={30}
+          strokeColor="rgb(14 165 233)"
+          fillId="billingCallVolumeFill"
         />
         <ActivityChart
           data={data.smsVolume}
           title="SMS volume"
-          description="SMS messages per day over the last 30 days."
+          description="SMS messages per day over time. Use the clock to change the period."
+          valueNoun="SMS"
+          initialDays={30}
+          strokeColor="rgb(16 185 129)"
+          fillId="billingSmsVolumeFill"
         />
       </div>
 

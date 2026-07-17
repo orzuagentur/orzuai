@@ -17,7 +17,6 @@ import { ContactAdditionalContactsSection } from "@/components/contacts/ContactA
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ContactCrmFieldsForm } from "@/components/contacts/ContactCrmFieldsForm";
 import { ContactProfileInfoTable } from "@/components/contacts/ContactProfileInfoTable";
-import { ContactProfileInsightsFooter } from "@/components/contacts/ContactProfileInsightsFooter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +53,7 @@ import {
 } from "@/utils/contact-crm-form";
 import type { AdditionalContactEntry } from "@/utils/contact-additional-contacts";
 import { buildContactProfileInfoRows } from "@/utils/contact-profile-info";
+import { canUseTwilioPhoneActions } from "@/utils/contact-display";
 import {
   getLeadScoreBadgeClassName,
   getLeadScoreLabel,
@@ -96,6 +96,7 @@ export function ContactFullProfilePanel({
 
   const { contact } = profile;
   const infoRows = buildContactProfileInfoRows(profile);
+  const showTwilioCall = canUseTwilioPhoneActions(contact);
 
   useEffect(() => {
     if (!isEditing) {
@@ -140,6 +141,41 @@ export function ContactFullProfilePanel({
 
       toast.success(CONTACTS_MESSAGES.contactSaved);
       setIsEditing(false);
+      await onRefresh();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteNotes() {
+    if (!contact.customFields.notes?.trim()) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const result = await updateContactAction({
+        contactId: contact.id,
+        name: contact.name,
+        email: contact.email ?? "",
+        tags: contact.tags,
+        customFields: {
+          company: contact.customFields.company ?? "",
+          notes: "",
+          location: contact.customFields.location ?? "",
+          additionalContacts: contact.customFields.additionalContacts ?? [],
+        },
+        pipelineStage: contact.pipelineStage,
+        dealValue: contact.dealValue,
+        expectedCloseDate: contact.expectedCloseDate,
+      });
+
+      if (!result.success) {
+        toast.error(result.error.message);
+        return;
+      }
+
+      toast.success(CONTACTS_MESSAGES.notesDeleted);
       await onRefresh();
     } finally {
       setIsSaving(false);
@@ -294,7 +330,7 @@ export function ContactFullProfilePanel({
               </div>
             </div>
             <div className="flex shrink-0 gap-1">
-              {contact.identifier?.trim() ? (
+              {showTwilioCall ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -459,9 +495,24 @@ export function ContactFullProfilePanel({
 
               {contact.customFields.notes ? (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {CONTACTS_MESSAGES.notesLabel}
-                  </h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {CONTACTS_MESSAGES.notesLabel}
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-destructive hover:text-destructive"
+                      disabled={isSaving}
+                      onClick={() => {
+                        void handleDeleteNotes();
+                      }}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      {CONTACTS_MESSAGES.deleteNotes}
+                    </Button>
+                  </div>
                   <p className="rounded-lg border bg-muted/20 px-3 py-2 text-sm text-muted-foreground [overflow-wrap:anywhere] [word-break:break-word]">
                     {contact.customFields.notes}
                   </p>
@@ -470,14 +521,6 @@ export function ContactFullProfilePanel({
             </div>
           )}
         </div>
-
-        {!isEditing ? (
-          <ContactProfileInsightsFooter
-            contactId={contact.id}
-            aiSummary={contact.aiSummary}
-            onRefresh={onRefresh}
-          />
-        ) : null}
       </div>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -27,6 +27,8 @@ export type KnowledgeCategoryCard = {
 export type KnowledgeEntryMetadata = {
   price?: string;
   unit?: string;
+  tableId?: string;
+  tableTitle?: string;
   [key: string]: string | undefined;
 };
 

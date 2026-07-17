@@ -1,7 +1,6 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { ANALYTICS_MESSAGES } from "@/features/analytics/constants";
-import { AUTOMATIONS_MESSAGES } from "@/features/automations/constants";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import {
@@ -55,13 +54,6 @@ export function getDashboardPageHeaderMeta(
     return {
       title: AI_ASSISTANT_MESSAGES.singleAgentTitle,
       description: AI_ASSISTANT_MESSAGES.pageSubtitle,
-    };
-  }
-
-  if (pathname === DASHBOARD_ROUTES.automations) {
-    return {
-      title: AUTOMATIONS_MESSAGES.pageTitle,
-      description: AUTOMATIONS_MESSAGES.pageDescription,
     };
   }
 

@@ -101,20 +101,18 @@ export function BillingUsagePanel({ data }: BillingUsagePanelProps) {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle className="text-base">AI usage trend</CardTitle>
-            <CardDescription>Daily AI replies over the last 14 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityChart
-              data={data.aiDailyUsage.map((point) => ({
-                label: point.label,
-                value: point.value,
-              }))}
-            />
-          </CardContent>
-        </Card>
+        <ActivityChart
+          data={data.aiDailyUsage.map((point) => ({
+            label: point.label,
+            value: point.value,
+          }))}
+          title="AI usage trend"
+          description="Daily AI replies over time. Use the clock to change the period."
+          valueNoun="replies"
+          initialDays={14}
+          strokeColor="rgb(124 58 237)"
+          fillId="billingAiUsageFill"
+        />
 
         <Card className="shadow-none">
           <CardHeader>
@@ -133,24 +131,6 @@ export function BillingUsagePanel({ data }: BillingUsagePanelProps) {
                 percent={
                   data.channelsLimit > 0 && !isUnlimitedQuota(data.channelsLimit)
                     ? Math.round((data.channelsUsed / data.channelsLimit) * 100)
-                    : null
-                }
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm">
-                <span>Automations</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {data.automationsUsed} /{" "}
-                  {isUnlimitedQuota(data.automationsLimit)
-                    ? "∞"
-                    : data.automationsLimit || "—"}
-                </span>
-              </div>
-              <UsageBar
-                percent={
-                  data.automationsLimit > 0 && !isUnlimitedQuota(data.automationsLimit)
-                    ? Math.round((data.automationsUsed / data.automationsLimit) * 100)
                     : null
                 }
               />

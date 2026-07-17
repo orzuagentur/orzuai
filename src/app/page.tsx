@@ -34,11 +34,11 @@ export async function generateMetadata({
       "AI business communication platform",
       "AI customer support",
       "unified AI inbox",
-      "WhatsApp Business automation",
+      "WhatsApp Business inbox",
       "Instagram DM CRM",
       "Telegram customer service",
       "AI voice agent",
-      "CRM and calendar automation",
+      "CRM and calendar tools",
       "customer channel integrations",
     ],
     alternates: {

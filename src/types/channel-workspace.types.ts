@@ -1,22 +1,19 @@
 import { z } from "zod";
 
-import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
+import type { AnalyticsPulseData } from "./analytics.types";
 import type {
-  AnalyticsPulseData,
   AgentRunListItem,
   AgentRunsMetrics,
-  AutomationOpsMetrics,
 } from "./analytics.types";
 import type {
-  AiPerformanceMetrics,
   CrmFunnelMetrics,
-  LeadSourceEntry,
-  ResponseTimeMetrics,
   RevenueMetrics,
-  SentimentBreakdown,
-  TeamAnalyticsMetrics,
 } from "./dashboard.types";
-import type { AnalyticsPeriod, AnalyticsTab } from "@/utils/analytics-url";
+import type { AnalyticsPeriod } from "@/utils/analytics-url";
+import type {
+  AnalyticsCallsChartPoint,
+  AnalyticsChartPoint,
+} from "./analytics-chart.types";
 import type { AiAssistantProfileData } from "./ai-assistant-profile.types";
 import type {
   AgentActivityPoint,
@@ -33,9 +30,13 @@ import {
   AI_AGENT_CHANNELS,
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations/constants";
-import type { AiCostMetrics } from "./ai-usage.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
 import { REPLY_WAIT_MS_OPTIONS } from "@/lib/ai/languages";
+import type { IntegrationChannelStatusMap } from "@/features/integrations/channel-status";
+import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
+import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
+import type { BusinessAiKeySettings } from "@/services/business-ai-keys.service";
+import type { SalesAgentSettings } from "@/types/ai-usage.types";
 
 export type { MessagingChannel };
 
@@ -155,11 +156,6 @@ export type AiAssistantChannelEntry = {
   settings: ChannelAiSettingsData;
 };
 
-import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
-import type { FollowUpAgentSettings } from "@/services/follow-up-settings.service";
-import type { BusinessAiKeySettings } from "@/services/business-ai-keys.service";
-import type { SalesAgentSettings } from "@/types/ai-usage.types";
-
 export type AiAssistantPageData = {
   hasBusiness: boolean;
   geminiConfigured: boolean;
@@ -235,25 +231,15 @@ export type AnalyticsTotals = {
 
 export type AnalyticsPageData = {
   hasBusiness: boolean;
-  activeTab: AnalyticsTab;
   activePeriod: AnalyticsPeriod;
   pulse: AnalyticsPulseData;
-  activeChannelId: MessagingChannel | null;
   channelStatuses: IntegrationChannelStatusMap;
-  channels: AnalyticsChannelEntry[];
-  totals: AnalyticsTotals;
-  aiPerformance: AiPerformanceMetrics;
-  leadSources: LeadSourceEntry[];
-  responseTime: ResponseTimeMetrics;
   crmFunnel: CrmFunnelMetrics;
-  aiCost: AiCostMetrics;
-  teamAnalytics: TeamAnalyticsMetrics;
   revenue: RevenueMetrics;
-  sentiment: SentimentBreakdown;
-  agentStats: AgentDashboardStats;
-  automationOps: AutomationOpsMetrics;
-  agentRuns: AgentRunsMetrics;
-  recentAgentRuns: AgentRunListItem[];
+  messageSeries: AnalyticsChartPoint[];
+  clientSeries: AnalyticsChartPoint[];
+  dealSeries: AnalyticsChartPoint[];
+  callSeries: AnalyticsCallsChartPoint[];
 };
 
 export type ChannelWorkspaceSummary = {

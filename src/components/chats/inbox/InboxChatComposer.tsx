@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Loader2Icon,
@@ -12,6 +11,7 @@ import {
   SmileIcon,
   SparklesIcon,
   SquareIcon,
+  StickyNoteIcon,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -21,7 +21,8 @@ import {
   ComposerRecordingBar,
   type ComposerAttachmentKind,
 } from "@/components/chats/inbox/ComposerAttachmentPreview";
-import { ConversationInternalNotes } from "@/components/chats/ConversationInternalNotes";
+import { InboxContactNotesCard } from "@/components/chats/inbox/InboxContactNotesCard";
+import { InboxQuickRepliesDialog } from "@/components/chats/inbox/InboxQuickRepliesDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -32,7 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants";
 import { CHAT_ATTACHMENT_ACCEPT } from "@/features/chats/chat-attachments";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
@@ -62,6 +62,7 @@ type PendingAttachment = {
 
 type InboxChatComposerProps = {
   conversationId: string;
+  contactId?: string | null;
   channel: MessagingChannel;
   internalNote: string | null;
   draft: string;
@@ -119,9 +120,10 @@ function createPreviewUrl(file: File, kind: ComposerAttachmentKind): string | nu
 }
 
 export function InboxChatComposer({
-  conversationId,
+  conversationId: _conversationId,
+  contactId = null,
   channel,
-  internalNote,
+  internalNote: _internalNote,
   draft,
   onDraftChange,
   cannedResponses,
@@ -152,11 +154,26 @@ export function InboxChatComposer({
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingAttachment | null>(null);
   const [mediaCaption, setMediaCaption] = useState("");
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [quickRepliesManageOpen, setQuickRepliesManageOpen] = useState(false);
+  const [localCannedResponses, setLocalCannedResponses] =
+    useState(cannedResponses);
   const mediaSupported = supportsMediaChannel(channel) && !hideMediaActions;
   const isBusy = isSending;
   const hasPendingAttachment = pendingAttachment !== null;
   const readyToSubmit =
     canSubmit ?? (canSend && draft.trim().length > 0);
+
+  useEffect(() => {
+    setLocalCannedResponses(cannedResponses);
+  }, [cannedResponses]);
+
+  useEffect(() => {
+    if (composerTab === "note") {
+      setNoteDialogOpen(true);
+      onComposerTabChange("reply");
+    }
+  }, [composerTab, onComposerTabChange]);
 
   const clearPendingAttachment = useCallback(() => {
     setMediaCaption("");
@@ -382,37 +399,7 @@ export function InboxChatComposer({
       className={cn("mt-auto shrink-0", chatComposerShellClassName)}
       data-inbox-chat-composer
     >
-      <div className="flex gap-1 border-b px-3 pt-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={composerTab === "reply" ? "secondary" : "ghost"}
-          className="h-7 px-3 text-xs"
-          onClick={() => onComposerTabChange("reply")}
-        >
-          {CHAT_MESSAGES.composerReplyTab}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={composerTab === "note" ? "secondary" : "ghost"}
-          className="h-7 px-3 text-xs"
-          onClick={() => onComposerTabChange("note")}
-        >
-          {CHAT_MESSAGES.composerNoteTab}
-        </Button>
-      </div>
-
-      {composerTab === "note" ? (
-        <div className="p-3">
-          <ConversationInternalNotes
-            conversationId={conversationId}
-            initialNote={internalNote}
-            layout="compact"
-          />
-        </div>
-      ) : (
-        <div className="space-y-2 p-3">
+      <div className="space-y-2 p-3">
           {!canSend ? (
             <p className="text-xs text-muted-foreground">{channelNotConnectedMessage}</p>
           ) : websiteFormsHint ? (
@@ -449,6 +436,19 @@ export function InboxChatComposer({
 
           <div className="flex items-end gap-2">
             <div className="flex shrink-0 items-center gap-0.5 pb-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9 rounded-full"
+                disabled={isBusy || isRecording || hasPendingAttachment || !contactId}
+                aria-label={CHAT_MESSAGES.contactNotesTitle}
+                title={CHAT_MESSAGES.contactNotesTitle}
+                onClick={() => setNoteDialogOpen(true)}
+              >
+                <StickyNoteIcon className="size-5 text-muted-foreground" />
+              </Button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -539,24 +539,12 @@ export function InboxChatComposer({
                     {CANNED_RESPONSES_MESSAGES.pickerLabel}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {cannedResponses.length === 0 ? (
-                    <>
-                      <p className="px-2 py-2 text-xs text-muted-foreground">
-                        {CANNED_RESPONSES_MESSAGES.pickerEmpty}
-                      </p>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href={DASHBOARD_ROUTES.settings}
-                          className="gap-2 font-medium"
-                        >
-                          <PlusIcon className="size-4" />
-                          {CANNED_RESPONSES_MESSAGES.addButton}
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
+                  {localCannedResponses.length === 0 ? (
+                    <p className="px-2 py-2 text-xs text-muted-foreground">
+                      {CANNED_RESPONSES_MESSAGES.pickerEmpty}
+                    </p>
                   ) : (
-                    cannedResponses.map((item) => (
+                    localCannedResponses.map((item) => (
                       <DropdownMenuItem
                         key={item.id}
                         className="flex flex-col items-start gap-0.5"
@@ -569,6 +557,14 @@ export function InboxChatComposer({
                       </DropdownMenuItem>
                     ))
                   )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="gap-2 font-medium"
+                    onClick={() => setQuickRepliesManageOpen(true)}
+                  >
+                    <PlusIcon className="size-4" />
+                    {CANNED_RESPONSES_MESSAGES.addButton}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -624,8 +620,21 @@ export function InboxChatComposer({
               </Button>
             </div>
           </div>
-        </div>
-      )}
+      </div>
+
+      <InboxContactNotesCard
+        open={noteDialogOpen}
+        onOpenChange={setNoteDialogOpen}
+        contactId={contactId}
+      />
+
+      <InboxQuickRepliesDialog
+        open={quickRepliesManageOpen}
+        onOpenChange={setQuickRepliesManageOpen}
+        initialResponses={localCannedResponses}
+        onResponsesChange={setLocalCannedResponses}
+        onSelect={onDraftChange}
+      />
     </div>
   );
 }

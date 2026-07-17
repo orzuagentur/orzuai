@@ -128,7 +128,7 @@ export function buildArchitectureArticleSchema(locale: LandingLocale) {
     about: [
       "AI communication platform",
       "customer channel routing",
-      "CRM automation",
+      "CRM workflows",
       "AI voice agent",
       "service integrations",
     ],

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeftIcon,
   BookOpenIcon,
@@ -208,6 +208,14 @@ function AgentTestChatCard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isTesting, setIsTesting] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = messagesScrollRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [messages, isTesting]);
 
   async function sendMessage() {
     const text = draft.trim();
@@ -253,17 +261,20 @@ function AgentTestChatCard() {
   }
 
   return (
-    <Card className="flex min-h-[540px] flex-col shadow-none">
+    <Card className="flex h-[540px] min-h-0 flex-col overflow-hidden shadow-none">
       <CardHeader className="shrink-0 pb-3">
         <CardTitle className="text-lg">Test Agent</CardTitle>
         <CardDescription>
           Chat with your agent — same Phase 1 reply plus Phase 2 CRM preview.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex min-h-[460px] flex-1 flex-col gap-4 pb-6">
-        <div className="min-h-[360px] flex-1 space-y-4 overflow-y-auto rounded-2xl border bg-muted/10 p-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pb-6">
+        <div
+          ref={messagesScrollRef}
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden rounded-2xl border bg-muted/10 p-4"
+        >
           {messages.length === 0 ? (
-            <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 text-center">
+            <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 text-center">
               <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <BotIcon className="size-8" />
               </div>
@@ -309,6 +320,7 @@ function AgentTestChatCard() {
               Agent is thinking...
             </div>
           ) : null}
+          <div ref={messagesEndRef} />
         </div>
         <form
           className="flex shrink-0 gap-2"
@@ -347,7 +359,6 @@ export function AgentDashboardPanel({
 }: AgentDashboardPanelProps) {
   const profile = data.assistantProfile;
   const agentActive = Boolean(profile?.canReply && data.enabledChannelCount > 0);
-  const voiceEnabled = profile?.voiceReplyEnabled ?? false;
   const connectedChannels = data.channels.filter(
     (entry) => entry.settings.isChannelConnected,
   );
@@ -383,7 +394,7 @@ export function AgentDashboardPanel({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <DashboardActionCard
           title="Agent status"
           actionLabel="Open agent settings"
@@ -457,41 +468,12 @@ export function AgentDashboardPanel({
             </p>
           </div>
         </DashboardActionCard>
-
-        <DashboardActionCard
-          title="Voice agent"
-          actionLabel="Configure voice agent"
-          actionIcon={Volume2Icon}
-          onAction={() => onNavigate("voice")}
-        >
-          <div className="flex flex-col items-center px-2 text-center">
-            <div
-              className={cn(
-                "flex size-14 items-center justify-center rounded-2xl",
-                voiceEnabled
-                  ? "bg-violet-100 text-violet-600"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <Volume2Icon className="size-7" />
-            </div>
-            <p className="mt-4 text-lg font-semibold">
-              {voiceEnabled ? "Voice enabled" : "Voice disabled"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {profile?.elevenlabsVoiceName?.trim() ||
-                (data.elevenLabsConfigured
-                  ? "Select a voice"
-                  : "ElevenLabs not configured")}
-            </p>
-          </div>
-        </DashboardActionCard>
       </div>
 
       <AgentAiActivityChart initialPoints={aiActivity} initialDays={1} />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-        <Card className="shadow-none">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <Card className="min-w-0 shadow-none">
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>

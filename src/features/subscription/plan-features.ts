@@ -19,14 +19,6 @@ export function buildPlanFeaturesFromEntitlements(
     "Unified inbox + CRM + calendar",
   ];
 
-  if (entitlements.maxAutomationRules === 0) {
-    features.push("Automations not included");
-  } else if (isUnlimitedQuota(entitlements.maxAutomationRules)) {
-    features.push("Unlimited automations");
-  } else {
-    features.push(`Up to ${entitlements.maxAutomationRules} automation rules`);
-  }
-
   if (entitlements.websiteKnowledgeSync) {
     features.push("Website knowledge sync");
   }

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { AI_ASSISTANT_MESSAGES } from "@/features/ai-assistant/constants";
 import { Suspense } from "react";
 
 import { IntegrationChannelShell } from "@/components/integrations/IntegrationChannelShell";
@@ -55,7 +56,7 @@ import {
 
 type IntegrationsChannelPageProps = {
   params: Promise<{ channel: string }>;
-  searchParams: Promise<{ section?: string }>;
+  searchParams: Promise<{ section?: string; from?: string }>;
 };
 
 export default async function IntegrationsChannelPage({
@@ -63,7 +64,7 @@ export default async function IntegrationsChannelPage({
   searchParams,
 }: IntegrationsChannelPageProps) {
   const { channel: channelParam } = await params;
-  const { section: sectionParam } = await searchParams;
+  const { section: sectionParam, from: fromParam } = await searchParams;
 
   if (channelParam === "website_knowledge") {
     redirect(DASHBOARD_ROUTES.aiAssistantKnowledgeWebsite);
@@ -143,6 +144,17 @@ export default async function IntegrationsChannelPage({
   });
 
   const isActivated = isChannelActivated(channel, channelStatuses);
+  const fromAiAssistant = fromParam === "ai-assistant";
+  const backHref = fromAiAssistant
+    ? DASHBOARD_ROUTES.aiAssistantChannels
+    : isActivated
+      ? DASHBOARD_ROUTES.integrations
+      : DASHBOARD_ROUTES.marketplace;
+  const backLabel = fromAiAssistant
+    ? AI_ASSISTANT_MESSAGES.wizardBackToChannels
+    : isActivated
+      ? INTEGRATIONS_MESSAGES.backToIntegrations
+      : INTEGRATIONS_MESSAGES.backToMarketplace;
   const channelContacts =
     business && isMessagingIntegrationChannel(channel)
       ? await getChannelContacts(channel)
@@ -158,14 +170,8 @@ export default async function IntegrationsChannelPage({
         activeChannel={channel}
         channelStatuses={channelStatuses}
         isActivated={isActivated}
-        backHref={
-          isActivated ? DASHBOARD_ROUTES.integrations : DASHBOARD_ROUTES.marketplace
-        }
-        backLabel={
-          isActivated
-            ? INTEGRATIONS_MESSAGES.backToIntegrations
-            : INTEGRATIONS_MESSAGES.backToMarketplace
-        }
+        backHref={backHref}
+        backLabel={backLabel}
       >
         <IntegrationSectionPanels
           channel={channel}

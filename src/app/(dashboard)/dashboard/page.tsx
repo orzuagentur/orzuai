@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { ProfessionalAreaChart } from "@/components/analytics/ProfessionalAreaChart";
 import { AiStatusCard } from "@/components/dashboard/AiStatusCard";
 import { AnalyticsCardsGrid } from "@/components/dashboard/AnalyticsCardsGrid";
 import { DashboardPageSkeleton } from "@/components/dashboard/DashboardPageSkeleton";
@@ -14,6 +14,7 @@ import { WhatsAppStatusCard } from "@/components/dashboard/WhatsAppStatusCard";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { MESSAGING_INTEGRATION_CHANNELS } from "@/features/integrations";
 import { getDashboardOverview } from "@/services/analytics.service";
+import { getAnalyticsSeries } from "@/services/analytics-series.service";
 import { getCurrentUser } from "@/services/auth.service";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -56,9 +57,10 @@ async function DashboardPageContent() {
 
   const business = accessibleBusiness;
 
-  const [overview, channelStatuses] = await Promise.all([
+  const [overview, channelStatuses, messageSeries] = await Promise.all([
     getDashboardOverview(),
     getChannelConnectionStatuses(business.id),
+    getAnalyticsSeries(business.id, "messages", 7),
   ]);
 
   const hasConnectedChannel = MESSAGING_INTEGRATION_CHANNELS.some(
@@ -76,7 +78,15 @@ async function DashboardPageContent() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <ActivityChart data={overview.activity} />
+          <ProfessionalAreaChart
+            title="Message activity"
+            description="Inbound and outbound message volume. Use the clock to change the period."
+            metric="messages"
+            valueNoun="messages"
+            initialPoints={messageSeries}
+            initialDays={7}
+            fillId="dashboardMessagesFill"
+          />
         </div>
         <QuickActions enabled={hasConnectedChannel} />
       </div>

@@ -300,8 +300,13 @@ export function buildChannelWorkspaceHref(
 
 export function buildIntegrationActivateHref(
   channel: IntegrationChannelId,
+  options?: { from?: "ai-assistant" },
 ): string {
-  return `${DASHBOARD_ROUTES.integrations}/${channel}?section=activate`;
+  const params = new URLSearchParams({ section: "activate" });
+  if (options?.from === "ai-assistant") {
+    params.set("from", "ai-assistant");
+  }
+  return `${DASHBOARD_ROUTES.integrations}/${channel}?${params.toString()}`;
 }
 
 export function isIntegrationChannelId(

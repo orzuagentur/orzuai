@@ -427,14 +427,6 @@ export function BusinessDetailPanel({ businessId }: BusinessDetailPanelProps) {
                 updateControls({ businessId, outboundAiEnabled: value })
               }
             />
-            <ToggleRow
-              label="Автоматизации"
-              description="Workflows и фоновые задачи"
-              checked={controls?.automationsEnabled ?? true}
-              onChange={(value) =>
-                updateControls({ businessId, automationsEnabled: value })
-              }
-            />
           </div>
         </SectionCard>
 

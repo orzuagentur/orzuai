@@ -74,7 +74,7 @@ function buildFallbackPlans(): PlatformPlanRecord[] {
     const staticPlan = {
       free: { label: "Free", tagline: "Launch your first AI inbox", price: 0, highlighted: false },
       starter: { label: "Starter", tagline: "For growing local businesses", price: 49, highlighted: false },
-      pro: { label: "Pro", tagline: "Voice AI + full automation stack", price: 129, highlighted: true },
+      pro: { label: "Pro", tagline: "Voice AI + full inbox and CRM stack", price: 129, highlighted: true },
       agency: { label: "Agency", tagline: "High-volume teams & partners", price: 349, highlighted: false },
     }[id];
 

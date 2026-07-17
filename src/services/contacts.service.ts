@@ -1301,6 +1301,167 @@ export async function updateContact(
   return { success: true };
 }
 
+export async function getContactNotes(
+  contactId: string,
+): Promise<{ notes: string | null; name: string } | null> {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("contacts")
+    .select("name, custom_fields")
+    .eq("id", contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!data) {
+    return null;
+  }
+
+  const customFields = parseCustomFields(
+    data.custom_fields as ContactRow["custom_fields"],
+  );
+
+  return {
+    name: data.name,
+    notes: customFields.notes?.trim() || null,
+  };
+}
+
+export async function updateContactNotes(input: {
+  contactId: string;
+  notes: string;
+}): Promise<ContactActionResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: { code: "NO_BUSINESS", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("contacts")
+    .select("custom_fields")
+    .eq("id", input.contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!existing) {
+    return {
+      success: false,
+      error: { code: "NOT_FOUND", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const existingCustomFields = parseCustomFields(
+    existing.custom_fields as ContactRow["custom_fields"],
+  );
+  const nextNotes = input.notes.trim();
+  const merged: ContactCustomFields = {
+    ...existingCustomFields,
+  };
+
+  if (nextNotes) {
+    merged.notes = nextNotes.slice(0, 4000);
+  } else {
+    delete merged.notes;
+  }
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      custom_fields: merged as unknown as Record<string, string>,
+    })
+    .eq("id", input.contactId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "UPDATE_FAILED", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.contacts);
+  revalidatePath(DASHBOARD_ROUTES.chats);
+
+  return { success: true };
+}
+
+export async function updateContactClientDescription(input: {
+  contactId: string;
+  description: string;
+}): Promise<ContactActionResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: { code: "MISSING_CONFIG", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: { code: "NO_BUSINESS", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const supabase = await createClient();
+  const description = input.description.trim().slice(0, 800);
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("id", input.contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return {
+      success: false,
+      error: { code: "NOT_FOUND", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      ai_summary: description.length > 0 ? description : null,
+    })
+    .eq("id", input.contactId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: { code: "UPDATE_FAILED", message: CONTACTS_MESSAGES.contactSaveFailed },
+    };
+  }
+
+  revalidateContactPaths();
+  return { success: true };
+}
+
 export async function updateContactAdditionalContacts(
   contactId: string,
   additionalContacts: AdditionalContactEntry[],

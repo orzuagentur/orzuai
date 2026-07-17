@@ -53,10 +53,10 @@ export const DRIP_CONTENT: Record<OnboardingDripDay, OnboardingDripContent> = {
   },
   5: {
     subject: EMAIL_SUBJECTS.onboardingDay5,
-    preview: "Day 5: save time with follow-up automations.",
-    title: "Automate follow-ups",
-    body: "Set up automations for lead follow-ups, appointment reminders, and human handoffs so your team focuses on high-value conversations.",
-    cta: "Explore automations",
+    preview: "Day 5: save time with AI follow-ups.",
+    title: "Tune AI follow-ups",
+    body: "Refine your AI agent for lead follow-ups, appointment reminders, and human handoffs so your team focuses on high-value conversations.",
+    cta: "Open AI agent",
   },
   7: {
     subject: EMAIL_SUBJECTS.onboardingDay7,

@@ -54,7 +54,7 @@ export default function OpenGraphImage() {
             AI communication platform for modern revenue teams
           </p>
           <p style={{ fontSize: 26, lineHeight: 1.4, color: "rgba(255,255,255,0.62)", margin: 0 }}>
-            Unified inbox · Voice AI · CRM · Calendar · Automations
+            Unified inbox · Voice AI · CRM · Calendar · Analytics
           </p>
         </div>
 

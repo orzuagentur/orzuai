@@ -120,6 +120,7 @@ export function AiAssistantChannelRow({
               <Link
                 href={buildIntegrationActivateHref(
                   settings.channel as IntegrationChannelId,
+                  { from: "ai-assistant" },
                 )}
               >
                 {AI_ASSISTANT_MESSAGES.assistantConnectChannel}

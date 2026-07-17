@@ -71,9 +71,12 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     permission: "canAddNote",
     customerVisible: false,
     runsWithoutContact: false,
-    description: "Append a customer-visible note on the contact profile.",
-    orchestratorHint: "Summarize new facts the customer shared.",
-    executorHint: "Short factual note — visible on the contact record.",
+    description:
+      "Append a CRM note and refresh the client description (who they are + what they want).",
+    orchestratorHint:
+      "When you learn who the client is or what they want, add_note with a concise portrait: role/intent + goal. This updates the CRM client description.",
+    executorHint:
+      "Short factual note on the contact record; also refreshes contacts.ai_summary.",
     schema: executorAddNoteActionSchema,
   },
   {
