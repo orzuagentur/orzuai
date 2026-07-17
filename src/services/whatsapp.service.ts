@@ -918,21 +918,30 @@ async function completeInboundWhatsAppMessage(input: {
     .eq("id", connection.id);
 
   if (!shouldDeferAutoReplyForInboundVoice(content)) {
-    await scheduleInboundMessageProcessing({
+    void scheduleInboundMessageProcessing({
       admin,
       businessId,
       channel: "whatsapp",
       conversationId,
       clientMessage: getMessagePlainText(content),
+    }).catch((error) => {
+      console.error(
+        "[whatsapp] scheduleInboundMessageProcessing failed",
+        error instanceof Error ? error.message : "unknown",
+      );
     });
   }
 }
 
 export async function processWhatsAppWebhook(
   payload: WhatsAppWebhookPayload,
-): Promise<{ processed: number }> {
+): Promise<{ processed: number; messagesIngested: number; error?: string }> {
   if (!hasSupabaseEnv()) {
-    return { processed: 0 };
+    return {
+      processed: 0,
+      messagesIngested: 0,
+      error: "Supabase environment is not configured.",
+    };
   }
 
   const admin = createAdminClient();
@@ -942,7 +951,7 @@ export async function processWhatsAppWebhook(
   const messages = parseWhatsAppWebhookPayload(payload);
 
   if (messages.length === 0) {
-    return { processed };
+    return { processed, messagesIngested: 0 };
   }
 
   const outcomes = await runWithConcurrency(
@@ -957,6 +966,10 @@ export async function processWhatsAppWebhook(
         .maybeSingle();
 
       if (!connection) {
+        console.warn(
+          "[whatsapp] inbound skipped: no connected phone for phone_number_id",
+          message.phoneNumberId,
+        );
         return 0;
       }
 
@@ -965,7 +978,15 @@ export async function processWhatsAppWebhook(
     },
   );
 
-  processed += outcomes.filter((count) => count === 1).length;
+  const messagesIngested = outcomes.filter((count) => count === 1).length;
+  processed += messagesIngested;
 
-  return { processed };
+  return {
+    processed,
+    messagesIngested,
+    error:
+      messagesIngested === 0
+        ? "No connected WhatsApp phone matched the inbound webhook."
+        : undefined,
+  };
 }

@@ -148,7 +148,28 @@ export function messagesAreLikelyDuplicates(
     return true;
   }
 
+  // Short generic “I'll help you right now” variants should not both reach the customer.
+  if (
+    a.length <= 120 &&
+    b.length <= 120 &&
+    looksLikeGenericWaitingPhrase(a) &&
+    looksLikeGenericWaitingPhrase(b)
+  ) {
+    return true;
+  }
+
   return false;
+}
+
+function looksLikeGenericWaitingPhrase(text: string): boolean {
+  return [
+    /i('?ll| will) help you (right )?(now|here)/i,
+    /help you right (now|here)/i,
+    /помогу[\s\S]{0,80}(сейчас|прямо|здесь|чате)/i,
+    /прямо сейчас[\s\S]{0,40}(здесь|помогу)/i,
+    /shu yerda yordam/i,
+    /hozir[\s\S]{0,40}yordam/i,
+  ].some((pattern) => pattern.test(text));
 }
 
 export function shouldSendCustomerActionFollowUp(input: {

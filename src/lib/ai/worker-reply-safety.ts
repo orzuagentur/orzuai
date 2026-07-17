@@ -20,6 +20,10 @@ const DELEGATION_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /(бронь|бронирование|запись)[\s\S]{0,80}(недоступ|не настроен|не могу)/i, reason: "booking_denial" },
   { pattern: /(menejer|xodim|operator)[\s\S]{0,120}(bog'lanadi|tekshiradi|tasdiqlaydi)/i, reason: "manager_callback" },
   { pattern: /(menejerga|xodimga)[\s\S]{0,120}(yuboraman|yetkazaman|beraman)/i, reason: "delegation_promise" },
+  { pattern: /i('?ll| will) help you (right )?(now|here)/i, reason: "passive_waiting" },
+  { pattern: /\bhelp you right (now|here)\b/i, reason: "passive_waiting" },
+  { pattern: /помогу[\s\S]{0,80}(сейчас|прямо здесь|прямо сейчас)/i, reason: "passive_waiting" },
+  { pattern: /прямо сейчас[\s\S]{0,40}помогу/i, reason: "passive_waiting" },
 ];
 
 export function containsWorkerUnsafeReplyLanguage(text: string): string | null {

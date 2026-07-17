@@ -486,16 +486,32 @@ function resolveSafeAssistantFallbackReplyMessage(input: {
 }
 
 function looksLikePassiveWaitingReply(text: string): boolean {
+  const trimmed = text.trim();
+
+  if (!trimmed || trimmed.length > 160) {
+    return false;
+  }
+
+  // Clarifying questions are useful — keep them.
+  if (/[?？]\s*$/.test(trimmed) || /\b(what|when|which|how|какой|какую|когда|какой|qaysi)\b/i.test(trimmed)) {
+    return false;
+  }
+
   return [
     /checking availability/i,
     /checking the details/i,
     /being created now/i,
     /will (get back|follow up|respond|confirm later)/i,
+    /i('?ll| will) help you (right )?(now|here)/i,
+    /help you right (now|here)/i,
     /biroz kuting/i,
     /проверяю[\s\S]{0,80}(доступ|брон|детал)/i,
+    /помогу[\s\S]{0,80}(сейчас|прямо|здесь|чате)/i,
+    /прямо сейчас[\s\S]{0,40}(здесь|помогу)/i,
     /ожидайте/i,
     /tekshir(yapman|aman)/i,
-  ].some((pattern) => pattern.test(text));
+    /hozir[\s\S]{0,40}yordam beraman/i,
+  ].some((pattern) => pattern.test(trimmed));
 }
 
 function buildKnowledgeGuidance(knowledgeCount: number): string {
@@ -886,16 +902,14 @@ export async function generateFastAssistantReply(input: {
 
   let finalText = safeReply.text ?? fallbackText;
 
-  if (
-    preferredConfirmation &&
-    (safeReply.rewritten || looksLikePassiveWaitingReply(finalText))
-  ) {
-    const safeConfirmation = sanitizeWorkerFacingReply(preferredConfirmation, {
-      fallback: null,
-    });
-
-    if (safeConfirmation.text) {
-      finalText = safeConfirmation.text;
+  if (safeReply.rewritten || looksLikePassiveWaitingReply(finalText)) {
+    if (preferredConfirmation) {
+      const safeConfirmation = sanitizeWorkerFacingReply(preferredConfirmation, {
+        fallback: null,
+      });
+      finalText = safeConfirmation.text ?? fallbackText;
+    } else {
+      finalText = fallbackText;
     }
   }
 

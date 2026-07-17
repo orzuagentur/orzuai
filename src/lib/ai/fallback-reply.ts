@@ -45,12 +45,15 @@ function resolveActionFallbackReplyMessage(input: {
 function isGenericWaitingFallback(message: string): boolean {
   return [
     /help you right here in (this )?chat/i,
+    /i('?ll| will) help you (right )?(now|here)/i,
     /checking this and will help/i,
     /checking the details now/i,
     /biroz kuting/i,
-    /помогу[\s\S]{0,80}(здесь|чате|чат)/i,
+    /помогу[\s\S]{0,80}(здесь|чате|чат|сейчас)/i,
+    /прямо сейчас[\s\S]{0,40}(здесь|помогу)/i,
     /проверяю[\s\S]{0,80}помогу/i,
     /shu yerda yordam beraman/i,
+    /hozir[\s\S]{0,40}yordam/i,
   ].some((pattern) => pattern.test(message));
 }
 

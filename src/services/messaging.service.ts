@@ -35,6 +35,7 @@ import {
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
+import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -417,6 +418,32 @@ export async function processChannelAutoReply(input: {
     });
   }
 
+  // Skip provider send when the same (or near-same) AI reply was just delivered —
+  // protects against job retries after a successful channel send.
+  try {
+    const recentAiMessage = await getMessageRepository(admin).findLatestAiMessage(
+      conversationId,
+      businessId,
+    );
+
+    if (
+      recentAiMessage?.content &&
+      Date.now() - new Date(recentAiMessage.created_at).getTime() < 2 * 60 * 1000 &&
+      messagesAreLikelyDuplicates(recentAiMessage.content, reply.text)
+    ) {
+      console.warn(
+        "[messaging] skipped duplicate auto-reply send",
+        JSON.stringify({ businessId, channel, conversationId }),
+      );
+      return;
+    }
+  } catch (error) {
+    console.warn(
+      "[messaging] duplicate-reply check failed; continuing with send",
+      error instanceof Error ? error.message : "unknown",
+    );
+  }
+
   const voiceDecision = await shouldUseVoiceAutoReply({
     admin,
     businessId,
@@ -563,10 +590,15 @@ export async function scheduleInboundMessageProcessing(input: {
     console.error("[messaging] immediate human request failed", error);
   });
 
-  await scheduleChannelAutoReply({
+  void scheduleChannelAutoReply({
     businessId: input.businessId,
     channel: input.channel,
     conversationId: input.conversationId,
     clientMessage: input.clientMessage,
+  }).catch((error) => {
+    console.error(
+      "[messaging] scheduleChannelAutoReply failed",
+      error instanceof Error ? error.message : "unknown",
+    );
   });
 }

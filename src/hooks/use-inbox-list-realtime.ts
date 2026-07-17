@@ -117,6 +117,7 @@ export function useInboxListRealtime({
       }
 
       let updatedItem: ConversationListItem | null = null;
+      let missingConversation = false;
 
       onConversationsChangeRef.current((current) => {
         const result = applyRealtimeMessageToList(current, message, {
@@ -127,12 +128,40 @@ export function useInboxListRealtime({
         updatedItem = result.updatedItem;
 
         if (!result.found) {
-          scheduleRefresh();
+          missingConversation = true;
           return current;
         }
 
         return result.items;
       });
+
+      if (missingConversation) {
+        // New chats often insert the message before the conversation is in the
+        // local list — fetch immediately so the first inbound is visible.
+        void fetchConversationListItemAction({
+          conversationId: message.conversation_id,
+        }).then((result) => {
+          if (!result.success) {
+            scheduleRefresh();
+            return;
+          }
+
+          const item =
+            selectedConversationIdRef.current === result.data.id
+              ? {
+                  ...result.data,
+                  isUnread: false,
+                  unreadMessageCount: 0,
+                }
+              : result.data;
+
+          onConversationsChangeRef.current((current) =>
+            prependConversationListItem(current, item),
+          );
+          applyListUpdates(item);
+        });
+        return;
+      }
 
       applyListUpdates(updatedItem);
     };

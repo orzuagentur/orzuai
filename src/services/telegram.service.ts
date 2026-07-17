@@ -498,12 +498,17 @@ async function completeInboundTelegramMessage(input: {
     .eq("id", connection.id);
 
   if (!shouldDeferAutoReplyForInboundVoice(content)) {
-    await scheduleInboundMessageProcessing({
+    void scheduleInboundMessageProcessing({
       admin,
       businessId,
       channel: "telegram",
       conversationId,
       clientMessage: getMessagePlainText(content),
+    }).catch((error) => {
+      console.error(
+        "[telegram] scheduleInboundMessageProcessing failed",
+        error instanceof Error ? error.message : "unknown",
+      );
     });
   }
 }
@@ -511,9 +516,14 @@ async function completeInboundTelegramMessage(input: {
 export async function processTelegramWebhook(
   secretToken: string,
   payload: TelegramWebhookPayload,
-): Promise<{ processed: number }> {
+): Promise<{ processed: number; error?: string }> {
   if (!hasSupabaseEnv() || !secretToken) {
-    return { processed: 0 };
+    return {
+      processed: 0,
+      error: !secretToken
+        ? "Missing Telegram secret token."
+        : "Supabase environment is not configured.",
+    };
   }
 
   const messages = parseTelegramWebhookPayload(payload);
@@ -543,45 +553,35 @@ export async function processTelegramWebhook(
   const connection = connectionQuery.data;
 
   if (!connection) {
-    return { processed: 0 };
+    return {
+      processed: 0,
+      error: "No connected Telegram bot matched the webhook secret.",
+    };
   }
 
-  const [botToken, webhookSecretKeyName] = await Promise.all([
-    resolveIntegrationSecret(admin, {
-      businessId: connection.business_id,
-      kind: "TELEGRAM_BOT_TOKEN",
-      secretKeyName: connection.bot_token_secret_key_name,
-      legacyValue: connection.bot_token,
-      onMigrated: async (secretKeyName) => {
-        await admin
-          .from("telegram_connections")
-          .update({
-            bot_token: null,
-            bot_token_secret_key_name: secretKeyName,
-          })
-          .eq("id", connection.id);
-      },
-    }),
-    storeIntegrationSecret(admin, {
-      businessId: connection.business_id,
-      kind: "TELEGRAM_WEBHOOK_SECRET",
-      value: secretToken,
-    }),
-  ]);
+  // Resolve bot token only on the hot path. Secret vault writes used to run
+  // before ingest and could drop the first message on cold starts.
+  const botToken = await resolveIntegrationSecret(admin, {
+    businessId: connection.business_id,
+    kind: "TELEGRAM_BOT_TOKEN",
+    secretKeyName: connection.bot_token_secret_key_name,
+    legacyValue: connection.bot_token,
+    onMigrated: async (secretKeyName) => {
+      await admin
+        .from("telegram_connections")
+        .update({
+          bot_token: null,
+          bot_token_secret_key_name: secretKeyName,
+        })
+        .eq("id", connection.id);
+    },
+  });
 
   if (!botToken) {
-    return { processed: 0 };
-  }
-
-  if (!connection.webhook_secret_hash || connection.webhook_secret) {
-    await admin
-      .from("telegram_connections")
-      .update({
-        webhook_secret: null,
-        webhook_secret_secret_key_name: webhookSecretKeyName,
-        webhook_secret_hash: secretHash,
-      })
-      .eq("id", connection.id);
+    return {
+      processed: 0,
+      error: "Telegram bot token is missing for this connection.",
+    };
   }
 
   const hydratedConnection = { ...connection, bot_token: botToken };
@@ -590,6 +590,30 @@ export async function processTelegramWebhook(
   for (const message of messages) {
     await ingestTelegramMessage(admin, hydratedConnection, message);
     processed += 1;
+  }
+
+  if (!connection.webhook_secret_hash || connection.webhook_secret) {
+    void (async () => {
+      const webhookSecretKeyName = await storeIntegrationSecret(admin, {
+        businessId: connection.business_id,
+        kind: "TELEGRAM_WEBHOOK_SECRET",
+        value: secretToken,
+      });
+
+      await admin
+        .from("telegram_connections")
+        .update({
+          webhook_secret: null,
+          webhook_secret_secret_key_name: webhookSecretKeyName,
+          webhook_secret_hash: secretHash,
+        })
+        .eq("id", connection.id);
+    })().catch((error) => {
+      console.warn(
+        "[telegram] deferred webhook secret migration failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    });
   }
 
   return { processed };

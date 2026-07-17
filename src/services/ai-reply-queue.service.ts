@@ -5,7 +5,6 @@ import { createHash } from "crypto";
 import { claimAiReplyJobs } from "@/lib/queue/claim-jobs";
 import { dispatchAiReplyQueueWorker } from "@/lib/queue/qstash-ai-reply-worker";
 import { scheduleAfterResponse } from "@/lib/queue/schedule-deferred";
-import { sleep } from "@/lib/queue/sleep";
 import {
   getWorkerConcurrency,
   runWithConcurrency,
@@ -27,7 +26,10 @@ export const DEFAULT_AUTO_REPLY_DEBOUNCE_MS = 1_500;
 const BATCH_SIZE = 20;
 const MAX_DRAIN_BATCHES = 20;
 const BASE_RETRY_SECONDS = 15;
-const STALE_PROCESSING_MS = 5 * 60 * 1000;
+/** Recover stuck jobs faster so a dead webhook drain cannot silence a chat for minutes. */
+const STALE_PROCESSING_MS = 2 * 60 * 1000;
+/** If a job stays processing this long, a new inbound may force it back to pending. */
+const FORCE_REQUEUE_WHILE_PROCESSING_MS = 90_000;
 
 type AiReplyJobRow = Database["public"]["Tables"]["ai_reply_jobs"]["Row"];
 
@@ -211,7 +213,7 @@ async function upsertAiReplyJob(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const { data: existing, error: fetchError } = await admin
       .from("ai_reply_jobs")
-      .select("id, status, pending_messages, needs_reprocess")
+      .select("id, status, pending_messages, needs_reprocess, updated_at")
       .eq("business_id", input.businessId)
       .eq("conversation_id", input.conversationId)
       .maybeSingle();
@@ -222,6 +224,11 @@ async function upsertAiReplyJob(
 
     if (existing) {
       const isProcessing = existing.status === "processing";
+      const processingAgeMs = isProcessing
+        ? Date.now() - new Date(existing.updated_at).getTime()
+        : 0;
+      const forceRequeue =
+        isProcessing && processingAgeMs >= FORCE_REQUEUE_WHILE_PROCESSING_MS;
       const pendingMessages = [...(existing.pending_messages ?? []), trimmed];
 
       const { error: updateError } = await admin
@@ -230,9 +237,13 @@ async function upsertAiReplyJob(
           channel: input.channel,
           pending_messages: pendingMessages,
           next_attempt_at: debouncedAt,
-          needs_reprocess: isProcessing ? true : existing.needs_reprocess,
-          status: isProcessing ? "processing" : "pending",
-          updated_at: now,
+          needs_reprocess: isProcessing && !forceRequeue
+            ? true
+            : existing.needs_reprocess,
+          // Keep processing jobs claimable after a stuck worker dies.
+          status: isProcessing && !forceRequeue ? "processing" : "pending",
+          // Do not refresh updated_at while still processing — preserves stale recovery.
+          ...(isProcessing && !forceRequeue ? {} : { updated_at: now }),
         })
         .eq("id", existing.id);
 
@@ -363,18 +374,9 @@ export async function scheduleDebouncedChannelAutoReply(
 
   await notifyAutoReplyTyping(input.conversationId, true, typingContext);
 
-  // Process in the same request after the DB debounce window (webhook/cron stay alive).
-  await sleep(getDebouncedDrainDelayMs(replyWaitMs));
-
-  try {
-    await drainAiReplyQueue();
-  } catch (error) {
-    console.error(
-      "[ai-reply-queue] inline drain failed after enqueue",
-      formatSupabaseError(error),
-    );
-    dispatchAiReplyWorker("enqueue", replyWaitMs);
-  }
+  // Always schedule a deferred/QStash drain. Do not await LLM inside the webhook —
+  // complex replies were timing out and leaving jobs stuck until a second message.
+  dispatchAiReplyWorker("enqueue", replyWaitMs);
 }
 
 async function markAiReplyJobRetry(
@@ -440,8 +442,9 @@ async function finalizeAiReplyJob(
       .eq("id", job.id)
       .maybeSingle();
 
-    const hasPendingMessages =
-      (current?.pending_messages?.length ?? 0) > 0 || current?.needs_reprocess;
+    // Only requeue when real messages remain. needs_reprocess alone used to
+    // requeue empty jobs and silently drop follow-up customer messages.
+    const hasPendingMessages = (current?.pending_messages?.length ?? 0) > 0;
 
     if (hasPendingMessages) {
       const replyWaitMs = await getBusinessReplyWaitMs(
@@ -457,6 +460,7 @@ async function finalizeAiReplyJob(
           needs_reprocess: false,
           next_attempt_at: new Date(Date.now() + replyWaitMs).toISOString(),
           processed_at: now,
+          updated_at: now,
         })
         .eq("id", job.id);
 
@@ -472,6 +476,7 @@ async function finalizeAiReplyJob(
         needs_reprocess: false,
         processed_at: now,
         last_error: null,
+        updated_at: now,
       })
       .eq("id", job.id);
 
@@ -485,7 +490,9 @@ async function processClaimedAiReplyJob(
   admin: MessagingDbClient,
   job: AiReplyJobRow,
 ): Promise<"completed" | "retried" | "failed" | "requeued"> {
-  const clientMessage = combineClientMessages(job.pending_messages ?? []);
+  const claimedMessages = [...(job.pending_messages ?? [])];
+  const claimedCount = claimedMessages.length;
+  const clientMessage = combineClientMessages(claimedMessages);
 
   if (!clientMessage) {
     await admin
@@ -493,6 +500,7 @@ async function processClaimedAiReplyJob(
       .update({
         status: "completed",
         pending_messages: [],
+        needs_reprocess: false,
         processed_at: new Date().toISOString(),
       })
       .eq("id", job.id);
@@ -518,9 +526,24 @@ async function processClaimedAiReplyJob(
       clientMessage,
     });
 
+    // Clear only messages this claim processed. Newer messages appended while
+    // processing must stay in pending_messages for the next drain.
+    const { data: current } = await admin
+      .from("ai_reply_jobs")
+      .select("pending_messages")
+      .eq("id", job.id)
+      .maybeSingle();
+
+    const remainingMessages = (current?.pending_messages ?? []).slice(
+      claimedCount,
+    );
+
     await admin
       .from("ai_reply_jobs")
-      .update({ pending_messages: [] })
+      .update({
+        pending_messages: remainingMessages,
+        needs_reprocess: remainingMessages.length > 0,
+      })
       .eq("id", job.id);
 
     return finalizeAiReplyJob(admin, job, "completed");

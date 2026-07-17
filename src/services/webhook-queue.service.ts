@@ -14,13 +14,17 @@ import { processWhatsAppWebhook } from "@/services/whatsapp.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { TelegramWebhookPayload } from "@/types/telegram.types";
 import type { WhatsAppWebhookPayload } from "@/types/whatsapp.types";
+import { parseTelegramWebhookPayload } from "@/utils/telegram-webhook";
+import { parseWhatsAppWebhookPayload } from "@/utils/whatsapp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
 const BATCH_SIZE = 20;
 const BASE_RETRY_SECONDS = 15;
-const STALE_PROCESSING_MS = 5 * 60 * 1000;
+/** Recover stuck webhook jobs quickly so first inbound messages are not silent for minutes. */
+const STALE_PROCESSING_MS = 90 * 1000;
+const FORCE_REQUEUE_WHILE_PROCESSING_MS = 60 * 1000;
 
 export type WebhookQueueDrainResult = {
   processed: number;
@@ -86,6 +90,10 @@ export async function receiveInboundWebhook(
 
   if (error) {
     if (error.code === "23505") {
+      await requeueStuckDuplicateWebhookJob(admin, {
+        channel: input.channel,
+        idempotencyKey: input.idempotencyKey,
+      });
       await drainInboundWebhookQueueHotPath();
       dispatchInboundWebhookWorker("enqueue");
       return { queued: false, duplicate: true, processedInline: false };
@@ -217,6 +225,43 @@ export async function drainInboundWebhookQueueHotPath(): Promise<WebhookQueueDra
   };
 }
 
+async function requeueStuckDuplicateWebhookJob(
+  admin: MessagingDbClient,
+  input: { channel: MessagingChannel; idempotencyKey: string },
+): Promise<boolean> {
+  const { data: existing } = await admin
+    .from("inbound_webhook_queue")
+    .select("id, status, updated_at")
+    .eq("channel", input.channel)
+    .eq("idempotency_key", input.idempotencyKey)
+    .maybeSingle();
+
+  if (!existing || existing.status !== "processing") {
+    return false;
+  }
+
+  const ageMs = Date.now() - new Date(existing.updated_at).getTime();
+
+  if (ageMs < FORCE_REQUEUE_WHILE_PROCESSING_MS) {
+    return false;
+  }
+
+  const { data: updated } = await admin
+    .from("inbound_webhook_queue")
+    .update({
+      status: "pending",
+      next_attempt_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_error: "Requeued stuck processing webhook after provider retry.",
+    })
+    .eq("id", existing.id)
+    .eq("status", "processing")
+    .select("id")
+    .maybeSingle();
+
+  return Boolean(updated);
+}
+
 async function processInboundWebhookJobInline(
   admin: MessagingDbClient,
   job: InboundWebhookJobRow,
@@ -225,7 +270,7 @@ async function processInboundWebhookJobInline(
 
   const { data: claimed } = await admin
     .from("inbound_webhook_queue")
-    .update({ status: "processing" })
+    .update({ status: "processing", updated_at: now })
     .eq("id", job.id)
     .eq("status", "pending")
     .select("id")
@@ -235,33 +280,50 @@ async function processInboundWebhookJobInline(
     return false;
   }
 
-  const result = await processWebhookJob({
-    id: job.id,
-    channel: job.channel,
-    payload: job.payload,
-    metadata: (job.metadata as Record<string, unknown> | null) ?? null,
-  });
+  try {
+    const result = await processWebhookJob({
+      id: job.id,
+      channel: job.channel,
+      payload: job.payload,
+      metadata: (job.metadata as Record<string, unknown> | null) ?? null,
+    });
 
-  if (result.success) {
-    await admin
-      .from("inbound_webhook_queue")
-      .update({
-        status: "completed",
-        processed_at: now,
-        last_error: result.error ?? null,
-      })
-      .eq("id", job.id);
-    return true;
+    if (result.success) {
+      await admin
+        .from("inbound_webhook_queue")
+        .update({
+          status: "completed",
+          processed_at: now,
+          last_error: result.error ?? null,
+        })
+        .eq("id", job.id);
+      return true;
+    }
+
+    await markWebhookJobRetry(admin, {
+      id: job.id,
+      attempt_count: job.attempt_count,
+      max_attempts: job.max_attempts,
+      error: result.error ?? "Processing failed.",
+    });
+
+    return false;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Webhook processing threw.";
+    console.error(
+      "[webhook-queue] inline webhook job failed",
+      JSON.stringify({ jobId: job.id, channel: job.channel, error: message }),
+    );
+    await markWebhookJobRetry(admin, {
+      id: job.id,
+      attempt_count: job.attempt_count,
+      max_attempts: job.max_attempts,
+      error: message,
+    });
+    dispatchInboundWebhookWorker("retry");
+    return false;
   }
-
-  await markWebhookJobRetry(admin, {
-    id: job.id,
-    attempt_count: job.attempt_count,
-    max_attempts: job.max_attempts,
-    error: result.error ?? "Processing failed.",
-  });
-
-  return false;
 }
 
 async function markWebhookJobRetry(
@@ -333,10 +395,26 @@ async function processWebhookJob(job: {
   metadata: Record<string, unknown> | null;
 }): Promise<{ success: boolean; error?: string }> {
   if (job.channel === "whatsapp") {
-    const result = await processWhatsAppWebhook(
-      job.payload as WhatsAppWebhookPayload,
-    );
-    return { success: true, error: result.processed === 0 ? "No messages" : undefined };
+    const payload = job.payload as WhatsAppWebhookPayload;
+    const inboundMessages = parseWhatsAppWebhookPayload(payload);
+    const result = await processWhatsAppWebhook(payload);
+
+    if (inboundMessages.length > 0 && result.messagesIngested === 0) {
+      return {
+        success: false,
+        error:
+          result.error ??
+          "WhatsApp webhook had inbound messages but none were ingested.",
+      };
+    }
+
+    return {
+      success: true,
+      error:
+        inboundMessages.length === 0 && result.processed === 0
+          ? "No messages"
+          : undefined,
+    };
   }
 
   if (job.channel === "telegram") {
@@ -349,10 +427,19 @@ async function processWebhookJob(job: {
       return { success: false, error: "Missing Telegram secret token." };
     }
 
-    await processTelegramWebhook(
-      secretToken,
-      job.payload as TelegramWebhookPayload,
-    );
+    const payload = job.payload as TelegramWebhookPayload;
+    const inboundMessages = parseTelegramWebhookPayload(payload);
+    const result = await processTelegramWebhook(secretToken, payload);
+
+    if (inboundMessages.length > 0 && result.processed === 0) {
+      return {
+        success: false,
+        error:
+          result.error ??
+          "Telegram webhook had inbound messages but none were ingested.",
+      };
+    }
+
     return { success: true };
   }
 
@@ -370,37 +457,59 @@ async function processClaimedWebhookJob(job: {
   const admin = createAdminClient();
   const now = new Date().toISOString();
 
-  const result = await processWebhookJob({
-    id: job.id,
-    channel: job.channel,
-    payload: job.payload,
-    metadata: job.metadata,
-  });
+  try {
+    const result = await processWebhookJob({
+      id: job.id,
+      channel: job.channel,
+      payload: job.payload,
+      metadata: job.metadata,
+    });
 
-  if (result.success) {
-    await admin
-      .from("inbound_webhook_queue")
-      .update({
-        status: "completed",
-        processed_at: now,
-        last_error: result.error ?? null,
-      })
-      .eq("id", job.id);
-    return "completed";
+    if (result.success) {
+      await admin
+        .from("inbound_webhook_queue")
+        .update({
+          status: "completed",
+          processed_at: now,
+          last_error: result.error ?? null,
+        })
+        .eq("id", job.id);
+      return "completed";
+    }
+
+    const outcome = await markWebhookJobRetry(admin, {
+      id: job.id,
+      attempt_count: job.attempt_count,
+      max_attempts: job.max_attempts,
+      error: result.error ?? "Processing failed.",
+    });
+
+    if (outcome === "retried") {
+      dispatchInboundWebhookWorker("retry");
+    }
+
+    return outcome;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Webhook processing threw.";
+    console.error(
+      "[webhook-queue] claimed webhook job failed",
+      JSON.stringify({ jobId: job.id, channel: job.channel, error: message }),
+    );
+
+    const outcome = await markWebhookJobRetry(admin, {
+      id: job.id,
+      attempt_count: job.attempt_count,
+      max_attempts: job.max_attempts,
+      error: message,
+    });
+
+    if (outcome === "retried") {
+      dispatchInboundWebhookWorker("retry");
+    }
+
+    return outcome;
   }
-
-  const outcome = await markWebhookJobRetry(admin, {
-    id: job.id,
-    attempt_count: job.attempt_count,
-    max_attempts: job.max_attempts,
-    error: result.error ?? "Processing failed.",
-  });
-
-  if (outcome === "retried") {
-    dispatchInboundWebhookWorker("retry");
-  }
-
-  return outcome;
 }
 
 export async function processPendingInboundWebhooks(): Promise<{
