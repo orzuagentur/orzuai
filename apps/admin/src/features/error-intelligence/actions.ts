@@ -105,10 +105,31 @@ export async function fetchErrorIntelligenceEventsAction(
       .order("last_seen_at", { ascending: false })
       .limit(limit);
 
-    if (filters.severity) query = query.eq("severity", filters.severity);
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.module) query = query.eq("module", filters.module);
-    if (filters.environment) query = query.eq("environment", filters.environment);
+    if (Array.isArray(filters.severity) && filters.severity.length > 0) {
+      query = query.in("severity", filters.severity);
+    } else if (typeof filters.severity === "string" && filters.severity) {
+      query = query.eq("severity", filters.severity);
+    }
+
+    if (Array.isArray(filters.status) && filters.status.length > 0) {
+      query = query.in("status", filters.status);
+    } else if (typeof filters.status === "string" && filters.status) {
+      query = query.eq("status", filters.status);
+    }
+
+    if (Array.isArray(filters.module) && filters.module.length > 0) {
+      query = query.in("module", filters.module);
+    } else if (typeof filters.module === "string" && filters.module) {
+      query = query.eq("module", filters.module);
+    }
+
+    if (Array.isArray(filters.environment) && filters.environment.length > 0) {
+      query = query.in("environment", filters.environment);
+    } else if (typeof filters.environment === "string" && filters.environment) {
+      query = query.eq("environment", filters.environment);
+    }
+
+    if (filters.source) query = query.eq("source", filters.source);
     if (filters.businessId) query = query.eq("business_id", filters.businessId);
 
     const search = filters.query?.trim();
@@ -437,116 +458,6 @@ export async function deleteErrorEventsAction(input: {
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unable to delete.",
-    };
-  }
-}
-
-export async function seedDemoErrorEventsAction(): Promise<{
-  success: boolean;
-  message?: string;
-  created?: number;
-}> {
-  try {
-    await requirePlatformAdmin();
-    const admin = createServiceRoleClient();
-    const now = new Date().toISOString();
-
-    const demos = [
-      {
-        fingerprint: `demo-vapid-${Date.now()}`,
-        severity: "high",
-        module: "platform",
-        category: "push",
-        source: "push-notifications",
-        title: "VAPID subject invalid",
-        message: "Vapid subject is not an https: or mailto: URL.",
-        description: "Web push configuration rejected invalid contact URI.",
-        root_cause: "VAPID_SUBJECT was set to http://localhost:3000",
-        suggested_fix: "Set VAPID_SUBJECT=mailto:support@orzux.com",
-        impact: "Push notifications for agent actions fail silently.",
-        recurrence_risk: "High until env is corrected.",
-        stack_trace:
-          "Error: Vapid subject is not an https: or mailto: URL.\n    at validateSubject\n    at setVapidDetails",
-        raw_log: "[push] failed to notify agent action",
-        terminal: {
-          runtime: "nodejs",
-          console: ["[push] failed to notify agent action"],
-        },
-        context: { envKey: "VAPID_SUBJECT" },
-        path: "/api/internal/agent-action",
-        http_status: 500,
-      },
-      {
-        fingerprint: `demo-ai-json-${Date.now()}`,
-        severity: "warning",
-        module: "ai",
-        category: "parsing",
-        source: "gemini",
-        title: "AI returned invalid JSON",
-        message: "Model completion was not valid JSON for tool call.",
-        description: "Parser rejected model output during CRM tool execution.",
-        root_cause: "Model wrapped JSON in markdown fences or truncated.",
-        suggested_fix: "Retry with stricter schema and lower temperature.",
-        impact: "CRM auto-update skipped for one turn.",
-        recurrence_risk: "Medium",
-        ai: {
-          model: "gemini-2.5-flash",
-          latencyMs: 1840,
-          confidence: 0.42,
-          tokensIn: 2100,
-          tokensOut: 180,
-        },
-        terminal: {
-          prompt: "Extract CRM fields as JSON...",
-          completion: "```json\n{ incomplete",
-        },
-      },
-      {
-        fingerprint: `demo-whatsapp-${Date.now()}`,
-        severity: "critical",
-        module: "whatsapp",
-        category: "delivery",
-        source: "360dialog",
-        title: "WhatsApp delivery failed",
-        message: "Template rejected by Meta.",
-        description: "Outbound template message could not be delivered.",
-        root_cause: "Template language mismatch or unapproved template.",
-        suggested_fix: "Verify template status in Meta Business Manager.",
-        impact: "Customer did not receive confirmation message.",
-        recurrence_risk: "High for this template",
-        http_status: 400,
-        path: "/api/webhooks/whatsapp",
-        response_body: { error: "template_rejected" },
-      },
-    ];
-
-    const { data, error } = await admin
-      .from("platform_error_events")
-      .insert(
-        demos.map((demo) => ({
-          ...demo,
-          status: "open",
-          environment: "production",
-          first_seen_at: now,
-          last_seen_at: now,
-          occurrences: 1,
-          request_headers: {},
-          context: demo.context ?? {},
-          terminal: demo.terminal ?? {},
-          ai: demo.ai ?? {},
-        })),
-      )
-      .select("id");
-
-    if (error) {
-      return { success: false, message: error.message };
-    }
-
-    return { success: true, created: data?.length ?? 0 };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Unable to seed demos.",
     };
   }
 }

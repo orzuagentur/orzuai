@@ -2,38 +2,33 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
-  ActivityIcon,
-  AlertTriangleIcon,
-  CheckCircle2Icon,
+  Building2Icon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CopyIcon,
-  FilterIcon,
+  EyeIcon,
+  FunctionSquareIcon,
+  GlobeIcon,
   Loader2Icon,
-  RadarIcon,
   RefreshCwIcon,
   SearchIcon,
-  Trash2Icon,
+  ShieldIcon,
+  SquareStackIcon,
+  XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/ui/EmptyState";
-import { PageHeader } from "@/components/ui/PageHeader";
 import {
-  bulkUpdateErrorEventsAction,
   deleteErrorEventsAction,
   fetchErrorBusinessSnapshotAction,
   fetchErrorIntelligenceEventsAction,
   fetchErrorIntelligenceStatsAction,
-  seedDemoErrorEventsAction,
   updateErrorEventStatusAction,
 } from "@/features/error-intelligence/actions";
 import {
   ERROR_ENVIRONMENTS,
   ERROR_MODULES,
-  ERROR_SEVERITIES,
   ERROR_STATUSES,
-  rowAccentClass,
-  severityTone,
-  statusTone,
   type ErrorEnvironment,
   type ErrorIntelligenceBusinessSnapshot,
   type ErrorIntelligenceEvent,
@@ -41,23 +36,23 @@ import {
   type ErrorSeverity,
   type ErrorStatus,
 } from "@/features/error-intelligence/types";
-import { formatAdminDateTime } from "@/lib/format-datetime";
-import { buildCsvContent, downloadCsv } from "@/lib/csv-download";
 import { cn } from "@/lib/utils";
+import {
+  formatAdminLogTick,
+  formatAdminLogTimestamp,
+} from "@/lib/format-datetime";
 import { createAdminSupabaseBrowserClient } from "@/lib/supabase/client";
 
-function formatRelativeTime(iso: string): string {
-  const deltaMs = Date.now() - new Date(iso).getTime();
-  const seconds = Math.max(0, Math.floor(deltaMs / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "Yesterday";
-  return `${days}d ago`;
-}
+const SEVERITY_LEVELS: Array<{
+  id: ErrorSeverity;
+  label: string;
+  dot: string;
+}> = [
+  { id: "warning", label: "Warning", dot: "bg-amber-400" },
+  { id: "high", label: "Error", dot: "bg-orange-500" },
+  { id: "critical", label: "Fatal", dot: "bg-rose-500" },
+  { id: "info", label: "Info", dot: "bg-sky-400" },
+];
 
 function prettyJson(value: unknown): string {
   try {
@@ -72,42 +67,131 @@ function copyText(label: string, value: string) {
   toast.success(`${label} copied`);
 }
 
-function TerminalBlock({
+function statusCodeClass(code: number | null): string {
+  if (code == null) return "text-muted-foreground";
+  if (code >= 500) return "text-rose-600 dark:text-rose-400";
+  if (code >= 400) return "text-amber-600 dark:text-amber-400";
+  if (code >= 200 && code < 300) return "text-emerald-600 dark:text-emerald-400";
+  return "text-foreground";
+}
+
+function severityDot(severity: ErrorSeverity): string {
+  switch (severity) {
+    case "critical":
+      return "bg-rose-500";
+    case "high":
+      return "bg-orange-500";
+    case "warning":
+      return "bg-amber-400";
+    default:
+      return "bg-sky-400";
+  }
+}
+
+function buildHistogram(events: ErrorIntelligenceEvent[], buckets = 48) {
+  if (events.length === 0) {
+    return { bars: Array.from({ length: buckets }, () => 0), ticks: [] as string[] };
+  }
+
+  const times = events
+    .map((e) => new Date(e.lastSeenAt).getTime())
+    .filter(Number.isFinite);
+  const max = Math.max(...times);
+  const min = Math.min(...times, max - 15 * 60 * 1000);
+  const span = Math.max(max - min, 60_000);
+  const bars = Array.from({ length: buckets }, () => 0);
+
+  for (const time of times) {
+    const index = Math.min(
+      buckets - 1,
+      Math.max(0, Math.floor(((time - min) / span) * buckets)),
+    );
+    bars[index] += 1;
+  }
+
+  const ticks = [0, Math.floor(buckets / 2), buckets - 1].map((i) =>
+    formatAdminLogTick(
+      new Date(min + (span * i) / Math.max(buckets - 1, 1)).toISOString(),
+    ),
+  );
+
+  return { bars, ticks };
+}
+
+function FilterAccordion({
   title,
-  value,
+  children,
   defaultOpen = false,
 }: {
   title: string;
-  value: string;
+  children: React.ReactNode;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  if (!value.trim()) return null;
-
   return (
-    <div className="rounded-lg border bg-zinc-950 text-zinc-100">
-      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2">
-        <button
-          type="button"
-          className="text-left text-xs font-medium tracking-wide text-zinc-300 uppercase"
-          onClick={() => setOpen((current) => !current)}
-        >
-          {open ? "▾" : "▸"} {title}
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          onClick={() => copyText(title, value)}
-        >
-          <CopyIcon className="size-3" />
-          Copy
-        </button>
+    <div className="border-b border-border/70">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {title}
+        <ChevronDownIcon
+          className={cn(
+            "size-3.5 text-muted-foreground transition",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open ? <div className="space-y-1 px-3 pb-3">{children}</div> : null}
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  if (!value.trim() || value === "—") return null;
+  return (
+    <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-2 py-0.5 font-mono text-[11px] leading-5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="min-w-0 break-all text-foreground/90">{value}</span>
+    </div>
+  );
+}
+
+function TimelineItem({
+  icon,
+  title,
+  badge,
+  badgeClassName,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  badge?: string;
+  badgeClassName?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-3 pb-4 last:pb-0">
+      <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+        {icon}
       </div>
-      {open ? (
-        <pre className="max-h-64 overflow-auto p-3 font-mono text-[11px] leading-5 whitespace-pre-wrap">
-          {value}
-        </pre>
-      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium">{title}</span>
+          {badge ? (
+            <span
+              className={cn(
+                "font-mono text-[10px] font-medium",
+                badgeClassName,
+              )}
+            >
+              {badge}
+            </span>
+          ) : null}
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
@@ -117,20 +201,38 @@ export function ErrorIntelligenceCenterPanel() {
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<ErrorIntelligenceStats | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [draftQuery, setDraftQuery] = useState("");
+  const [severities, setSeverities] = useState<ErrorSeverity[]>([
+    "critical",
+    "high",
+    "warning",
+  ]);
+  const [statuses, setStatuses] = useState<ErrorStatus[]>([]);
+  const [modules, setModules] = useState<string[]>([]);
+  const [environments, setEnvironments] = useState<ErrorEnvironment[]>([]);
+  const [detailOpen, setDetailOpen] = useState(true);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [snapshot, setSnapshot] =
     useState<ErrorIntelligenceBusinessSnapshot | null>(null);
-  const [query, setQuery] = useState("");
-  const [severity, setSeverity] = useState<ErrorSeverity | "">("");
-  const [status, setStatus] = useState<ErrorStatus | "">("open");
-  const [moduleFilter, setModuleFilter] = useState("");
-  const [environment, setEnvironment] = useState<ErrorEnvironment | "">("");
   const [isPending, startTransition] = useTransition();
-  const [terminalQuery, setTerminalQuery] = useState("");
 
-  const selected = useMemo(
-    () => events.find((event) => event.id === selectedId) ?? null,
+  const selectedIndex = useMemo(
+    () => events.findIndex((event) => event.id === selectedId),
     [events, selectedId],
+  );
+  const selected = selectedIndex >= 0 ? events[selectedIndex]! : null;
+  const histogram = useMemo(() => buildHistogram(events), [events]);
+  const maxBar = Math.max(...histogram.bars, 1);
+
+  const severityCounts = useMemo(
+    () => ({
+      critical: stats?.openCritical ?? 0,
+      high: stats?.openHigh ?? 0,
+      warning: stats?.openWarning ?? 0,
+      info: events.filter((e) => e.severity === "info").length,
+    }),
+    [events, stats],
   );
 
   const load = useCallback(() => {
@@ -138,11 +240,11 @@ export function ErrorIntelligenceCenterPanel() {
       const [listResult, statsResult] = await Promise.all([
         fetchErrorIntelligenceEventsAction({
           query,
-          severity,
-          status,
-          module: moduleFilter || undefined,
-          environment,
-          limit: 200,
+          severity: severities.length > 0 ? severities : undefined,
+          status: statuses.length > 0 ? statuses : undefined,
+          module: modules.length > 0 ? modules : undefined,
+          environment: environments.length > 0 ? environments : undefined,
+          limit: 250,
         }),
         fetchErrorIntelligenceStatsAction(),
       ]);
@@ -154,18 +256,45 @@ export function ErrorIntelligenceCenterPanel() {
 
       setEvents(listResult.events);
       setTotal(listResult.total);
-      if (!selectedId && listResult.events[0]) {
-        setSelectedId(listResult.events[0].id);
-      }
+      setSelectedId((current) => {
+        if (current && listResult.events.some((e) => e.id === current)) {
+          return current;
+        }
+        return listResult.events[0]?.id ?? null;
+      });
 
       if (statsResult.success) {
         setStats(statsResult.stats);
       }
     });
-  }, [environment, moduleFilter, query, selectedId, severity, status]);
+  }, [environments, modules, query, severities, statuses]);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => load(), 15000);
+    return () => window.clearInterval(interval);
+  }, [load]);
+
+  useEffect(() => {
+    try {
+      const supabase = createAdminSupabaseBrowserClient();
+      const channel = supabase
+        .channel("platform-error-events")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "platform_error_events" },
+          () => load(),
+        )
+        .subscribe();
+      return () => {
+        void supabase.removeChannel(channel);
+      };
+    } catch {
+      return undefined;
+    }
   }, [load]);
 
   useEffect(() => {
@@ -180,6 +309,9 @@ export function ErrorIntelligenceCenterPanel() {
       if (!cancelled && result.success) {
         setSnapshot(result.snapshot);
       }
+      if (!cancelled && !result.success) {
+        setSnapshot(null);
+      }
     })();
 
     return () => {
@@ -188,645 +320,774 @@ export function ErrorIntelligenceCenterPanel() {
   }, [selected?.businessId]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      load();
-    }, 15000);
-    return () => window.clearInterval(interval);
-  }, [load]);
+    setOverviewOpen(false);
+  }, [selectedId]);
 
-  useEffect(() => {
-    try {
-      const supabase = createAdminSupabaseBrowserClient();
-      const channel = supabase
-        .channel("platform-error-events")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "platform_error_events" },
-          () => {
-            load();
-          },
-        )
-        .subscribe();
-
-      return () => {
-        void supabase.removeChannel(channel);
-      };
-    } catch {
-      return undefined;
-    }
-  }, [load]);
-
-  const filteredTerminal = useMemo(() => {
-    if (!selected) return [];
-    const blocks: Array<{ title: string; value: string; open?: boolean }> = [
-      { title: "Stack Trace", value: selected.stackTrace ?? "", open: true },
-      { title: "Raw Log", value: selected.rawLog ?? "", open: true },
-      {
-        title: "Request Headers",
-        value: prettyJson(selected.requestHeaders),
-      },
-      { title: "Request Body", value: prettyJson(selected.requestBody) },
-      { title: "Response Body", value: prettyJson(selected.responseBody) },
-      { title: "Terminal", value: prettyJson(selected.terminal), open: true },
-      { title: "Context", value: prettyJson(selected.context) },
-      { title: "AI", value: prettyJson(selected.ai) },
-    ];
-
-    const q = terminalQuery.trim().toLowerCase();
-    if (!q) return blocks;
-    return blocks.filter(
-      (block) =>
-        block.title.toLowerCase().includes(q) ||
-        block.value.toLowerCase().includes(q),
-    );
-  }, [selected, terminalQuery]);
-
-  function toggleSelected(id: string) {
-    setSelectedIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
+  function toggleSeverity(value: ErrorSeverity) {
+    setSeverities((current) =>
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
     );
   }
 
-  async function handleStatus(next: ErrorStatus, ids?: string[]) {
-    const targetIds = ids ?? (selected ? [selected.id] : selectedIds);
-    if (targetIds.length === 0) return;
+  function toggleInList<T extends string>(
+    value: T,
+    current: T[],
+    setter: (next: T[]) => void,
+  ) {
+    setter(
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    );
+  }
 
-    const result =
-      targetIds.length === 1
-        ? await updateErrorEventStatusAction({ id: targetIds[0]!, status: next })
-        : await bulkUpdateErrorEventsAction({ ids: targetIds, status: next });
+  function selectAdjacent(delta: number) {
+    if (events.length === 0) return;
+    const next = Math.min(
+      events.length - 1,
+      Math.max(0, (selectedIndex < 0 ? 0 : selectedIndex) + delta),
+    );
+    setSelectedId(events[next]!.id);
+    setDetailOpen(true);
+  }
 
+  async function handleStatus(next: ErrorStatus) {
+    if (!selected) return;
+    const result = await updateErrorEventStatusAction({
+      id: selected.id,
+      status: next,
+    });
     if (!result.success) {
       toast.error(result.message ?? "Update failed");
       return;
     }
-
     toast.success(`Marked as ${next}`);
-    setSelectedIds([]);
     load();
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4">
-      <PageHeader
-        title="Error Intelligence Center"
-        description="Единый центр мониторинга, диагностики и анализа сбоев всей платформы ORZUAI"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm"
-              onClick={() => load()}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <RefreshCwIcon className="size-4" />
-              )}
-              Refresh
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm"
-              onClick={() => {
-                startTransition(async () => {
-                  const result = await seedDemoErrorEventsAction();
-                  if (!result.success) {
-                    toast.error(result.message);
-                    return;
-                  }
-                  toast.success(`Seeded ${result.created ?? 0} demo events`);
-                  load();
-                });
-              }}
-            >
-              <RadarIcon className="size-4" />
-              Seed demos
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm"
-              disabled={events.length === 0}
-              onClick={() => {
-                const csv = buildCsvContent(
-                  [
-                    "last_seen_at",
-                    "severity",
-                    "status",
-                    "module",
-                    "category",
-                    "title",
-                    "business",
-                    "occurrences",
-                    "environment",
-                  ],
-                  events.map((event) => [
-                    event.lastSeenAt,
-                    event.severity,
-                    event.status,
-                    event.module,
-                    event.category,
-                    event.title,
-                    event.businessName ?? "",
-                    String(event.occurrences),
-                    event.environment,
-                  ]),
-                );
-                downloadCsv(`error-intelligence-${Date.now()}.csv`, csv);
-              }}
-            >
-              Export CSV
-            </button>
+    <div className="flex h-full max-h-full min-h-0 overflow-hidden bg-background text-foreground">
+      <aside className="hidden h-full w-[220px] shrink-0 flex-col overflow-hidden border-r lg:flex">
+        <div className="border-b px-3 py-3">
+          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            Runtime Console
+          </p>
+        </div>
+
+        <div className="border-b px-3 py-3">
+          <p className="mb-2 text-[11px] text-muted-foreground">Level</p>
+          <div className="space-y-1.5">
+            {SEVERITY_LEVELS.map((level) => (
+              <label
+                key={level.id}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border"
+                  checked={severities.includes(level.id)}
+                  onChange={() => toggleSeverity(level.id)}
+                />
+                <span className={cn("size-1.5 rounded-full", level.dot)} />
+                <span className="flex-1">{level.label}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {severityCounts[level.id]}
+                </span>
+              </label>
+            ))}
           </div>
-        }
-      />
-
-      {stats ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          {[
-            {
-              label: "Critical open",
-              value: stats.openCritical,
-              tone: "text-rose-600",
-            },
-            {
-              label: "High open",
-              value: stats.openHigh,
-              tone: "text-orange-600",
-            },
-            {
-              label: "Warnings",
-              value: stats.openWarning,
-              tone: "text-amber-600",
-            },
-            {
-              label: "Resolved today",
-              value: stats.resolvedToday,
-              tone: "text-emerald-600",
-            },
-            { label: "Last hour", value: stats.lastHour, tone: "text-sky-600" },
-            { label: "Last 24h", value: stats.lastDay, tone: "text-violet-600" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-xl border bg-card px-4 py-3 shadow-none"
-            >
-              <p className="text-xs text-muted-foreground">{item.label}</p>
-              <p className={cn("mt-1 text-2xl font-semibold tabular-nums", item.tone)}>
-                {item.value}
-              </p>
-            </div>
-          ))}
         </div>
-      ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
-        <div className="relative min-w-[220px] flex-1">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search business, module, title, path, fingerprint…"
-            className="h-9 w-full rounded-lg border bg-background pr-3 pl-9 text-sm"
-          />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <FilterAccordion title="Status" defaultOpen>
+            {ERROR_STATUSES.map((status) => (
+              <label
+                key={status}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs capitalize hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border"
+                  checked={statuses.includes(status)}
+                  onChange={() => toggleInList(status, statuses, setStatuses)}
+                />
+                {status}
+              </label>
+            ))}
+          </FilterAccordion>
+
+          <FilterAccordion title="Environment" defaultOpen>
+            {ERROR_ENVIRONMENTS.map((env) => (
+              <label
+                key={env}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs capitalize hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border"
+                  checked={environments.includes(env)}
+                  onChange={() =>
+                    toggleInList(env, environments, setEnvironments)
+                  }
+                />
+                {env}
+              </label>
+            ))}
+          </FilterAccordion>
+
+          <FilterAccordion title="Module">
+            {ERROR_MODULES.map((module) => (
+              <label
+                key={module}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border"
+                  checked={modules.includes(module)}
+                  onChange={() => toggleInList(module, modules, setModules)}
+                />
+                {module}
+              </label>
+            ))}
+          </FilterAccordion>
         </div>
-        <FilterIcon className="size-4 text-muted-foreground" />
-        <select
-          value={severity}
-          onChange={(event) =>
-            setSeverity(event.target.value as ErrorSeverity | "")
-          }
-          className="h-9 rounded-lg border bg-background px-2 text-sm"
-        >
-          <option value="">All severities</option>
-          {ERROR_SEVERITIES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as ErrorStatus | "")}
-          className="h-9 rounded-lg border bg-background px-2 text-sm"
-        >
-          <option value="">All statuses</option>
-          {ERROR_STATUSES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select
-          value={moduleFilter}
-          onChange={(event) => setModuleFilter(event.target.value)}
-          className="h-9 rounded-lg border bg-background px-2 text-sm"
-        >
-          <option value="">All modules</option>
-          {ERROR_MODULES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select
-          value={environment}
-          onChange={(event) =>
-            setEnvironment(event.target.value as ErrorEnvironment | "")
-          }
-          className="h-9 rounded-lg border bg-background px-2 text-sm"
-        >
-          <option value="">All envs</option>
-          {ERROR_ENVIRONMENTS.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-muted-foreground">{total} events</span>
-      </div>
 
-      {selectedIds.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm">
-          <span className="font-medium">{selectedIds.length} selected</span>
+        <div className="border-t px-3 py-3">
+          <p className="truncate text-[11px] text-muted-foreground">
+            OrzuAI · {total} events
+          </p>
+        </div>
+      </aside>
+
+      <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full bg-foreground/80" />
+            <span className="truncate text-sm font-medium">orzuai</span>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-sm text-muted-foreground">Logs</span>
+          </div>
           <button
             type="button"
-            className="rounded-md border bg-background px-2 py-1 text-xs"
-            onClick={() => void handleStatus("resolved", selectedIds)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => load()}
+            disabled={isPending}
           >
-            Resolve
+            {isPending ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="size-3.5" />
+            )}
           </button>
-          <button
-            type="button"
-            className="rounded-md border bg-background px-2 py-1 text-xs"
-            onClick={() => void handleStatus("ignored", selectedIds)}
-          >
-            Ignore
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-rose-700"
-            onClick={() => {
-              startTransition(async () => {
-                const result = await deleteErrorEventsAction({
-                  ids: selectedIds,
-                });
-                if (!result.success) {
-                  toast.error(result.message);
-                  return;
-                }
-                toast.success(`Deleted ${result.deleted ?? 0}`);
-                setSelectedIds([]);
-                load();
-              });
+        </div>
+
+        <div className="shrink-0 border-b px-4 py-3">
+          <form
+            className="relative"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setQuery(draftQuery.trim());
             }}
           >
-            <Trash2Icon className="size-3.5" />
-            Delete
-          </button>
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={draftQuery}
+              onChange={(event) => setDraftQuery(event.target.value)}
+              placeholder="Search logs..."
+              className="h-9 w-full rounded-md border bg-muted/20 pr-3 pl-9 text-sm outline-none focus:border-foreground/30"
+            />
+          </form>
+
+          <div className="mt-3">
+            <div className="mb-1 flex justify-between font-mono text-[10px] text-muted-foreground">
+              {histogram.ticks.map((tick) => (
+                <span key={tick}>{tick}</span>
+              ))}
+            </div>
+            <div className="flex h-10 items-end gap-px">
+              {histogram.bars.map((value, index) => (
+                <div
+                  key={index}
+                  className="min-w-0 flex-1 rounded-t-[1px] bg-foreground/25"
+                  style={{
+                    height: `${Math.max(value > 0 ? 12 : 2, Math.round((value / maxBar) * 100))}%`,
+                    opacity: value > 0 ? 0.85 : 0.2,
+                  }}
+                  title={`${value}`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
+              <tr className="border-b text-[10px] tracking-wide text-muted-foreground uppercase">
+                <th className="px-4 py-2 font-medium">Time</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Host</th>
+                <th className="px-3 py-2 font-medium">Request</th>
+                <th className="px-4 py-2 font-medium">Message</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-[12px]">
+              {events.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-16 text-center text-sm text-muted-foreground"
+                  >
+                    {isPending ? "Loading logs…" : "No logs match these filters."}
+                  </td>
+                </tr>
+              ) : (
+                events.map((event) => {
+                  const active = event.id === selectedId;
+                  const method = (event.method ?? "ERR").toUpperCase();
+                  const code = event.httpStatus;
+                  return (
+                    <tr
+                      key={event.id}
+                      className={cn(
+                        "cursor-pointer border-b border-border/50 transition-colors",
+                        active ? "bg-sky-500/10" : "hover:bg-muted/40",
+                      )}
+                      onClick={() => {
+                        setSelectedId(event.id);
+                        setDetailOpen(true);
+                      }}
+                    >
+                      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "size-1.5 rounded-full",
+                              severityDot(event.severity),
+                            )}
+                          />
+                          {formatAdminLogTimestamp(event.lastSeenAt)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span className="text-foreground/80">{method}</span>{" "}
+                        <span className={statusCodeClass(code)}>
+                          {code ?? "---"}
+                        </span>
+                      </td>
+                      <td className="max-w-[140px] truncate px-3 py-2 text-muted-foreground">
+                        {event.source || event.environment}
+                      </td>
+                      <td className="max-w-[220px] px-3 py-2">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <SquareStackIcon className="size-3 shrink-0 text-muted-foreground" />
+                          <FunctionSquareIcon className="size-3 shrink-0 text-muted-foreground" />
+                          <span className="truncate">
+                            {event.path || `/${event.module}/${event.category}`}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="max-w-[360px] truncate px-4 py-2 text-muted-foreground">
+                        {event.title || event.message || "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {selected ? (
+          <div className="shrink-0 border-t bg-background px-4 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <Building2Icon className="size-3.5 text-muted-foreground" />
+                  <p className="text-xs font-medium">
+                    {snapshot?.name ||
+                      selected.businessName ||
+                      (selected.businessId ? "Business" : "Platform error")}
+                  </p>
+                  {selected.businessId ? (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {selected.businessId.slice(0, 8)}…
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">
+                      no business linked
+                    </span>
+                  )}
+                </div>
+                {snapshot ? (
+                  <div className="grid gap-x-6 gap-y-1 text-[11px] text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                    <p>
+                      Owner:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.ownerName || snapshot.ownerEmail || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      Email:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.ownerEmail || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      Phone:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.phone || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      Plan:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.plan || "—"} / {snapshot.status || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      Contacts:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.contactsCount}
+                      </span>
+                    </p>
+                    <p>
+                      Conversations:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.conversationsCount}
+                      </span>
+                    </p>
+                    <p>
+                      Open errors:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.openErrorsCount}
+                      </span>
+                    </p>
+                    <p className="truncate">
+                      Recent:{" "}
+                      <span className="text-foreground/90">
+                        {snapshot.recentErrorTitles[0] || "—"}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    {selected.title} · {selected.module}/{selected.category}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium hover:bg-muted"
+                onClick={() => setOverviewOpen(true)}
+              >
+                <EyeIcon className="size-3.5" />
+                Обзор
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {selected && detailOpen ? (
+        <aside className="hidden h-full w-[320px] shrink-0 flex-col overflow-hidden border-l xl:flex">
+          <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+            <p className="min-w-0 truncate font-mono text-xs font-medium">
+              {(selected.method ?? "ERR").toUpperCase()}{" "}
+              {selected.path || `/${selected.module}`}
+            </p>
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => selectAdjacent(-1)}
+                aria-label="Previous"
+              >
+                <ChevronUpIcon className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => selectAdjacent(1)}
+                aria-label="Next"
+              >
+                <ChevronDownIcon className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() =>
+                  copyText(
+                    "Event",
+                    prettyJson({
+                      id: selected.id,
+                      title: selected.title,
+                      message: selected.message,
+                      path: selected.path,
+                      stackTrace: selected.stackTrace,
+                    }),
+                  )
+                }
+                aria-label="Copy"
+              >
+                <CopyIcon className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setDetailOpen(false)}
+                aria-label="Close"
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <div className="mb-4 flex items-center gap-2">
+              <span
+                className={cn("size-2 rounded-full", severityDot(selected.severity))}
+              />
+              <div>
+                <p className="text-xs font-medium">Request started</p>
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  {formatAdminLogTimestamp(selected.firstSeenAt)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <MetaRow label="Request ID" value={selected.id} />
+              <MetaRow
+                label="Path"
+                value={
+                  selected.path || `/${selected.module}/${selected.category}`
+                }
+              />
+              <MetaRow label="Host" value={selected.source} />
+              <MetaRow label="Business" value={snapshot?.name || selected.businessName || ""} />
+              <MetaRow label="User Agent" value={selected.browser ?? ""} />
+            </div>
+
+            <div className="mb-5">
+              <TimelineItem
+                icon={<GlobeIcon className="size-3.5" />}
+                title={
+                  selected.region
+                    ? `Received in ${selected.region}`
+                    : selected.country
+                      ? `Received in ${selected.country}`
+                      : "Received on platform"
+                }
+              />
+              <TimelineItem
+                icon={<ShieldIcon className="size-3.5" />}
+                title="Severity"
+                badge={selected.severity}
+                badgeClassName={cn(
+                  selected.severity === "critical" && "text-rose-600",
+                  selected.severity === "high" && "text-orange-600",
+                  selected.severity === "warning" && "text-amber-600",
+                  selected.severity === "info" && "text-sky-600",
+                )}
+              />
+              <TimelineItem
+                icon={<SquareStackIcon className="size-3.5" />}
+                title="Module"
+                badge={selected.status}
+                badgeClassName="text-emerald-600"
+              >
+                <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  {selected.module} / {selected.category}
+                </p>
+              </TimelineItem>
+              <TimelineItem
+                icon={<FunctionSquareIcon className="size-3.5" />}
+                title="Function Invocation"
+                badge={
+                  selected.durationMs != null
+                    ? `${selected.durationMs}ms`
+                    : `${selected.occurrences}×`
+                }
+                badgeClassName="text-muted-foreground"
+              >
+                {selected.message ? (
+                  <p className="mt-1 font-mono text-[11px] leading-4 text-muted-foreground">
+                    {selected.message}
+                  </p>
+                ) : null}
+              </TimelineItem>
+            </div>
+
+            <button
+              type="button"
+              className="mb-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-xs font-medium hover:bg-muted"
+              onClick={() => setOverviewOpen(true)}
+            >
+              <EyeIcon className="size-3.5" />
+              Обзор
+            </button>
+
+            <div className="flex flex-wrap gap-3 border-t pt-3 text-[11px]">
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => void handleStatus("investigating")}
+              >
+                Investigate
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => void handleStatus("resolved")}
+              >
+                Resolve
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => void handleStatus("ignored")}
+              >
+                Ignore
+              </button>
+              <button
+                type="button"
+                className="text-rose-600 hover:text-rose-700"
+                onClick={() => {
+                  startTransition(async () => {
+                    const result = await deleteErrorEventsAction({
+                      ids: [selected.id],
+                    });
+                    if (!result.success) {
+                      toast.error(result.message ?? "Delete failed");
+                      return;
+                    }
+                    toast.success("Deleted");
+                    setSelectedId(null);
+                    load();
+                  });
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </aside>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(280px,1.1fr)_minmax(320px,1.3fr)_minmax(240px,0.9fr)]">
-        <section className="flex min-h-[420px] flex-col overflow-hidden rounded-xl border bg-card">
-          <div className="border-b px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Errors stream
+      {selected && overviewOpen ? (
+        <ErrorOverviewModal
+          event={selected}
+          snapshot={snapshot}
+          onClose={() => setOverviewOpen(false)}
+          onStatus={(status) => void handleStatus(status)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ErrorOverviewModal({
+  event,
+  snapshot,
+  onClose,
+  onStatus,
+}: {
+  event: ErrorIntelligenceEvent;
+  snapshot: ErrorIntelligenceBusinessSnapshot | null;
+  onClose: () => void;
+  onStatus: (status: ErrorStatus) => void;
+}) {
+  const codeBlock =
+    event.stackTrace ||
+    event.rawLog ||
+    prettyJson({
+      message: event.message,
+      context: event.context,
+      ai: event.ai,
+      terminal: event.terminal,
+      requestBody: event.requestBody,
+      responseBody: event.responseBody,
+    });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
+          <div className="min-w-0">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <span
+                className={cn("size-2 rounded-full", severityDot(event.severity))}
+              />
+              <p className="text-sm font-semibold">{event.title}</p>
+              <span className={cn("font-mono text-xs", statusCodeClass(event.httpStatus))}>
+                {(event.method ?? "ERR").toUpperCase()} {event.httpStatus ?? "---"}
+              </span>
+            </div>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {event.path || `/${event.module}/${event.category}`} ·{" "}
+              {formatAdminLogTimestamp(event.lastSeenAt)}
+            </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {events.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={AlertTriangleIcon}
-                  title="No errors yet"
-                  description="Errors from the whole platform will appear here automatically. Use Seed demos to preview the UI."
+          <button
+            type="button"
+            className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+            onClick={onClose}
+            aria-label="Close overview"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="mb-5 grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Error
+              </p>
+              <div className="space-y-1 font-mono text-[11px]">
+                <MetaRow label="ID" value={event.id} />
+                <MetaRow label="Fingerprint" value={event.fingerprint} />
+                <MetaRow label="Severity" value={event.severity} />
+                <MetaRow label="Status" value={event.status} />
+                <MetaRow label="Module" value={`${event.module} / ${event.category}`} />
+                <MetaRow label="Source" value={event.source} />
+                <MetaRow label="Environment" value={event.environment} />
+                <MetaRow
+                  label="Occurrences"
+                  value={`${event.occurrences} (retries ${event.retryCount})`}
+                />
+                <MetaRow
+                  label="Duration"
+                  value={event.durationMs != null ? `${event.durationMs} ms` : ""}
                 />
               </div>
-            ) : (
-              events.map((event) => {
-                const active = event.id === selectedId;
-                return (
-                  <div
-                    key={event.id}
-                    className={cn(
-                      "flex border-b border-l-4",
-                      rowAccentClass(event.severity, event.status),
-                      active ? "bg-primary/5" : "hover:bg-muted/40",
-                    )}
-                  >
-                    <label className="flex items-start px-2 pt-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(event.id)}
-                        onChange={() => toggleSelected(event.id)}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 px-2 py-3 text-left"
-                      onClick={() => setSelectedId(event.id)}
-                    >
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={cn(
-                            "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase",
-                            severityTone(event.severity),
-                          )}
-                        >
-                          {event.severity}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                            statusTone(event.status),
-                          )}
-                        >
-                          {event.status}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          ×{event.occurrences}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-sm font-medium">
-                        {event.title}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {event.module} · {event.category}
-                        {event.businessName ? ` · ${event.businessName}` : ""}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {formatRelativeTime(event.lastSeenAt)} ·{" "}
-                        {formatAdminDateTime(event.lastSeenAt)}
-                      </p>
-                    </button>
-                  </div>
-                );
-              })
-            )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Business
+              </p>
+              {snapshot ? (
+                <div className="space-y-1 font-mono text-[11px]">
+                  <MetaRow label="Name" value={snapshot.name} />
+                  <MetaRow label="Owner" value={snapshot.ownerName || ""} />
+                  <MetaRow label="Email" value={snapshot.ownerEmail || ""} />
+                  <MetaRow label="Phone" value={snapshot.phone || ""} />
+                  <MetaRow label="Plan" value={snapshot.plan || ""} />
+                  <MetaRow label="Status" value={snapshot.status || ""} />
+                  <MetaRow label="Contacts" value={String(snapshot.contactsCount)} />
+                  <MetaRow
+                    label="Conversations"
+                    value={String(snapshot.conversationsCount)}
+                  />
+                  <MetaRow
+                    label="Open errors"
+                    value={String(snapshot.openErrorsCount)}
+                  />
+                  <MetaRow label="Business ID" value={snapshot.id} />
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {event.businessName || event.businessId || "No business linked"}
+                </p>
+              )}
+            </div>
           </div>
-        </section>
 
-        <section className="flex min-h-[420px] flex-col overflow-hidden rounded-xl border bg-card">
-          <div className="border-b px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Error analysis
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {!selected ? (
-              <EmptyState
-                icon={ActivityIcon}
-                title="Select an error"
-                description="Pick an event from the stream to inspect root cause, traces, and terminal data."
-              />
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase",
-                        severityTone(selected.severity),
-                      )}
-                    >
-                      {selected.severity}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        statusTone(selected.status),
-                      )}
-                    >
-                      {selected.status}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {selected.environment} · {selected.source}
-                    </span>
-                  </div>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight">
-                    {selected.title}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {selected.message || selected.description || "No message"}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs"
-                    onClick={() => void handleStatus("resolved")}
-                  >
-                    <CheckCircle2Icon className="size-3.5" />
-                    Resolve
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-1.5 text-xs"
-                    onClick={() => void handleStatus("investigating")}
-                  >
-                    Investigating
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-1.5 text-xs"
-                    onClick={() => void handleStatus("ignored")}
-                  >
-                    Ignore
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-1.5 text-xs"
-                    onClick={() =>
-                      copyText("Fingerprint", selected.fingerprint)
-                    }
-                  >
-                    Copy fingerprint
-                  </button>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    ["Module", selected.module],
-                    ["Category", selected.category],
-                    ["Occurrences", String(selected.occurrences)],
-                    ["HTTP", selected.httpStatus ? String(selected.httpStatus) : "—"],
-                    ["Path", selected.path ?? "—"],
-                    ["Duration", selected.durationMs != null ? `${selected.durationMs}ms` : "—"],
-                    ["Trace ID", selected.traceId ?? "—"],
-                    ["Correlation", selected.correlationId ?? "—"],
-                    ["Session", selected.sessionId ?? "—"],
-                    ["Conversation", selected.conversationId ?? "—"],
-                    ["Deployment", selected.deploymentId ?? "—"],
-                    ["Commit", selected.commitHash?.slice(0, 8) ?? "—"],
-                    ["Version", selected.appVersion ?? "—"],
-                    ["Region", selected.region ?? "—"],
-                    ["Browser", selected.browser ?? "—"],
-                    ["Device", selected.device ?? "—"],
-                    ["IP", selected.ip ?? "—"],
-                    ["Country", selected.country ?? "—"],
-                    ["First seen", formatAdminDateTime(selected.firstSeenAt)],
-                    ["Last seen", formatAdminDateTime(selected.lastSeenAt)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg border bg-muted/20 p-2.5">
-                      <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                        {label}
-                      </p>
-                      <p className="mt-1 break-all text-sm font-medium">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-2 rounded-xl border bg-muted/15 p-4">
-                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    Root cause analysis
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Why: </span>
-                    {selected.rootCause ??
-                      "Automatic analysis pending — inspect terminal and stack below."}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Fix: </span>
-                    {selected.suggestedFix ?? "No suggested fix yet."}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Impact: </span>
-                    {selected.impact ?? "Impact not assessed."}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Recurrence: </span>
-                    {selected.recurrenceRisk ?? "Unknown"}
-                  </p>
-                </div>
-
-                {Object.keys(selected.ai).length > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {Object.entries(selected.ai).map(([key, value]) => (
-                      <div key={key} className="rounded-lg border p-2.5 text-sm">
-                        <p className="text-[10px] text-muted-foreground uppercase">
-                          AI · {key}
-                        </p>
-                        <p className="mt-1 font-medium">{String(value)}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+          <div className="mb-4 space-y-2">
+            {event.message ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Message
+                </p>
+                <p className="text-sm leading-6">{event.message}</p>
               </div>
-            )}
+            ) : null}
+            {event.description ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Description
+                </p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {event.description}
+                </p>
+              </div>
+            ) : null}
+            {event.rootCause ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Root cause
+                </p>
+                <p className="text-sm leading-6">{event.rootCause}</p>
+              </div>
+            ) : null}
+            {event.suggestedFix ? (
+              <div>
+                <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Suggested fix
+                </p>
+                <p className="text-sm leading-6">{event.suggestedFix}</p>
+              </div>
+            ) : null}
           </div>
-        </section>
 
-        <section className="flex min-h-[420px] flex-col overflow-hidden rounded-xl border bg-card">
-          <div className="border-b px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Business context
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Code / stack
+              </p>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() => copyText("Code", codeBlock)}
+              >
+                <CopyIcon className="size-3" />
+                Copy
+              </button>
+            </div>
+            <pre className="max-h-[280px] overflow-auto rounded-lg border bg-zinc-950 p-4 font-mono text-[11px] leading-5 whitespace-pre-wrap text-zinc-100">
+              {codeBlock}
+            </pre>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {!selected?.businessId ? (
-              <EmptyState
-                title="No business linked"
-                description="Platform-level events may not belong to a tenant. Business metrics appear when business_id is present."
-              />
-            ) : !snapshot ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2Icon className="size-4 animate-spin" />
-                Loading business…
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-lg font-semibold">{snapshot.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {snapshot.plan ?? "plan unknown"} · {snapshot.status}
-                  </p>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Owner: </span>
-                    {snapshot.ownerName ?? "—"} ({snapshot.ownerEmail ?? "—"})
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Phone: </span>
-                    {snapshot.phone ?? "—"}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Registered: </span>
-                    {snapshot.createdAt
-                      ? formatAdminDateTime(snapshot.createdAt)
-                      : "—"}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ["Contacts", snapshot.contactsCount],
-                    ["Conversations", snapshot.conversationsCount],
-                    ["Open errors", snapshot.openErrorsCount],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-lg border p-2.5">
-                      <p className="text-[10px] text-muted-foreground uppercase">
-                        {label}
-                      </p>
-                      <p className="text-lg font-semibold tabular-nums">{value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    Recent errors
-                  </p>
-                  <ul className="space-y-1.5">
-                    {snapshot.recentErrorTitles.map((title) => (
-                      <li
-                        key={title}
-                        className="truncate rounded-md border bg-muted/20 px-2 py-1.5 text-xs"
-                      >
-                        {title}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
+          <div className="flex flex-wrap gap-3 text-[11px]">
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => onStatus("investigating")}
+            >
+              Investigate
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => onStatus("resolved")}
+            >
+              Resolve
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => onStatus("ignored")}
+            >
+              Ignore
+            </button>
           </div>
-        </section>
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </div>
-
-      <section className="overflow-hidden rounded-xl border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
-          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Terminal
-          </p>
-          <div className="relative w-full max-w-sm">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={terminalQuery}
-              onChange={(event) => setTerminalQuery(event.target.value)}
-              placeholder="Search terminal blocks…"
-              className="h-8 w-full rounded-md border bg-background pr-2 pl-8 text-xs"
-            />
-          </div>
-        </div>
-        <div className="grid max-h-80 gap-2 overflow-y-auto bg-zinc-900/95 p-3 md:grid-cols-2">
-          {!selected ? (
-            <p className="col-span-full p-4 text-center text-sm text-zinc-400">
-              Select an error to inspect stack, payloads, and runtime output.
-            </p>
-          ) : filteredTerminal.length === 0 ? (
-            <p className="col-span-full p-4 text-center text-sm text-zinc-400">
-              No terminal blocks match your search.
-            </p>
-          ) : (
-            filteredTerminal.map((block) => (
-              <TerminalBlock
-                key={block.title}
-                title={block.title}
-                value={block.value}
-                defaultOpen={Boolean(block.open)}
-              />
-            ))
-          )}
-        </div>
-      </section>
     </div>
   );
 }

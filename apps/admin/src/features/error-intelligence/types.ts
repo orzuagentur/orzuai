@@ -129,10 +129,11 @@ export type ErrorIntelligenceStats = {
 
 export type ErrorIntelligenceListFilters = {
   query?: string;
-  severity?: ErrorSeverity | "";
-  status?: ErrorStatus | "";
-  module?: string;
-  environment?: ErrorEnvironment | "";
+  severity?: ErrorSeverity | "" | ErrorSeverity[];
+  status?: ErrorStatus | "" | ErrorStatus[];
+  module?: string | string[];
+  environment?: ErrorEnvironment | "" | ErrorEnvironment[];
+  source?: string;
   businessId?: string;
   limit?: number;
 };
