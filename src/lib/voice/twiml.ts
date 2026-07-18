@@ -288,25 +288,25 @@ export function withCallRecording(
   return twiml.replace("<Response>", `<Response>${recordingBlock}`);
 }
 
-export function buildHandoffToAgentTwiml(input: {
+export function buildHandoffToNumberTwiml(input: {
   speechLocale: string;
-  clientIdentity: string;
-  actionUrl?: string;
+  callerId: string;
+  toNumber: string;
   recordingStatusCallback?: string | null;
 }): string {
-  const identity = escapeXml(input.clientIdentity);
-  const actionAttr = input.actionUrl
-    ? ` action="${escapeXml(input.actionUrl)}"`
-    : "";
-  const recordingAttrs = input.recordingStatusCallback
-    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
-    : "";
+  const dial = buildDialPhoneNumberTwiml({
+    callerId: input.callerId,
+    toNumber: input.toNumber,
+    recordingStatusCallback: input.recordingStatusCallback,
+  });
+  const dialBody = dial
+    .replace(/^<\?xml[^>]*>\s*/i, "")
+    .replace(/^<Response>\s*/i, "")
+    .replace(/<\/Response>\s*$/i, "");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna" language="${input.speechLocale}">Please hold while I connect you with a team member.</Say>
-  <Dial timeout="25"${actionAttr}${recordingAttrs}>
-    <Client>${identity}</Client>
-  </Dial>
+  <Say voice="Polly.Joanna" language="${escapeXml(input.speechLocale)}">Please hold while I connect you with a team member.</Say>
+  ${dialBody}
 </Response>`;
 }

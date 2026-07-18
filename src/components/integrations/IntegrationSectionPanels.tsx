@@ -90,6 +90,7 @@ type IntegrationSectionPanelsProps = {
     connectConfig: VoiceConnectConfig;
     availablePhoneNumbers: TwilioPhoneNumberOption[];
     diagnostics: TwilioNumberDiagnostics | null;
+    forwardToE164?: string | null;
   };
   sms?: {
     connection: VoiceConnectionData | null;
@@ -238,6 +239,7 @@ function ActivateSection({
         diagnostics={voice.diagnostics}
         hasBusiness={hasBusiness}
         embeddedInHub
+        forwardToE164={voice.forwardToE164 ?? null}
       />
     );
   }

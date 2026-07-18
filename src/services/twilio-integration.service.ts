@@ -109,10 +109,10 @@ function mapTwilioConnection(row: TwilioConnection): TwilioConnectionData {
     businessId: row.business_id,
     status: row.twilio_status,
     authMode:
-      (row.auth_mode as TwilioConnectionData["authMode"] | undefined) ?? "connect",
+      (row.auth_mode as TwilioConnectionData["authMode"] | undefined) ?? "platform",
     billingOwner:
       (row.billing_owner as TwilioConnectionData["billingOwner"] | undefined) ??
-      "customer",
+      "platform",
     connectedAccountSid: row.connected_account_sid,
     parentAccountSid: row.parent_account_sid ?? null,
     apiKeySid: row.api_key_sid ?? null,
@@ -140,13 +140,12 @@ async function getOwnedBusinessId(): Promise<string | null> {
 }
 
 export function getTwilioConnectConfig(): TwilioConnectConfig {
-  const connectOAuthEnabled = hasTwilioConnectEnv();
-  const manualConnectEnabled = hasSupabaseEnv();
+  const platformReady = hasTwilioPlatformEnv();
 
   return {
-    isConfigured: connectOAuthEnabled || manualConnectEnabled,
-    connectOAuthEnabled,
-    manualConnectEnabled,
+    isConfigured: platformReady,
+    connectOAuthEnabled: false,
+    manualConnectEnabled: false,
     connectUrl: "/api/integrations/twilio/connect",
     authorizeRedirectUri: buildAppUrl("/api/integrations/twilio/callback"),
     deauthorizeRedirectUri: buildAppUrl("/api/integrations/twilio/deauthorize"),
@@ -184,15 +183,36 @@ export async function getTwilioConnection(
 async function getTwilioCredentialsForBusiness(
   businessId: string,
 ): Promise<{ connection: TwilioConnectionData; credentials: TwilioApiCredentials } | null> {
-  const connection = await getTwilioConnection(businessId);
+  const credentials = getPlatformTwilioCredentials();
 
-  if (!connection || connection.status === "disconnected") {
+  if (!credentials) {
     return null;
   }
 
-  const credentials = await resolveTwilioCredentialsForBusiness(connection);
+  let connection = await getTwilioConnection(businessId);
 
-  if (!credentials) {
+  if (!connection || connection.status === "disconnected") {
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+    connection = await upsertTwilioConnectionRow(admin, businessId, {
+      twilio_status: "authorized",
+      auth_mode: "platform",
+      billing_owner: "platform",
+      connected_account_sid: credentials.accountSid,
+      parent_account_sid: null,
+      account_friendly_name: "OrzuX Platform",
+      api_key_sid: null,
+      api_key_secret_key_name: null,
+      auth_token_secret_key_name: null,
+      browser_twiml_app_sid: null,
+      browser_phone_status: "disabled",
+      browser_phone_last_error: null,
+      connected_at: now,
+      last_synced_at: now,
+    });
+  }
+
+  if (!connection) {
     return null;
   }
 
@@ -216,6 +236,18 @@ export async function getTwilioConnectionByAccountSid(
   return data ? mapTwilioConnection(data) : null;
 }
 
+function getPlatformTwilioCredentials(): TwilioApiCredentials | null {
+  const accountSid = getTwilioPlatformAccountSid();
+  const authToken = getTwilioPlatformAuthToken();
+
+  if (!accountSid || !authToken) {
+    return null;
+  }
+
+  return { accountSid, authToken };
+}
+
+/** HeyKiki model: all voice/SMS traffic uses OrzuX platform Twilio credentials. */
 export async function resolveTwilioCredentialsForBusiness(
   connection: TwilioConnectionData | null,
 ): Promise<TwilioApiCredentials | null> {
@@ -223,76 +255,7 @@ export async function resolveTwilioCredentialsForBusiness(
     return null;
   }
 
-  if (connection.authMode === "api_key") {
-    if (
-      !connection.connectedAccountSid ||
-      !connection.apiKeySid ||
-      !connection.apiKeySecretKeyName
-    ) {
-      return null;
-    }
-
-    const admin = createAdminClient();
-    const [apiKeySecret, authToken] = await Promise.all([
-      readIntegrationSecret(admin, connection.apiKeySecretKeyName),
-      readIntegrationSecret(admin, connection.authTokenSecretKeyName),
-    ]);
-
-    if (!apiKeySecret) {
-      return null;
-    }
-
-    return {
-      accountSid: connection.connectedAccountSid,
-      authToken: authToken ?? "",
-      apiKeySid: connection.apiKeySid,
-      apiKeySecret,
-    };
-  }
-
-  if (connection.authMode === "auth_token") {
-    if (!connection.connectedAccountSid || !connection.authTokenSecretKeyName) {
-      return null;
-    }
-
-    const authToken = await readIntegrationSecret(
-      createAdminClient(),
-      connection.authTokenSecretKeyName,
-    );
-
-    if (!authToken) {
-      return null;
-    }
-
-    return {
-      accountSid: connection.connectedAccountSid,
-      authToken,
-    };
-  }
-
-  const authToken = getTwilioPlatformAuthToken();
-
-  if (!authToken || !connection.connectedAccountSid) {
-    return null;
-  }
-
-  return {
-    accountSid: connection.connectedAccountSid,
-    authToken,
-  };
-}
-
-async function readCustomerTwilioAuthToken(
-  connection: TwilioConnectionData | null,
-): Promise<string | null> {
-  if (!connection?.authTokenSecretKeyName) {
-    return null;
-  }
-
-  return readIntegrationSecret(
-    createAdminClient(),
-    connection.authTokenSecretKeyName,
-  );
+  return getPlatformTwilioCredentials();
 }
 
 export async function resolveTwilioWebhookValidationContext(
@@ -306,34 +269,12 @@ export async function resolveTwilioWebhookValidationContext(
     return null;
   }
 
-  if (connection.authMode === "api_key" || connection.authMode === "auth_token") {
-    return {
-      authToken: await readCustomerTwilioAuthToken(connection),
-      expectedAccountSid: connection.connectedAccountSid,
-      allowedAccountSids: connection.connectedAccountSid
-        ? [connection.connectedAccountSid]
-        : undefined,
-    };
-  }
-
   const platformAccountSid = getTwilioPlatformAccountSid() ?? null;
-  const connectAccountSid = connection.connectedAccountSid;
-  const allowedAccountSids = [
-    ...new Set(
-      [connectAccountSid, platformAccountSid].filter(
-        (value): value is string => Boolean(value?.trim()),
-      ),
-    ),
-  ];
 
-  // Connect softphone runs on the platform AC; inbound numbers use the Connect
-  // AC. Both are signed with the platform Auth Token. Leave expectedAccountSid
-  // unset so status/client callbacks are not rejected for AccountSid mismatch;
-  // HMAC (and orzuSig fallback) still authenticate the request.
   return {
     authToken: getTwilioPlatformAuthToken() ?? null,
-    expectedAccountSid: null,
-    allowedAccountSids,
+    expectedAccountSid: platformAccountSid,
+    allowedAccountSids: platformAccountSid ? [platformAccountSid] : undefined,
   };
 }
 
@@ -429,41 +370,11 @@ export async function resolveTwilioBrowserPhoneRuntimeConfig(
   return null;
 }
 
+/** Softphone removed — OrzuX uses platform numbers + Rufweiterleitung (HeyKiki model). */
 export function isBrowserPhoneSupportedForTwilioConnection(
   connection: TwilioConnectionData | null,
 ): boolean {
-  if (!connection || connection.status !== "connected") {
-    return false;
-  }
-
-  const storedBrowserPhoneSupported =
-    connection.browserPhoneStatus === "ready" &&
-    Boolean(
-      connection.connectedAccountSid &&
-        connection.apiKeySid &&
-        connection.apiKeySecretKeyName &&
-        connection.browserTwimlAppSid,
-    );
-
-  if (connection.authMode === "connect") {
-    // Softphone for Connect uses OrzuX platform keys (Connect ACs cannot create Keys).
-    // Show Go Online whenever platform softphone env is present — provision TwiML App lazily.
-    return Boolean(
-      getTwilioPlatformAccountSid() &&
-        getTwilioPlatformAuthToken() &&
-        getTwilioApiKeySid() &&
-        getTwilioApiKeySecret(),
-    );
-  }
-
-  if (connection.authMode === "api_key") {
-    return (
-      connection.billingOwner === "customer" &&
-      storedBrowserPhoneSupported &&
-      Boolean(connection.authTokenSecretKeyName)
-    );
-  }
-
+  void connection;
   return false;
 }
 
@@ -648,9 +559,21 @@ export async function purchaseAndConnectTwilioNumber(input: {
       };
     }
 
+    const { upsertActiveOrzuVoiceNumber } = await import(
+      "@/services/orzu-voice-numbers.service"
+    );
+    await upsertActiveOrzuVoiceNumber({
+      businessId: input.businessId,
+      phoneNumber: purchased.phoneNumber,
+      phoneSid: purchased.sid,
+      countryCode,
+      monthlyPriceCents: pricing.monthlyPriceCents,
+    });
+
     return selectTwilioPhoneNumber({
       businessId: input.businessId,
       phoneSid: purchased.sid,
+      phoneNumber: purchased.phoneNumber,
     });
   } catch (error) {
     return {
@@ -1598,22 +1521,6 @@ export async function selectTwilioPhoneNumber(input: {
     selectedSid = selected.sid;
   }
 
-  const browserPhoneProvisioning = await provisionBrowserPhoneForConnection({
-    businessId: input.businessId,
-    connection: ctx.connection,
-    credentials: ctx.credentials,
-  });
-
-  if (browserPhoneProvisioning && !browserPhoneProvisioning.success) {
-    console.warn(
-      "[twilio] Browser Phone provisioning skipped during number select",
-      JSON.stringify({
-        businessId: input.businessId,
-        message: browserPhoneProvisioning.message,
-      }),
-    );
-  }
-
   const webhooks = buildVoiceWebhookUrls(input.businessId);
   const now = new Date().toISOString();
   let cleanupPreviousNumber = false;
@@ -1655,11 +1562,41 @@ export async function selectTwilioPhoneNumber(input: {
 
   await upsertTwilioConnectionRow(admin, input.businessId, {
     twilio_status: "connected",
+    auth_mode: "platform",
+    billing_owner: "platform",
+    connected_account_sid: ctx.credentials.accountSid,
     phone_number: selectedNumber,
     phone_sid: selectedSid,
+    browser_phone_status: "disabled",
+    browser_twiml_app_sid: null,
     connected_at: ctx.connection.connectedAt ?? now,
     last_synced_at: now,
   });
+
+  try {
+    const { upsertActiveOrzuVoiceNumber } = await import(
+      "@/services/orzu-voice-numbers.service"
+    );
+    const countryCode = inferCountryCodeFromPhoneNumber(selectedNumber);
+    const pricing = getTwilioCountryPricing(countryCode);
+    await upsertActiveOrzuVoiceNumber({
+      businessId: input.businessId,
+      phoneNumber: selectedNumber,
+      phoneSid: selectedSid,
+      countryCode,
+      monthlyPriceCents: pricing?.monthlyPriceCents ?? 250,
+      voiceUrl: webhooks.inboundWebhookUrl,
+      smsUrl: webhooks.smsWebhookUrl,
+    });
+  } catch (error) {
+    console.warn(
+      "[twilio] orzu_voice_numbers upsert failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+  }
 
   const voiceSettingsResult = await import("@/services/voice-agent.service").then(
     (module) =>
@@ -1847,6 +1784,21 @@ export async function disconnectTwilioIntegration(
         }),
       );
     }
+  }
+
+  try {
+    const { releaseActiveOrzuVoiceNumber } = await import(
+      "@/services/orzu-voice-numbers.service"
+    );
+    await releaseActiveOrzuVoiceNumber(businessId);
+  } catch (error) {
+    console.warn(
+      "[twilio] orzu_voice_numbers release failed",
+      JSON.stringify({
+        businessId,
+        error: error instanceof Error ? error.message : "unknown",
+      }),
+    );
   }
 
   const admin = createAdminClient();

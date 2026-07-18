@@ -6,7 +6,6 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ENV_KEYS } from "@/constants/env-keys";
 import {
   getTwilioConnection,
-  isBrowserPhoneSupportedForTwilioConnection,
   getTwilioConnectConfig as getPlatformTwilioConnectConfig,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
@@ -861,34 +860,40 @@ export async function getInboundVoiceTwiml(
     );
   }
 
-  const twilioConnection = await getTwilioConnection(businessId);
+  if (settings.aiEnabled && settings.aiConfigured) {
+    return buildVoiceConversationTwiml({
+      businessId,
+      direction: "inbound",
+      forceAi: true,
+      callSid,
+      callLogId,
+    });
+  }
 
-  if (!isBrowserPhoneSupportedForTwilioConnection(twilioConnection)) {
-    if (settings.aiEnabled && settings.aiConfigured) {
-      return buildVoiceConversationTwiml({
-        businessId,
-        direction: "inbound",
-        forceAi: true,
-        callSid,
-        callLogId,
-      });
-    }
+  const { getActiveOrzuVoiceNumber } = await import(
+    "@/services/orzu-voice-numbers.service"
+  );
+  const orzuNumber = await getActiveOrzuVoiceNumber(businessId);
+  const forwardTo = orzuNumber?.forwardToE164?.trim();
 
+  if (forwardTo && settings.phoneNumber) {
+    const { buildDialPhoneNumberTwiml } = await import("@/lib/voice/twiml");
     return applyCallRecordingToTwiml(
       businessId,
-      buildStaticSayTwiml({
-        speech: settings.inboundGreeting,
-        speechLocale,
+      buildDialPhoneNumberTwiml({
+        callerId: settings.phoneNumber,
+        toNumber: forwardTo,
       }),
     );
   }
 
-  const { buildInboundBrowserTwiml } = await import(
-    "@/services/voice-client.service"
+  return applyCallRecordingToTwiml(
+    businessId,
+    buildStaticSayTwiml({
+      speech: settings.inboundGreeting,
+      speechLocale,
+    }),
   );
-  const twiml = await buildInboundBrowserTwiml(businessId);
-
-  return applyCallRecordingToTwiml(businessId, twiml);
 }
 
 export async function getOutboundVoiceTwiml(

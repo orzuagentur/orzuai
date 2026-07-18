@@ -38,21 +38,22 @@ export const TWILIO_MESSAGES = {
   noPhoneNumbersTitle: "Номера не найдены в подключённом аккаунте",
   noPhoneNumbersDescription:
     "Нажмите «Обновить список», чтобы заново получить номера из Twilio. Если номеров нет, можно купить новый номер через OrzuX.",
-  buyNumberTitle: "Купить номер через OrzuX",
+  buyNumberTitle: "Купить номер OrzuX",
   buyNumberDescription:
-    "Номер будет куплен в вашем авторизованном Twilio-аккаунте и сразу подключён к AI Voice.",
+    "Номер покупается на телефонии OrzuX и сразу подключается к ИИ. Оплата — через вашу подписку Stripe.",
   buyNumberCountryLabel: "Страна",
   buyNumberAreaCodeLabel: "Код региона (необязательно)",
   buyNumberSearchButton: "Найти номера",
   buyNumberPurchaseButton: "Купить и подключить",
   buyNumberSearching: "Поиск…",
   buyNumberPurchasing: "Покупка…",
-  buyNumberSuccess: "Номер куплен и подключён.",
-  purchaseNumberFailed: "Не удалось купить номер. Проверьте баланс Twilio и права Connect.",
+  buyNumberSuccess: "Номер OrzuX куплен и подключён.",
+  purchaseNumberFailed:
+    "Не удалось купить номер. Проверьте Geo Permissions и баланс platform Twilio OrzuX.",
   searchNumbersFailed: "Не удалось найти доступные номера.",
   listNumbersFailed: "Не удалось получить список номеров из Twilio.",
   platformKeysMissing:
-    "Платформенные ключи Twilio не настроены. Обратитесь в поддержку OrzuX.",
+    "Платформенные ключи Twilio не настроены (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN). Обратитесь в поддержку OrzuX.",
   refreshButton: "Обновить список",
   refreshSuccess: "Список номеров обновлён.",
   refreshFailed: "Не удалось обновить список номеров.",

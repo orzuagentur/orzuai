@@ -27,7 +27,8 @@ export type VoiceConnectionData = {
   lastSyncedAt: string | null;
   accountFriendlyName: string | null;
   pendingPhoneSelection: boolean;
-  authMode: "connect" | "api_key" | "auth_token" | null;
+  authMode: "platform" | "connect" | "api_key" | "auth_token" | null;
+  forwardToE164?: string | null;
 };
 
 export type VoiceConnectConfig = {

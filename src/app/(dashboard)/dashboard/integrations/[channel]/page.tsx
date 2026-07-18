@@ -31,6 +31,7 @@ import {
   getTwilioNumberDiagnostics,
   listTwilioPhoneNumbersForBusiness,
 } from "@/services/twilio-integration.service";
+import { getActiveOrzuVoiceNumber } from "@/services/orzu-voice-numbers.service";
 import {
   getGmailConnection,
   getGmailConnectConfig,
@@ -109,6 +110,7 @@ export default async function IntegrationsChannelPage({
     voiceConnectConfig,
     twilioPhoneNumbers,
     twilioDiagnostics,
+    orzuVoiceNumber,
     googleCalendarConnection,
     googleCalendarConnectConfig,
     gmailConnection,
@@ -131,6 +133,9 @@ export default async function IntegrationsChannelPage({
       : Promise.resolve([]),
     business && channel === "voice"
       ? getTwilioNumberDiagnostics(business.id)
+      : Promise.resolve(null),
+    business && channel === "voice"
+      ? getActiveOrzuVoiceNumber(business.id)
       : Promise.resolve(null),
     business ? getGoogleCalendarConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getGoogleCalendarConnectConfig()),
@@ -209,6 +214,7 @@ export default async function IntegrationsChannelPage({
                   connectConfig: voiceConnectConfig,
                   availablePhoneNumbers: twilioPhoneNumbers,
                   diagnostics: twilioDiagnostics,
+                  forwardToE164: orzuVoiceNumber?.forwardToE164 ?? null,
                 }
               : undefined
           }

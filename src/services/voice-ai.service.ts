@@ -44,8 +44,6 @@ import { listKnowledgeEntriesForBusiness } from "@/services/messaging.service";
 import { scheduleVoiceTurnOrchestration } from "@/services/voice-orchestrator.service";
 import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
 import {
-  getTwilioConnection,
-  isBrowserPhoneSupportedForTwilioConnection,
   resolveTwilioWebhookValidationContext,
 } from "@/services/twilio-integration.service";
 import {
@@ -805,9 +803,11 @@ export async function handleVoiceGatherInput(input: {
     );
   }
 
-  const handoffTwilioConnection = await getTwilioConnection(input.businessId);
+  const orzuNumber = await import("@/services/orzu-voice-numbers.service").then(
+    (module) => module.getActiveOrzuVoiceNumber(input.businessId),
+  );
   const shouldHandoff =
-    isBrowserPhoneSupportedForTwilioConnection(handoffTwilioConnection) &&
+    Boolean(orzuNumber?.forwardToE164?.trim()) &&
     (customerExplicitlyRequestedHuman(userSpeech) ||
       customerConfirmedHumanHandoff(userSpeech, session.turns));
 

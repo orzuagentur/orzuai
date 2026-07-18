@@ -26,7 +26,13 @@ export type TwilioConnectionStatus =
 
 export type TwilioBillingOwner = "customer" | "platform";
 
-export type TwilioAuthMode = "connect" | "api_key" | "auth_token";
+export type TwilioAuthMode = "platform" | "connect" | "api_key" | "auth_token";
+
+export type OrzuVoiceNumberStatus =
+  | "provisioning"
+  | "active"
+  | "releasing"
+  | "released";
 
 export type WebsiteFormStatus = "connected" | "disconnected" | "pending";
 
@@ -1056,6 +1062,77 @@ export type Database = {
             foreignKeyName: "google_calendar_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      orzu_voice_numbers: {
+        Row: {
+          id: string;
+          business_id: string;
+          phone_number: string;
+          phone_sid: string;
+          country_code: string;
+          forward_to_e164: string | null;
+          forward_verified_at: string | null;
+          forwarding_wizard_completed_at: string | null;
+          monthly_price_cents: number;
+          stripe_subscription_item_id: string | null;
+          billing_status: "active" | "canceled";
+          status: OrzuVoiceNumberStatus;
+          voice_url: string | null;
+          sms_url: string | null;
+          provisioned_at: string | null;
+          released_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          phone_number: string;
+          phone_sid: string;
+          country_code?: string;
+          forward_to_e164?: string | null;
+          forward_verified_at?: string | null;
+          forwarding_wizard_completed_at?: string | null;
+          monthly_price_cents: number;
+          stripe_subscription_item_id?: string | null;
+          billing_status?: "active" | "canceled";
+          status?: OrzuVoiceNumberStatus;
+          voice_url?: string | null;
+          sms_url?: string | null;
+          provisioned_at?: string | null;
+          released_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          phone_number?: string;
+          phone_sid?: string;
+          country_code?: string;
+          forward_to_e164?: string | null;
+          forward_verified_at?: string | null;
+          forwarding_wizard_completed_at?: string | null;
+          monthly_price_cents?: number;
+          stripe_subscription_item_id?: string | null;
+          billing_status?: "active" | "canceled";
+          status?: OrzuVoiceNumberStatus;
+          voice_url?: string | null;
+          sms_url?: string | null;
+          provisioned_at?: string | null;
+          released_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orzu_voice_numbers_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
             referencedRelation: "businesses";
             referencedColumns: ["id"];
           },

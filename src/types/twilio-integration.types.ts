@@ -54,7 +54,7 @@ export type TwilioNumberDiagnostics = {
   errorLogs: TwilioErrorLogItem[];
 };
 
-export type TwilioAuthMode = "connect" | "api_key" | "auth_token";
+export type TwilioAuthMode = "platform" | "connect" | "api_key" | "auth_token";
 
 export type TwilioBillingOwner = "customer" | "platform";
 

@@ -10,7 +10,6 @@ import { getPrimaryBusiness } from "@/services/business.service";
 import { isGoogleCalendarConnected } from "@/services/google-calendar.service";
 import { getActivePlatformAnnouncements } from "@/services/platform-announcements.service";
 import { getUserProfile } from "@/services/user.service";
-import { getVoiceClientConfig } from "@/services/voice-client.service";
 
 export const metadata = {
   robots: {
@@ -40,9 +39,6 @@ export default async function DashboardLayout({
   const googleCalendarConnected = business
     ? await isGoogleCalendarConnected(business.id)
     : false;
-  const voiceClientConfig = business
-    ? await getVoiceClientConfig(business.id)
-    : { enabled: false, phoneNumber: null };
   const announcements = await getActivePlatformAnnouncements(user.id);
 
   let supportUnreadCount = 0;
@@ -60,8 +56,6 @@ export default async function DashboardLayout({
     <DashboardShell
       userProfile={userProfile}
       googleCalendarConnected={googleCalendarConnected}
-      voiceBusinessId={business?.id ?? null}
-      voiceClientEnabled={voiceClientConfig.enabled}
       announcements={announcements}
       supportUnreadCount={supportUnreadCount}
       onboardingProgress={onboardingProgress}

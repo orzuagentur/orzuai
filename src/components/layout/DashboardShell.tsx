@@ -20,8 +20,6 @@ import type { OnboardingProgress } from "@/services/onboarding.service";
 import type { PlatformAnnouncement } from "@/services/platform-announcements.service";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PushNotificationsProvider } from "@/components/pwa/push-notifications-context";
-import { VoiceSoftphoneProvider } from "@/components/voice/voice-softphone-context";
-import { VoiceSoftphoneBarGate } from "@/components/voice/VoiceSoftphoneBar";
 import { useSupabaseRealtimeBootstrap } from "@/hooks/use-supabase-realtime-bootstrap";
 
 const DashboardInboundAlerts = dynamic(
@@ -75,8 +73,6 @@ const SetupProgressCard = dynamic(
 type DashboardShellProps = {
   userProfile: DashboardUserProfile;
   googleCalendarConnected?: boolean;
-  voiceBusinessId?: string | null;
-  voiceClientEnabled?: boolean;
   announcements?: PlatformAnnouncement[];
   supportUnreadCount?: number;
   onboardingProgress?: OnboardingProgress | null;
@@ -86,8 +82,6 @@ type DashboardShellProps = {
 export function DashboardShell({
   userProfile,
   googleCalendarConnected = false,
-  voiceBusinessId = null,
-  voiceClientEnabled = false,
   announcements = [],
   supportUnreadCount = 0,
   onboardingProgress = null,
@@ -99,10 +93,6 @@ export function DashboardShell({
     <PushNotificationsProvider>
       <DashboardNavBadgesProvider>
         <AiHumanRequestsProvider>
-          <VoiceSoftphoneProvider
-            enabled={voiceClientEnabled}
-            businessId={voiceBusinessId}
-          >
             <DashboardInboundAlerts />
             <DashboardAiHumanAlerts />
             <InboxChromeProvider>
@@ -125,7 +115,6 @@ export function DashboardShell({
                                 <PlatformAnnouncementsBanner
                                   announcements={announcements}
                                 />
-                                <VoiceSoftphoneBarGate />
                                 <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                                   {children}
                                 </div>
@@ -145,7 +134,6 @@ export function DashboardShell({
                 </AiAssistantChromeProvider>
               </ContactsChromeProvider>
             </InboxChromeProvider>
-          </VoiceSoftphoneProvider>
         </AiHumanRequestsProvider>
       </DashboardNavBadgesProvider>
     </PushNotificationsProvider>

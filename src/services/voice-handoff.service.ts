@@ -1,19 +1,19 @@
 import "server-only";
 
 import { buildAppUrl } from "@/lib/app-url";
-import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import { redirectTwilioCall } from "@/lib/twilio/client";
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import {
-  buildHandoffToAgentTwiml,
+  buildHandoffToNumberTwiml,
   buildRecordingStatusCallbackUrl,
+  buildStaticSayTwiml,
   mapVoiceLanguageToTwilioLocale,
 } from "@/lib/voice/twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceRepository } from "@/repositories/voice.repository";
+import { getActiveOrzuVoiceNumber } from "@/services/orzu-voice-numbers.service";
 import {
   getTwilioConnection,
-  isBrowserPhoneSupportedForTwilioConnection,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
@@ -27,14 +27,22 @@ export async function buildHandoffAgentTwiml(
   const recordingCallback = settings.recordingEnabled
     ? buildRecordingStatusCallbackUrl(businessId)
     : null;
+  const orzuNumber = await getActiveOrzuVoiceNumber(businessId);
+  const forwardTo = orzuNumber?.forwardToE164?.trim();
+  const callerId = settings.phoneNumber?.trim() || orzuNumber?.phoneNumber;
 
-  return buildHandoffToAgentTwiml({
+  if (!forwardTo || !callerId) {
+    return buildStaticSayTwiml({
+      speech:
+        "A team member is not available right now. Please leave a message after the tone or call back later.",
+      speechLocale,
+    });
+  }
+
+  return buildHandoffToNumberTwiml({
     speechLocale,
-    clientIdentity: buildVoiceAgentClientIdentity(businessId),
-    actionUrl: appendTwilioWebhookSignature(
-      `${buildAppUrl("/api/webhooks/voice/client-no-answer")}?businessId=${businessId}`,
-      businessId,
-    ),
+    callerId,
+    toNumber: forwardTo,
     recordingStatusCallback: recordingCallback,
   });
 }
@@ -47,15 +55,16 @@ export async function handoffActiveVoiceCallToAgent(input: {
     return { success: false, message: "Configuration missing." };
   }
 
-  const connection = await getTwilioConnection(input.businessId);
+  const orzuNumber = await getActiveOrzuVoiceNumber(input.businessId);
 
-  if (!isBrowserPhoneSupportedForTwilioConnection(connection)) {
+  if (!orzuNumber?.forwardToE164?.trim()) {
     return {
       success: false,
-      message: "Browser calling is not provisioned for this Twilio connection.",
+      message: "Set your personal forward-to number in Voice setup first.",
     };
   }
 
+  const connection = await getTwilioConnection(input.businessId);
   const repo = getVoiceRepository();
   const callLog = await repo.findCallLogById(input.businessId, input.callLogId);
 
