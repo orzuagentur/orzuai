@@ -25,7 +25,7 @@ const INTERNAL_ACTION_LABEL_PATTERNS = [
   /^crm\b/i,
 ];
 
-const BOOKING_SUCCESS_ACTION_PATTERNS = [
+export const BOOKING_SUCCESS_ACTION_PATTERNS = [
   /^booking confirmed/i,
   /^calendar event created/i,
 ];
@@ -47,10 +47,11 @@ const CUSTOMER_VISIBLE_ACTION_PATTERNS = [
   ...BOOKING_FAILURE_ACTION_PATTERNS,
   /task created:/i,
   /deal created:/i,
+  /deal updated:/i,
   /contact created:/i,
 ];
 
-function normalizeText(value: string): string {
+export function normalizeText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
@@ -69,7 +70,7 @@ function hasBookingFailureWithoutSuccess(actionsApplied: string[]): boolean {
   return hasFailure && !hasSuccess;
 }
 
-function summaryLooksLikeBookingConfirmation(summary: string): boolean {
+export function summaryLooksLikeBookingConfirmation(summary: string): boolean {
   const normalized = normalizeText(summary);
 
   return BOOKING_CONFIRMATION_SUMMARY_PATTERNS.some((pattern) =>
@@ -178,18 +179,38 @@ export function shouldSendCustomerActionFollowUp(input: {
 }): boolean {
   const sanitizedSummary = sanitizeCustomerFacingSummary(input.clientSummary);
   const visibleActions = filterCustomerVisibleActionLabels(input.actionsApplied);
+  const bookingFailure = hasBookingFailureWithoutSuccess(input.actionsApplied);
+  const hasBookingSuccess = input.actionsApplied.some((label) =>
+    BOOKING_SUCCESS_ACTION_PATTERNS.some((pattern) =>
+      pattern.test(normalizeText(label)),
+    ),
+  );
 
-  if (
-    sanitizedSummary &&
-    !(
-      hasBookingFailureWithoutSuccess(input.actionsApplied) &&
-      summaryLooksLikeBookingConfirmation(sanitizedSummary)
-    )
-  ) {
+  // Always notify customer when a booking attempt failed.
+  if (bookingFailure) {
     return true;
   }
 
-  return visibleActions.length > 0 && hasCustomerVisibleOutcome(visibleActions);
+  // Confirm only after a real calendar write.
+  if (hasBookingSuccess) {
+    return true;
+  }
+
+  // Drop false booking claims from orchestrator clientSummary.
+  if (
+    sanitizedSummary &&
+    summaryLooksLikeBookingConfirmation(sanitizedSummary)
+  ) {
+    return false;
+  }
+
+  // Avoid a second customer message for CRM-only outcomes (deal/note/task)
+  // — Phase-1 reply (or action-outcome context) should already cover them.
+  if (sanitizedSummary && !hasCustomerVisibleOutcome(visibleActions)) {
+    return false;
+  }
+
+  return false;
 }
 
 export function buildBookingFailureFollowUp(input: {

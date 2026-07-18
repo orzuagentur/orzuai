@@ -1,5 +1,12 @@
 import { AI_CONTEXT_LIMITS } from "@/lib/ai/context-window";
 
+export type CrmReplyOpenDeal = {
+  id: string;
+  title: string;
+  value: number | null;
+  stage: string | null;
+};
+
 export type CrmReplyContactSnapshot = {
   name: string;
   email?: string | null;
@@ -10,6 +17,7 @@ export type CrmReplyContactSnapshot = {
   expectedCloseDate: string | null;
   aiSummary: string | null;
   openTaskCount: number;
+  openDeals?: CrmReplyOpenDeal[];
   customFields?: Record<string, unknown> | null;
 };
 
@@ -19,6 +27,22 @@ export function buildCrmReplyContext(
   if (!snapshot) {
     return "";
   }
+
+  const openDeals = snapshot.openDeals ?? [];
+  const openDealsLine =
+    openDeals.length > 0
+      ? `Open deals: ${openDeals
+          .map((deal) => {
+            const parts = [
+              deal.title || "Untitled",
+              deal.value != null ? `value ${deal.value}` : null,
+              deal.stage ? `stage ${deal.stage}` : null,
+              `id ${deal.id}`,
+            ].filter(Boolean);
+            return parts.join(" · ");
+          })
+          .join("; ")}`
+      : "Open deals: none — create_deal only if this is a new sale";
 
   const lines = [
     `Contact: ${snapshot.name}`,
@@ -31,6 +55,7 @@ export function buildCrmReplyContext(
     snapshot.openTaskCount > 0
       ? `Open tasks: ${snapshot.openTaskCount}`
       : null,
+    openDealsLine,
     snapshot.aiSummary?.trim()
       ? `CRM notes: ${snapshot.aiSummary.trim()}`
       : null,
@@ -58,5 +83,6 @@ export function formatCrmContextForSystemPrompt(context: string): string {
   return [
     "Customer CRM snapshot (use only when relevant to the question):",
     context.trim(),
+    "If Open deals are listed, prefer update_deal (with deal id when present) instead of create_deal.",
   ].join("\n");
 }

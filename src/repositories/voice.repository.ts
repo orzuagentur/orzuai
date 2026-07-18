@@ -682,6 +682,70 @@ export class VoiceRepository {
     return data ?? [];
   }
 
+  async listCallEventsByCallSid(
+    businessId: string,
+    callSid: string,
+    limit = 50,
+  ): Promise<VoiceCallEventRow[]> {
+    const trimmed = callSid.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const { data, error } = await this.db
+      .from("voice_call_events")
+      .select("*")
+      .eq("business_id", businessId)
+      .eq("call_sid", trimmed)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data ?? [];
+  }
+
+  async hasBookingEventForCall(input: {
+    businessId: string;
+    callLogId?: string | null;
+    callSid?: string | null;
+  }): Promise<boolean> {
+    const bookingTypes = [
+      "voice_live.booking.created",
+      "voice_post_call.booking.created",
+    ];
+
+    if (input.callLogId) {
+      const byLog = await this.listCallEvents(
+        input.businessId,
+        input.callLogId,
+        30,
+      );
+      if (
+        byLog.some((event) => bookingTypes.includes(event.event_type))
+      ) {
+        return true;
+      }
+    }
+
+    if (input.callSid?.trim()) {
+      const bySid = await this.listCallEventsByCallSid(
+        input.businessId,
+        input.callSid,
+        30,
+      );
+      if (
+        bySid.some((event) => bookingTypes.includes(event.event_type))
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async enqueuePostCallJob(input: VoicePostCallJobInsert): Promise<void> {
     const now = new Date().toISOString();
     const { error } = await this.db

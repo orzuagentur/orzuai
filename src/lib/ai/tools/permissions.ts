@@ -36,13 +36,43 @@ export function filterExecutorPlanByProfile(
 
   return {
     plan: {
-      clientSummary: plan.clientSummary,
+      clientSummary: sanitizeBlockedBookingSummary(
+        plan.clientSummary,
+        blockedActions,
+      ),
       contactUpdates: contactUpdatesBlocked ? undefined : plan.contactUpdates,
       actions,
     },
     blockedActions,
     contactUpdatesBlocked,
   };
+}
+
+function sanitizeBlockedBookingSummary(
+  clientSummary: string | undefined,
+  blockedActions: AgentToolName[],
+): string | undefined {
+  if (!clientSummary?.trim()) {
+    return clientSummary;
+  }
+
+  if (!blockedActions.includes("create_calendar_event")) {
+    return clientSummary;
+  }
+
+  // Drop false booking confirmations when calendar tool was not permitted.
+  if (
+    /\b(booking|reservation|appointment)\b.*\b(confirmed|booked|scheduled)\b/i.test(
+      clientSummary,
+    ) ||
+    /(бронь|бронирование|запись)[\s\S]{0,80}(подтвержд|создан|оформл|забронир)/i.test(
+      clientSummary,
+    )
+  ) {
+    return undefined;
+  }
+
+  return clientSummary;
 }
 
 /** @deprecated Use filterExecutorPlanByProfile */

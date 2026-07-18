@@ -15,6 +15,7 @@ import {
   executorScheduleFollowUpActionSchema,
   executorSendCustomerMessageActionSchema,
   executorUpdateCollectedFieldsActionSchema,
+  executorUpdateDealActionSchema,
   executorUpdateDealStageActionSchema,
   executorUpdateTaskStatusActionSchema,
 } from "@/types/agent-executor.types";
@@ -62,9 +63,23 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     customerVisible: true,
     runsWithoutContact: false,
     description: "Create a sales deal on the contact.",
-    orchestratorHint: "Use for pricing, quotes, purchase intent, or demos.",
+    orchestratorHint:
+      "Use ONLY when this contact has no open deal. Prefer update_deal when changing price, title, notes, or stage on an existing deal.",
     executorHint: "Include a specific deal title — not generic placeholders.",
     schema: executorCreateDealActionSchema,
+  },
+  {
+    name: "update_deal",
+    permission: "canCreateDeal",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description:
+      "Update an existing CRM deal (title, value, stage, notes) instead of creating a duplicate.",
+    orchestratorHint:
+      "Use when the customer changes quote/price/scope or when Open deals are listed in CRM context. Never create_deal for the same sale.",
+    executorHint:
+      "Updates the matched or latest open deal for the contact; creates nothing new.",
+    schema: executorUpdateDealActionSchema,
   },
   {
     name: "add_note",

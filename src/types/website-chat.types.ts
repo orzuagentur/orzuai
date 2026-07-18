@@ -56,6 +56,7 @@ export type EnableWebsiteChatInput = UpdateWebsiteChatSettingsInput;
 export const websiteChatMessageSchema = z.object({
   visitorId: z.string().min(8).max(128),
   name: z.string().max(120).optional(),
+  phone: z.string().max(40).optional(),
   message: z.string().min(1).max(4000),
 });
 

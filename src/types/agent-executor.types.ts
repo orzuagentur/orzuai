@@ -129,6 +129,15 @@ export const executorUpdateDealStageActionSchema = z.object({
   title: z.string().trim().max(200).optional(),
 });
 
+export const executorUpdateDealActionSchema = z.object({
+  type: z.literal("update_deal"),
+  dealId: z.string().uuid().optional(),
+  title: z.string().trim().min(1).max(200).optional(),
+  value: z.number().min(0).max(999999999).optional(),
+  stage: z.enum(PIPELINE_STAGES).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
 export const executorSendCustomerMessageActionSchema = z.object({
   type: z.literal("send_customer_message"),
   content: z.string().trim().min(1).max(2000),
@@ -158,6 +167,7 @@ export const executorActionSchema = z.discriminatedUnion("type", [
   executorCancelCalendarEventActionSchema,
   executorUpdateTaskStatusActionSchema,
   executorUpdateDealStageActionSchema,
+  executorUpdateDealActionSchema,
   executorSendCustomerMessageActionSchema,
   executorScheduleEventReminderActionSchema,
 ]);

@@ -190,22 +190,32 @@ async function fetchCrmReplySnapshot(
   businessId: string,
   contactId: string,
 ): Promise<CrmReplyContactSnapshot | null> {
-  const [{ data: contact }, { count: openTaskCount }] = await Promise.all([
-    admin
-      .from("contacts")
-      .select(
-        "name, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date",
-      )
-      .eq("id", contactId)
-      .eq("business_id", businessId)
-      .maybeSingle(),
-    admin
-      .from("crm_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("contact_id", contactId)
-      .eq("business_id", businessId)
-      .eq("status", "open"),
-  ]);
+  const [{ data: contact }, { count: openTaskCount }, { data: openDeals }] =
+    await Promise.all([
+      admin
+        .from("contacts")
+        .select(
+          "name, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date",
+        )
+        .eq("id", contactId)
+        .eq("business_id", businessId)
+        .maybeSingle(),
+      admin
+        .from("crm_tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("contact_id", contactId)
+        .eq("business_id", businessId)
+        .eq("status", "open"),
+      admin
+        .from("crm_deals")
+        .select("id, title, value, stage")
+        .eq("contact_id", contactId)
+        .eq("business_id", businessId)
+        .not("status", "eq", "lost")
+        .not("status", "eq", "won")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
   if (!contact) {
     return null;
@@ -219,6 +229,12 @@ async function fetchCrmReplySnapshot(
     expectedCloseDate: contact.expected_close_date,
     aiSummary: contact.ai_summary,
     openTaskCount: openTaskCount ?? 0,
+    openDeals: (openDeals ?? []).map((deal) => ({
+      id: String(deal.id),
+      title: String(deal.title ?? ""),
+      value: typeof deal.value === "number" ? deal.value : null,
+      stage: deal.stage ? String(deal.stage) : null,
+    })),
   };
 }
 

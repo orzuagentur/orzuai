@@ -339,22 +339,32 @@ async function fetchCrmReplySnapshot(
     return null;
   }
 
-  const [{ data: contact }, { count: openTaskCount }] = await Promise.all([
-    admin
-      .from("contacts")
-      .select(
-        "name, email, phone_number, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date, custom_fields",
-      )
-      .eq("id", contactId)
-      .eq("business_id", businessId)
-      .maybeSingle(),
-    admin
-      .from("crm_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("contact_id", contactId)
-      .eq("business_id", businessId)
-      .eq("status", "open"),
-  ]);
+  const [{ data: contact }, { count: openTaskCount }, { data: openDeals }] =
+    await Promise.all([
+      admin
+        .from("contacts")
+        .select(
+          "name, email, phone_number, pipeline_stage, deal_value, lead_score, ai_summary, expected_close_date, custom_fields",
+        )
+        .eq("id", contactId)
+        .eq("business_id", businessId)
+        .maybeSingle(),
+      admin
+        .from("crm_tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("contact_id", contactId)
+        .eq("business_id", businessId)
+        .eq("status", "open"),
+      admin
+        .from("crm_deals")
+        .select("id, title, value, stage")
+        .eq("contact_id", contactId)
+        .eq("business_id", businessId)
+        .not("status", "eq", "lost")
+        .not("status", "eq", "won")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
   if (!contact) {
     return null;
@@ -370,6 +380,12 @@ async function fetchCrmReplySnapshot(
     expectedCloseDate: contact.expected_close_date,
     aiSummary: contact.ai_summary,
     openTaskCount: openTaskCount ?? 0,
+    openDeals: (openDeals ?? []).map((deal) => ({
+      id: String(deal.id),
+      title: String(deal.title ?? ""),
+      value: typeof deal.value === "number" ? deal.value : null,
+      stage: deal.stage ? String(deal.stage) : null,
+    })),
     customFields:
       contact.custom_fields && typeof contact.custom_fields === "object"
         ? (contact.custom_fields as Record<string, unknown>)
@@ -536,13 +552,16 @@ function buildActionOutcomeContext(input: {
   language: string;
   agentName: string;
 }): string {
-  const confirmation =
-    buildCustomerFacingActionSummary({
-      agentName: input.agentName,
-      language: input.language,
-      actionsApplied: input.actionsApplied,
-      clientSummary: input.clientSummary ?? undefined,
-    }) ?? input.clientSummary;
+  const confirmation = buildCustomerFacingActionSummary({
+    agentName: input.agentName,
+    language: input.language,
+    actionsApplied: input.actionsApplied,
+    clientSummary: input.clientSummary ?? undefined,
+  });
+
+  const hasBookingSuccess = input.actionsApplied.some((label) =>
+    /^booking confirmed/i.test(label.trim()),
+  );
 
   return [
     "Worker actions already completed for this customer turn:",
@@ -552,7 +571,10 @@ function buildActionOutcomeContext(input: {
     confirmation
       ? `Confirmed outcome to tell the customer:\n${confirmation}`
       : "If details are still missing, ask exactly one clear question. Do not say you are checking or waiting.",
-    "Confirm the outcome clearly in your reply. Never say you are still checking, waiting, or that a manager will follow up.",
+    hasBookingSuccess
+      ? "Confirm the booking clearly with exact date/time. Never invent a booking that is not listed above as Booking confirmed."
+      : "Do NOT tell the customer a booking/meeting was created or confirmed unless actions include 'Booking confirmed'. If booking failed or was skipped, say so briefly and ask one clarifying question or offer another slot.",
+    "Never say you are still checking, waiting, or that a manager will follow up.",
   ].join("\n");
 }
 

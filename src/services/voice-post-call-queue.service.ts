@@ -275,19 +275,56 @@ async function enqueueDependentVoicePostCallJobs(
   job: VoicePostCallJobRow,
 ): Promise<void> {
   const repo = getVoiceRepository();
-  const dependentTypes =
-    job.job_type === "transcribe"
-      ? (["summarize", "extract_actions", "sync_crm", "booking"] as const)
-      : job.job_type === "summarize" || job.job_type === "extract_actions"
-        ? (["sync_crm", "booking"] as const)
-        : [];
 
-  if (dependentTypes.length === 0) {
+  // Keep analysis before CRM write: sync_crm used to race and permanently skip.
+  if (job.job_type === "transcribe") {
+    await Promise.allSettled(
+      (["summarize", "extract_actions"] as const).map((jobType) =>
+        repo.enqueuePostCallJob({
+          businessId: job.business_id,
+          callLogId: job.call_log_id,
+          jobType,
+          payload: {
+            sourceJobId: job.id,
+            sourceJobType: job.job_type,
+          },
+        }),
+      ),
+    );
+    dispatchVoicePostCallWorker("enqueue");
+    return;
+  }
+
+  if (job.job_type !== "summarize" && job.job_type !== "extract_actions") {
+    return;
+  }
+
+  const events = await repo.listCallEvents(job.business_id, job.call_log_id);
+  const hasSummary = events.some(
+    (event) => event.event_type === "voice_post_call.summary.created",
+  );
+  const hasActions = events.some(
+    (event) => event.event_type === "voice_post_call.action_items.extracted",
+  );
+
+  // Wait until at least one analysis event exists; prefer both when possible.
+  // Enqueue CRM/booking once either sibling finished so a single failure
+  // cannot block the other forever.
+  if (!hasSummary && !hasActions) {
+    return;
+  }
+
+  // If this job was summarize and extract is still missing, still proceed
+  // after summarize so CRM notes are not stuck. Same for extract-only.
+  if (job.job_type === "summarize" && !hasSummary) {
+    return;
+  }
+  if (job.job_type === "extract_actions" && !hasActions && !hasSummary) {
     return;
   }
 
   await Promise.allSettled(
-    dependentTypes.map((jobType) =>
+    (["sync_crm", "booking"] as const).map((jobType) =>
       repo.enqueuePostCallJob({
         businessId: job.business_id,
         callLogId: job.call_log_id,

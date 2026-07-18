@@ -290,7 +290,10 @@ export async function createAiCalendarBooking(input: {
   const title = [...new Set(titleParts)].join(" · ").slice(0, 200);
 
   const descriptionLines = [
-    input.description?.trim(),
+    input.description?.trim() || null,
+    input.clientMessage?.trim()
+      ? `Customer request: ${input.clientMessage.trim().slice(0, 800)}`
+      : null,
     ...formatBookingAnswersForDescription(formFields, formAnswers),
     resource?.name ? `Resource: ${resource.name}` : null,
     resolvedResourceName && resource?.name !== resolvedResourceName

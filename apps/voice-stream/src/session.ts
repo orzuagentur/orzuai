@@ -53,6 +53,8 @@ export class VoiceStreamSession {
   private pendingTranscript = "";
   private lastFlushedTranscript = "";
   private queuedUserMessages: string[] = [];
+  private speakingStartedAt = 0;
+  private static readonly ECHO_GRACE_MS = 350;
   private pendingInboundAudio: string[] = [];
   private transcriptTimer: NodeJS.Timeout | null = null;
   private closed = false;
@@ -278,10 +280,19 @@ export class VoiceStreamSession {
       return;
     }
 
+    // Ignore echo / noise right after TTS starts.
+    if (
+      this.speakingStartedAt > 0 &&
+      Date.now() - this.speakingStartedAt < VoiceStreamSession.ECHO_GRACE_MS
+    ) {
+      return;
+    }
+
     this.speechAbort?.abort();
     this.speechAbort = null;
     this.replyAbort?.abort();
     this.isSpeaking = false;
+    this.queuedUserMessages = [];
     this.audioPacer?.clear();
     this.audioPacer?.reset();
 
@@ -404,7 +415,7 @@ export class VoiceStreamSession {
       }
 
       const finalText = assistantText.trim();
-      if (finalText) {
+      if (finalText && !replyAbort.signal.aborted) {
         this.conversationHistory.push({ role: "assistant", content: finalText });
         void appendVoiceStreamTurn({
           appUrl: this.options.appUrl,
@@ -416,7 +427,7 @@ export class VoiceStreamSession {
         });
       }
 
-      if (endCall) {
+      if (endCall && !replyAbort.signal.aborted) {
         this.ws.close();
       }
     } catch (error) {
@@ -463,6 +474,7 @@ export class VoiceStreamSession {
     }
 
     this.isSpeaking = true;
+    this.speakingStartedAt = Date.now();
 
     try {
       await streamElevenLabsUlawToTwilio({

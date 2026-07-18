@@ -42,7 +42,7 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
   },
   title: {
     type: SchemaType.STRING,
-    description: "Title for create_task or create_deal.",
+    description: "Title for create_task, create_deal, or update_deal.",
   },
   dueAt: {
     type: SchemaType.STRING,
@@ -50,17 +50,17 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
   },
   value: {
     type: SchemaType.NUMBER,
-    description: "Deal value for create_deal.",
+    description: "Deal value for create_deal or update_deal.",
   },
   stage: {
     type: SchemaType.STRING,
     format: "enum",
     enum: PIPELINE_ENUM,
-    description: "Pipeline stage for create_deal or create_contact.",
+    description: "Pipeline stage for create_deal, update_deal, or create_contact.",
   },
   notes: {
     type: SchemaType.STRING,
-    description: "Optional deal notes.",
+    description: "Optional deal notes for create_deal or update_deal.",
   },
   content: {
     type: SchemaType.STRING,
@@ -150,7 +150,7 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
   },
   dealId: {
     type: SchemaType.STRING,
-    description: "CRM deal UUID.",
+    description: "CRM deal UUID for update_deal or update_deal_stage.",
   },
   status: {
     type: SchemaType.STRING,

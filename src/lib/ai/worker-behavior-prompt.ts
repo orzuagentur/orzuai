@@ -15,7 +15,7 @@ export const WORKER_ASSISTANT_RULES = [
 export const WORKER_ORCHESTRATOR_RULES = [
   "Act as a CRM worker: extract facts and plan concrete actions.",
   "Prefer create_calendar_event when booking is enabled and the customer gave a usable date/time.",
-  "Prefer create_deal + add_note for sales interest.",
+  "Prefer create_deal + add_note for sales interest when no open deal exists; otherwise prefer update_deal.",
   "Use contactUpdates.pipelineStage=new for registration/onboarding intent.",
   "Never plan actions that tell the customer a manager will follow up - use clientSummary to confirm outcomes directly only after the action can be executed.",
   "handoffConfirmed only when the customer explicitly agreed to a human after being asked.",

@@ -67,6 +67,7 @@ async function runVoiceTurnOrchestration(input: {
 
   const admin = createAdminClient();
   const conversationRepo = getConversationRepository(admin);
+  const voiceRepo = getVoiceRepository();
   const contactId = await conversationRepo.findContactIdByPhone(
     input.businessId,
     input.callerPhone,
@@ -75,6 +76,26 @@ async function runVoiceTurnOrchestration(input: {
   if (!contactId) {
     return;
   }
+
+  const callSid = input.callSid?.trim() || null;
+  let callLogId: string | null = null;
+
+  if (callSid) {
+    const callLog =
+      (await voiceRepo.findCallLogByBusinessAndExternalCallId(
+        input.businessId,
+        callSid,
+      )) ?? (await voiceRepo.findCallLogByExternalCallId(callSid));
+    callLogId = callLog?.id ?? null;
+  }
+
+  const alreadyBookedThisCall = callSid
+    ? await voiceRepo.hasBookingEventForCall({
+        businessId: input.businessId,
+        callLogId,
+        callSid,
+      })
+    : false;
 
   const profile = await resolveAssistantProfile(admin, input.businessId);
   const contact = await loadContactSnapshot(
@@ -105,9 +126,10 @@ async function runVoiceTurnOrchestration(input: {
     bookingSetup,
   );
   const bookingPagesText = formatBookingPagesForAiPrompt(bookingPages);
-  const availabilityText = calendarBookingEnabled
-    ? await formatAvailabilityForAiPrompt(input.businessId)
-    : "";
+  const availabilityText =
+    calendarBookingEnabled && !alreadyBookedThisCall
+      ? await formatAvailabilityForAiPrompt(input.businessId)
+      : "";
 
   const conversationHistory = input.conversationHistory.map((turn) => ({
     role: turn.role,
@@ -119,7 +141,7 @@ async function runVoiceTurnOrchestration(input: {
     message: input.clientMessage,
     conversationHistory,
     contact,
-    calendarBookingEnabled,
+    calendarBookingEnabled: calendarBookingEnabled && !alreadyBookedThisCall,
     googleCalendarConnected: calendarConnected,
     bookableResourcesText,
     bookingPagesText,
@@ -139,6 +161,20 @@ async function runVoiceTurnOrchestration(input: {
     return;
   }
 
+  let plan = applyAgentPermissionsToPlan(
+    orchestratorResponseToExecutorPlan(orchestrationResult.data),
+    profile,
+  );
+
+  if (alreadyBookedThisCall) {
+    plan = {
+      ...plan,
+      actions: plan.actions.filter(
+        (action) => action.type !== "create_calendar_event",
+      ),
+    };
+  }
+
   const executorResult = await applyPreparedExecutorPlan({
     admin,
     businessId: input.businessId,
@@ -148,25 +184,18 @@ async function runVoiceTurnOrchestration(input: {
     clientMessage: input.clientMessage,
     agent: null,
     routingMethod: "none",
-    plan: applyAgentPermissionsToPlan(
-      orchestratorResponseToExecutorPlan(orchestrationResult.data),
-      profile,
-    ),
+    plan,
   });
 
-  if (
-    input.callSid?.trim() &&
-    executorResult.actionsApplied.some((action) =>
-      /^booking confirmed/i.test(action.trim()),
-    )
-  ) {
-    const repo = getVoiceRepository();
-    const callLog = await repo.findCallLogByExternalCallId(input.callSid);
+  const booked = executorResult.actionsApplied.some((action) =>
+    /^booking confirmed/i.test(action.trim()),
+  );
 
-    await repo.insertCallEvent({
+  if (callSid && booked) {
+    await voiceRepo.insertCallEvent({
       businessId: input.businessId,
-      callLogId: callLog?.id ?? null,
-      callSid: input.callSid,
+      callLogId,
+      callSid,
       eventType: "voice_live.booking.created",
       actorType: "ai",
       payload: {

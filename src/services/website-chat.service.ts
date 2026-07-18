@@ -28,6 +28,7 @@ import {
   resolveInboundConversation,
 } from "@/services/messaging.service";
 import { WEBSITE_CHAT_DEFAULT_APPEARANCE } from "@/features/website-chat/widget-appearance";
+import { normalizePhoneNumber } from "@/utils/whatsapp";
 import type {
   EnableWebsiteChatInput,
   EnableWebsiteChatResult,
@@ -571,10 +572,112 @@ export async function processWebsiteChatMessage(
     clientMessage: input.message.trim(),
   });
 
+  await maybeScheduleWebsiteChatOutboundCall({
+    admin,
+    businessId: connection.business_id,
+    contactId: context.contactId,
+    message: input.message.trim(),
+    optionalPhone: input.phone,
+  });
+
   return {
     success: true,
     data: mapWebsiteChatWidgetMessage(insertResult.message),
   };
+}
+
+function extractCallablePhoneFromText(text: string): string | null {
+  const candidates = text.match(/(?:\+|00)?[\d][\d\s\-().]{7,20}\d/g) ?? [];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePhoneNumber(candidate);
+    const digits = normalized.replace(/\D/g, "");
+    if (digits.length >= 9 && digits.length <= 15) {
+      return normalized.startsWith("+") ? normalized : `+${digits}`;
+    }
+  }
+
+  return null;
+}
+
+async function maybeScheduleWebsiteChatOutboundCall(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  businessId: string;
+  contactId: string;
+  message: string;
+  optionalPhone?: string | null;
+}): Promise<void> {
+  const fromField = input.optionalPhone?.trim()
+    ? normalizePhoneNumber(input.optionalPhone)
+    : null;
+  const fromMessage = extractCallablePhoneFromText(input.message);
+  const rawPhone = fromField || fromMessage;
+
+  if (!rawPhone) {
+    return;
+  }
+
+  const digits = rawPhone.replace(/\D/g, "");
+  if (digits.length < 9 || digits.length > 15) {
+    return;
+  }
+
+  const phoneNumber = rawPhone.startsWith("+") ? rawPhone : `+${digits}`;
+
+  if (
+    phoneNumber.startsWith("webchat:") ||
+    phoneNumber.startsWith("web:") ||
+    phoneNumber === "website-form-lead"
+  ) {
+    return;
+  }
+
+  const { data: current } = await input.admin
+    .from("contacts")
+    .select("id, phone_number")
+    .eq("id", input.contactId)
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  if (!current) {
+    return;
+  }
+
+  const currentPhone = current.phone_number?.trim() ?? "";
+  const isPlaceholder =
+    !currentPhone ||
+    currentPhone.startsWith("webchat:") ||
+    currentPhone.startsWith("web:");
+
+  // Only trigger outbound the first time we learn a real phone for this chat lead.
+  if (!isPlaceholder) {
+    return;
+  }
+
+  const { data: conflict } = await input.admin
+    .from("contacts")
+    .select("id")
+    .eq("business_id", input.businessId)
+    .eq("phone_number", phoneNumber)
+    .neq("id", input.contactId)
+    .maybeSingle();
+
+  if (!conflict) {
+    await input.admin
+      .from("contacts")
+      .update({ phone_number: phoneNumber })
+      .eq("id", input.contactId)
+      .eq("business_id", input.businessId);
+  }
+
+  const { scheduleOutboundCallAfterOrder } = await import(
+    "@/services/voice-agent.service"
+  );
+  await scheduleOutboundCallAfterOrder({
+    businessId: input.businessId,
+    contactId: input.contactId,
+    phoneNumber,
+  });
 }
 
 export async function getWebsiteChatConfigByToken(

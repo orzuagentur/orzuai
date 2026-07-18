@@ -607,6 +607,7 @@ export async function scheduleOutboundCallAfterOrder(input: {
       contactId: input.contactId,
       phoneNumber: input.phoneNumber,
       triggerReason: "order_callback",
+      requireAiAssistant: true,
     });
     return;
   }
@@ -642,6 +643,7 @@ export async function processVoiceCallQueue(): Promise<{
         contactId: item.contact_id,
         phoneNumber: item.phone_number,
         triggerReason: item.trigger_reason,
+        requireAiAssistant: item.trigger_reason === "order_callback",
       });
     } catch (error) {
       console.error(

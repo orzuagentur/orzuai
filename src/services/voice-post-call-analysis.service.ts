@@ -523,7 +523,7 @@ export async function syncVoicePostCallToCrm(
 
   if (!summary && actionItems.length === 0) {
     return {
-      status: "skipped",
+      status: "retry",
       message: "No post-call CRM summary or actions are available yet.",
       payload: { reason: "analysis_missing" },
     };
@@ -577,10 +577,100 @@ export async function syncVoicePostCallToCrm(
     throw new Error(updateError.message);
   }
 
+  const createdTasks: string[] = [];
+  for (const item of actionItems.slice(0, 5)) {
+    const title = item.title.trim().slice(0, 200);
+    if (!title) {
+      continue;
+    }
+
+    const { data: existingTask } = await admin
+      .from("crm_tasks")
+      .select("id")
+      .eq("business_id", context.businessId)
+      .eq("contact_id", context.contactId)
+      .ilike("title", title)
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingTask) {
+      continue;
+    }
+
+    const { error: taskError } = await admin.from("crm_tasks").insert({
+      business_id: context.businessId,
+      contact_id: context.contactId,
+      title,
+      status: "open",
+      due_at: null,
+    });
+
+    if (!taskError) {
+      createdTasks.push(title);
+    }
+  }
+
+  // Ensure there is an open deal after a sales-oriented call outcome.
+  let dealTouched: string | null = null;
+  const outcome = summary?.outcome?.toLowerCase() ?? "";
+  const wantsDeal =
+    /\b(sale|sales|deal|quote|purchase|order|interested)\b/i.test(
+      `${summary?.summary ?? ""} ${outcome}`,
+    ) || actionItems.some((item) => /\b(deal|quote|sale|order)\b/i.test(item.title));
+
+  if (wantsDeal) {
+    const { data: openDeal } = await admin
+      .from("crm_deals")
+      .select("id, title")
+      .eq("business_id", context.businessId)
+      .eq("contact_id", context.contactId)
+      .not("status", "eq", "lost")
+      .not("status", "eq", "won")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (openDeal) {
+      dealTouched = `updated:${openDeal.id}`;
+      await admin
+        .from("crm_deals")
+        .update({
+          notes: note.slice(0, 2000),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", openDeal.id)
+        .eq("business_id", context.businessId);
+    } else {
+      const dealTitle =
+        (summary?.summary ?? "Voice call opportunity").trim().slice(0, 200) ||
+        "Voice call opportunity";
+      const { data: insertedDeal, error: dealError } = await admin
+        .from("crm_deals")
+        .insert({
+          business_id: context.businessId,
+          contact_id: context.contactId,
+          title: dealTitle,
+          stage: "new",
+          status: "open",
+          notes: note.slice(0, 2000),
+          is_primary: false,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (!dealError && insertedDeal) {
+        dealTouched = `created:${insertedDeal.id}`;
+      }
+    }
+  }
+
   const payload = {
     contactId: context.contactId,
     summary: summary?.summary ?? null,
     actionItems,
+    createdTasks,
+    dealTouched,
   };
 
   await repo.insertCallEvent({
@@ -611,14 +701,13 @@ export async function createVoicePostCallBooking(
   }
 
   const repo = getVoiceRepository();
-  const events = await repo.listCallEvents(context.businessId, context.callLogId);
+  const alreadyBooked = await repo.hasBookingEventForCall({
+    businessId: context.businessId,
+    callLogId: context.callLogId,
+    callSid: context.callSid,
+  });
 
-  if (
-    events.some((event) =>
-      event.event_type === "voice_post_call.booking.created" ||
-      event.event_type === "voice_live.booking.created",
-    )
-  ) {
+  if (alreadyBooked) {
     return {
       status: "completed",
       message: "Booking already created for this call.",

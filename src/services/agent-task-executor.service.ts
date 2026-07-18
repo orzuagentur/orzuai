@@ -1213,6 +1213,166 @@ async function hasRecentDeal(
   return Boolean(data?.length);
 }
 
+async function findOpenDealForContact(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  dealId?: string,
+  title?: string,
+): Promise<{ id: string; title: string } | null> {
+  if (dealId) {
+    const { data } = await admin
+      .from("crm_deals")
+      .select("id, title")
+      .eq("id", dealId)
+      .eq("business_id", businessId)
+      .eq("contact_id", contactId)
+      .maybeSingle();
+    return data ? { id: String(data.id), title: String(data.title ?? "") } : null;
+  }
+
+  if (title?.trim()) {
+    const { data } = await admin
+      .from("crm_deals")
+      .select("id, title")
+      .eq("business_id", businessId)
+      .eq("contact_id", contactId)
+      .ilike("title", title.trim())
+      .not("status", "eq", "lost")
+      .not("status", "eq", "won")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      return { id: String(data.id), title: String(data.title ?? "") };
+    }
+  }
+
+  const { data: primary } = await admin
+    .from("crm_deals")
+    .select("id, title")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .eq("is_primary", true)
+    .not("status", "eq", "lost")
+    .not("status", "eq", "won")
+    .maybeSingle();
+
+  if (primary) {
+    return { id: String(primary.id), title: String(primary.title ?? "") };
+  }
+
+  const { data: latest } = await admin
+    .from("crm_deals")
+    .select("id, title")
+    .eq("business_id", businessId)
+    .eq("contact_id", contactId)
+    .not("status", "eq", "lost")
+    .not("status", "eq", "won")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return latest
+    ? { id: String(latest.id), title: String(latest.title ?? "") }
+    : null;
+}
+
+async function applyUpdateDeal(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "update_deal" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+  },
+): Promise<string | null> {
+  const deal = await findOpenDealForContact(
+    admin,
+    businessId,
+    contactId,
+    action.dealId,
+    action.title,
+  );
+
+  if (!deal) {
+    return null;
+  }
+
+  const fingerprint = [
+    action.dealId ?? deal.id,
+    action.title ?? "",
+    action.value ?? "",
+    action.stage ?? "",
+    action.notes ?? "",
+  ].join(":");
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "update_deal",
+    actionFingerprint: fingerprint,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const patch: {
+    updated_at: string;
+    title?: string;
+    value?: number;
+    stage?: string;
+    status?: string;
+    notes?: string;
+  } = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (action.title?.trim()) {
+    patch.title = action.title.trim();
+  }
+  if (action.value != null) {
+    patch.value = action.value;
+  }
+  if (action.stage) {
+    patch.stage = action.stage;
+    patch.status = mapDealStatus(action.stage);
+  }
+  if (action.notes?.trim()) {
+    patch.notes = action.notes.trim();
+  }
+
+  if (Object.keys(patch).length <= 1) {
+    return null;
+  }
+
+  const { error } = await admin
+    .from("crm_deals")
+    .update(patch)
+    .eq("id", deal.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "update_deal",
+  });
+
+  const parts = [
+    action.title?.trim() || deal.title,
+    action.value != null ? `value ${action.value}` : null,
+    action.stage ? `stage ${action.stage}` : null,
+  ].filter(Boolean);
+
+  return `Deal updated: ${parts.join(" · ")}`;
+}
+
 async function applyCreateDeal(
   admin: MessagingDbClient,
   businessId: string,
@@ -1227,6 +1387,50 @@ async function applyCreateDeal(
 
   if (GENERIC_DEAL_TITLES.has(title.toLowerCase())) {
     return null;
+  }
+
+  // Prefer updating an existing open deal instead of creating duplicates.
+  const existingOpen = await findOpenDealForContact(
+    admin,
+    businessId,
+    contactId,
+    undefined,
+    title,
+  );
+
+  if (existingOpen) {
+    return applyUpdateDeal(
+      admin,
+      businessId,
+      contactId,
+      {
+        type: "update_deal",
+        dealId: existingOpen.id,
+        title,
+        value: action.value,
+        stage: action.stage,
+        notes: action.notes,
+      },
+      idempotencyContext,
+    );
+  }
+
+  const anyOpen = await findOpenDealForContact(admin, businessId, contactId);
+  if (anyOpen) {
+    return applyUpdateDeal(
+      admin,
+      businessId,
+      contactId,
+      {
+        type: "update_deal",
+        dealId: anyOpen.id,
+        title,
+        value: action.value,
+        stage: action.stage,
+        notes: action.notes,
+      },
+      idempotencyContext,
+    );
   }
 
   const idempotencyKey = buildCrmActionIdempotencyKey({
@@ -1421,11 +1625,7 @@ async function applyCreateCalendarEvent(
   });
 
   if (!bookingResult.success) {
-    await recordCrmIdempotencyKey(admin, {
-      businessId,
-      idempotencyKey,
-      actionType: "create_calendar_event",
-    });
+    // Do not lock the fingerprint on failure — allow a corrected retry.
     return `Booking not confirmed: ${bookingResult.message}`;
   }
 
@@ -1546,9 +1746,15 @@ async function applyExecutorPlan(
     // Soft gate: delay deal/booking until required collection is complete.
     if (
       !requiredComplete &&
-      (action.type === "create_deal" || action.type === "create_calendar_event")
+      (action.type === "create_deal" ||
+        action.type === "update_deal" ||
+        action.type === "create_calendar_event")
     ) {
-      skipped.push(`${action.type} (waiting for required data)`);
+      if (action.type === "create_calendar_event") {
+        applied.push("Booking not confirmed: waiting for required customer data");
+      } else {
+        skipped.push(`${action.type} (waiting for required data)`);
+      }
       continue;
     }
 
@@ -1564,6 +1770,14 @@ async function applyExecutorPlan(
       );
     } else if (action.type === "create_deal") {
       result = await applyCreateDeal(
+        admin,
+        businessId,
+        workingContact.id,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "update_deal") {
+      result = await applyUpdateDeal(
         admin,
         businessId,
         workingContact.id,
@@ -1810,11 +2024,13 @@ async function executePlanOnContact(input: {
       });
     }
 
-    await recordCrmIdempotencyKey(input.admin, {
-      businessId: input.businessId,
-      idempotencyKey: planIdempotencyKey,
-      actionType: "executor_plan",
-    });
+    if (!bookingFailed) {
+      await recordCrmIdempotencyKey(input.admin, {
+        businessId: input.businessId,
+        idempotencyKey: planIdempotencyKey,
+        actionType: "executor_plan",
+      });
+    }
 
     console.info(
       "[agent-executor]",

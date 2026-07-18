@@ -10,11 +10,14 @@ import {
 } from "@/services/push-notifications.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import {
+  BOOKING_SUCCESS_ACTION_PATTERNS,
   buildBookingFailureFollowUp,
   filterCustomerVisibleActionLabels,
   messagesAreLikelyDuplicates,
+  normalizeText,
   sanitizeCustomerFacingSummary,
   shouldSendCustomerActionFollowUp,
+  summaryLooksLikeBookingConfirmation,
 } from "@/utils/customer-facing-agent-summary";
 
 type MessagingDbClient = SupabaseClient<Database>;
@@ -47,9 +50,18 @@ export function buildCustomerFacingActionSummary(input: {
     return bookingFailure;
   }
 
+  const hasBookingSuccess = input.actionsApplied.some((label) =>
+    BOOKING_SUCCESS_ACTION_PATTERNS.some((pattern) =>
+      pattern.test(normalizeText(label)),
+    ),
+  );
+
   const custom = sanitizeCustomerFacingSummary(input.clientSummary);
 
-  if (custom) {
+  // Never tell the customer a booking is confirmed unless a real booking write succeeded.
+  if (custom && summaryLooksLikeBookingConfirmation(custom) && !hasBookingSuccess) {
+    // Fall through to visible action labels (or null).
+  } else if (custom) {
     return custom;
   }
 
