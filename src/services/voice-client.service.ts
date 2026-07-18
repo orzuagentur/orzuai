@@ -8,10 +8,7 @@ import {
   createTwilioVoiceAccessToken,
 } from "@/lib/twilio/access-token";
 import {
-  createTwilioOutboundCallWithTwiml,
   listTwilioIncomingPhoneNumbers,
-  type TwilioApiCredentials,
-  TwilioApiRequestError,
   verifyTwilioApiKeyCredentials,
 } from "@/lib/twilio/client";
 import {
@@ -21,9 +18,8 @@ import {
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
 import { buildVoiceAgentClientIdentity } from "@/lib/twilio/client-identity";
 import {
-  buildConferenceStatusCallbackUrl,
-  buildDialConferenceTwiml,
   buildDialClientTwiml,
+  buildDialPhoneNumberTwiml,
   buildRecordingStatusCallbackUrl,
   buildStaticSayTwiml,
   mapVoiceLanguageToTwilioLocale,
@@ -37,11 +33,7 @@ import {
 } from "@/services/twilio-integration.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { recordClientOutboundVoiceCall, markInboundCallAiFallback } from "@/services/voice-inbox.service";
-import { recordCustomerOutboundLeg } from "@/services/voice-outbound-cancel.service";
 import { resolveRecordingCallbackUrl } from "@/services/voice-recording.service";
-
-const CONFERENCE_WAIT_URL =
-  "http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical";
 
 export type VoiceClientConfig = {
   enabled: boolean;
@@ -251,108 +243,12 @@ async function resolveBrowserPhoneCallerId(
   }
 }
 
-function buildOutboundConferenceName(input: {
-  businessId: string;
-  callSid: string;
-}): string {
-  const businessPart = input.businessId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
-  const callPart = input.callSid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 34);
-  return `orzux-${businessPart}-${callPart}`.slice(0, 80);
-}
-
-function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
-  if (error instanceof TwilioApiRequestError) {
-    const message = error.message.toLowerCase();
-
-    if (error.code === 21215 || error.code === 13227) {
-      return "This destination country is blocked in Twilio Voice Geo Permissions on the OrzuX platform Twilio account used for Browser Phone. Open that account in Twilio Console → Voice → Geo Permissions, enable the country, save, and retry.";
-    }
-
-    if (
-      error.code === 21216
-      || error.code === 13225
-      || message.includes("primary customer profile")
-      || message.includes("trust hub")
-    ) {
-      return "Twilio blocked this call to a plus-one destination. Approve a Business Primary Customer Profile in Trust Hub on the OrzuX platform Twilio account, then retry.";
-    }
-
-    if (
-      message.includes("not allowed to call")
-      || message.includes("geo permission")
-    ) {
-      return "This destination country is blocked in Twilio Voice Geo Permissions on the account that places the call. Enable the country, save, and retry.";
-    }
-
-    if (error.code === 21211 || message.includes("invalid 'to' phone number")) {
-      return "The destination phone number is invalid.";
-    }
-
-    if (
-      message.includes("unverified")
-      || message.includes("verified numbers")
-    ) {
-      return "Twilio trial accounts can only call verified numbers. Verify the destination number in Twilio Console or upgrade the account.";
-    }
-
-    if (message.includes("fraud") || message.includes("blocked")) {
-      return "Twilio blocked this outbound call. Check Twilio Monitor alerts and Fraud Guard settings.";
-    }
-
-    return `Unable to connect the customer call. ${error.message}`;
-  }
-
-  if (error instanceof Error && error.message.trim()) {
-    return `Unable to connect the customer call. ${error.message}`;
-  }
-
-  return "Unable to connect the customer call.";
-}
-
-function buildBrowserPhoneRestCredentials(
-  config: Awaited<ReturnType<typeof resolveTwilioBrowserPhoneRuntimeConfig>>,
-): TwilioApiCredentials | null {
-  if (!config) {
-    return null;
-  }
-
-  if (config.mode === "customer") {
-    return {
-      accountSid: config.accountSid,
-      authToken: config.authToken,
-      apiKeySid: config.apiKeySid,
-      apiKeySecret: config.apiKeySecret,
-    };
-  }
-
-  return {
-    accountSid: config.accountSid,
-    authToken: config.authToken,
-  };
-}
-
-async function resolveSoftphoneCustomerLeg(input: {
-  businessId: string;
+async function resolveSoftphoneCallerId(input: {
   browserPhone: NonNullable<
     Awaited<ReturnType<typeof resolveTwilioBrowserPhoneRuntimeConfig>>
   >;
   preferredCallerId: string;
-}): Promise<{
-  credentials: TwilioApiCredentials;
-  callerId: string;
-  dialAccount: "connect" | "platform" | "customer";
-} | null> {
-  // Conference names are account-scoped. Softphone Client calls always run on
-  // the browserPhone account (platform for Connect). The PSTN customer leg MUST
-  // be created on that same account or both sides hear hold music forever and
-  // never bridge.
-  void input.businessId;
-
-  const credentials = buildBrowserPhoneRestCredentials(input.browserPhone);
-  if (!credentials) {
-    return null;
-  }
-
+}): Promise<{ callerId: string; dialAccount: "platform" | "customer" } | null> {
   const callerId = await resolveBrowserPhoneOutboundCallerId({
     mode: input.browserPhone.mode,
     preferredCallerId: input.preferredCallerId,
@@ -363,7 +259,6 @@ async function resolveSoftphoneCustomerLeg(input: {
   }
 
   return {
-    credentials,
     callerId,
     dialAccount: input.browserPhone.mode === "customer" ? "customer" : "platform",
   };
@@ -413,18 +308,9 @@ export async function buildClientOutboundTwiml(input: {
   }
 
   const parentCallSid = input.callSid.trim();
-  const conferenceName = buildOutboundConferenceName({
-    businessId: input.businessId,
-    callSid: parentCallSid,
-  });
-  const conferenceStatusCallback = buildConferenceStatusCallbackUrl({
-    businessId: input.businessId,
-    parentCallSid,
-  });
   const recordingCallback = settings.recordingEnabled
     ? buildRecordingStatusCallbackUrl(input.businessId, parentCallSid)
     : null;
-  const webhooks = buildVoiceWebhookUrls(input.businessId);
   const callLog = await recordClientOutboundVoiceCall({
     businessId: input.businessId,
     phoneNumber: to,
@@ -440,83 +326,35 @@ export async function buildClientOutboundTwiml(input: {
     });
   }
 
-  const customerLeg = await resolveSoftphoneCustomerLeg({
-    businessId: input.businessId,
+  const customerLeg = await resolveSoftphoneCallerId({
     browserPhone,
     preferredCallerId: phoneNumber,
   });
 
   if (!customerLeg) {
     return buildStaticSayTwiml({
-      speech: "Browser calling is missing a valid caller ID.",
+      speech: "Browser calling is missing a valid caller ID on the OrzuX platform Twilio account.",
       speechLocale,
     });
   }
 
-  const customerTwiml = buildDialConferenceTwiml({
-    conferenceName,
-    participantLabel: "customer",
-    statusCallbackUrl: conferenceStatusCallback,
-    startConferenceOnEnter: false,
-    endConferenceOnExit: true,
-    waitUrl: CONFERENCE_WAIT_URL,
-  });
-
-  try {
-    const customerCallSid = await createTwilioOutboundCallWithTwiml({
-      credentials: customerLeg.credentials,
+  // Direct Dial keeps operator + customer on the same Client call account.
+  // Conference REST legs previously split Connect vs platform and never bridged.
+  console.info(
+    "[voice-client] softphone direct dial",
+    JSON.stringify({
+      businessId: input.businessId,
+      parentCallSid,
+      callLogId: callLog.callLogId,
+      dialAccount: customerLeg.dialAccount,
       from: customerLeg.callerId,
       to,
-      twiml: customerTwiml,
-      statusCallbackUrl: webhooks.customerLegStatusCallbackUrl(parentCallSid),
-    });
+    }),
+  );
 
-    console.info(
-      "[voice-client] conference customer leg created",
-      JSON.stringify({
-        businessId: input.businessId,
-        parentCallSid,
-        customerCallSid,
-        callLogId: callLog.callLogId,
-        dialAccount: customerLeg.dialAccount,
-        from: customerLeg.callerId,
-        to,
-      }),
-    );
-
-    await recordCustomerOutboundLeg({
-      businessId: input.businessId,
-      callLogId: callLog.callLogId,
-      parentCallSid,
-      customerCallSid,
-      phoneNumber: to,
-    });
-  } catch (error) {
-    console.error(
-      "[voice-client] conference customer leg failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        parentCallSid,
-        dialAccount: customerLeg.dialAccount,
-        from: customerLeg.callerId,
-        to,
-        code: error instanceof TwilioApiRequestError ? error.code : null,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
-    );
-
-    return buildStaticSayTwiml({
-      speech: resolveOutboundCustomerLegErrorSpeech(error),
-      speechLocale,
-    });
-  }
-
-  return buildDialConferenceTwiml({
-    conferenceName,
-    participantLabel: "operator",
-    statusCallbackUrl: conferenceStatusCallback,
-    startConferenceOnEnter: true,
-    endConferenceOnExit: true,
+  return buildDialPhoneNumberTwiml({
+    callerId: customerLeg.callerId,
+    toNumber: to,
     recordingStatusCallback: recordingCallback,
   });
 }
