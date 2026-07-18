@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  AlertTriangleIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   KeyRoundIcon,
@@ -43,6 +44,7 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type {
   TwilioAvailablePhoneNumber,
+  TwilioNumberDiagnostics,
   TwilioPhoneNumberOption,
 } from "@/types/twilio-integration.types";
 import type {
@@ -56,6 +58,7 @@ type VoiceActivatePanelProps = {
   settings: VoiceAgentSettings;
   config: VoiceConnectConfig;
   availablePhoneNumbers: TwilioPhoneNumberOption[];
+  diagnostics?: TwilioNumberDiagnostics | null;
   hasBusiness: boolean;
   embeddedInHub?: boolean;
 };
@@ -68,11 +71,138 @@ function formatDateTime(value: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function TwilioDiagnosticsSection({
+  diagnostics,
+}: {
+  diagnostics?: TwilioNumberDiagnostics | null;
+}) {
+  if (!diagnostics) {
+    return null;
+  }
+
+  const fields = [
+    ...diagnostics.numberFields,
+    ...diagnostics.browserAppFields,
+  ];
+  const mismatches = fields.filter((field) => field.ok === false);
+  const hasErrors =
+    diagnostics.status === "error" || diagnostics.status === "warning";
+  const Icon = hasErrors ? AlertTriangleIcon : CheckCircle2Icon;
+
+  return (
+    <div
+      className={cn(
+        "space-y-4 rounded-lg border p-4 text-sm",
+        diagnostics.status === "error"
+          ? "border-destructive/40 bg-destructive/5"
+          : diagnostics.status === "warning"
+            ? "border-amber-300 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20"
+            : "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20",
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <Icon
+            className={cn(
+              "mt-0.5 size-5 shrink-0",
+              hasErrors ? "text-amber-600" : "text-emerald-600",
+            )}
+          />
+          <div className="min-w-0 space-y-1">
+            <p className="font-medium">Twilio diagnostics</p>
+            <p className="text-muted-foreground">{diagnostics.summary}</p>
+          </div>
+        </div>
+        <Badge
+          variant={diagnostics.status === "error" ? "destructive" : "outline"}
+          className="capitalize"
+        >
+          {diagnostics.status}
+        </Badge>
+      </div>
+
+      <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+        <p>
+          Connected account:{" "}
+          <span className="font-medium text-foreground">
+            {diagnostics.connectedAccountSid ?? "not available"}
+          </span>
+        </p>
+        <p>
+          Phone SID:{" "}
+          <span className="font-medium text-foreground">
+            {diagnostics.selectedPhoneSid ?? "not selected"}
+          </span>
+        </p>
+        <p>
+          Browser TwiML App:{" "}
+          <span className="font-medium text-foreground">
+            {diagnostics.browserTwimlAppSid ?? "not configured"}
+          </span>
+        </p>
+        <p>
+          Selected number:{" "}
+          <span className="font-medium text-foreground">
+            {diagnostics.selectedPhoneNumber ?? "not selected"}
+          </span>
+        </p>
+      </div>
+
+      {mismatches.length > 0 ? (
+        <div className="space-y-2">
+          <p className="font-medium">Webhook mismatches</p>
+          <div className="space-y-2">
+            {mismatches.map((field) => (
+              <div
+                key={`${field.label}-${field.expected ?? ""}`}
+                className="rounded-md border bg-background/80 p-3"
+              >
+                <p className="font-medium">{field.label}</p>
+                <p className="mt-1 break-all text-xs text-muted-foreground">
+                  Current: {field.value || "empty"}
+                </p>
+                <p className="mt-1 break-all text-xs text-muted-foreground">
+                  Expected: {field.expected || "empty"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {diagnostics.errorLogs.length > 0 ? (
+        <div className="space-y-2">
+          <p className="font-medium">Recent Twilio errors</p>
+          <div className="space-y-2">
+            {diagnostics.errorLogs.slice(0, 3).map((item) => (
+              <div key={item.sid} className="rounded-md border bg-background/80 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{item.errorCode ?? "Twilio"}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDateTime(item.dateCreated)}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-medium">{item.diagnosis}</p>
+                {item.requestUrl ? (
+                  <p className="mt-1 break-all text-xs text-muted-foreground">
+                    {item.requestMethod ?? "POST"} {item.requestUrl}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function VoiceActivatePanel({
   connection,
   settings,
   config,
   availablePhoneNumbers,
+  diagnostics,
   hasBusiness,
   embeddedInHub = false,
 }: VoiceActivatePanelProps) {
@@ -500,6 +630,8 @@ export function VoiceActivatePanel({
                 {formatDateTime(connection.lastSyncedAt)}
               </p>
             </div>
+
+            <TwilioDiagnosticsSection diagnostics={diagnostics} />
 
             <div className="flex flex-wrap gap-2">
               <Button

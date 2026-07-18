@@ -7,6 +7,7 @@ export function buildMediaStreamConnectTwiml(input: {
   callSid: string;
   direction: "inbound" | "outbound";
   triggerReason?: string | null;
+  callLogId?: string | null;
   recordingStatusCallback?: string | null;
 }): string {
   const streamToken = signVoiceStreamToken({
@@ -18,6 +19,9 @@ export function buildMediaStreamConnectTwiml(input: {
     `<Parameter name="businessId" value="${escapeXmlAttr(input.businessId)}" />`,
     `<Parameter name="direction" value="${escapeXmlAttr(input.direction)}" />`,
     `<Parameter name="callSid" value="${escapeXmlAttr(input.callSid)}" />`,
+    input.callLogId?.trim()
+      ? `<Parameter name="callLogId" value="${escapeXmlAttr(input.callLogId.trim())}" />`
+      : "",
     streamToken
       ? `<Parameter name="streamToken" value="${escapeXmlAttr(streamToken)}" />`
       : "",
@@ -32,6 +36,7 @@ export function buildMediaStreamConnectTwiml(input: {
     wsUrl: input.wsUrl,
     businessId: input.businessId,
     callSid: input.callSid,
+    callLogId: input.callLogId,
     streamToken,
   });
 
@@ -51,11 +56,16 @@ function buildSignedStreamUrl(input: {
   wsUrl: string;
   businessId: string;
   callSid: string;
+  callLogId?: string | null;
   streamToken: string | null;
 }): string {
   const url = new URL(input.wsUrl.trim());
   url.searchParams.set("businessId", input.businessId);
   url.searchParams.set("callSid", input.callSid);
+
+  if (input.callLogId?.trim()) {
+    url.searchParams.set("callLogId", input.callLogId.trim());
+  }
 
   if (input.streamToken) {
     url.searchParams.set("streamToken", input.streamToken);

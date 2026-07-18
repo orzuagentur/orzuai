@@ -20,7 +20,7 @@ import {
   mapVoiceLanguageToTwilioLocale,
   sanitizeForSpeech,
 } from "@/lib/voice/twiml";
-import { isVoiceStreamEnabled, getVoiceStreamWsUrl } from "@/lib/voice/stream-config";
+import { isVoiceStreamEnabledAsync, getVoiceStreamWsUrl } from "@/lib/voice/stream-config";
 import { buildMediaStreamConnectTwiml } from "@/lib/voice/stream-twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
@@ -46,6 +46,7 @@ import { markVoiceCallCompleted } from "@/services/voice-inbox.service";
 import {
   getTwilioConnection,
   isBrowserPhoneSupportedForTwilioConnection,
+  resolveTwilioWebhookValidationContext,
 } from "@/services/twilio-integration.service";
 import {
   applyCallRecordingToTwiml,
@@ -664,6 +665,7 @@ export async function buildVoiceConversationTwiml(input: {
   triggerReason?: string | null;
   forceAi?: boolean;
   callSid?: string | null;
+  callLogId?: string | null;
 }): Promise<string> {
   const settings = await getVoiceAgentSettings(input.businessId);
   const phoneVoice = await loadPhoneVoiceSettings(input.businessId);
@@ -681,11 +683,17 @@ export async function buildVoiceConversationTwiml(input: {
     );
   }
 
-  const twilioConnection = await getTwilioConnection(input.businessId);
-  const mediaStreamAllowed =
-    isBrowserPhoneSupportedForTwilioConnection(twilioConnection);
+  const twilioValidation = await resolveTwilioWebhookValidationContext(
+    input.businessId,
+  );
+  const mediaStreamAllowed = Boolean(twilioValidation?.authToken);
 
-  if (mediaStreamAllowed && isVoiceStreamEnabled() && realCallSid && phoneVoice.voiceId) {
+  if (
+    mediaStreamAllowed &&
+    (await isVoiceStreamEnabledAsync()) &&
+    realCallSid &&
+    phoneVoice.voiceId
+  ) {
     const wsBase = getVoiceStreamWsUrl();
     if (wsBase) {
       const wsUrl = `${wsBase.replace(/\/$/, "")}/voice/stream`;
@@ -699,6 +707,7 @@ export async function buildVoiceConversationTwiml(input: {
           callSid: realCallSid,
           direction: input.direction,
           triggerReason: input.triggerReason,
+          callLogId: input.callLogId,
           recordingStatusCallback: recordingCallback,
         }),
       );

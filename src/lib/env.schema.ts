@@ -19,6 +19,26 @@ const resendFromEmailSchema = z
     return z.string().email().safeParse(email).success;
   }, "RESEND_FROM_EMAIL must be a valid email or 'Name <email@domain.com>' format");
 
+function emptyStringToUndefined(value: unknown): unknown {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+
+  return value;
+}
+
+const optionalEnvString = z.preprocess(
+  emptyStringToUndefined,
+  z.string().trim().min(1).optional(),
+);
+
+function optionalEnvStringMin(min: number) {
+  return z.preprocess(
+    emptyStringToUndefined,
+    z.string().trim().min(min).optional(),
+  );
+}
+
 export const clientEnvSchema = z.object({
   [ENV_KEYS.NEXT_PUBLIC_APP_URL]: z
     .string()
@@ -32,17 +52,9 @@ export const clientEnvSchema = z.object({
     .string()
     .trim()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
-  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
-  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
+  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: optionalEnvString,
+  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: optionalEnvString,
+  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: optionalEnvString,
 });
 
 export const serverEnvSchema = z.object({
@@ -60,30 +72,18 @@ export const serverEnvSchema = z.object({
     .string()
     .trim()
     .min(1, "GEMINI_API_KEY is required"),
-  [ENV_KEYS.GEMINI_DEFAULT_MODEL]: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
-  [ENV_KEYS.GOOGLE_CLIENT_ID]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.GOOGLE_CLIENT_SECRET]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.WHATSAPP_VERIFY_TOKEN]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.WHATSAPP_APP_SECRET]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.WHATSAPP_API_VERSION]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
-  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: z
-    .string()
-    .trim()
-    .min(1)
-    .optional(),
-  [ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]: z.string().trim().min(1).optional(),
-  [ENV_KEYS.CRON_SECRET]: z.string().trim().min(16).optional(),
+  [ENV_KEYS.GEMINI_DEFAULT_MODEL]: optionalEnvString,
+  [ENV_KEYS.GOOGLE_CLIENT_ID]: optionalEnvString,
+  [ENV_KEYS.GOOGLE_CLIENT_SECRET]: optionalEnvString,
+  [ENV_KEYS.WHATSAPP_VERIFY_TOKEN]: optionalEnvString,
+  [ENV_KEYS.WHATSAPP_APP_SECRET]: optionalEnvString,
+  [ENV_KEYS.WHATSAPP_API_VERSION]: optionalEnvString,
+  [ENV_KEYS.NEXT_PUBLIC_META_APP_ID]: optionalEnvString,
+  [ENV_KEYS.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID]: optionalEnvString,
+  [ENV_KEYS.NEXT_PUBLIC_INSTAGRAM_EMBEDDED_SIGNUP_CONFIG_ID]: optionalEnvString,
+  [ENV_KEYS.INSTAGRAM_VERIFY_TOKEN]: optionalEnvString,
+  [ENV_KEYS.TELEGRAM_WEBHOOK_SECRET]: optionalEnvString,
+  [ENV_KEYS.CRON_SECRET]: optionalEnvStringMin(16),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
@@ -154,6 +154,102 @@ function formatZodIssues(
   }));
 }
 
+function readTrimmedProcessEnv(key: string): string | undefined {
+  const value = process.env[key]?.trim();
+  return value || undefined;
+}
+
+function collectConfiguredVoiceKeyIssues(keys: readonly string[]): EnvValidationIssue[] {
+  return keys
+    .filter((key) => key in process.env && !readTrimmedProcessEnv(key))
+    .map((key) => ({
+      key,
+      message: `${key} is set but empty. Remove it or provide a real value.`,
+    }));
+}
+
+function collectRequiredSetIssues(input: {
+  name: string;
+  triggerKeys: readonly string[];
+  requiredKeys: readonly string[];
+}): EnvValidationIssue[] {
+  const hasAnyTrigger = input.triggerKeys.some((key) =>
+    Boolean(readTrimmedProcessEnv(key)),
+  );
+
+  if (!hasAnyTrigger) {
+    return [];
+  }
+
+  return input.requiredKeys
+    .filter((key) => !readTrimmedProcessEnv(key))
+    .map((key) => ({
+      key,
+      message: `${key} is required for ${input.name}.`,
+    }));
+}
+
+function collectVoiceReadinessIssues(): EnvValidationIssue[] {
+  const voiceKeys = [
+    ENV_KEYS.TWILIO_ACCOUNT_SID,
+    ENV_KEYS.TWILIO_AUTH_TOKEN,
+    ENV_KEYS.TWILIO_CONNECT_APP_SID,
+    ENV_KEYS.TWILIO_API_KEY_SID,
+    ENV_KEYS.TWILIO_API_KEY_SECRET,
+    ENV_KEYS.TWILIO_TWIML_APP_SID,
+    ENV_KEYS.TWILIO_BROWSER_CALLER_ID,
+    ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET,
+    ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET_PREVIOUS,
+    ENV_KEYS.VOICE_STREAM_WS_URL,
+    ENV_KEYS.VOICE_STREAM_SECRET,
+    ENV_KEYS.ELEVENLABS_API_KEY,
+    ENV_KEYS.DEEPGRAM_API_KEY,
+  ] as const;
+
+  return [
+    ...collectConfiguredVoiceKeyIssues(voiceKeys),
+    ...collectRequiredSetIssues({
+      name: "Twilio Connect webhooks",
+      triggerKeys: [ENV_KEYS.TWILIO_CONNECT_APP_SID],
+      requiredKeys: [
+        ENV_KEYS.TWILIO_CONNECT_APP_SID,
+        ENV_KEYS.TWILIO_ACCOUNT_SID,
+        ENV_KEYS.TWILIO_AUTH_TOKEN,
+      ],
+    }),
+    ...collectRequiredSetIssues({
+      name: "platform Browser Phone",
+      triggerKeys: [
+        ENV_KEYS.TWILIO_API_KEY_SID,
+        ENV_KEYS.TWILIO_API_KEY_SECRET,
+        ENV_KEYS.TWILIO_TWIML_APP_SID,
+      ],
+      requiredKeys: [
+        ENV_KEYS.TWILIO_ACCOUNT_SID,
+        ENV_KEYS.TWILIO_AUTH_TOKEN,
+        ENV_KEYS.TWILIO_API_KEY_SID,
+        ENV_KEYS.TWILIO_API_KEY_SECRET,
+        ENV_KEYS.TWILIO_TWIML_APP_SID,
+      ],
+    }),
+    ...collectRequiredSetIssues({
+      name: "realtime AI voice stream",
+      triggerKeys: [
+        ENV_KEYS.VOICE_STREAM_WS_URL,
+        ENV_KEYS.VOICE_STREAM_SECRET,
+        ENV_KEYS.ELEVENLABS_API_KEY,
+        ENV_KEYS.DEEPGRAM_API_KEY,
+      ],
+      requiredKeys: [
+        ENV_KEYS.VOICE_STREAM_WS_URL,
+        ENV_KEYS.VOICE_STREAM_SECRET,
+        ENV_KEYS.ELEVENLABS_API_KEY,
+        ENV_KEYS.DEEPGRAM_API_KEY,
+      ],
+    }),
+  ];
+}
+
 export function validateEnv(): EnvValidationResult {
   const clientResult = clientEnvSchema.safeParse(collectClientEnv());
   const serverResult = serverEnvSchema.safeParse(collectServerEnv());
@@ -167,7 +263,9 @@ export function validateEnv(): EnvValidationResult {
     issues.push(...formatZodIssues(serverResult.error.issues));
   }
 
-  if (!clientResult.success || !serverResult.success) {
+  issues.push(...collectVoiceReadinessIssues());
+
+  if (!clientResult.success || !serverResult.success || issues.length > 0) {
     return { success: false, issues };
   }
 

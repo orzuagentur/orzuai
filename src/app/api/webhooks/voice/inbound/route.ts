@@ -34,9 +34,11 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
   }
 
+  let callLogId: string | null = null;
+
   return runVoiceTwimlWebhook(async () => {
     try {
-      await recordInboundVoiceCall({
+      callLogId = await recordInboundVoiceCall({
         businessId,
         phoneNumber: params.From ?? "",
         callSid: params.CallSid ?? "",
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
     const twiml = await getInboundVoiceTwiml(
       businessId,
       params.CallSid ?? null,
+      callLogId,
     );
 
     return new NextResponse(twiml, {

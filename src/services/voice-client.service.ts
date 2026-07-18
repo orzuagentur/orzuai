@@ -6,7 +6,6 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
 import {
   createTwilioVoiceAccessToken,
-  hasTwilioVoiceClientEnv,
 } from "@/lib/twilio/access-token";
 import {
   createTwilioOutboundCallWithTwiml,
@@ -58,10 +57,7 @@ export async function getVoiceClientConfig(
   ]);
 
   const browserPhoneSupported =
-    connection?.authMode === "api_key"
-      ? isBrowserPhoneSupportedForTwilioConnection(connection)
-      : hasTwilioVoiceClientEnv() &&
-        isBrowserPhoneSupportedForTwilioConnection(connection);
+    isBrowserPhoneSupportedForTwilioConnection(connection);
 
   const enabled =
     browserPhoneSupported && Boolean(settings.phoneNumber) && settings.outboundEnabled;

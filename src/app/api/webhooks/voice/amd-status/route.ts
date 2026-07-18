@@ -5,6 +5,7 @@ import {
   readTwilioRequestParams,
 } from "@/lib/twilio/request";
 import { resolveTwilioWebhookValidationContext } from "@/services/twilio-integration.service";
+import { bindVoiceCallLogToTwilioCall } from "@/services/voice-agent.service";
 import { handleTwilioAmdStatusUpdate } from "@/services/voice-ai-outbound-guard.service";
 
 export async function POST(request: NextRequest) {
@@ -32,9 +33,31 @@ export async function POST(request: NextRequest) {
 
   const callSid = params.CallSid?.trim();
   const answeredBy = params.AnsweredBy?.trim();
+  const callLogId = request.nextUrl.searchParams.get("callLogId");
 
   if (!callSid || !answeredBy) {
     return new NextResponse("Missing AMD status", { status: 400 });
+  }
+
+  if (callLogId) {
+    try {
+      await bindVoiceCallLogToTwilioCall({
+        businessId,
+        callLogId,
+        callSid,
+        callMode: "ai",
+      });
+    } catch (error) {
+      console.warn(
+        "[voice-webhook] AMD CallSid bind failed",
+        JSON.stringify({
+          businessId,
+          callLogId,
+          callSid,
+          error: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+    }
   }
 
   await handleTwilioAmdStatusUpdate({

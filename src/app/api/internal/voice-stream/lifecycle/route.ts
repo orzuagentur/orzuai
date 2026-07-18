@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     businessId?: string;
     callSid?: string;
+    callLogId?: string | null;
     direction?: string;
     event?: string;
     triggerReason?: string | null;
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
   await handleVoiceStreamLifecycle({
     businessId,
     callSid,
+    callLogId: body.callLogId ?? null,
     direction,
     event,
     triggerReason: body.triggerReason ?? null,

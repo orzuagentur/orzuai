@@ -443,6 +443,7 @@ export async function appendVoiceStreamSessionTurn(input: {
 export async function handleVoiceStreamLifecycle(input: {
   businessId: string;
   callSid: string;
+  callLogId?: string | null;
   direction: "inbound" | "outbound";
   event: "start" | "stop";
   triggerReason?: string | null;
@@ -464,10 +465,41 @@ export async function handleVoiceStreamLifecycle(input: {
       return;
     }
 
+    const callLogId = input.callLogId?.trim();
+    if (callLogId) {
+      const callLog = await repo.findCallLogById(input.businessId, callLogId);
+
+      if (callLog) {
+        if (
+          callLog.external_call_id?.trim() &&
+          callLog.external_call_id.trim() !== input.callSid
+        ) {
+          console.warn(
+            "[voice-stream] ignored stream CallSid bind for already-bound call log",
+            JSON.stringify({
+              businessId: input.businessId,
+              callLogId,
+              existingCallSid: callLog.external_call_id,
+              receivedCallSid: input.callSid,
+            }),
+          );
+        } else {
+          await repo.updateCallLog(callLog.id, {
+            externalCallId: input.callSid,
+            status: "active",
+            callMode: "ai",
+            aiHandled: true,
+            triggerReason: input.triggerReason ?? undefined,
+          });
+          return;
+        }
+      }
+    }
+
     await repo.insertCallLog({
       businessId: input.businessId,
       direction: input.direction,
-      phoneNumber: "stream",
+      phoneNumber: "unknown",
       status: "active",
       provider: "twilio",
       externalCallId: input.callSid,

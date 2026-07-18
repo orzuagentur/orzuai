@@ -189,9 +189,9 @@ export async function recordInboundVoiceCall(input: {
   businessId: string;
   phoneNumber: string;
   callSid: string;
-}): Promise<void> {
+}): Promise<string | null> {
   if (!hasSupabaseEnv()) {
-    return;
+    return null;
   }
 
   const phoneNumber = input.phoneNumber.trim();
@@ -242,6 +242,8 @@ export async function recordInboundVoiceCall(input: {
       callMode,
     },
   });
+
+  return callLogId;
 }
 
 export async function saveVoiceAgentSettings(
@@ -336,6 +338,75 @@ async function logVoiceCall(input: {
       callMode: input.callMode ?? "unknown",
     },
   });
+
+  return callLogId;
+}
+
+export async function bindVoiceCallLogToTwilioCall(input: {
+  businessId: string;
+  callLogId?: string | null;
+  callSid?: string | null;
+  status?: string;
+  callMode?: "ai" | "human" | "handoff" | "unknown";
+  triggerReason?: string | null;
+}): Promise<string | null> {
+  const callLogId = input.callLogId?.trim();
+  const callSid = input.callSid?.trim();
+
+  if (!hasSupabaseEnv() || !callLogId || !callSid) {
+    return null;
+  }
+
+  const repo = getVoiceRepository();
+  const existing = await repo.findCallLogById(input.businessId, callLogId);
+
+  if (!existing) {
+    return null;
+  }
+
+  const existingCallSid = existing.external_call_id?.trim() || null;
+
+  if (
+    existingCallSid &&
+    existingCallSid !== callSid
+  ) {
+    console.warn(
+      "[voice-agent] ignored CallSid bind for already-bound call log",
+      JSON.stringify({
+        businessId: input.businessId,
+        callLogId,
+        existingCallSid: existing.external_call_id,
+        receivedCallSid: callSid,
+      }),
+    );
+    return null;
+  }
+
+  const alreadyBound = existingCallSid === callSid;
+
+  await repo.updateCallLog(callLogId, {
+    externalCallId: callSid,
+    status: input.status,
+    callMode: input.callMode,
+    aiHandled: input.callMode === "ai" ? true : undefined,
+    humanHandled: input.callMode === "human" ? true : undefined,
+    triggerReason: input.triggerReason ?? undefined,
+  });
+
+  if (!alreadyBound) {
+    await repo.insertCallEvent({
+      businessId: input.businessId,
+      callLogId,
+      callSid,
+      eventType: "call.twilio_bound",
+      actorType: "twilio",
+      payload: {
+        status: input.status ?? null,
+        callMode: input.callMode ?? null,
+        triggerReason: input.triggerReason ?? null,
+      },
+    });
+  }
 
   return callLogId;
 }
@@ -500,17 +571,44 @@ export async function placeOutboundVoiceCall(input: {
   const webhooks = buildWebhookUrls(input.businessId);
   let externalCallId: string | null = null;
   let status = "queued";
+  let callLogId: string | null = null;
+  const callMode = input.requireAiAssistant ? "ai" : "unknown";
 
   if (settings.provider === "twilio") {
     if (!twilioCredentials) {
       return { success: false, message: VOICE_MESSAGES.platformMissing };
     }
 
+    callLogId = await logVoiceCall({
+      businessId: input.businessId,
+      contactId: input.contactId,
+      direction: "outbound",
+      phoneNumber: input.phoneNumber,
+      status,
+      provider: settings.provider,
+      externalCallId: null,
+      triggerReason: input.triggerReason,
+      callMode,
+      customPrompt: input.customPrompt,
+    });
+
     const outboundUrl = new URL(webhooks.outboundWebhookUrl);
     outboundUrl.searchParams.set("triggerReason", input.triggerReason);
 
+    if (callLogId) {
+      outboundUrl.searchParams.set("callLogId", callLogId);
+    }
+
     if (input.requireAiAssistant) {
       outboundUrl.searchParams.set("callMode", "ai");
+    }
+
+    const statusCallbackUrl = new URL(webhooks.statusCallbackUrl);
+    const amdStatusCallbackUrl = new URL(webhooks.amdStatusCallbackUrl);
+
+    if (callLogId) {
+      statusCallbackUrl.searchParams.set("callLogId", callLogId);
+      amdStatusCallbackUrl.searchParams.set("callLogId", callLogId);
     }
 
     const result = await twilioCreateCall({
@@ -518,18 +616,48 @@ export async function placeOutboundVoiceCall(input: {
       from: settings.phoneNumber,
       to: input.phoneNumber,
       twimlUrl: outboundUrl.toString(),
-      statusCallbackUrl: webhooks.statusCallbackUrl,
+      statusCallbackUrl: statusCallbackUrl.toString(),
       amdStatusCallbackUrl: input.requireAiAssistant
-        ? webhooks.amdStatusCallbackUrl
+        ? amdStatusCallbackUrl.toString()
         : undefined,
     });
 
     if (!result.success) {
+      if (callLogId) {
+        const repo = getVoiceRepository();
+        await repo.updateCallLog(callLogId, {
+          status: "failed",
+          endedAt: new Date().toISOString(),
+        });
+        await repo.insertCallEvent({
+          businessId: input.businessId,
+          callLogId,
+          callSid: null,
+          eventType: "call.failed",
+          actorType: "twilio",
+          payload: {
+            message: result.message,
+            triggerReason: input.triggerReason,
+            callMode,
+          },
+        });
+      }
       return { success: false, message: result.message };
     }
 
     externalCallId = result.callSid;
     status = "initiated";
+
+    if (callLogId) {
+      await bindVoiceCallLogToTwilioCall({
+        businessId: input.businessId,
+        callLogId,
+        callSid: externalCallId,
+        status,
+        callMode,
+        triggerReason: input.triggerReason,
+      });
+    }
   } else if (settings.provider === "retell") {
     if (!settings.retellAgentId) {
       return { success: false, message: "Retell agent ID is required." };
@@ -566,18 +694,20 @@ export async function placeOutboundVoiceCall(input: {
     status = "initiated";
   }
 
-  const callLogId = await logVoiceCall({
-    businessId: input.businessId,
-    contactId: input.contactId,
-    direction: "outbound",
-    phoneNumber: input.phoneNumber,
-    status,
-    provider: settings.provider,
-    externalCallId,
-    triggerReason: input.triggerReason,
-    callMode: input.requireAiAssistant ? "ai" : "unknown",
-    customPrompt: input.customPrompt,
-  });
+  if (!callLogId) {
+    callLogId = await logVoiceCall({
+      businessId: input.businessId,
+      contactId: input.contactId,
+      direction: "outbound",
+      phoneNumber: input.phoneNumber,
+      status,
+      provider: settings.provider,
+      externalCallId,
+      triggerReason: input.triggerReason,
+      callMode,
+      customPrompt: input.customPrompt,
+    });
+  }
 
   return { success: true, callLogId: callLogId ?? undefined };
 }
@@ -692,6 +822,7 @@ export async function getVoiceAgentSettingsForUser(): Promise<{
 export async function getInboundVoiceTwiml(
   businessId: string,
   callSid?: string | null,
+  callLogId?: string | null,
 ): Promise<string> {
   const settings = await getVoiceAgentSettings(businessId);
   const speechLocale = mapVoiceLanguageToTwilioLocale(settings.voiceLanguage);
@@ -739,6 +870,7 @@ export async function getInboundVoiceTwiml(
         direction: "inbound",
         forceAi: true,
         callSid,
+        callLogId,
       });
     }
 
@@ -764,6 +896,7 @@ export async function getOutboundVoiceTwiml(
   triggerReason?: string | null,
   callMode?: string | null,
   callSid?: string | null,
+  callLogId?: string | null,
 ): Promise<string> {
   return buildVoiceConversationTwiml({
     businessId,
@@ -771,6 +904,7 @@ export async function getOutboundVoiceTwiml(
     triggerReason,
     forceAi: callMode === "ai",
     callSid,
+    callLogId,
   });
 }
 

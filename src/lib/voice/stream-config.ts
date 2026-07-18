@@ -17,7 +17,7 @@ export function getVoiceStreamSecret(): string | undefined {
 }
 
 export function getVoiceStreamWsUrl(): string | undefined {
-  return process.env[ENV_KEYS.VOICE_STREAM_WS_URL]?.trim() || undefined;
+  return resolveSecretValue(ENV_KEYS.VOICE_STREAM_WS_URL)?.trim() || undefined;
 }
 
 export function getVoiceMonitorWsUrl(): string | null {

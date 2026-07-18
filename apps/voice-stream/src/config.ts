@@ -329,6 +329,7 @@ export async function notifyVoiceStreamLifecycle(input: {
   secret: string;
   businessId: string;
   callSid: string;
+  callLogId?: string | null;
   direction: "inbound" | "outbound";
   event: "start" | "stop";
   triggerReason?: string | null;
@@ -342,6 +343,7 @@ export async function notifyVoiceStreamLifecycle(input: {
     body: JSON.stringify({
       businessId: input.businessId,
       callSid: input.callSid,
+      callLogId: input.callLogId ?? null,
       direction: input.direction,
       event: input.event,
       triggerReason: input.triggerReason ?? null,

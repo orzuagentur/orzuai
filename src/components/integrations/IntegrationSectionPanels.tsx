@@ -42,6 +42,7 @@ import type {
   ChannelContactsData,
 } from "@/types/channel-workspace.types";
 import type {
+  TwilioNumberDiagnostics,
   TwilioPhoneNumberOption,
 } from "@/types/twilio-integration.types";
 import type {
@@ -88,6 +89,7 @@ type IntegrationSectionPanelsProps = {
     settings: VoiceAgentSettings;
     connectConfig: VoiceConnectConfig;
     availablePhoneNumbers: TwilioPhoneNumberOption[];
+    diagnostics: TwilioNumberDiagnostics | null;
   };
   sms?: {
     connection: VoiceConnectionData | null;
@@ -233,6 +235,7 @@ function ActivateSection({
         settings={voice.settings}
         config={voice.connectConfig}
         availablePhoneNumbers={voice.availablePhoneNumbers}
+        diagnostics={voice.diagnostics}
         hasBusiness={hasBusiness}
         embeddedInHub
       />

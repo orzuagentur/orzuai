@@ -27,6 +27,7 @@ import {
 import {
   clearTwilioPhoneNumberWebhooks,
   configureTwilioPhoneNumberWebhooks,
+  createTwilioApiKey,
   createTwilioApplication,
   fetchTwilioApplication,
   fetchTwilioAccount,
@@ -36,6 +37,7 @@ import {
   purchaseTwilioPhoneNumber,
   searchTwilioAvailablePhoneNumbers,
   updateTwilioApplication,
+  verifyTwilioApiKeyCredentials,
   type TwilioApiCredentials,
   TwilioApiRequestError,
 } from "@/lib/twilio/client";
@@ -324,22 +326,38 @@ export async function resolveTwilioBrowserPhoneRuntimeConfig(
     return null;
   }
 
-  if (connection?.authMode === "api_key") {
+  const hasStoredBrowserCredentials = Boolean(
+    connection?.connectedAccountSid &&
+      connection.apiKeySid &&
+      connection.apiKeySecretKeyName &&
+      connection.browserTwimlAppSid,
+  );
+
+  if (
+    connection?.authMode === "api_key" ||
+    (connection?.authMode === "connect" && hasStoredBrowserCredentials)
+  ) {
     if (
       !connection.connectedAccountSid ||
       !connection.apiKeySid ||
       !connection.apiKeySecretKeyName ||
-      !connection.authTokenSecretKeyName ||
+      (connection.authMode === "api_key" && !connection.authTokenSecretKeyName) ||
       !connection.browserTwimlAppSid
     ) {
       return null;
     }
 
     const admin = createAdminClient();
-    const [apiKeySecret, authToken] = await Promise.all([
+    const [apiKeySecret, customerAuthToken] = await Promise.all([
       readIntegrationSecret(admin, connection.apiKeySecretKeyName),
-      readIntegrationSecret(admin, connection.authTokenSecretKeyName),
+      connection.authMode === "api_key"
+        ? readIntegrationSecret(admin, connection.authTokenSecretKeyName)
+        : Promise.resolve(null),
     ]);
+    const authToken =
+      connection.authMode === "api_key"
+        ? customerAuthToken
+        : getTwilioPlatformAuthToken();
 
     if (!apiKeySecret || !authToken) {
       return null;
@@ -378,25 +396,47 @@ export async function resolveTwilioBrowserPhoneRuntimeConfig(
 export function isBrowserPhoneSupportedForTwilioConnection(
   connection: TwilioConnectionData | null,
 ): boolean {
-  const platformBrowserPhoneSupported =
-    connection?.status === "connected" &&
-    connection.authMode === "connect" &&
-    connection.billingOwner === "platform";
+  if (!connection || connection.status !== "connected") {
+    return false;
+  }
 
-  const customerBrowserPhoneSupported =
-    connection?.status === "connected" &&
-    connection.authMode === "api_key" &&
-    connection.billingOwner === "customer" &&
+  const storedBrowserPhoneSupported =
     connection.browserPhoneStatus === "ready" &&
     Boolean(
       connection.connectedAccountSid &&
         connection.apiKeySid &&
         connection.apiKeySecretKeyName &&
-        connection.authTokenSecretKeyName &&
         connection.browserTwimlAppSid,
     );
 
-  return platformBrowserPhoneSupported || customerBrowserPhoneSupported;
+  if (connection.authMode === "connect") {
+    const connectedAccountBrowserPhoneSupported =
+      storedBrowserPhoneSupported && Boolean(getTwilioPlatformAuthToken());
+    const legacyPlatformBrowserPhoneSupported =
+      connection.billingOwner === "platform" &&
+      Boolean(
+        getTwilioPlatformAccountSid() &&
+          getTwilioPlatformAuthToken() &&
+          getTwilioApiKeySid() &&
+          getTwilioApiKeySecret() &&
+          getTwilioTwimlAppSid(),
+      );
+
+    return (
+      connectedAccountBrowserPhoneSupported ||
+      legacyPlatformBrowserPhoneSupported
+    );
+  }
+
+  if (connection.authMode === "api_key") {
+    return (
+      connection.billingOwner === "customer" &&
+      storedBrowserPhoneSupported &&
+      Boolean(connection.authTokenSecretKeyName)
+    );
+  }
+
+  return false;
 }
 
 export async function listTwilioPhoneNumbersForBusiness(
@@ -635,14 +675,62 @@ function sanitizeTwilioProvisioningError(error: unknown): string {
   return message.replace(/\s+/g, " ").slice(0, 500);
 }
 
+type BrowserPhoneProvisioningResult =
+  | { success: true; appSid: string }
+  | { success: false; message: string };
+
+async function upsertBrowserPhoneTwimlApplication(input: {
+  businessId: string;
+  connection: TwilioConnectionData;
+  credentials: TwilioApiCredentials;
+}): Promise<string> {
+  const urls = buildBrowserPhoneApplicationUrls(input.businessId);
+  const friendlyName = `${BROWSER_PHONE_APP_NAME} ${input.businessId.slice(0, 8)}`;
+  const existingAppSid = input.connection.browserTwimlAppSid?.trim();
+  let app: Awaited<ReturnType<typeof createTwilioApplication>>;
+
+  if (existingAppSid) {
+    try {
+      app = await updateTwilioApplication({
+        credentials: input.credentials,
+        applicationSid: existingAppSid,
+        friendlyName,
+        voiceUrl: urls.voiceUrl,
+        statusCallbackUrl: urls.statusCallbackUrl,
+      });
+    } catch (error) {
+      if (
+        error instanceof TwilioApiRequestError &&
+        (error.status === 404 || error.code === 20404)
+      ) {
+        app = await createTwilioApplication({
+          credentials: input.credentials,
+          friendlyName,
+          voiceUrl: urls.voiceUrl,
+          statusCallbackUrl: urls.statusCallbackUrl,
+        });
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    app = await createTwilioApplication({
+      credentials: input.credentials,
+      friendlyName,
+      voiceUrl: urls.voiceUrl,
+      statusCallbackUrl: urls.statusCallbackUrl,
+    });
+  }
+
+  return app.sid;
+}
+
 async function provisionCustomerBrowserPhoneApplication(input: {
   businessId: string;
   connection: TwilioConnectionData;
   credentials: TwilioApiCredentials;
-}): Promise<{ success: true; appSid: string } | { success: false; message: string }> {
+}): Promise<BrowserPhoneProvisioningResult> {
   const admin = createAdminClient();
-  const urls = buildBrowserPhoneApplicationUrls(input.businessId);
-  const friendlyName = `${BROWSER_PHONE_APP_NAME} ${input.businessId.slice(0, 8)}`;
 
   await upsertTwilioConnectionRow(admin, input.businessId, {
     browser_phone_status: "pending",
@@ -650,51 +738,17 @@ async function provisionCustomerBrowserPhoneApplication(input: {
   });
 
   try {
-    const existingAppSid = input.connection.browserTwimlAppSid?.trim();
-    let app;
-
-    if (existingAppSid) {
-      try {
-        app = await updateTwilioApplication({
-          credentials: input.credentials,
-          applicationSid: existingAppSid,
-          friendlyName,
-          voiceUrl: urls.voiceUrl,
-          statusCallbackUrl: urls.statusCallbackUrl,
-        });
-      } catch (error) {
-        if (
-          error instanceof TwilioApiRequestError &&
-          (error.status === 404 || error.code === 20404)
-        ) {
-          app = await createTwilioApplication({
-            credentials: input.credentials,
-            friendlyName,
-            voiceUrl: urls.voiceUrl,
-            statusCallbackUrl: urls.statusCallbackUrl,
-          });
-        } else {
-          throw error;
-        }
-      }
-    } else {
-      app = await createTwilioApplication({
-        credentials: input.credentials,
-        friendlyName,
-        voiceUrl: urls.voiceUrl,
-        statusCallbackUrl: urls.statusCallbackUrl,
-      });
-    }
+    const appSid = await upsertBrowserPhoneTwimlApplication(input);
 
     await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_twiml_app_sid: app.sid,
+      browser_twiml_app_sid: appSid,
       browser_phone_status: "ready",
       browser_phone_last_error: null,
       browser_phone_provisioned_at: new Date().toISOString(),
       last_synced_at: new Date().toISOString(),
     });
 
-    return { success: true, appSid: app.sid };
+    return { success: true, appSid };
   } catch (error) {
     const message = sanitizeTwilioProvisioningError(error);
 
@@ -716,6 +770,161 @@ async function provisionCustomerBrowserPhoneApplication(input: {
 
     return { success: false, message };
   }
+}
+
+async function ensureConnectBrowserPhoneApiKey(input: {
+  admin: AdminClient;
+  businessId: string;
+  connection: TwilioConnectionData;
+  credentials: TwilioApiCredentials;
+  actorUserId?: string | null;
+  actorEmail?: string;
+}): Promise<{ apiKeySid: string; apiKeySecretKeyName: string }> {
+  const existingApiKeySid = input.connection.apiKeySid?.trim();
+  const existingSecretKeyName = input.connection.apiKeySecretKeyName?.trim();
+
+  if (existingApiKeySid && existingSecretKeyName) {
+    const existingSecret = await readIntegrationSecret(
+      input.admin,
+      existingSecretKeyName,
+    );
+
+    if (existingSecret) {
+      const credentialCheck = await verifyTwilioApiKeyCredentials({
+        accountSid: input.credentials.accountSid,
+        apiKeySid: existingApiKeySid,
+        apiKeySecret: existingSecret,
+      });
+
+      if (credentialCheck.ok) {
+        return {
+          apiKeySid: existingApiKeySid,
+          apiKeySecretKeyName: existingSecretKeyName,
+        };
+      }
+
+      console.warn(
+        "[twilio] stored Connect Browser Phone API key failed validation",
+        JSON.stringify({
+          businessId: input.businessId,
+          accountSid: input.credentials.accountSid,
+          apiKeySid: existingApiKeySid,
+          message: credentialCheck.message,
+        }),
+      );
+    }
+  }
+
+  const apiKey = await createTwilioApiKey({
+    credentials: input.credentials,
+    friendlyName: `${BROWSER_PHONE_APP_NAME} ${input.businessId.slice(0, 8)} SDK Key`,
+  });
+  const secretKeyName = await storeIntegrationSecret(input.admin, {
+    businessId: input.businessId,
+    kind: "TWILIO_API_KEY_SECRET",
+    value: apiKey.secret,
+    description: `Twilio Connect Browser Phone API key secret for business ${input.businessId}`,
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+  });
+
+  if (!secretKeyName) {
+    throw new Error(TWILIO_MESSAGES.apiKeySecretStoreFailed);
+  }
+
+  if (existingSecretKeyName && existingSecretKeyName !== secretKeyName) {
+    await deleteIntegrationSecret(input.admin, existingSecretKeyName, {
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail,
+    });
+  }
+
+  return {
+    apiKeySid: apiKey.sid,
+    apiKeySecretKeyName: secretKeyName,
+  };
+}
+
+async function provisionConnectBrowserPhoneApplication(input: {
+  businessId: string;
+  connection: TwilioConnectionData;
+  credentials: TwilioApiCredentials;
+  actorUserId?: string | null;
+  actorEmail?: string;
+}): Promise<BrowserPhoneProvisioningResult> {
+  const admin = createAdminClient();
+
+  await upsertTwilioConnectionRow(admin, input.businessId, {
+    browser_phone_status: "pending",
+    browser_phone_last_error: null,
+  });
+
+  try {
+    const apiKey = await ensureConnectBrowserPhoneApiKey({
+      admin,
+      businessId: input.businessId,
+      connection: input.connection,
+      credentials: input.credentials,
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail,
+    });
+
+    await upsertTwilioConnectionRow(admin, input.businessId, {
+      api_key_sid: apiKey.apiKeySid,
+      api_key_secret_key_name: apiKey.apiKeySecretKeyName,
+      last_synced_at: new Date().toISOString(),
+    });
+
+    const appSid = await upsertBrowserPhoneTwimlApplication(input);
+
+    await upsertTwilioConnectionRow(admin, input.businessId, {
+      api_key_sid: apiKey.apiKeySid,
+      api_key_secret_key_name: apiKey.apiKeySecretKeyName,
+      browser_twiml_app_sid: appSid,
+      browser_phone_status: "ready",
+      browser_phone_last_error: null,
+      browser_phone_provisioned_at: new Date().toISOString(),
+      last_synced_at: new Date().toISOString(),
+    });
+
+    return { success: true, appSid };
+  } catch (error) {
+    const message = sanitizeTwilioProvisioningError(error);
+
+    await upsertTwilioConnectionRow(admin, input.businessId, {
+      browser_phone_status: "failed",
+      browser_phone_last_error: message,
+      browser_phone_provisioned_at: null,
+      last_synced_at: new Date().toISOString(),
+    });
+
+    console.warn(
+      "[twilio] Connect Browser Phone provisioning failed",
+      JSON.stringify({
+        businessId: input.businessId,
+        accountSid: input.credentials.accountSid,
+        message,
+      }),
+    );
+
+    return { success: false, message };
+  }
+}
+
+async function provisionBrowserPhoneForConnection(input: {
+  businessId: string;
+  connection: TwilioConnectionData;
+  credentials: TwilioApiCredentials;
+}): Promise<BrowserPhoneProvisioningResult | null> {
+  if (input.connection.authMode === "connect") {
+    return provisionConnectBrowserPhoneApplication(input);
+  }
+
+  if (input.connection.authMode === "api_key") {
+    return provisionCustomerBrowserPhoneApplication(input);
+  }
+
+  return null;
 }
 
 function buildWebhookField(
@@ -792,9 +1001,7 @@ export async function getTwilioNumberDiagnostics(
   const platformAccountSid = getTwilioPlatformAccountSid() ?? null;
   const platformAuthToken = getTwilioPlatformAuthToken() ?? null;
   const browserTwimlAppSid =
-    connection?.authMode === "api_key"
-      ? connection.browserTwimlAppSid
-      : getTwilioTwimlAppSid() ?? null;
+    connection?.browserTwimlAppSid ?? getTwilioTwimlAppSid() ?? null;
 
   const base: TwilioNumberDiagnostics = {
     status: "unavailable",
@@ -823,14 +1030,15 @@ export async function getTwilioNumberDiagnostics(
     };
   }
 
-  const browserAppCredentials =
-    connection.authMode === "api_key"
-      ? ctx.credentials
-      : platformAccountSid && platformAuthToken
-        ? { accountSid: platformAccountSid, authToken: platformAuthToken }
-        : null;
+  const browserAppCredentials = connection.browserTwimlAppSid
+    ? ctx.credentials
+    : platformAccountSid && platformAuthToken
+      ? { accountSid: platformAccountSid, authToken: platformAuthToken }
+      : null;
   const monitorCredentials =
-    connection.authMode === "api_key" || connection.authMode === "auth_token"
+    connection.authMode === "api_key" ||
+    connection.authMode === "auth_token" ||
+    connection.authMode === "connect"
       ? ctx.credentials
       : platformAccountSid && platformAuthToken
         ? { accountSid: platformAccountSid, authToken: platformAuthToken }
@@ -1007,7 +1215,7 @@ export async function completeTwilioConnectAuthorization(input: {
     await deleteIntegrationSecret(admin, existingConnection.authTokenSecretKeyName);
   }
 
-  await upsertTwilioConnectionRow(admin, input.businessId, {
+  const connection = await upsertTwilioConnectionRow(admin, input.businessId, {
     twilio_status: "authorized",
     auth_mode: "connect",
     billing_owner: "customer",
@@ -1025,6 +1233,16 @@ export async function completeTwilioConnectAuthorization(input: {
     phone_sid: null,
     connected_at: null,
     last_synced_at: new Date().toISOString(),
+  });
+
+  if (!connection) {
+    return { success: false, message: TWILIO_MESSAGES.saveFailed };
+  }
+
+  await provisionConnectBrowserPhoneApplication({
+    businessId: input.businessId,
+    connection,
+    credentials,
   });
 
   revalidateTwilioPaths();
@@ -1396,6 +1614,21 @@ export async function selectTwilioPhoneNumber(input: {
     selectedSid = selected.sid;
   }
 
+  const browserPhoneProvisioning = await provisionBrowserPhoneForConnection({
+    businessId: input.businessId,
+    connection: ctx.connection,
+    credentials: ctx.credentials,
+  });
+
+  if (browserPhoneProvisioning && !browserPhoneProvisioning.success) {
+    return {
+      success: false,
+      message:
+        TWILIO_MESSAGES.browserPhoneProvisionFailed +
+        ` ${browserPhoneProvisioning.message}`,
+    };
+  }
+
   const webhooks = buildVoiceWebhookUrls(input.businessId);
   const now = new Date().toISOString();
   let cleanupPreviousNumber = false;
@@ -1485,14 +1718,14 @@ export async function resyncTwilioConnection(
   if (connection.status === "authorized") {
     const ctx = await getTwilioCredentialsForBusiness(businessId);
 
-    if (ctx && connection.authMode === "api_key") {
-      const provisioning = await provisionCustomerBrowserPhoneApplication({
+    if (ctx) {
+      const provisioning = await provisionBrowserPhoneForConnection({
         businessId,
         connection,
         credentials: ctx.credentials,
       });
 
-      if (!provisioning.success) {
+      if (provisioning && !provisioning.success) {
         return {
           success: false,
           message:
@@ -1534,21 +1767,19 @@ export async function resyncTwilioConnection(
       statusCallbackUrl: webhooks.statusCallbackUrl,
     });
 
-    if (connection.authMode === "api_key") {
-      const provisioning = await provisionCustomerBrowserPhoneApplication({
-        businessId,
-        connection,
-        credentials: ctx.credentials,
-      });
+    const provisioning = await provisionBrowserPhoneForConnection({
+      businessId,
+      connection,
+      credentials: ctx.credentials,
+    });
 
-      if (!provisioning.success) {
-        return {
-          success: false,
-          message:
-            TWILIO_MESSAGES.browserPhoneProvisionFailed +
-            ` ${provisioning.message}`,
-        };
-      }
+    if (provisioning && !provisioning.success) {
+      return {
+        success: false,
+        message:
+          TWILIO_MESSAGES.browserPhoneProvisionFailed +
+          ` ${provisioning.message}`,
+      };
     }
   } catch {
     return { success: false, message: TWILIO_MESSAGES.resyncFailed };

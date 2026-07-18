@@ -84,6 +84,10 @@ export type VoiceCallLogUpdate = {
   durationSeconds?: number | null;
   aiHandled?: boolean;
   contactId?: string | null;
+  externalCallId?: string | null;
+  phoneNumber?: string;
+  triggerReason?: string | null;
+  customPrompt?: string | null;
   recordingUrl?: string | null;
   recordingSid?: string | null;
   conversationId?: string | null;
@@ -115,6 +119,18 @@ export type VoiceCallSessionTurn = {
   content: string;
   at?: string;
 };
+
+function normalizeCallLogPhoneNumberForPatch(
+  phoneNumber: string | null | undefined,
+): string | undefined {
+  const normalized = phoneNumber?.trim();
+
+  if (!normalized || normalized === "stream" || normalized === "unknown") {
+    return undefined;
+  }
+
+  return normalized;
+}
 
 export class VoiceRepository {
   constructor(private readonly db: DbClient) {}
@@ -238,12 +254,16 @@ export class VoiceRepository {
 
       if (existing) {
         await this.updateCallLog(existing.id, {
+          status: input.status,
           contactId: input.contactId ?? existing.contact_id,
           conversationId: input.conversationId ?? existing.conversation_id,
           aiHandled: input.aiHandled ?? existing.ai_handled ?? false,
           humanHandled: input.humanHandled,
           callMode: input.callMode,
           operatorUserId: input.operatorUserId,
+          phoneNumber: normalizeCallLogPhoneNumberForPatch(input.phoneNumber),
+          triggerReason: input.triggerReason ?? undefined,
+          customPrompt: input.customPrompt ?? undefined,
         });
         return existing.id;
       }
@@ -276,6 +296,20 @@ export class VoiceRepository {
           input.businessId,
           externalCallId,
         );
+        if (existing) {
+          await this.updateCallLog(existing.id, {
+            status: input.status,
+            contactId: input.contactId ?? existing.contact_id,
+            conversationId: input.conversationId ?? existing.conversation_id,
+            aiHandled: input.aiHandled ?? existing.ai_handled ?? false,
+            humanHandled: input.humanHandled,
+            callMode: input.callMode,
+            operatorUserId: input.operatorUserId,
+            phoneNumber: normalizeCallLogPhoneNumberForPatch(input.phoneNumber),
+            triggerReason: input.triggerReason ?? undefined,
+            customPrompt: input.customPrompt ?? undefined,
+          });
+        }
         return existing?.id ?? null;
       }
 
@@ -586,6 +620,22 @@ export class VoiceRepository {
 
     if (patch.contactId !== undefined) {
       updatePayload.contact_id = patch.contactId;
+    }
+
+    if (patch.externalCallId !== undefined) {
+      updatePayload.external_call_id = patch.externalCallId?.trim() || null;
+    }
+
+    if (patch.phoneNumber !== undefined) {
+      updatePayload.phone_number = patch.phoneNumber;
+    }
+
+    if (patch.triggerReason !== undefined) {
+      updatePayload.trigger_reason = patch.triggerReason?.trim() || null;
+    }
+
+    if (patch.customPrompt !== undefined) {
+      updatePayload.custom_prompt = patch.customPrompt?.trim() || null;
     }
 
     if (patch.recordingUrl !== undefined) {

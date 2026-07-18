@@ -228,6 +228,12 @@ type TwilioApplicationResource = {
   sms_method?: string | null;
 };
 
+type TwilioApiKeyResource = {
+  sid?: string;
+  secret?: string;
+  friendly_name?: string | null;
+};
+
 export type TwilioApplicationDetails = {
   sid: string;
   accountSid: string | null;
@@ -238,6 +244,12 @@ export type TwilioApplicationDetails = {
   statusCallbackMethod: string | null;
   smsUrl: string | null;
   smsMethod: string | null;
+};
+
+export type TwilioApiKeyDetails = {
+  sid: string;
+  secret: string;
+  friendlyName: string | null;
 };
 
 type TwilioMonitorAlertResource = {
@@ -472,6 +484,35 @@ export async function updateTwilioApplication(input: {
   );
 
   return mapTwilioApplicationDetails(app);
+}
+
+export async function createTwilioApiKey(input: {
+  credentials: TwilioApiCredentials;
+  friendlyName: string;
+}): Promise<TwilioApiKeyDetails> {
+  const body = new URLSearchParams({
+    FriendlyName: input.friendlyName,
+  });
+  const key = await twilioRequest<TwilioApiKeyResource>(
+    input.credentials,
+    `/Accounts/${input.credentials.accountSid}/Keys.json`,
+    { method: "POST", body },
+  );
+  const sid = key.sid?.trim();
+  const secret = key.secret?.trim();
+
+  if (!sid || !secret) {
+    throw new TwilioApiRequestError(
+      "Twilio did not return the created API Key SID and Secret.",
+      502,
+    );
+  }
+
+  return {
+    sid,
+    secret,
+    friendlyName: key.friendly_name ?? null,
+  };
 }
 
 export async function listTwilioMonitorAlerts(

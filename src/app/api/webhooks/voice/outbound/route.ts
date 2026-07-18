@@ -6,7 +6,10 @@ import {
 } from "@/lib/twilio/request";
 import { runVoiceTwimlWebhook } from "@/lib/voice/webhook-handler";
 import { resolveTwilioWebhookValidationContext } from "@/services/twilio-integration.service";
-import { getOutboundVoiceTwiml } from "@/services/voice-agent.service";
+import {
+  bindVoiceCallLogToTwilioCall,
+  getOutboundVoiceTwiml,
+} from "@/services/voice-agent.service";
 
 export async function POST(request: NextRequest) {
   const businessId = request.nextUrl.searchParams.get("businessId");
@@ -33,14 +36,39 @@ export async function POST(request: NextRequest) {
 
   const triggerReason = request.nextUrl.searchParams.get("triggerReason");
   const callMode = request.nextUrl.searchParams.get("callMode");
+  const callLogId = request.nextUrl.searchParams.get("callLogId");
   const callSid = params.CallSid?.trim() || null;
 
   return runVoiceTwimlWebhook(async () => {
+    if (callSid && callLogId) {
+      try {
+        await bindVoiceCallLogToTwilioCall({
+          businessId,
+          callLogId,
+          callSid,
+          status: "active",
+          callMode: callMode === "ai" ? "ai" : "unknown",
+          triggerReason,
+        });
+      } catch (error) {
+        console.warn(
+          "[voice-webhook] outbound CallSid bind failed",
+          JSON.stringify({
+            businessId,
+            callLogId,
+            callSid,
+            error: error instanceof Error ? error.message : "unknown",
+          }),
+        );
+      }
+    }
+
     const twiml = await getOutboundVoiceTwiml(
       businessId,
       triggerReason,
       callMode,
       callSid,
+      callLogId,
     );
 
     return new NextResponse(twiml, {

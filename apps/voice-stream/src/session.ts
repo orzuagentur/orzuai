@@ -40,6 +40,7 @@ export class VoiceStreamSession {
   private readonly options: VoiceStreamSessionOptions;
   private streamSid: string | null = null;
   private callSid: string | null = null;
+  private callLogId: string | null = null;
   private businessId: string | null = null;
   private direction: "inbound" | "outbound" = "inbound";
   private triggerReason: string | null = null;
@@ -96,6 +97,7 @@ export class VoiceStreamSession {
       this.callSid = message.start.callSid;
       const params = message.start.customParameters ?? {};
       this.businessId = params.businessId?.trim() || null;
+      this.callLogId = params.callLogId?.trim() || null;
       this.direction = params.direction === "outbound" ? "outbound" : "inbound";
       this.triggerReason = params.triggerReason?.trim() || null;
 
@@ -144,6 +146,7 @@ export class VoiceStreamSession {
         secret: this.options.streamSecret,
         businessId: this.businessId,
         callSid: this.callSid,
+        callLogId: this.callLogId,
         direction: this.direction,
         event: "start",
         triggerReason: this.triggerReason,
@@ -514,6 +517,7 @@ export class VoiceStreamSession {
         secret: this.options.streamSecret,
         businessId: this.businessId,
         callSid: this.callSid,
+        callLogId: this.callLogId,
         direction: this.direction,
         event: "stop",
         triggerReason: this.triggerReason,
