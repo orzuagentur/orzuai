@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Missing businessId", { status: 400 });
   }
 
-  const validation = await resolveTwilioWebhookValidationContext(businessId);
+  const validation = await resolveTwilioWebhookValidationContext(businessId, {
+    softphoneClient: true,
+  });
 
   if (
     !validation ||

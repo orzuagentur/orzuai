@@ -138,7 +138,8 @@ export const TWILIO_MESSAGES = {
   invalidAuthToken: "Twilio Auth Token is invalid or too short.",
   authTokenAccountMismatch: "Twilio Auth Token does not belong to the selected Account SID.",
   authTokenStoreFailed: "Unable to store Twilio Auth Token securely.",
-  browserPhoneProvisionFailed: "Unable to provision customer Browser Phone TwiML App.",
+  browserPhoneProvisionFailed:
+    "Browser Phone не настроен (для OrzuX Connect нужны платформенные TWILIO_API_KEY_*). AI-звонки и номер всё равно работают.",
   authModeConnectLabel: "OrzuX Connect",
   authModeApiKeyLabel: "Свой аккаунт (API Key)",
   authModeAuthTokenLabel: "Свой аккаунт (Auth Token)",

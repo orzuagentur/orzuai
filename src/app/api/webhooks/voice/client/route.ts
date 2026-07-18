@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { parseBusinessIdFromVoiceClientIdentity } from "@/lib/twilio/client-identity";
 import {
   isTwilioWebhookSignatureValid,
   readTwilioRequestParams,
@@ -13,12 +14,16 @@ export async function POST(request: NextRequest) {
   const businessId =
     request.nextUrl.searchParams.get("businessId")?.trim() ||
     params.businessId?.trim() ||
+    parseBusinessIdFromVoiceClientIdentity(params.From) ||
+    parseBusinessIdFromVoiceClientIdentity(params.Caller) ||
     "";
 
   if (!businessId) {
     return new NextResponse("Missing businessId", { status: 400 });
   }
-  const validation = await resolveTwilioWebhookValidationContext(businessId);
+  const validation = await resolveTwilioWebhookValidationContext(businessId, {
+    softphoneClient: true,
+  });
 
   if (
     !validation ||
