@@ -13,6 +13,7 @@ import {
   listTwilioIncomingPhoneNumbers,
   type TwilioApiCredentials,
   TwilioApiRequestError,
+  verifyTwilioApiKeyCredentials,
 } from "@/lib/twilio/client";
 import {
   getTwilioPlatformAccountSid,
@@ -103,6 +104,29 @@ export async function createVoiceClientTokenForUser(input: {
   }
 
   const identity = buildVoiceAgentClientIdentity(input.businessId);
+
+  const credentialCheck = await verifyTwilioApiKeyCredentials({
+    accountSid: browserPhone.accountSid,
+    apiKeySid: browserPhone.apiKeySid,
+    apiKeySecret: browserPhone.apiKeySecret,
+  });
+
+  if (!credentialCheck.ok) {
+    console.warn(
+      "[voice-client] Twilio API key check failed before Access Token mint",
+      JSON.stringify({
+        businessId: input.businessId,
+        accountSidPrefix: browserPhone.accountSid.slice(0, 10),
+        apiKeySidPrefix: browserPhone.apiKeySid.slice(0, 10),
+        message: credentialCheck.message,
+      }),
+    );
+
+    return {
+      success: false,
+      message: credentialCheck.message,
+    };
+  }
 
   try {
     const token = createTwilioVoiceAccessToken({

@@ -43,6 +43,65 @@ export function hasTwilioApiCredentials(
   );
 }
 
+/** Verifies Account SID + API Key SID/Secret belong together (Access Token signing keys). */
+export async function verifyTwilioApiKeyCredentials(input: {
+  accountSid: string;
+  apiKeySid: string;
+  apiKeySecret: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const accountSid = input.accountSid.trim();
+  const apiKeySid = input.apiKeySid.trim();
+  const apiKeySecret = input.apiKeySecret.trim();
+
+  if (!accountSid || !apiKeySid || !apiKeySecret) {
+    return {
+      ok: false,
+      message: "Twilio Account SID, API Key SID, and API Key Secret are required.",
+    };
+  }
+
+  if (!accountSid.startsWith("AC") || !apiKeySid.startsWith("SK")) {
+    return {
+      ok: false,
+      message: "Twilio credentials look malformed (Account SID or API Key SID).",
+    };
+  }
+
+  try {
+    // Standard API keys cannot call /Accounts — same check as connectTwilioWithApiKey.
+    await listTwilioIncomingPhoneNumbers({
+      accountSid,
+      authToken: "",
+      apiKeySid,
+      apiKeySecret,
+    });
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof TwilioApiRequestError) {
+      if (error.status === 401 || error.status === 403) {
+        return {
+          ok: false,
+          message:
+            "Twilio rejected the API Key (wrong secret or key not on this Account SID). Reconnect Twilio and recreate the API Key.",
+        };
+      }
+
+      return {
+        ok: false,
+        message: error.message || "Twilio credential check failed.",
+      };
+    }
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Twilio credential check failed.",
+    };
+  }
+}
+
 export function buildTwilioApiAuthorizationHeader(
   credentials: TwilioApiCredentials,
 ): string {

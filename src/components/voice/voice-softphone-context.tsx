@@ -444,7 +444,13 @@ function useVoiceSoftphoneState(input: {
 
       device.on("error", (deviceError) => {
         hasDeviceErrorRef.current = true;
-        setError(deviceError.message || VOICE_MESSAGES.softphoneError);
+        const raw = deviceError.message || VOICE_MESSAGES.softphoneError;
+        const message =
+          /AccessTokenInvalid|20101/i.test(raw) ||
+          /unable to validate your Access Token/i.test(raw)
+            ? VOICE_MESSAGES.softphoneAccessTokenInvalid
+            : raw;
+        setError(message);
         setStatus("error");
       });
 

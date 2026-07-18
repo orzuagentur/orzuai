@@ -166,6 +166,8 @@ export const VOICE_MESSAGES = {
   softphoneNotConfigured: "Browser calling is not configured. Add Twilio API Key and TwiML App.",
   softphoneError: "Softphone error",
   softphoneRegisterFailed: "Unable to register browser phone.",
+  softphoneAccessTokenInvalid:
+    "Twilio rejected the browser phone token. Reconnect Twilio with a fresh API Key SID + Secret from the same Account SID, then try again.",
   callRecordingTitle: "Call recording",
   callRecordingDownload: "Download",
   callRecordingDelete: "Delete",
