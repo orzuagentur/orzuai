@@ -264,12 +264,24 @@ function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
   if (error instanceof TwilioApiRequestError) {
     const message = error.message.toLowerCase();
 
+    if (error.code === 21215 || error.code === 13227) {
+      return "This destination country is blocked in Twilio Voice Geo Permissions on the account that places the call. For OrzuX Connect softphone, enable the country under the connected Twilio account (Voice → Geo Permissions), then save and retry.";
+    }
+
     if (
-      error.code === 21215
-      || message.includes("not allowed to call")
+      error.code === 21216
+      || error.code === 13225
+      || message.includes("primary customer profile")
+      || message.includes("trust hub")
+    ) {
+      return "Twilio blocked this call to a plus-one destination. Approve a Business Primary Customer Profile in Trust Hub on the Twilio account placing the call, then retry.";
+    }
+
+    if (
+      message.includes("not allowed to call")
       || message.includes("geo permission")
     ) {
-      return "This destination country is blocked in Twilio Geo Permissions. Open Twilio Console, Voice, Geo Permissions, and enable the destination country.";
+      return "This destination country is blocked in Twilio Voice Geo Permissions on the account that places the call. Enable the country, save, and retry.";
     }
 
     if (error.code === 21211 || message.includes("invalid 'to' phone number")) {
@@ -277,8 +289,7 @@ function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
     }
 
     if (
-      error.code === 13227
-      || message.includes("unverified")
+      message.includes("unverified")
       || message.includes("verified numbers")
     ) {
       return "Twilio trial accounts can only call verified numbers. Verify the destination number in Twilio Console or upgrade the account.";
@@ -317,6 +328,62 @@ function buildBrowserPhoneRestCredentials(
   return {
     accountSid: config.accountSid,
     authToken: config.authToken,
+  };
+}
+
+async function resolveSoftphoneCustomerLeg(input: {
+  businessId: string;
+  browserPhone: NonNullable<
+    Awaited<ReturnType<typeof resolveTwilioBrowserPhoneRuntimeConfig>>
+  >;
+  preferredCallerId: string;
+}): Promise<{
+  credentials: TwilioApiCredentials;
+  callerId: string;
+  dialAccount: "connect" | "platform" | "customer";
+} | null> {
+  const connection = await getTwilioConnection(input.businessId);
+  const preferredCallerId = input.preferredCallerId.trim();
+
+  // Connect softphone: operator stays on platform TwiML App, but the PSTN
+  // customer leg must be placed on the Connect account so Geo Permissions and
+  // caller ID follow the business number the customer authorized.
+  if (
+    connection?.authMode === "connect" &&
+    connection.connectedAccountSid &&
+    preferredCallerId
+  ) {
+    const authToken = getTwilioPlatformAuthToken();
+    if (authToken) {
+      return {
+        credentials: {
+          accountSid: connection.connectedAccountSid,
+          authToken,
+        },
+        callerId: preferredCallerId,
+        dialAccount: "connect",
+      };
+    }
+  }
+
+  const credentials = buildBrowserPhoneRestCredentials(input.browserPhone);
+  if (!credentials) {
+    return null;
+  }
+
+  const callerId = await resolveBrowserPhoneOutboundCallerId({
+    mode: input.browserPhone.mode,
+    preferredCallerId,
+  });
+
+  if (!callerId) {
+    return null;
+  }
+
+  return {
+    credentials,
+    callerId,
+    dialAccount: input.browserPhone.mode === "customer" ? "customer" : "platform",
   };
 }
 
@@ -383,21 +450,21 @@ export async function buildClientOutboundTwiml(input: {
   });
 
   const browserPhone = await resolveTwilioBrowserPhoneRuntimeConfig(input.businessId);
-  const browserCredentials = buildBrowserPhoneRestCredentials(browserPhone);
 
-  if (!browserPhone || !browserCredentials) {
+  if (!browserPhone) {
     return buildStaticSayTwiml({
       speech: "Browser calling is not provisioned for this Twilio connection.",
       speechLocale,
     });
   }
 
-  const browserCallerId = await resolveBrowserPhoneOutboundCallerId({
-    mode: browserPhone.mode,
+  const customerLeg = await resolveSoftphoneCustomerLeg({
+    businessId: input.businessId,
+    browserPhone,
     preferredCallerId: phoneNumber,
   });
 
-  if (!browserCallerId) {
+  if (!customerLeg) {
     return buildStaticSayTwiml({
       speech: "Browser calling is missing a valid caller ID.",
       speechLocale,
@@ -415,8 +482,8 @@ export async function buildClientOutboundTwiml(input: {
 
   try {
     const customerCallSid = await createTwilioOutboundCallWithTwiml({
-      credentials: browserCredentials,
-      from: browserCallerId,
+      credentials: customerLeg.credentials,
+      from: customerLeg.callerId,
       to,
       twiml: customerTwiml,
       statusCallbackUrl: webhooks.customerLegStatusCallbackUrl(parentCallSid),
@@ -429,6 +496,9 @@ export async function buildClientOutboundTwiml(input: {
         parentCallSid,
         customerCallSid,
         callLogId: callLog.callLogId,
+        dialAccount: customerLeg.dialAccount,
+        from: customerLeg.callerId,
+        to,
       }),
     );
 
@@ -445,6 +515,10 @@ export async function buildClientOutboundTwiml(input: {
       JSON.stringify({
         businessId: input.businessId,
         parentCallSid,
+        dialAccount: customerLeg.dialAccount,
+        from: customerLeg.callerId,
+        to,
+        code: error instanceof TwilioApiRequestError ? error.code : null,
         error: error instanceof Error ? error.message : "unknown",
       }),
     );
