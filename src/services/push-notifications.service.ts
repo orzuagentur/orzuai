@@ -28,12 +28,20 @@ function ensureVapidConfigured(): boolean {
   }
 
   if (!vapidConfigured) {
-    webpush.setVapidDetails(
-      getVapidSubject(),
-      getVapidPublicKey()!,
-      getVapidPrivateKey()!,
-    );
-    vapidConfigured = true;
+    try {
+      webpush.setVapidDetails(
+        getVapidSubject(),
+        getVapidPublicKey()!,
+        getVapidPrivateKey()!,
+      );
+      vapidConfigured = true;
+    } catch (error) {
+      console.error(
+        "[push] invalid VAPID configuration; push notifications disabled",
+        error instanceof Error ? error.message : error,
+      );
+      return false;
+    }
   }
 
   return true;

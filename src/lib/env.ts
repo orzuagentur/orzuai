@@ -145,8 +145,30 @@ export function getVapidPrivateKey(): string | undefined {
   return readEnv(ENV_KEYS.VAPID_PRIVATE_KEY);
 }
 
+/**
+ * web-push requires a contact URI: `mailto:` or `https:` only.
+ * Invalid values (e.g. http://localhost:3000) are ignored.
+ */
 export function getVapidSubject(): string {
-  return readEnv(ENV_KEYS.VAPID_SUBJECT) || `mailto:${SUPPORT_EMAIL}`;
+  const fallback = `mailto:${SUPPORT_EMAIL}`;
+  const configured = readEnv(ENV_KEYS.VAPID_SUBJECT);
+
+  if (!configured) {
+    return fallback;
+  }
+
+  const normalized = configured.trim();
+  if (
+    normalized.startsWith("mailto:") ||
+    normalized.startsWith("https://")
+  ) {
+    return normalized;
+  }
+
+  console.warn(
+    `[env] Ignoring invalid VAPID_SUBJECT "${normalized}". Use mailto: or https: (falling back to ${fallback}).`,
+  );
+  return fallback;
 }
 
 export function hasPushEnv(): boolean {
