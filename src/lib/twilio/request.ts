@@ -45,21 +45,24 @@ export function isTwilioWebhookSignatureValid(input: {
     return false;
   }
 
+  const orzuSigned = isOrzuSignedRequestValid(input.request, businessId);
+
   if (!authToken) {
     if (expectedAccountSid && !receivedAccountSid) {
       return false;
     }
 
     return (
-      isOrzuSignedRequestValid(input.request, businessId) ||
-      isSignatureValidationBypassedForLocalDevelopment()
+      orzuSigned || isSignatureValidationBypassedForLocalDevelopment()
     );
   }
 
   const signature = input.request.headers.get("x-twilio-signature");
 
   if (!signature) {
-    return isSignatureValidationBypassedForLocalDevelopment();
+    return (
+      orzuSigned || isSignatureValidationBypassedForLocalDevelopment()
+    );
   }
 
   for (const url of getTwilioSignatureUrlCandidates(input.request)) {
@@ -73,6 +76,20 @@ export function isTwilioWebhookSignatureValid(input: {
     ) {
       return true;
     }
+  }
+
+  // Auth Token may be rotated/stale while the provisioned webhook URL still
+  // carries a valid Orzu signature — accept that rather than dropping calls.
+  if (orzuSigned) {
+    console.warn(
+      "[twilio-webhook] X-Twilio-Signature failed; accepted orzuSig fallback (re-save Auth Token)",
+      JSON.stringify({
+        businessId: businessId ?? null,
+        path: input.request.nextUrl.pathname,
+        accountSid: receivedAccountSid ?? null,
+      }),
+    );
+    return true;
   }
 
   return false;

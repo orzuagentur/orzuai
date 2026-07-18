@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const validation = await resolveTwilioWebhookValidationContext(businessId);
 
   if (
-    !validation?.authToken ||
+    !validation ||
     !isTwilioWebhookSignatureValid({
       request,
       params,

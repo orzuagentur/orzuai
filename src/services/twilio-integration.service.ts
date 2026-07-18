@@ -748,12 +748,12 @@ function diagnoseTwilioAlert(alert: {
   const responseBody = alert.responseBody?.trim() ?? "";
   const requestUrl = alert.requestUrl ?? "";
 
-  if (
-    alert.errorCode === "11200" &&
-    requestUrl.includes("/api/webhooks/voice/client") &&
-    responseBody.includes("Invalid Twilio signature")
-  ) {
-    return "Browser Phone TwiML App callback reached OrzuX, but OrzuX rejected X-Twilio-Signature. The most common non-key cause here is URL mismatch between orzux.com and www.orzux.com for the TwiML App callback.";
+  if (alert.errorCode === "11200" && responseBody.includes("Invalid Twilio signature")) {
+    if (requestUrl.includes("/api/webhooks/voice/client")) {
+      return "Browser Phone TwiML App callback reached OrzuX, but OrzuX rejected X-Twilio-Signature. Re-save the current Auth Token, and confirm the TwiML App Voice URL host matches (www.orzux.com vs orzux.com).";
+    }
+
+    return "OrzuX rejected Twilio's X-Twilio-Signature. Usually the saved Auth Token is outdated or from another account — reconnect Twilio with the current Auth Token from Console → Account → API keys & tokens. Also confirm the webhook URL host matches (www.orzux.com vs orzux.com).";
   }
 
   if (alert.errorCode === "11200") {

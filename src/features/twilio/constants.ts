@@ -9,8 +9,23 @@ export const TWILIO_MESSAGES = {
   smsLabel: "SMS",
   connectTitle: "Connect Twilio for Calls",
   connectDescription:
-    "Authorize Twilio to enable AI phone line, inbound and outbound calls.",
-  connectButton: "Подключить Twilio",
+    "Выберите способ: OrzuX одной кнопкой, или свой Twilio-аккаунт с ключами.",
+  connectButton: "Подключить через OrzuX",
+  connectTabOrzuLabel: "OrzuX",
+  connectTabOwnLabel: "Свой аккаунт",
+  connectOrzuTitle: "Подключение через OrzuX",
+  connectOrzuDescription:
+    "Одна кнопка. OrzuX сам настроит webhooks и хранит служебные ключи платформы. После авторизации списание идёт на ваш Twilio.",
+  connectOrzuNote:
+    "Рекомендуется для большинства бизнесов. Номера остаются в вашем Twilio; OrzuX управляет маршрутизацией звонков и SMS.",
+  connectOrzuUnavailableTitle: "OrzuX Connect пока не готов на платформе",
+  connectOrzuUnavailableDescription:
+    "Нужны TWILIO_CONNECT_APP_SID, TWILIO_ACCOUNT_SID и TWILIO_AUTH_TOKEN платформы. Пока можно подключить свой аккаунт на вкладке «Свой аккаунт».",
+  connectOwnTitle: "Подключить свой Twilio",
+  connectOwnDescription:
+    "Вставьте Account SID, API Key и Auth Token. Секреты шифруются и хранятся только на сервере OrzuX.",
+  connectNote:
+    "One-click Twilio Connect. Usage is charged to your Twilio account and card. Numbers are managed in your Connect workspace inside Twilio.",
   selectPhoneTitle: "Выберите номер",
   selectPhoneDescription:
     "Choose a Twilio number for voice calls. OrzuX configures webhooks automatically.",
@@ -93,26 +108,22 @@ export const TWILIO_MESSAGES = {
   invalidAccountSid: "Некорректный Twilio Account SID.",
   noBusiness: "Сначала создайте бизнес в настройках.",
   selectPhoneButton: "Использовать этот номер",
-  connectNote:
-    "One-click Twilio Connect. Usage is charged to your Twilio account and card. Numbers are managed in your Connect workspace inside Twilio.",
-  manualConnectTitle: "Полное подключение",
+  manualConnectTitle: "Полное подключение (API Key)",
   manualConnectDescription:
-    "Account SID, API Key и Auth Token — для SMS, AI-звонков и звонков из панели OrzuX в браузере (Browser Phone).",
-  manualServerConnectTitle: "Серверное подключение",
+    "Account SID, API Key и Auth Token — SMS, AI-звонки и Browser Phone из панели OrzuX.",
+  manualServerConnectTitle: "Только сервер (Auth Token)",
   manualServerConnectDescription:
-    "Только Account SID и Auth Token — для SMS, входящих/исходящих AI-звонков и webhooks. Звонки из браузера недоступны.",
+    "Account SID + Auth Token — SMS и AI-звонки без Browser Phone.",
   manualConnectAccountSidLabel: "Account SID",
   manualConnectApiKeySidLabel: "API Key SID",
   manualConnectApiKeySecretLabel: "API Key Secret",
-  manualConnectButton:
-    "Подключить: SMS + AI-звонки + звонки из панели в браузере",
-  manualServerConnectButton:
-    "Подключить: SMS + AI-звонки на сервере (без браузера)",
+  manualConnectButton: "Подключить свой Twilio",
+  manualServerConnectButton: "Подключить без Browser Phone",
   manualConnectConnecting: "Проверка…",
   manualConnectSuccess: "Twilio подключён по API Key. Выберите номер.",
   manualServerConnectSuccess: "Twilio подключён (серверный режим). Выберите номер.",
   manualConnectSecurityNote:
-    "Секреты шифруются и хранятся только на сервере OrzuX. Auth Token обязателен для проверки webhook-подписей Twilio.",
+    "Секреты шифруются и хранятся только на сервере OrzuX. Auth Token обязателен для проверки webhook-подписей Twilio. Используйте Standard API Key (не Restricted).",
   manualServerConnectSecurityNote:
     "Auth Token шифруется и хранится только на сервере OrzuX. Для звонков из панели используйте полное подключение с API Key.",
   manualConnectHelpLink: "Как создать API Key в Twilio",
@@ -128,7 +139,7 @@ export const TWILIO_MESSAGES = {
   authTokenAccountMismatch: "Twilio Auth Token does not belong to the selected Account SID.",
   authTokenStoreFailed: "Unable to store Twilio Auth Token securely.",
   browserPhoneProvisionFailed: "Unable to provision customer Browser Phone TwiML App.",
-  authModeConnectLabel: "Twilio Connect",
-  authModeApiKeyLabel: "API Key (полный аккаунт)",
-  authModeAuthTokenLabel: "Auth Token (сервер)",
+  authModeConnectLabel: "OrzuX Connect",
+  authModeApiKeyLabel: "Свой аккаунт (API Key)",
+  authModeAuthTokenLabel: "Свой аккаунт (Auth Token)",
 } as const;

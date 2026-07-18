@@ -94,7 +94,8 @@ export function VoiceActivatePanel({
   const [aiEnabled, setAiEnabled] = useState(settings.aiEnabled);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
   const [showServerConnect, setShowServerConnect] = useState(false);
-  const [showManualConnect, setShowManualConnect] = useState(false);
+  const [showManualConnect, setShowManualConnect] = useState(true);
+  const [connectTab, setConnectTab] = useState<"orzu" | "own">("orzu");
   const [serverAccountSid, setServerAccountSid] = useState("");
   const [serverAuthToken, setServerAuthToken] = useState("");
   const [manualAccountSid, setManualAccountSid] = useState("");
@@ -103,6 +104,12 @@ export function VoiceActivatePanel({
   const [manualAuthToken, setManualAuthToken] = useState("");
   const [isConnectingServer, setIsConnectingServer] = useState(false);
   const [isConnectingManual, setIsConnectingManual] = useState(false);
+
+  useEffect(() => {
+    if (!config.connectOAuthEnabled && config.manualConnectEnabled) {
+      setConnectTab("own");
+    }
+  }, [config.connectOAuthEnabled, config.manualConnectEnabled]);
 
   const cardClassName = embeddedInHub
     ? "w-full max-w-none border-0 bg-transparent shadow-none"
@@ -621,38 +628,87 @@ export function VoiceActivatePanel({
           </p>
         )}
 
-        {config.connectOAuthEnabled ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{TWILIO_MESSAGES.connectNote}</p>
-            <Button type="button" className="w-full sm:w-auto" asChild>
-              <a href={config.connectUrl}>{TWILIO_MESSAGES.connectButton}</a>
-            </Button>
+        {config.connectOAuthEnabled || config.manualConnectEnabled ? (
+          <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1">
+            <button
+              type="button"
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                connectTab === "orzu"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setConnectTab("orzu")}
+            >
+              {TWILIO_MESSAGES.connectTabOrzuLabel}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                connectTab === "own"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+                !config.manualConnectEnabled ? "opacity-50" : "",
+              )}
+              disabled={!config.manualConnectEnabled}
+              onClick={() => setConnectTab("own")}
+            >
+              {TWILIO_MESSAGES.connectTabOwnLabel}
+            </button>
           </div>
         ) : null}
 
-        {config.connectOAuthEnabled && config.manualConnectEnabled ? (
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+        {connectTab === "orzu" ? (
+          config.connectOAuthEnabled ? (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{TWILIO_MESSAGES.connectOrzuTitle}</p>
+                <p className="text-sm text-muted-foreground">
+                  {TWILIO_MESSAGES.connectOrzuDescription}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {TWILIO_MESSAGES.connectOrzuNote}
+              </p>
+              <Button type="button" className="w-full sm:w-auto" asChild>
+                <a href={config.connectUrl}>{TWILIO_MESSAGES.connectButton}</a>
+              </Button>
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">или</span>
+          ) : (
+            <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {TWILIO_MESSAGES.connectOrzuUnavailableTitle}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {TWILIO_MESSAGES.connectOrzuUnavailableDescription}
+                </p>
+              </div>
+              <div className="rounded-md border bg-background/80 p-3 text-sm">
+                <p className="font-medium">{TWILIO_MESSAGES.authorizeRedirectLabel}</p>
+                <code className="mt-1 block break-all text-xs">
+                  {config.authorizeRedirectUri}
+                </code>
+                <p className="mt-3 font-medium">
+                  {TWILIO_MESSAGES.deauthorizeRedirectLabel}
+                </p>
+                <code className="mt-1 block break-all text-xs">
+                  {config.deauthorizeRedirectUri}
+                </code>
+              </div>
             </div>
-          </div>
+          )
         ) : null}
 
-        {config.manualConnectEnabled ? (
+        {connectTab === "own" && config.manualConnectEnabled ? (
           <div className="space-y-3">
-            <TwilioServerManualConnectSection
-              accountSid={serverAccountSid}
-              authToken={serverAuthToken}
-              expanded={showServerConnect || !config.connectOAuthEnabled}
-              isConnecting={isConnectingServer}
-              onAccountSidChange={setServerAccountSid}
-              onAuthTokenChange={setServerAuthToken}
-              onConnect={() => void handleServerManualConnect()}
-              onToggleExpanded={() => setShowServerConnect((value) => !value)}
-            />
+            <div className="space-y-1 px-0.5">
+              <p className="text-sm font-medium">{TWILIO_MESSAGES.connectOwnTitle}</p>
+              <p className="text-sm text-muted-foreground">
+                {TWILIO_MESSAGES.connectOwnDescription}
+              </p>
+            </div>
             <TwilioFullManualConnectSection
               accountSid={manualAccountSid}
               apiKeySid={manualApiKeySid}
@@ -666,6 +722,16 @@ export function VoiceActivatePanel({
               onAuthTokenChange={setManualAuthToken}
               onConnect={() => void handleManualConnect()}
               onToggleExpanded={() => setShowManualConnect((value) => !value)}
+            />
+            <TwilioServerManualConnectSection
+              accountSid={serverAccountSid}
+              authToken={serverAuthToken}
+              expanded={showServerConnect}
+              isConnecting={isConnectingServer}
+              onAccountSidChange={setServerAccountSid}
+              onAuthTokenChange={setServerAuthToken}
+              onConnect={() => void handleServerManualConnect()}
+              onToggleExpanded={() => setShowServerConnect((value) => !value)}
             />
           </div>
         ) : null}
