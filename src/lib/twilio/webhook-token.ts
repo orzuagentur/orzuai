@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 import { ENV_KEYS } from "@/constants/env-keys";
 import { resolveSecretValue } from "@/lib/secrets/resolver";
-import { getTwilioPlatformAuthToken } from "@/lib/twilio/connect";
+import { getTwilioPlatformAuthToken } from "@/lib/twilio/platform";
 
 const WEBHOOK_SIGNATURE_PARAM = "orzuSig";
 const WEBHOOK_SIGNATURE_VERSION_PARAM = "orzuSigVersion";

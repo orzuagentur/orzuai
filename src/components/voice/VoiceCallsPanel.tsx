@@ -25,7 +25,6 @@ import { VoiceInboxDetailsPanel } from "@/components/voice/VoiceInboxDetailsPane
 import { VoiceInboxToolbar } from "@/components/voice/VoiceInboxToolbar";
 import { VoiceWorkspacePanel } from "@/components/voice/workspace/VoiceWorkspacePanel";
 import type { VoiceWorkspaceView } from "@/components/voice/workspace/voice-workspace.types";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { VoiceCallFilters } from "@/components/voice/VoiceCallFilters";
 import { VoiceCallList } from "@/components/voice/VoiceCallList";
 import { Button } from "@/components/ui/button";
@@ -40,8 +39,6 @@ import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_MESSAGES } from "@/features/chats";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
-import { fetchVoiceCallsAction } from "@/features/voice/actions/fetch-voice-calls";
-import { requestReleaseOperatorVoiceLine } from "@/lib/voice/request-end-call";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
 import type { MessagingChannel } from "@/types/database.types";
@@ -49,7 +46,6 @@ import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
   filterVoiceCalls,
   isActiveVoiceCallStatus,
-  sanitizeCallsForOperatorSession,
   type VoiceCallFilter,
 } from "@/utils/voice-call-display";
 import {
@@ -104,9 +100,7 @@ function VoiceCallsPanelContent({
   const [workspaceView, setWorkspaceView] = useState<VoiceWorkspaceView>({ mode: "dialpad" });
   const [phonebookContacts, setPhonebookContacts] = useState<PhoneContactListItem[]>([]);
   const { detailsOpen } = useInboxLayout();
-  const softphone = useVoiceSoftphone();
   const notifiedInboundCallsRef = useRef(new Set<string>());
-  const prevSoftphoneStatusRef = useRef(softphone.status);
 
   useEffect(() => {
     setCalls(initialCalls);
@@ -163,20 +157,16 @@ function VoiceCallsPanelContent({
   }, [refreshPhonebookContacts, voiceInboxEnabled]);
 
   const filteredCalls = useMemo(() => filterVoiceCalls(calls, callFilter), [callFilter, calls]);
-  const sanitizedCalls = useMemo(
-    () => sanitizeCallsForOperatorSession(calls, softphone.status),
-    [calls, softphone.status],
-  );
   const listCalls = useMemo(() => {
     const deduped = dedupeVoiceCallsByContact(filteredCalls);
     return enrichVoiceCallsWithPhonebook(deduped, phonebookContacts);
   }, [filteredCalls, phonebookContacts]);
   const workspaceAllCalls = useMemo(() => {
     return enrichVoiceCallsWithPhonebook(
-      filterVoiceCalls(sanitizedCalls, callFilter),
+      filterVoiceCalls(calls, callFilter),
       phonebookContacts,
     );
-  }, [callFilter, phonebookContacts, sanitizedCalls]);
+  }, [callFilter, calls, phonebookContacts]);
   const activeContactKey = useMemo(() => {
     const active = calls.find((call) => call.id === activeCallId);
     return active ? getVoiceCallListKey(active) : null;
@@ -219,70 +209,17 @@ function VoiceCallsPanelContent({
 
   const detailsConversationId = selectedCall?.conversationId ?? null;
   const showRightPanel = detailsOpen && Boolean(detailsConversationId);
-  const liveCall = useMemo(() => findFirstActiveAiVoiceCall(sanitizedCalls), [sanitizedCalls]);
+  const liveCall = useMemo(() => findFirstActiveAiVoiceCall(calls), [calls]);
   const activeLiveCallIds = useMemo(
     () =>
       new Set(
-        sanitizedCalls
+        calls
           .filter((call) => isActiveVoiceCallStatus(call.status))
           .map((call) => call.id),
       ),
-    [sanitizedCalls],
+    [calls],
   );
   const hasNumberSelected = Boolean(activeCallId || phoneDraft);
-
-  useEffect(() => {
-    const previous = prevSoftphoneStatusRef.current;
-    prevSoftphoneStatusRef.current = softphone.status;
-
-    const wasOperatorSession =
-      previous === "connecting" || previous === "on-call";
-    const isIdle = softphone.status === "ready" || softphone.status === "offline";
-
-    if (!wasOperatorSession || !isIdle) {
-      return;
-    }
-
-    setCalls((current) =>
-      sanitizeCallsForOperatorSession(current, softphone.status),
-    );
-
-    setActiveCallDetail((current) => {
-      if (!current) {
-        return null;
-      }
-
-      if (
-        isActiveVoiceCallStatus(current.status)
-        && current.callMode === "human"
-      ) {
-        return {
-          ...current,
-          status: "canceled",
-          endedAt: current.endedAt ?? new Date().toISOString(),
-        };
-      }
-
-      return current;
-    });
-
-    if (workspaceView.mode === "live") {
-      setWorkspaceView(
-        activeCallId || phoneDraft ? { mode: "home" } : { mode: "dialpad" },
-      );
-    }
-
-    void requestReleaseOperatorVoiceLine();
-
-    void fetchVoiceCallsAction().then((result) => {
-      if (result.success) {
-        setCalls(
-          sanitizeCallsForOperatorSession(result.data, softphone.status),
-        );
-      }
-    });
-    router.refresh();
-  }, [activeCallId, phoneDraft, router, softphone.status, workspaceView.mode]);
 
   useEffect(() => {
     if (!activeCallId && !phoneDraft) {

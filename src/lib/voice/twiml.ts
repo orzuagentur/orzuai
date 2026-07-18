@@ -224,30 +224,6 @@ export function buildDialConferenceTwiml(input: {
 </Response>`;
 }
 
-export function buildDialClientTwiml(input: {
-  clientIdentity: string;
-  timeoutSeconds?: number;
-  actionUrl?: string;
-  speechLocale: string;
-  recordingStatusCallback?: string | null;
-}): string {
-  const identity = escapeXml(input.clientIdentity);
-  const timeout = input.timeoutSeconds ?? 25;
-  const actionAttr = input.actionUrl
-    ? ` action="${escapeXml(input.actionUrl)}"`
-    : "";
-  const recordingAttrs = input.recordingStatusCallback
-    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
-    : "";
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Dial timeout="${timeout}"${actionAttr}${recordingAttrs}>
-    <Client>${identity}</Client>
-  </Dial>
-</Response>`;
-}
-
 export function buildRecordingStatusCallbackUrl(
   businessId: string,
   parentCallSid?: string | null,

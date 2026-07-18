@@ -193,11 +193,6 @@ function collectVoiceReadinessIssues(): EnvValidationIssue[] {
   const voiceKeys = [
     ENV_KEYS.TWILIO_ACCOUNT_SID,
     ENV_KEYS.TWILIO_AUTH_TOKEN,
-    ENV_KEYS.TWILIO_CONNECT_APP_SID,
-    ENV_KEYS.TWILIO_API_KEY_SID,
-    ENV_KEYS.TWILIO_API_KEY_SECRET,
-    ENV_KEYS.TWILIO_TWIML_APP_SID,
-    ENV_KEYS.TWILIO_BROWSER_CALLER_ID,
     ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET,
     ENV_KEYS.TWILIO_WEBHOOK_SIGNING_SECRET_PREVIOUS,
     ENV_KEYS.VOICE_STREAM_WS_URL,
@@ -209,27 +204,14 @@ function collectVoiceReadinessIssues(): EnvValidationIssue[] {
   return [
     ...collectConfiguredVoiceKeyIssues(voiceKeys),
     ...collectRequiredSetIssues({
-      name: "Twilio Connect webhooks",
-      triggerKeys: [ENV_KEYS.TWILIO_CONNECT_APP_SID],
-      requiredKeys: [
-        ENV_KEYS.TWILIO_CONNECT_APP_SID,
-        ENV_KEYS.TWILIO_ACCOUNT_SID,
-        ENV_KEYS.TWILIO_AUTH_TOKEN,
-      ],
-    }),
-    ...collectRequiredSetIssues({
-      name: "platform Browser Phone",
+      name: "OrzuX platform Twilio voice",
       triggerKeys: [
-        ENV_KEYS.TWILIO_API_KEY_SID,
-        ENV_KEYS.TWILIO_API_KEY_SECRET,
-        ENV_KEYS.TWILIO_TWIML_APP_SID,
+        ENV_KEYS.TWILIO_ACCOUNT_SID,
+        ENV_KEYS.TWILIO_AUTH_TOKEN,
       ],
       requiredKeys: [
         ENV_KEYS.TWILIO_ACCOUNT_SID,
         ENV_KEYS.TWILIO_AUTH_TOKEN,
-        ENV_KEYS.TWILIO_API_KEY_SID,
-        ENV_KEYS.TWILIO_API_KEY_SECRET,
-        ENV_KEYS.TWILIO_TWIML_APP_SID,
       ],
     }),
     ...collectRequiredSetIssues({

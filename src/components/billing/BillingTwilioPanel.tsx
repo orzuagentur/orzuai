@@ -49,7 +49,7 @@ export function BillingTwilioPanel({
   hasActivePaidSubscription,
 }: BillingTwilioPanelProps) {
   const router = useRouter();
-  const [countryCode, setCountryCode] = useState("US");
+  const [countryCode, setCountryCode] = useState("DE");
   const [areaCode, setAreaCode] = useState("");
   const [availableNumbers, setAvailableNumbers] = useState<
     TwilioAvailablePhoneNumber[]
@@ -212,7 +212,7 @@ export function BillingTwilioPanel({
           href={`${DASHBOARD_ROUTES.integrations}/voice`}
           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
         >
-          Twilio settings
+          Twilio / Voice settings
           <ExternalLinkIcon className="size-3.5" />
         </Link>
       </div>
@@ -384,7 +384,7 @@ export function BillingTwilioPanel({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {data.activePhoneNumber ?? data.accountFriendlyName ?? "Not connected"}
+            {data.activePhoneNumber ?? data.accountFriendlyName ?? "No OrzuX number yet"}
           </CardContent>
         </Card>
         <Card className="shadow-none">
@@ -409,13 +409,13 @@ export function BillingTwilioPanel({
         <Card className="shadow-none">
           <CardContent className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Connect your Twilio account before purchasing numbers.
+              {BILLING_MESSAGES.twilioGetNumberHint}
             </p>
-            {data.isConnectConfigured ? (
-              <Button asChild>
-                <a href={data.connectUrl}>{BILLING_MESSAGES.connectTwilio}</a>
-              </Button>
-            ) : null}
+            <Button asChild>
+              <Link href={`${DASHBOARD_ROUTES.integrations}/voice`}>
+                {BILLING_MESSAGES.twilioGetNumberCta}
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -507,7 +507,7 @@ export function BillingTwilioPanel({
               <Button
                 type="button"
                 className="w-full"
-                disabled={!data.isConnected || isSearching}
+                disabled={isSearching}
                 onClick={() => {
                   void handleSearch();
                 }}

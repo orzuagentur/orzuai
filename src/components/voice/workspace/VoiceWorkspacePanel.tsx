@@ -8,15 +8,11 @@ import {
   HeadphonesIcon,
   HistoryIcon,
   MessageSquareIcon,
-  MicIcon,
-  MicOffIcon,
   PencilIcon,
   PhoneIcon,
   PhoneOffIcon,
   UserPlusIcon,
   VoicemailIcon,
-  Volume2Icon,
-  VolumeXIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +27,6 @@ import { VoiceRecordingCard } from "@/components/voice/VoiceRecordingCard";
 import { VoiceTranscriptTurns } from "@/components/voice/VoiceTranscriptTurns";
 import { VoiceMonitorWaveform } from "@/components/voice/workspace/VoiceMonitorWaveform";
 import type { VoiceWorkspaceView } from "@/components/voice/workspace/voice-workspace.types";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { useLiveCallTimer } from "@/hooks/use-live-call-timer";
@@ -84,7 +79,7 @@ function mergeListItemToDetail(
 }
 
 function isEphemeralLiveCallId(callId: string): boolean {
-  return callId.startsWith("pending-") || callId === "softphone-live";
+  return callId.startsWith("pending-");
 }
 
 type VoiceWorkspacePanelProps = {
@@ -129,12 +124,10 @@ export function VoiceWorkspacePanel({
   className,
 }: VoiceWorkspacePanelProps) {
   const router = useRouter();
-  const softphone = useVoiceSoftphone();
   const [dialedNumber, setDialedNumber] = useState(initialPhone);
   const [callModeOpen, setCallModeOpen] = useState(false);
   const [editContactOpen, setEditContactOpen] = useState(false);
   const [optimisticLiveCall, setOptimisticLiveCall] = useState<VoiceCallDetail | null>(null);
-  const prevSoftphoneStatusRef = useRef(softphone.status);
 
   useEffect(() => {
     if (initialPhone) {
@@ -204,47 +197,21 @@ export function VoiceWorkspacePanel({
         return optimisticLiveCall;
       }
 
-      if (view.callId === "softphone-live" || isEphemeralLiveCallId(view.callId)) {
-        const phone =
-          softphone.activePhoneNumber?.trim()
-          || phoneToCall
-          || call?.phoneNumber
-          || "";
+      if (isEphemeralLiveCallId(view.callId)) {
+        const phone = phoneToCall || call?.phoneNumber || "";
 
         if (phone) {
           return buildPlaceholderVoiceCallDetail({
             id: view.callId,
             phoneNumber: phone,
-            status:
-              softphone.status === "on-call" ? "in-progress" : "ringing",
+            status: "ringing",
             contactId: call?.contactId ?? null,
             contactName: call?.contactName ?? null,
-            callMode: optimisticLiveCall?.callMode ?? "human",
-            aiHandled: optimisticLiveCall?.aiHandled ?? false,
-            humanHandled: optimisticLiveCall?.humanHandled ?? true,
+            callMode: optimisticLiveCall?.callMode ?? "ai",
+            aiHandled: optimisticLiveCall?.aiHandled ?? true,
+            humanHandled: optimisticLiveCall?.humanHandled ?? false,
           });
         }
-      }
-
-      const phone =
-        softphone.activePhoneNumber?.trim()
-        || phoneToCall
-        || call?.phoneNumber
-        || "";
-
-      if (phone) {
-        return buildPlaceholderVoiceCallDetail({
-          id: view.callId,
-          phoneNumber: phone,
-          status:
-            softphone.status === "on-call" ? "in-progress" : "ringing",
-          contactId: call?.contactId ?? null,
-          contactName: call?.contactName ?? null,
-          callMode: optimisticLiveCall?.callMode ?? call?.callMode ?? "human",
-          aiHandled: optimisticLiveCall?.aiHandled ?? call?.aiHandled ?? false,
-          humanHandled:
-            optimisticLiveCall?.humanHandled ?? call?.humanHandled ?? true,
-        });
       }
 
       return null;
@@ -254,46 +221,12 @@ export function VoiceWorkspacePanel({
       return call;
     }
 
-    if (
-      softphone.status === "connecting"
-      || softphone.status === "on-call"
-      || softphone.status === "incoming"
-    ) {
-      const phone = softphone.activePhoneNumber?.trim() || phoneToCall;
-      const match = phone
-        ? allCalls.find(
-            (item) =>
-              phonesMatch(item.phoneNumber, phone)
-              && isActiveVoiceCallStatus(item.status),
-          )
-        : null;
-
-      if (match) {
-        return mergeListItemToDetail(match, call);
-      }
-
-      if (phone) {
-        return buildPlaceholderVoiceCallDetail({
-          id: "softphone-live",
-          phoneNumber: phone,
-          status:
-            softphone.status === "on-call" ? "in-progress" : "ringing",
-          callMode: "human",
-          humanHandled: true,
-          contactId: call?.contactId ?? null,
-          contactName: call?.contactName ?? null,
-        });
-      }
-    }
-
     return null;
   }, [
     allCalls,
     call,
     optimisticLiveCall,
     phoneToCall,
-    softphone.activePhoneNumber,
-    softphone.status,
     view,
   ]);
 
@@ -319,42 +252,6 @@ export function VoiceWorkspacePanel({
       onSelectCall?.(match.id);
     }
   }, [allCalls, onSelectCall, onViewChange, optimisticLiveCall, view.mode]);
-
-  useEffect(() => {
-    if (
-      softphone.status !== "connecting"
-      && softphone.status !== "on-call"
-      && softphone.status !== "incoming"
-    ) {
-      return;
-    }
-
-    const phone = softphone.activePhoneNumber?.trim();
-    if (!phone) {
-      return;
-    }
-
-    const match = allCalls.find(
-      (item) =>
-        phonesMatch(item.phoneNumber, phone)
-        && isActiveVoiceCallStatus(item.status),
-    );
-
-    if (view.mode === "live") {
-      return;
-    }
-
-    onViewChange({
-      mode: "live",
-      callId: match?.id ?? "softphone-live",
-    });
-  }, [
-    allCalls,
-    onViewChange,
-    softphone.activePhoneNumber,
-    softphone.status,
-    view.mode,
-  ]);
 
   const transcriptCall = useMemo(() => {
     if (view.mode !== "transcript") {
@@ -419,31 +316,7 @@ export function VoiceWorkspacePanel({
       const mode = selection.mode;
 
       if (mode === "human") {
-        if (!softphone.isOnline) {
-          toast.message(VOICE_MESSAGES.softphoneGoOnlineFirst);
-          return;
-        }
-
-        openOptimisticLiveView(phoneToCall, {
-          callMode: "human",
-          humanHandled: true,
-        });
         setCallModeOpen(false);
-
-        void softphone
-          .placeCall(phoneToCall)
-          .then(() => {
-            scheduleVoiceInboxRefresh(() => router.refresh());
-          })
-          .catch((error: unknown) => {
-            setOptimisticLiveCall(null);
-            onViewChange(resolveBackView());
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : VOICE_MESSAGES.callOutboundFailed,
-            );
-          });
         return;
       }
 
@@ -487,28 +360,16 @@ export function VoiceWorkspacePanel({
       phoneToCall,
       resolveBackView,
       router,
-      softphone,
       onPrepareNewCall,
     ],
   );
 
   const handleEndCall = useCallback(
     (callLogId: string) => {
-      const parentCallSid = softphone.activeCallSid;
-      const isEphemeral =
-        isEphemeralLiveCallId(callLogId) || callLogId === "softphone-live";
+      const isEphemeral = isEphemeralLiveCallId(callLogId);
 
       stopOutboundRingback();
-
-      if (
-        softphone.status === "connecting"
-        || softphone.status === "on-call"
-        || softphone.status === "incoming"
-      ) {
-        softphone.hangUp();
-      } else {
-        playCallDisconnectedTone();
-      }
+      playCallDisconnectedTone();
 
       setOptimisticLiveCall(null);
       onViewChange(resolveBackView());
@@ -516,22 +377,21 @@ export function VoiceWorkspacePanel({
       void (async () => {
         const result = await requestEndVoiceCall({
           callLogId: isEphemeral ? undefined : callLogId,
-          parentCallSid: parentCallSid ?? undefined,
-          phoneNumber: softphone.activePhoneNumber ?? (phoneToCall || undefined),
+          phoneNumber: phoneToCall || undefined,
         });
 
         void requestReleaseOperatorVoiceLine({
-          phoneNumber: softphone.activePhoneNumber ?? (phoneToCall || undefined),
+          phoneNumber: phoneToCall || undefined,
         });
 
         scheduleVoiceInboxRefresh(() => router.refresh());
 
-        if (!result.success && !isEphemeral && !parentCallSid) {
+        if (!result.success && !isEphemeral) {
           toast.error(result.message ?? VOICE_MESSAGES.callEndFailed);
         }
       })();
     },
-    [onViewChange, resolveBackView, router, softphone],
+    [onViewChange, phoneToCall, resolveBackView, router],
   );
 
   useEffect(() => {
@@ -539,15 +399,7 @@ export function VoiceWorkspacePanel({
       return;
     }
 
-    if (isEphemeralLiveCallId(view.callId) || view.callId === "softphone-live") {
-      return;
-    }
-
-    if (
-      softphone.status === "connecting"
-      || softphone.status === "on-call"
-      || softphone.status === "incoming"
-    ) {
+    if (isEphemeralLiveCallId(view.callId)) {
       return;
     }
 
@@ -556,29 +408,9 @@ export function VoiceWorkspacePanel({
       setOptimisticLiveCall(null);
       onViewChange(resolveBackView());
     }
-  }, [allCalls, onViewChange, resolveBackView, softphone.status, view]);
+  }, [allCalls, onViewChange, resolveBackView, view]);
 
-  useEffect(() => {
-    const previous = prevSoftphoneStatusRef.current;
-    prevSoftphoneStatusRef.current = softphone.status;
-
-    const wasLiveSession =
-      previous === "connecting"
-      || previous === "on-call"
-      || previous === "incoming";
-    const isIdle =
-      softphone.status === "ready"
-      || softphone.status === "offline";
-
-    if (wasLiveSession && isIdle && view.mode === "live") {
-      setOptimisticLiveCall(null);
-      onViewChange(resolveBackView());
-      scheduleVoiceInboxRefresh(() => router.refresh());
-    }
-  }, [onViewChange, resolveBackView, router, softphone.status, view.mode]);
-
-  const isOnCall =
-    softphone.status === "on-call" || softphone.status === "connecting";
+  const isOnCall = isLineBusy;
 
   const phonebookMatch = useMemo(
     () =>
@@ -609,11 +441,6 @@ export function VoiceWorkspacePanel({
             value={dialedNumber}
             onChange={setDialedNumber}
             onCall={handleCall}
-            onDigitPress={(digit) => {
-              if (isOnCall) {
-                softphone.sendDigits(digit);
-              }
-            }}
             callDisabled={isOnCall || isLineBusy}
             onAddContact={
               canAddContact ? () => onAddContact?.(phoneToCall) : undefined
@@ -743,7 +570,7 @@ export function VoiceWorkspacePanel({
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={phoneToCall}
-        humanAvailable={softphone.enabled && !isOnCall}
+        humanAvailable={false}
         pendingMode={null}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}
@@ -932,15 +759,10 @@ function WorkspaceLiveView({
   onEndCall: () => void;
   onOpenTranscript: () => void;
 }) {
-  const softphone = useVoiceSoftphone();
   const displayName =
     call.contactName ?? formatContactIdentifier(call.phoneNumber);
   const isOperatorCall = !isAiOnlyLiveCall(call);
-  const { isRinging, isConnected, displaySeconds } = useLiveCallTimer(call, {
-    status: softphone.status,
-    activePhoneNumber: softphone.activePhoneNumber,
-    callElapsedSeconds: softphone.callElapsedSeconds,
-  });
+  const { isRinging, isConnected, displaySeconds } = useLiveCallTimer(call);
   const { reconnect, stop, isListening } = useVoiceMonitorAudio({
     callLogId: call.id,
     enabled: false,
@@ -948,9 +770,8 @@ function WorkspaceLiveView({
   const [listening, setListening] = useState(false);
   const canMonitor =
     isAiOnlyLiveCall(call)
-    && !isEphemeralLiveCallId(call.id)
-    && call.id !== "softphone-live";
-  const isLiveSession = isRinging || isConnected || softphone.status === "incoming";
+    && !isEphemeralLiveCallId(call.id);
+  const isLiveSession = isRinging || isConnected;
 
   useEffect(() => {
     if (listening) {
@@ -1032,7 +853,7 @@ function WorkspaceLiveView({
                   </span>
                 ) : isRinging ? (
                   <span className="text-amber-700 dark:text-amber-300">
-                    {VOICE_MESSAGES.softphoneConnecting}
+                    {VOICE_MESSAGES.callOutboundPending}
                   </span>
                 ) : null}
                 <span>
@@ -1045,7 +866,18 @@ function WorkspaceLiveView({
           </div>
 
           {isOperatorCall ? (
-            <WorkspaceOperatorInCallControls onEndCall={onEndCall} />
+            <div className="mx-auto mt-5 flex max-w-sm items-center justify-center">
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                className="size-11 rounded-full"
+                onClick={onEndCall}
+                aria-label={VOICE_MESSAGES.callEnd}
+              >
+                <PhoneOffIcon className="size-5" />
+              </Button>
+            </div>
           ) : (
             <div className="mt-5 flex flex-wrap gap-2">
               {canMonitor ? (
@@ -1107,92 +939,6 @@ function WorkspaceLiveView({
           </div>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function WorkspaceOperatorInCallControls({
-  onEndCall,
-}: {
-  onEndCall: () => void;
-}) {
-  const softphone = useVoiceSoftphone();
-  const isIncoming = softphone.status === "incoming";
-
-  if (isIncoming) {
-    return (
-      <div className="mx-auto mt-5 flex max-w-sm items-center justify-center gap-3">
-        <Button
-          type="button"
-          size="lg"
-          className="rounded-full"
-          onClick={softphone.acceptIncoming}
-        >
-          <PhoneIcon className="mr-2 size-4" />
-          {VOICE_MESSAGES.softphoneAccept}
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          variant="outline"
-          className="rounded-full"
-          onClick={softphone.rejectIncoming}
-        >
-          <PhoneOffIcon className="mr-2 size-4" />
-          {VOICE_MESSAGES.softphoneReject}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto mt-5 flex max-w-sm items-center justify-center gap-2">
-      <Button
-        type="button"
-        size="icon"
-        variant={softphone.isMuted ? "default" : "outline"}
-        className="size-11 rounded-full"
-        onClick={softphone.toggleMute}
-        aria-label={
-          softphone.isMuted ? VOICE_MESSAGES.softphoneUnmute : VOICE_MESSAGES.softphoneMute
-        }
-      >
-        {softphone.isMuted ? (
-          <MicOffIcon className="size-5" />
-        ) : (
-          <MicIcon className="size-5" />
-        )}
-      </Button>
-
-      <Button
-        type="button"
-        size="icon"
-        variant={softphone.isSpeakerMuted ? "default" : "outline"}
-        className="size-11 rounded-full"
-        onClick={softphone.toggleSpeaker}
-        aria-label={
-          softphone.isSpeakerMuted
-            ? VOICE_MESSAGES.softphoneSpeaker
-            : VOICE_MESSAGES.softphoneSpeakerOff
-        }
-      >
-        {softphone.isSpeakerMuted ? (
-          <VolumeXIcon className="size-5" />
-        ) : (
-          <Volume2Icon className="size-5" />
-        )}
-      </Button>
-
-      <Button
-        type="button"
-        size="icon"
-        variant="destructive"
-        className="size-11 rounded-full"
-        onClick={onEndCall}
-        aria-label={VOICE_MESSAGES.callEnd}
-      >
-        <PhoneOffIcon className="size-5" />
-      </Button>
     </div>
   );
 }

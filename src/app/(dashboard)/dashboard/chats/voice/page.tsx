@@ -17,7 +17,6 @@ export default async function VoiceInboxPage({ searchParams }: VoiceInboxPagePro
       businessId={data.businessId}
       voiceInboxEnabled={data.voiceInboxEnabled}
       smsInboxEnabled={data.smsInboxEnabled}
-      softphoneEnabled={data.softphoneEnabled}
       visibleChannelIds={data.visibleChannelIds}
       calls={data.calls}
       activeCall={data.activeCall}

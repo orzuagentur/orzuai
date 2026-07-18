@@ -119,7 +119,7 @@ export function VoiceDialPad({
           autoComplete="tel"
           value={value}
           onChange={(event) => handleInputChange(event.target.value)}
-          placeholder={VOICE_MESSAGES.softphoneDialpadTitle}
+          placeholder={VOICE_MESSAGES.dialpadTitle}
           className={cn(
             "w-full border-0 bg-transparent text-center text-2xl font-medium tracking-wide outline-none placeholder:text-muted-foreground/50",
             value ? "text-foreground" : "text-muted-foreground",
@@ -150,7 +150,7 @@ export function VoiceDialPad({
           type="button"
           onClick={deleteDigit}
           disabled={!value}
-          aria-label={VOICE_MESSAGES.softphoneDeleteDigit}
+          aria-label={VOICE_MESSAGES.dialpadDeleteDigit}
           className="flex size-12 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
         >
           <DeleteIcon className="size-5" />

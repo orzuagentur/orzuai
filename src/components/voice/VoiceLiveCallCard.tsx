@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,6 @@ import {
   isActiveVoiceCallStatus,
   isConnectedVoiceCallStatus,
 } from "@/utils/voice-call-display";
-import { phonesMatch } from "@/utils/voice-contact-calls";
 
 type ConferenceParticipant = {
   callSid: string;
@@ -148,7 +146,6 @@ export function VoiceLiveCallCard({
   className,
   defaultCollapsed = false,
 }: VoiceLiveCallCardProps) {
-  const softphone = useVoiceSoftphone();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [isHandoffPending, setIsHandoffPending] = useState(false);
   const [isEndPending, setIsEndPending] = useState(false);
@@ -157,10 +154,7 @@ export function VoiceLiveCallCard({
   >(null);
 
   const isLive = isActiveVoiceCallStatus(call.status);
-  const isConnected =
-    isConnectedVoiceCallStatus(call.status)
-    || (softphone.status === "on-call"
-      && phonesMatch(softphone.activePhoneNumber ?? "", call.phoneNumber));
+  const isConnected = isConnectedVoiceCallStatus(call.status);
   const displayName =
     call.contactName ?? formatContactIdentifier(call.phoneNumber);
   const durationSeconds = useLiveCallDuration(
@@ -176,11 +170,7 @@ export function VoiceLiveCallCard({
     participant.label.toLowerCase().includes("customer"),
   );
   const canHandoff =
-    softphone.enabled && call.aiHandled && isLive && !call.humanHandled;
-  const canJoin =
-    softphone.enabled &&
-    isLive &&
-    (call.humanHandled || call.callMode === "human");
+    call.aiHandled && isLive && !call.humanHandled;
   const modeLabel = call.aiHandled
     ? VOICE_MESSAGES.callModeAiTitle
     : call.humanHandled
@@ -290,23 +280,6 @@ export function VoiceLiveCallCard({
     }
   }
 
-  function handleJoin() {
-    if (canHandoff) {
-      void handleHandoff();
-      return;
-    }
-
-    if (canJoin && call.phoneNumber) {
-      void softphone.placeCall(call.phoneNumber).catch((error: unknown) => {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : VOICE_MESSAGES.callOutboundFailed,
-        );
-      });
-    }
-  }
-
   return (
     <section
       className={cn(
@@ -389,23 +362,21 @@ export function VoiceLiveCallCard({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {(canHandoff || canJoin) && (
+            {canHandoff ? (
               <Button
                 type="button"
                 size="sm"
                 disabled={isHandoffPending}
-                onClick={handleJoin}
+                onClick={() => void handleHandoff()}
               >
                 {isHandoffPending ? (
                   <Loader2Icon className="mr-2 size-4 animate-spin" />
                 ) : (
                   <UserIcon className="mr-2 size-4" />
                 )}
-                {canHandoff
-                  ? VOICE_MESSAGES.callTakeOver
-                  : VOICE_MESSAGES.callJoin}
+                {VOICE_MESSAGES.callTakeOver}
               </Button>
-            )}
+            ) : null}
 
             <Button
               type="button"
@@ -495,22 +466,6 @@ export function VoiceLiveCallCard({
                     : VOICE_MESSAGES.callConferenceMute}
                 </Button>
               </>
-            ) : softphone.status === "on-call" ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={softphone.toggleMute}
-              >
-                {softphone.isMuted ? (
-                  <MicOffIcon className="mr-2 size-4" />
-                ) : (
-                  <MicIcon className="mr-2 size-4" />
-                )}
-                {softphone.isMuted
-                  ? VOICE_MESSAGES.softphoneUnmute
-                  : VOICE_MESSAGES.softphoneMute}
-              </Button>
             ) : null}
           </div>
         </div>

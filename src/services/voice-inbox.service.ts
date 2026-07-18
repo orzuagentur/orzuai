@@ -17,7 +17,6 @@ import { getTwilioConnection } from "@/services/twilio-integration.service";
 import { completeOperatorCallAfterCustomerLeave } from "@/services/voice-conference.service";
 import { guardAiOutboundOnMissedStatus } from "@/services/voice-ai-outbound-guard.service";
 import { cancelOutboundVoiceCall } from "@/services/voice-outbound-cancel.service";
-import { getVoiceClientConfig } from "@/services/voice-client.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
@@ -103,7 +102,6 @@ export async function getVoiceInboxPageData(
       businessId: null,
       voiceInboxEnabled: false,
       smsInboxEnabled: false,
-      softphoneEnabled: false,
       businessPhoneNumber: null,
       visibleChannelIds: [],
       calls: [],
@@ -117,7 +115,6 @@ export async function getVoiceInboxPageData(
       businessId: null,
       voiceInboxEnabled: false,
       smsInboxEnabled: false,
-      softphoneEnabled: false,
       businessPhoneNumber: null,
       visibleChannelIds: [],
       calls: [],
@@ -126,13 +123,13 @@ export async function getVoiceInboxPageData(
   }
 
   const { businessId } = inboxContext;
-  const [voiceInboxEnabled, smsInboxEnabled, visibleChannelIds, calls, clientConfig] =
+  const [voiceInboxEnabled, smsInboxEnabled, visibleChannelIds, calls, connection] =
     await Promise.all([
       isVoiceInboxVisible(businessId),
       isSmsInboxVisible(businessId),
       resolveVisibleChannelIds(businessId),
       getVoiceRepository().listCallLogsForInbox(businessId),
-      getVoiceClientConfig(businessId),
+      getTwilioConnection(businessId),
     ]);
 
   const mappedCalls = calls.map(mapCallLogRow);
@@ -146,8 +143,7 @@ export async function getVoiceInboxPageData(
     businessId,
     voiceInboxEnabled,
     smsInboxEnabled,
-    softphoneEnabled: clientConfig.enabled,
-    businessPhoneNumber: clientConfig.phoneNumber,
+    businessPhoneNumber: connection?.phoneNumber ?? null,
     visibleChannelIds,
     calls: mappedCalls,
     activeCall,
@@ -608,67 +604,6 @@ export async function markInboundCallAiFallback(
       reason: "operator_no_answer",
     },
   });
-}
-
-export async function recordClientOutboundVoiceCall(input: {
-  businessId: string;
-  phoneNumber: string;
-  callSid: string;
-  contactId?: string | null;
-}): Promise<{ callLogId: string | null }> {
-  if (!hasSupabaseEnv() || !input.callSid.trim()) {
-    return { callLogId: null };
-  }
-
-  const repo = getVoiceRepository();
-  const existing = await repo.findCallLogByExternalCallId(input.callSid);
-
-  if (existing) {
-    if (existing.business_id !== input.businessId) {
-      console.warn(
-        "[voice-inbox] ignored browser outbound call for mismatched business",
-        JSON.stringify({
-          expectedBusinessId: existing.business_id,
-          receivedBusinessId: input.businessId,
-          callSid: input.callSid,
-        }),
-      );
-      return { callLogId: null };
-    }
-
-    return { callLogId: existing.id };
-  }
-
-  await repo.insertCallLog({
-    businessId: input.businessId,
-    contactId: input.contactId ?? null,
-    direction: "outbound",
-    phoneNumber: input.phoneNumber,
-    status: "ringing",
-    provider: "twilio",
-    externalCallId: input.callSid,
-    triggerReason: "browser_call",
-    callMode: "human",
-    humanHandled: true,
-  });
-
-  const created = await repo.findCallLogByExternalCallId(input.callSid);
-
-  await repo.insertCallEvent({
-    businessId: input.businessId,
-    callLogId: created?.id ?? null,
-    callSid: input.callSid,
-    eventType: "call.created",
-    actorType: "operator",
-    payload: {
-      direction: "outbound",
-      phoneNumber: input.phoneNumber,
-      callMode: "human",
-      triggerReason: "browser_call",
-    },
-  });
-
-  return { callLogId: created?.id ?? null };
 }
 
 export async function syncVoiceCallToConversation(input: {

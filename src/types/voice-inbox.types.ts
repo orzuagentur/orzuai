@@ -43,7 +43,6 @@ export type VoiceInboxPageData = {
   businessId: string | null;
   voiceInboxEnabled: boolean;
   smsInboxEnabled: boolean;
-  softphoneEnabled: boolean;
   businessPhoneNumber: string | null;
   visibleChannelIds: import("@/types/database.types").MessagingChannel[];
   calls: VoiceInboxCallListItem[];

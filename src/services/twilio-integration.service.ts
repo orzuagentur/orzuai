@@ -10,45 +10,27 @@ import {
 import { TWILIO_MESSAGES } from "@/features/twilio/constants";
 import { buildAppUrl } from "@/lib/app-url";
 import {
-  buildTwilioConnectAuthorizeUrl,
-  createTwilioConnectState,
-  getTwilioConnectAppSid,
   getTwilioPlatformAccountSid,
   getTwilioPlatformAuthToken,
-  hasTwilioConnectEnv,
   hasTwilioPlatformEnv,
-} from "@/lib/twilio/connect";
+} from "@/lib/twilio/platform";
 import { appendTwilioWebhookSignature } from "@/lib/twilio/webhook-token";
-import {
-  getTwilioApiKeySecret,
-  getTwilioApiKeySid,
-  getTwilioTwimlAppSid,
-} from "@/lib/twilio/access-token";
 import {
   clearTwilioPhoneNumberWebhooks,
   configureTwilioPhoneNumberWebhooks,
-  createTwilioApplication,
-  fetchTwilioApplication,
-  fetchTwilioAccount,
   fetchTwilioIncomingPhoneNumber,
   listTwilioMonitorAlerts,
   listTwilioIncomingPhoneNumbers,
   purchaseTwilioPhoneNumber,
   searchTwilioAvailablePhoneNumbers,
-  updateTwilioApplication,
   type TwilioApiCredentials,
-  TwilioApiRequestError,
 } from "@/lib/twilio/client";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { registerTwilioNumberBilling } from "@/services/billing-twilio.service";
-import {
-  deleteIntegrationSecret,
-  readIntegrationSecret,
-  storeIntegrationSecret,
-} from "@/services/integration-secrets.service";
+import { deleteIntegrationSecret } from "@/services/integration-secrets.service";
 import type { TwilioConnection } from "@/types/database.types";
 import type {
   TwilioAvailablePhoneNumber,
@@ -63,22 +45,10 @@ import type {
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-const BROWSER_PHONE_APP_NAME = "OrzuX Browser Phone";
-
 type TwilioWebhookValidationContext = {
   authToken: string | null;
   expectedAccountSid: string | null;
-  /** Connect softphone callbacks use the platform AC; inbound uses the Connect AC. */
   allowedAccountSids?: string[];
-};
-
-export type TwilioBrowserPhoneRuntimeConfig = {
-  accountSid: string;
-  apiKeySid: string;
-  apiKeySecret: string;
-  twimlAppSid: string;
-  authToken: string;
-  mode: "platform" | "customer";
 };
 
 function mapBrowserPhoneStatus(
@@ -150,17 +120,6 @@ export function getTwilioConnectConfig(): TwilioConnectConfig {
     authorizeRedirectUri: buildAppUrl("/api/integrations/twilio/callback"),
     deauthorizeRedirectUri: buildAppUrl("/api/integrations/twilio/deauthorize"),
   };
-}
-
-export async function buildTwilioConnectUrlForBusiness(
-  businessId: string,
-): Promise<string> {
-  if (!hasTwilioConnectEnv()) {
-    throw new Error(TWILIO_MESSAGES.notConfiguredTitle);
-  }
-
-  const state = await createTwilioConnectState(businessId);
-  return buildTwilioConnectAuthorizeUrl(state);
 }
 
 export async function getTwilioConnection(
@@ -260,9 +219,7 @@ export async function resolveTwilioCredentialsForBusiness(
 
 export async function resolveTwilioWebhookValidationContext(
   businessId: string,
-  options?: { softphoneClient?: boolean },
 ): Promise<TwilioWebhookValidationContext | null> {
-  void options;
   const connection = await getTwilioConnection(businessId);
 
   if (!connection || connection.status === "disconnected") {
@@ -276,98 +233,6 @@ export async function resolveTwilioWebhookValidationContext(
     expectedAccountSid: platformAccountSid,
     allowedAccountSids: platformAccountSid ? [platformAccountSid] : undefined,
   };
-}
-
-export async function resolveTwilioBrowserPhoneRuntimeConfig(
-  businessId: string,
-): Promise<TwilioBrowserPhoneRuntimeConfig | null> {
-  const connection = await getTwilioConnection(businessId);
-
-  if (!isBrowserPhoneSupportedForTwilioConnection(connection)) {
-    return null;
-  }
-
-  const hasStoredBrowserCredentials = Boolean(
-    connection?.connectedAccountSid &&
-      connection.apiKeySid &&
-      connection.apiKeySecretKeyName &&
-      connection.browserTwimlAppSid,
-  );
-
-  // Connect softphone uses OrzuX platform API Key + TwiML App (Connect
-  // subaccounts cannot create Keys — Twilio returns 20003).
-  if (connection?.authMode === "connect") {
-    let twimlAppSid = connection.browserTwimlAppSid?.trim() || null;
-
-    if (!twimlAppSid || connection.browserPhoneStatus !== "ready") {
-      const credentials = await resolveTwilioCredentialsForBusiness(connection);
-      if (credentials) {
-        const provisioning = await provisionConnectBrowserPhoneApplication({
-          businessId,
-          connection,
-          credentials,
-        });
-        if (provisioning.success) {
-          twimlAppSid = provisioning.appSid;
-        }
-      }
-    }
-
-    if (!twimlAppSid) {
-      twimlAppSid = getTwilioTwimlAppSid()?.trim() || null;
-    }
-
-    const accountSid = getTwilioPlatformAccountSid();
-    const authToken = getTwilioPlatformAuthToken();
-    const apiKeySid = getTwilioApiKeySid();
-    const apiKeySecret = getTwilioApiKeySecret();
-
-    if (!accountSid || !authToken || !apiKeySid || !apiKeySecret || !twimlAppSid) {
-      return null;
-    }
-
-    return {
-      accountSid,
-      apiKeySid,
-      apiKeySecret,
-      twimlAppSid,
-      authToken,
-      mode: "platform",
-    };
-  }
-
-  if (connection?.authMode === "api_key" && hasStoredBrowserCredentials) {
-    if (
-      !connection.connectedAccountSid ||
-      !connection.apiKeySid ||
-      !connection.apiKeySecretKeyName ||
-      !connection.authTokenSecretKeyName ||
-      !connection.browserTwimlAppSid
-    ) {
-      return null;
-    }
-
-    const admin = createAdminClient();
-    const [apiKeySecret, authToken] = await Promise.all([
-      readIntegrationSecret(admin, connection.apiKeySecretKeyName),
-      readIntegrationSecret(admin, connection.authTokenSecretKeyName),
-    ]);
-
-    if (!apiKeySecret || !authToken) {
-      return null;
-    }
-
-    return {
-      accountSid: connection.connectedAccountSid,
-      apiKeySid: connection.apiKeySid,
-      apiKeySecret,
-      twimlAppSid: connection.browserTwimlAppSid,
-      authToken,
-      mode: "customer",
-    };
-  }
-
-  return null;
 }
 
 /** Softphone removed — OrzuX uses platform numbers + Rufweiterleitung (HeyKiki model). */
@@ -607,233 +472,6 @@ function buildVoiceWebhookUrls(businessId: string) {
   };
 }
 
-function buildBrowserPhoneApplicationUrls(businessId: string) {
-  return {
-    voiceUrl: buildAppUrl("/api/webhooks/voice/client"),
-    statusCallbackUrl: appendTwilioWebhookSignature(
-      `${buildAppUrl("/api/webhooks/voice/status")}?businessId=${businessId}`,
-      businessId,
-    ),
-  };
-}
-
-function sanitizeTwilioProvisioningError(error: unknown): string {
-  const message =
-    error instanceof Error && error.message.trim()
-      ? error.message.trim()
-      : "Twilio Browser Phone provisioning failed.";
-
-  return message.replace(/\s+/g, " ").slice(0, 500);
-}
-
-type BrowserPhoneProvisioningResult =
-  | { success: true; appSid: string }
-  | { success: false; message: string };
-
-async function upsertBrowserPhoneTwimlApplication(input: {
-  businessId: string;
-  connection: TwilioConnectionData;
-  credentials: TwilioApiCredentials;
-}): Promise<string> {
-  const urls = buildBrowserPhoneApplicationUrls(input.businessId);
-  const friendlyName = `${BROWSER_PHONE_APP_NAME} ${input.businessId.slice(0, 8)}`;
-  const existingAppSid = input.connection.browserTwimlAppSid?.trim();
-  let app: Awaited<ReturnType<typeof createTwilioApplication>>;
-
-  if (existingAppSid) {
-    try {
-      app = await updateTwilioApplication({
-        credentials: input.credentials,
-        applicationSid: existingAppSid,
-        friendlyName,
-        voiceUrl: urls.voiceUrl,
-        statusCallbackUrl: urls.statusCallbackUrl,
-      });
-    } catch (error) {
-      const shouldRecreate =
-        error instanceof TwilioApiRequestError &&
-        (error.status === 404 ||
-          error.status === 403 ||
-          error.code === 20404 ||
-          error.code === 20003);
-
-      if (shouldRecreate) {
-        app = await createTwilioApplication({
-          credentials: input.credentials,
-          friendlyName,
-          voiceUrl: urls.voiceUrl,
-          statusCallbackUrl: urls.statusCallbackUrl,
-        });
-      } else {
-        throw error;
-      }
-    }
-  } else {
-    app = await createTwilioApplication({
-      credentials: input.credentials,
-      friendlyName,
-      voiceUrl: urls.voiceUrl,
-      statusCallbackUrl: urls.statusCallbackUrl,
-    });
-  }
-
-  return app.sid;
-}
-
-async function provisionCustomerBrowserPhoneApplication(input: {
-  businessId: string;
-  connection: TwilioConnectionData;
-  credentials: TwilioApiCredentials;
-}): Promise<BrowserPhoneProvisioningResult> {
-  const admin = createAdminClient();
-
-  await upsertTwilioConnectionRow(admin, input.businessId, {
-    browser_phone_status: "pending",
-    browser_phone_last_error: null,
-  });
-
-  try {
-    const appSid = await upsertBrowserPhoneTwimlApplication(input);
-
-    await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_twiml_app_sid: appSid,
-      browser_phone_status: "ready",
-      browser_phone_last_error: null,
-      browser_phone_provisioned_at: new Date().toISOString(),
-      last_synced_at: new Date().toISOString(),
-    });
-
-    return { success: true, appSid };
-  } catch (error) {
-    const message = sanitizeTwilioProvisioningError(error);
-
-    await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_phone_status: "failed",
-      browser_phone_last_error: message,
-      browser_phone_provisioned_at: null,
-      last_synced_at: new Date().toISOString(),
-    });
-
-    console.warn(
-      "[twilio] BYOT Browser Phone provisioning failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid: input.credentials.accountSid,
-        message,
-      }),
-    );
-
-    return { success: false, message };
-  }
-}
-
-async function provisionConnectBrowserPhoneApplication(input: {
-  businessId: string;
-  connection: TwilioConnectionData;
-  credentials: TwilioApiCredentials;
-  actorUserId?: string | null;
-  actorEmail?: string;
-}): Promise<BrowserPhoneProvisioningResult> {
-  const admin = createAdminClient();
-  const platformAccountSid = getTwilioPlatformAccountSid();
-  const platformAuthToken = getTwilioPlatformAuthToken();
-  const platformApiKeySid = getTwilioApiKeySid();
-  const platformApiKeySecret = getTwilioApiKeySecret();
-
-  await upsertTwilioConnectionRow(admin, input.businessId, {
-    browser_phone_status: "pending",
-    browser_phone_last_error: null,
-  });
-
-  if (
-    !platformAccountSid ||
-    !platformAuthToken ||
-    !platformApiKeySid ||
-    !platformApiKeySecret
-  ) {
-    const message =
-      "OrzuX platform softphone keys are missing (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET). Connect accounts cannot create their own API Keys.";
-
-    await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_phone_status: "failed",
-      browser_phone_last_error: message,
-      browser_phone_provisioned_at: null,
-      last_synced_at: new Date().toISOString(),
-    });
-
-    console.warn(
-      "[twilio] Connect Browser Phone provisioning failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid: input.credentials.accountSid,
-        message,
-      }),
-    );
-
-    return { success: false, message };
-  }
-
-  try {
-    // Create/update TwiML App on the OrzuX platform account — Connect
-    // "Charge account for usage" cannot create Keys on the connected AC.
-    const appSid = await upsertBrowserPhoneTwimlApplication({
-      businessId: input.businessId,
-      connection: input.connection,
-      credentials: {
-        accountSid: platformAccountSid,
-        authToken: platformAuthToken,
-      },
-    });
-
-    await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_twiml_app_sid: appSid,
-      browser_phone_status: "ready",
-      browser_phone_last_error: null,
-      browser_phone_provisioned_at: new Date().toISOString(),
-      last_synced_at: new Date().toISOString(),
-    });
-
-    return { success: true, appSid };
-  } catch (error) {
-    const message = sanitizeTwilioProvisioningError(error);
-
-    await upsertTwilioConnectionRow(admin, input.businessId, {
-      browser_phone_status: "failed",
-      browser_phone_last_error: message,
-      browser_phone_provisioned_at: null,
-      last_synced_at: new Date().toISOString(),
-    });
-
-    console.warn(
-      "[twilio] Connect Browser Phone provisioning failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid: input.credentials.accountSid,
-        platformAccountSid,
-        message,
-      }),
-    );
-
-    return { success: false, message };
-  }
-}
-
-async function provisionBrowserPhoneForConnection(input: {
-  businessId: string;
-  connection: TwilioConnectionData;
-  credentials: TwilioApiCredentials;
-}): Promise<BrowserPhoneProvisioningResult | null> {
-  if (input.connection.authMode === "connect") {
-    return provisionConnectBrowserPhoneApplication(input);
-  }
-
-  if (input.connection.authMode === "api_key") {
-    return provisionCustomerBrowserPhoneApplication(input);
-  }
-
-  return null;
-}
-
 function buildWebhookField(
   label: string,
   value: string | null,
@@ -862,14 +500,9 @@ function diagnoseTwilioAlert(alert: {
   alertText: string | null;
 }): string {
   const responseBody = alert.responseBody?.trim() ?? "";
-  const requestUrl = alert.requestUrl ?? "";
 
   if (alert.errorCode === "11200" && responseBody.includes("Invalid Twilio signature")) {
-    if (requestUrl.includes("/api/webhooks/voice/client")) {
-      return "Browser Phone TwiML App callback reached OrzuX, but OrzuX rejected X-Twilio-Signature. Re-save the current Auth Token, and confirm the TwiML App Voice URL host matches (www.orzux.com vs orzux.com).";
-    }
-
-    return "OrzuX rejected Twilio's X-Twilio-Signature. Usually the saved Auth Token is outdated or from another account — reconnect Twilio with the current Auth Token from Console → Account → API keys & tokens. Also confirm the webhook URL host matches (www.orzux.com vs orzux.com).";
+    return "OrzuX rejected Twilio's X-Twilio-Signature. Confirm platform TWILIO_AUTH_TOKEN matches the OrzuX Twilio account and webhook URL host matches (www.orzux.com vs orzux.com).";
   }
 
   if (alert.errorCode === "11200") {
@@ -906,9 +539,6 @@ export async function getTwilioNumberDiagnostics(
   const connection = await getTwilioConnection(businessId);
   const webhooks = buildVoiceWebhookUrls(businessId);
   const platformAccountSid = getTwilioPlatformAccountSid() ?? null;
-  const platformAuthToken = getTwilioPlatformAuthToken() ?? null;
-  const browserTwimlAppSid =
-    connection?.browserTwimlAppSid ?? getTwilioTwimlAppSid() ?? null;
 
   const base: TwilioNumberDiagnostics = {
     status: "unavailable",
@@ -917,7 +547,7 @@ export async function getTwilioNumberDiagnostics(
     platformAccountSid: maskTwilioSid(platformAccountSid),
     selectedPhoneSid: connection?.phoneSid ?? null,
     selectedPhoneNumber: connection?.phoneNumber ?? null,
-    browserTwimlAppSid: maskTwilioSid(browserTwimlAppSid),
+    browserTwimlAppSid: null,
     numberFields: [],
     browserAppFields: [],
     errorLogs: [],
@@ -937,25 +567,10 @@ export async function getTwilioNumberDiagnostics(
     };
   }
 
-  const browserAppCredentials = connection.browserTwimlAppSid
-    ? ctx.credentials
-    : platformAccountSid && platformAuthToken
-      ? { accountSid: platformAccountSid, authToken: platformAuthToken }
-      : null;
-  const monitorCredentials =
-    connection.authMode === "api_key" ||
-    connection.authMode === "auth_token" ||
-    connection.authMode === "connect"
-      ? ctx.credentials
-      : platformAccountSid && platformAuthToken
-        ? { accountSid: platformAccountSid, authToken: platformAuthToken }
-        : null;
+  const monitorCredentials = getPlatformTwilioCredentials();
 
-  const [numberResult, appResult, alertsResult] = await Promise.allSettled([
+  const [numberResult, alertsResult] = await Promise.allSettled([
     fetchTwilioIncomingPhoneNumber(ctx.credentials, connection.phoneSid),
-    browserAppCredentials && browserTwimlAppSid
-      ? fetchTwilioApplication(browserAppCredentials, browserTwimlAppSid)
-      : Promise.resolve(null),
     monitorCredentials
       ? listTwilioMonitorAlerts(monitorCredentials, 10)
       : Promise.resolve([]),
@@ -963,7 +578,6 @@ export async function getTwilioNumberDiagnostics(
 
   const number =
     numberResult.status === "fulfilled" ? numberResult.value : null;
-  const app = appResult.status === "fulfilled" ? appResult.value : null;
   const alerts =
     alertsResult.status === "fulfilled" ? alertsResult.value : [];
 
@@ -986,17 +600,6 @@ export async function getTwilioNumberDiagnostics(
       ]
     : [];
 
-  const browserAppFields = app
-    ? [
-        buildWebhookField(
-          "Browser Phone Voice URL",
-          app.voiceUrl,
-          buildAppUrl("/api/webhooks/voice/client"),
-        ),
-        buildWebhookField("Browser Phone Voice Method", app.voiceMethod, "POST"),
-      ]
-    : [];
-
   const errorLogs = alerts.map(mapErrorLog).filter((alert) => {
     const url = alert.requestUrl ?? "";
     return url.includes("/api/webhooks/voice") || alert.errorCode === "11200";
@@ -1004,20 +607,17 @@ export async function getTwilioNumberDiagnostics(
   const hasInvalidSignature = errorLogs.some((alert) =>
     alert.responseBody?.includes("Invalid Twilio signature"),
   );
-  const hasFieldMismatch = [...numberFields, ...browserAppFields].some(
-    (field) => field.ok === false,
-  );
+  const hasFieldMismatch = numberFields.some((field) => field.ok === false);
 
   return {
     ...base,
     status: hasInvalidSignature || hasFieldMismatch ? "error" : "ok",
     summary: hasInvalidSignature
-      ? "Latest Twilio error is an invalid webhook signature on the Browser Phone TwiML App callback."
+      ? "Latest Twilio error is an invalid webhook signature on a voice webhook."
       : hasFieldMismatch
         ? "One or more Twilio webhook settings do not match the expected OrzuX configuration."
-        : "Selected phone number webhooks and Browser Phone TwiML App settings match the expected OrzuX configuration.",
+        : "Selected phone number webhooks match the expected OrzuX configuration.",
     numberFields,
-    browserAppFields,
     errorLogs,
   };
 }
@@ -1068,424 +668,6 @@ async function upsertTwilioConnectionRow(
   }
 
   return data ? mapTwilioConnection(data) : null;
-}
-
-export async function completeTwilioConnectAuthorization(input: {
-  businessId: string;
-  connectedAccountSid: string;
-}): Promise<{ success: boolean; message?: string; autoConnected?: boolean }> {
-  if (!hasSupabaseEnv() || !hasTwilioPlatformEnv()) {
-    return { success: false, message: TWILIO_MESSAGES.notConfiguredTitle };
-  }
-
-  const accountSid = input.connectedAccountSid.trim();
-
-  if (!accountSid.startsWith("AC")) {
-    return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
-  }
-
-  const admin = createAdminClient();
-  const existingConnection = await getTwilioConnection(input.businessId);
-  const credentials: TwilioApiCredentials = {
-    accountSid,
-    authToken: getTwilioPlatformAuthToken()!,
-  };
-
-  let friendlyName: string | null = null;
-  let parentAccountSid: string | null = null;
-
-  try {
-    const account = await fetchTwilioAccount(credentials);
-    friendlyName = account.friendly_name ?? null;
-    parentAccountSid = account.owner_account_sid?.trim() || null;
-
-    if (parentAccountSid === accountSid) {
-      parentAccountSid = null;
-    }
-  } catch (error) {
-    console.warn(
-      "[twilio] account lookup failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
-    );
-    return { success: false, message: TWILIO_MESSAGES.accountVerifyFailed };
-  }
-
-  if (existingConnection?.apiKeySecretKeyName) {
-    await deleteIntegrationSecret(admin, existingConnection.apiKeySecretKeyName);
-  }
-
-  if (existingConnection?.authTokenSecretKeyName) {
-    await deleteIntegrationSecret(admin, existingConnection.authTokenSecretKeyName);
-  }
-
-  const connection = await upsertTwilioConnectionRow(admin, input.businessId, {
-    twilio_status: "authorized",
-    auth_mode: "connect",
-    billing_owner: "customer",
-    connected_account_sid: accountSid,
-    parent_account_sid: parentAccountSid,
-    api_key_sid: null,
-    api_key_secret_key_name: null,
-    auth_token_secret_key_name: null,
-    browser_twiml_app_sid: null,
-    browser_phone_status: "disabled",
-    browser_phone_last_error: null,
-    browser_phone_provisioned_at: null,
-    account_friendly_name: friendlyName,
-    phone_number: null,
-    phone_sid: null,
-    connected_at: null,
-    last_synced_at: new Date().toISOString(),
-  });
-
-  if (!connection) {
-    return { success: false, message: TWILIO_MESSAGES.saveFailed };
-  }
-
-  await provisionConnectBrowserPhoneApplication({
-    businessId: input.businessId,
-    connection,
-    credentials,
-  });
-
-  revalidateTwilioPaths();
-  return { success: true, autoConnected: false };
-}
-
-function normalizeTwilioSid(value: string, prefix: "AC" | "SK"): string | null {
-  const trimmed = value.trim().toUpperCase();
-
-  if (!trimmed.startsWith(prefix) || trimmed.length !== 34) {
-    return null;
-  }
-
-  return trimmed;
-}
-
-function sanitizeTwilioSecret(value: string): string {
-  return value.trim().replace(/\s+/g, "");
-}
-
-function resolveTwilioAccountSid(
-  account: { sid?: string; account_sid?: string },
-  fallback: string,
-): string {
-  return (account.sid ?? account.account_sid ?? fallback).trim().toUpperCase();
-}
-
-function formatTwilioConnectError(error: unknown, fallback: string): string {
-  if (error instanceof TwilioApiRequestError) {
-    if (error.code === 20003 || error.status === 401 || error.status === 403) {
-      return (
-        "Twilio отклонил учётные данные (код 20003). Проверьте Account SID и Auth Token " +
-        "с одной страницы в Twilio Console. Для API Key нужен Main key, не Standard."
-      );
-    }
-
-    return error.message;
-  }
-
-  return error instanceof Error ? error.message : fallback;
-}
-
-export async function connectTwilioWithAuthToken(input: {
-  businessId: string;
-  accountSid: string;
-  authToken: string;
-  actorUserId?: string | null;
-  actorEmail?: string;
-}): Promise<{ success: boolean; message?: string }> {
-  if (!hasSupabaseEnv()) {
-    return { success: false, message: TWILIO_MESSAGES.saveFailed };
-  }
-
-  const accountSid = normalizeTwilioSid(input.accountSid, "AC");
-  const authToken = sanitizeTwilioSecret(input.authToken);
-
-  if (!accountSid) {
-    return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
-  }
-
-  if (authToken.length < 16) {
-    return { success: false, message: TWILIO_MESSAGES.invalidAuthToken };
-  }
-
-  const credentials: TwilioApiCredentials = {
-    accountSid,
-    authToken,
-  };
-
-  let friendlyName: string | null = null;
-
-  try {
-    const account = await fetchTwilioAccount(credentials);
-    friendlyName = account.friendly_name ?? null;
-
-    const resolvedAccountSid = resolveTwilioAccountSid(account, accountSid);
-    if (resolvedAccountSid !== accountSid) {
-      console.warn(
-        "[twilio] auth token connect account sid mismatch",
-        JSON.stringify({
-          businessId: input.businessId,
-          expected: accountSid,
-          resolved: resolvedAccountSid,
-        }),
-      );
-    }
-
-    await listTwilioIncomingPhoneNumbers(credentials);
-  } catch (error) {
-    console.warn(
-      "[twilio] auth token connect validation failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
-    );
-
-    return {
-      success: false,
-      message: formatTwilioConnectError(error, TWILIO_MESSAGES.authTokenConnectFailed),
-    };
-  }
-
-  const admin = createAdminClient();
-
-  const authTokenSecretKeyName = await storeIntegrationSecret(admin, {
-    businessId: input.businessId,
-    kind: "TWILIO_AUTH_TOKEN",
-    value: authToken,
-    description: `Twilio Auth Token for business ${input.businessId}`,
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
-  });
-
-  if (!authTokenSecretKeyName) {
-    return { success: false, message: TWILIO_MESSAGES.authTokenStoreFailed };
-  }
-
-  const connection = await upsertTwilioConnectionRow(admin, input.businessId, {
-    twilio_status: "authorized",
-    auth_mode: "auth_token",
-    billing_owner: "customer",
-    connected_account_sid: accountSid,
-    parent_account_sid: null,
-    api_key_sid: null,
-    api_key_secret_key_name: null,
-    auth_token_secret_key_name: authTokenSecretKeyName,
-    browser_phone_status: "disabled",
-    browser_phone_last_error: null,
-    account_friendly_name: friendlyName,
-    phone_number: null,
-    phone_sid: null,
-    connected_at: null,
-    last_synced_at: new Date().toISOString(),
-  });
-
-  if (!connection) {
-    return { success: false, message: TWILIO_MESSAGES.saveFailed };
-  }
-
-  revalidateTwilioPaths();
-  return { success: true };
-}
-
-export async function connectTwilioWithAuthTokenForCurrentUser(input: {
-  accountSid: string;
-  authToken: string;
-}): Promise<{ success: boolean; message?: string }> {
-  const user = await requireUser();
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return { success: false, message: TWILIO_MESSAGES.noBusiness };
-  }
-
-  return connectTwilioWithAuthToken({
-    businessId,
-    accountSid: input.accountSid,
-    authToken: input.authToken,
-    actorUserId: user.id,
-    actorEmail: user.email ?? undefined,
-  });
-}
-
-export async function connectTwilioWithApiKey(input: {
-  businessId: string;
-  accountSid: string;
-  apiKeySid: string;
-  apiKeySecret: string;
-  authToken: string;
-  actorUserId?: string | null;
-  actorEmail?: string;
-}): Promise<{ success: boolean; message?: string }> {
-  if (!hasSupabaseEnv()) {
-    return { success: false, message: TWILIO_MESSAGES.saveFailed };
-  }
-
-  const accountSid = normalizeTwilioSid(input.accountSid, "AC");
-  const apiKeySid = normalizeTwilioSid(input.apiKeySid, "SK");
-  const apiKeySecret = sanitizeTwilioSecret(input.apiKeySecret);
-  const authToken = sanitizeTwilioSecret(input.authToken);
-
-  if (!accountSid) {
-    return { success: false, message: TWILIO_MESSAGES.invalidAccountSid };
-  }
-
-  if (!apiKeySid) {
-    return { success: false, message: TWILIO_MESSAGES.invalidApiKeySid };
-  }
-
-  if (apiKeySecret.length < 16) {
-    return { success: false, message: TWILIO_MESSAGES.invalidApiKeySecret };
-  }
-
-  if (authToken.length < 16) {
-    return { success: false, message: TWILIO_MESSAGES.invalidAuthToken };
-  }
-
-  const apiKeyCredentials: TwilioApiCredentials = {
-    accountSid,
-    authToken: "",
-    apiKeySid,
-    apiKeySecret,
-  };
-
-  const authTokenCredentials: TwilioApiCredentials = {
-    accountSid,
-    authToken,
-  };
-
-  const credentials: TwilioApiCredentials = {
-    accountSid,
-    authToken,
-    apiKeySid,
-    apiKeySecret,
-  };
-
-  let friendlyName: string | null = null;
-
-  try {
-    // Standard API keys cannot call /Accounts — validate via IncomingPhoneNumbers.
-    await listTwilioIncomingPhoneNumbers(apiKeyCredentials);
-
-    const account = await fetchTwilioAccount(authTokenCredentials);
-    friendlyName = account.friendly_name ?? null;
-
-    await listTwilioIncomingPhoneNumbers(credentials);
-  } catch (error) {
-    console.warn(
-      "[twilio] api key connect validation failed",
-      JSON.stringify({
-        businessId: input.businessId,
-        accountSid,
-        error: error instanceof Error ? error.message : "unknown",
-      }),
-    );
-
-    return {
-      success: false,
-      message: formatTwilioConnectError(error, TWILIO_MESSAGES.apiKeyConnectFailed),
-    };
-  }
-
-  const admin = createAdminClient();
-
-  const secretKeyName = await storeIntegrationSecret(admin, {
-    businessId: input.businessId,
-    kind: "TWILIO_API_KEY_SECRET",
-    value: apiKeySecret,
-    description: `Twilio API key secret for business ${input.businessId}`,
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
-  });
-
-  if (!secretKeyName) {
-    return { success: false, message: TWILIO_MESSAGES.apiKeySecretStoreFailed };
-  }
-
-  const authTokenSecretKeyName = await storeIntegrationSecret(admin, {
-    businessId: input.businessId,
-    kind: "TWILIO_AUTH_TOKEN",
-    value: authToken,
-    description: `Twilio Auth Token for business ${input.businessId}`,
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
-  });
-
-  if (!authTokenSecretKeyName) {
-    await deleteIntegrationSecret(admin, secretKeyName);
-    return { success: false, message: TWILIO_MESSAGES.authTokenStoreFailed };
-  }
-
-  const connection = await upsertTwilioConnectionRow(admin, input.businessId, {
-    twilio_status: "authorized",
-    auth_mode: "api_key",
-    billing_owner: "customer",
-    connected_account_sid: accountSid,
-    parent_account_sid: null,
-    api_key_sid: apiKeySid,
-    api_key_secret_key_name: secretKeyName,
-    auth_token_secret_key_name: authTokenSecretKeyName,
-    browser_phone_status: "pending",
-    browser_phone_last_error: null,
-    account_friendly_name: friendlyName,
-    phone_number: null,
-    phone_sid: null,
-    connected_at: null,
-    last_synced_at: new Date().toISOString(),
-  });
-
-  if (!connection) {
-    return { success: false, message: TWILIO_MESSAGES.saveFailed };
-  }
-
-  const provisioning = await provisionCustomerBrowserPhoneApplication({
-    businessId: input.businessId,
-    connection,
-    credentials,
-  });
-
-  if (!provisioning.success) {
-    return {
-      success: false,
-      message:
-        TWILIO_MESSAGES.browserPhoneProvisionFailed +
-        ` ${provisioning.message}`,
-    };
-  }
-
-  revalidateTwilioPaths();
-  return { success: true };
-}
-
-export async function connectTwilioWithApiKeyForCurrentUser(input: {
-  accountSid: string;
-  apiKeySid: string;
-  apiKeySecret: string;
-  authToken: string;
-}): Promise<{ success: boolean; message?: string }> {
-  const user = await requireUser();
-  const businessId = await getOwnedBusinessId();
-
-  if (!businessId) {
-    return { success: false, message: TWILIO_MESSAGES.noBusiness };
-  }
-
-  return connectTwilioWithApiKey({
-    businessId,
-    accountSid: input.accountSid,
-    apiKeySid: input.apiKeySid,
-    apiKeySecret: input.apiKeySecret,
-    authToken: input.authToken,
-    actorUserId: user.id,
-    actorEmail: user.email ?? undefined,
-  });
 }
 
 export async function selectTwilioPhoneNumber(input: {
@@ -1567,8 +749,6 @@ export async function selectTwilioPhoneNumber(input: {
     connected_account_sid: ctx.credentials.accountSid,
     phone_number: selectedNumber,
     phone_sid: selectedSid,
-    browser_phone_status: "disabled",
-    browser_twiml_app_sid: null,
     connected_at: ctx.connection.connectedAt ?? now,
     last_synced_at: now,
   });
@@ -1638,23 +818,6 @@ export async function resyncTwilioConnection(
   }
 
   if (connection.status === "authorized") {
-    const ctx = await getTwilioCredentialsForBusiness(businessId);
-
-    if (ctx) {
-      const provisioning = await provisionBrowserPhoneForConnection({
-        businessId,
-        connection,
-        credentials: ctx.credentials,
-      });
-
-      if (provisioning && !provisioning.success) {
-        console.warn(
-          "[twilio] Browser Phone provisioning skipped during authorized resync",
-          JSON.stringify({ businessId, message: provisioning.message }),
-        );
-      }
-    }
-
     const refreshed = await refreshTwilioPhoneNumbers(businessId, {
       revalidate: true,
     });
@@ -1686,19 +849,6 @@ export async function resyncTwilioConnection(
       smsUrl: webhooks.smsWebhookUrl,
       statusCallbackUrl: webhooks.statusCallbackUrl,
     });
-
-    const provisioning = await provisionBrowserPhoneForConnection({
-      businessId,
-      connection,
-      credentials: ctx.credentials,
-    });
-
-    if (provisioning && !provisioning.success) {
-      console.warn(
-        "[twilio] Browser Phone provisioning skipped during connected resync",
-        JSON.stringify({ businessId, message: provisioning.message }),
-      );
-    }
   } catch {
     return { success: false, message: TWILIO_MESSAGES.resyncFailed };
   }
@@ -1710,52 +860,6 @@ export async function resyncTwilioConnection(
 
   revalidateTwilioPaths();
   return { success: true };
-}
-
-export async function handleTwilioConnectDeauthorization(input: {
-  accountSid: string;
-  connectAppSid?: string | null;
-}): Promise<{ success: boolean; processed: boolean }> {
-  const accountSid = input.accountSid.trim();
-  const expectedConnectAppSid = getTwilioConnectAppSid();
-
-  if (!accountSid.startsWith("AC")) {
-    return { success: false, processed: false };
-  }
-
-  if (
-    input.connectAppSid &&
-    expectedConnectAppSid &&
-    input.connectAppSid !== expectedConnectAppSid
-  ) {
-    console.warn(
-      "[twilio] deauthorize ignored — ConnectAppSid mismatch",
-      JSON.stringify({
-        received: input.connectAppSid,
-      }),
-    );
-    return { success: false, processed: false };
-  }
-
-  const connection = await getTwilioConnectionByAccountSid(accountSid);
-
-  if (!connection) {
-    return { success: true, processed: false };
-  }
-
-  await disconnectTwilioIntegration(connection.businessId, {
-    skipWebhookCleanup: true,
-  });
-
-  console.info(
-    "[twilio] deauthorized",
-    JSON.stringify({
-      businessId: connection.businessId,
-      accountSid,
-    }),
-  );
-
-  return { success: true, processed: true };
 }
 
 export async function disconnectTwilioIntegration(

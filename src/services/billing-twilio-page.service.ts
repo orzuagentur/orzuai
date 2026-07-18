@@ -8,7 +8,6 @@ import {
   listTwilioNumberSubscriptions,
 } from "@/services/billing-twilio.service";
 import {
-  buildTwilioConnectUrlForBusiness,
   getTwilioConnectConfig,
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
@@ -33,14 +32,14 @@ function buildEmptyTwilioBillingData(): TwilioBillingData {
     callVolume: [],
     smsVolume: [],
     monthlyNumberSpendCents: 0,
-    connectUrl: "/api/integrations/twilio/connect",
+    connectUrl: "/dashboard/integrations/voice",
     isConnectConfigured: getTwilioConnectConfig().isConfigured,
     balanceCents: null,
     balanceCurrency: null,
     balanceError: null,
     walletBalanceCents: 0,
     topUpFeePercent: getTwilioTopUpFeePercent(),
-    billingOwner: "customer" as const,
+    billingOwner: "platform" as const,
     balanceSource: null,
     twilioConsoleUrl: "https://console.twilio.com/us1/billing/manage-billing/billing-overview",
     balanceUpdatedAt: null,
@@ -132,13 +131,13 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
     0,
   );
 
-  let connectUrl = empty.connectUrl;
+  let connectUrl = "/dashboard/integrations/voice";
   let balanceCents: number | null = null;
   let balanceCurrency: string | null = null;
   let balanceError: string | null = null;
   let balanceUpdatedAt: string | null = null;
   let balanceSource: TwilioBillingData["balanceSource"] = null;
-  const billingOwner = connection?.billingOwner ?? "customer";
+  const billingOwner = "platform" as const;
   const twilioConsoleUrl = "https://console.twilio.com/us1/billing/manage-billing/billing-overview";
   let topUpHistory: TwilioBillingData["topUpHistory"] = [];
 
@@ -158,21 +157,11 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
   }));
 
   const creditsCents = sumCompletedTopUpCredits(topUps ?? []);
-  const walletBalanceCents =
-    billingOwner === "platform" ? await getTwilioWalletBalanceCents(businessId) : 0;
+  const walletBalanceCents = await getTwilioWalletBalanceCents(businessId);
   const resolvedWalletBalanceCents =
-    billingOwner === "platform"
-      ? walletBalanceCents > 0
-        ? walletBalanceCents
-        : creditsCents
-      : 0;
+    walletBalanceCents > 0 ? walletBalanceCents : creditsCents;
 
-  if (
-    connection &&
-    (connection.status === "connected" ||
-      (connection.status === "authorized" &&
-        (connection.authMode === "api_key" || connection.authMode === "auth_token")))
-  ) {
+  if (connection && connection.status === "connected") {
     const credentials = await resolveTwilioCredentialsForBusiness(connection);
 
     if (credentials) {
@@ -187,20 +176,11 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
         balanceUpdatedAt = new Date().toISOString();
         balanceSource = balance.source;
       } else {
-        balanceError =
-          billingOwner === "customer"
-            ? "Balance is managed in your Twilio account. Top up at console.twilio.com."
-            : balance.message;
+        balanceError = balance.message;
       }
     } else {
-      balanceError = "Twilio credentials are not configured for this account.";
+      balanceError = "Twilio platform credentials are not configured.";
     }
-  }
-
-  try {
-    connectUrl = await buildTwilioConnectUrlForBusiness(businessId);
-  } catch {
-    connectUrl = empty.connectUrl;
   }
 
   return {

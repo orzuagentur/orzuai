@@ -25,7 +25,6 @@ import {
   type VoiceCallModeSelection,
 } from "@/components/voice/VoiceCallModeDialog";
 import { VoiceDialPad } from "@/components/voice/VoiceDialPad";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -67,7 +66,6 @@ export function VoiceInboxDialerPanel({
   className,
 }: VoiceInboxDialerPanelProps) {
   const router = useRouter();
-  const softphone = useVoiceSoftphone();
   const [dialedNumber, setDialedNumber] = useState(initialPhone);
   const [callModeOpen, setCallModeOpen] = useState(false);
   const [pendingCallMode, setPendingCallMode] = useState<VoiceCallMode | null>(
@@ -150,42 +148,11 @@ export function VoiceInboxDialerPanel({
       return;
     }
 
-    const mode = selection.mode;
-    setPendingCallMode(mode);
-
-    if (mode === "human") {
-      if (!softphone.isOnline) {
-        toast.message(VOICE_MESSAGES.softphoneGoOnlineFirst);
-        void softphone.goOnline().catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : VOICE_MESSAGES.softphoneUnavailable,
-          );
-        });
-        setPendingCallMode(null);
-        return;
-      }
-
-      void softphone
-        .placeCall(phoneToCall)
-        .then(() => {
-          toast.success(VOICE_MESSAGES.callOutboundSuccess);
-          setCallModeOpen(false);
-          scheduleVoiceInboxRefresh(() => router.refresh());
-        })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : VOICE_MESSAGES.callOutboundFailed,
-          );
-        })
-        .finally(() => {
-          setPendingCallMode(null);
-        });
+    if (selection.mode === "human") {
       return;
     }
+
+    setPendingCallMode("ai");
 
     startCalling(async () => {
       try {
@@ -214,20 +181,6 @@ export function VoiceInboxDialerPanel({
     });
   }
 
-  function handleDigitPress(digit: string) {
-    if (softphone.status === "on-call" || softphone.status === "connecting") {
-      softphone.sendDigits(digit);
-    }
-  }
-
-  const isOnCall =
-    softphone.status === "on-call" || softphone.status === "connecting";
-  const isSoftphoneBusy =
-    softphone.status === "registering" ||
-    softphone.status === "connecting" ||
-    softphone.status === "on-call" ||
-    softphone.status === "incoming";
-
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       {activeAiCall && !isSelectedCallLive ? (
@@ -239,7 +192,7 @@ export function VoiceInboxDialerPanel({
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder={VOICE_MESSAGES.softphoneSearchContacts}
+          placeholder={VOICE_MESSAGES.dialpadSearchContacts}
           className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-primary/30 focus:ring-2"
         />
         {onToggleDetails ? (
@@ -287,16 +240,15 @@ export function VoiceInboxDialerPanel({
         value={dialedNumber}
         onChange={handleDialedNumberChange}
         onCall={handleCall}
-        onDigitPress={handleDigitPress}
         callDisabled={
-          isCalling || Boolean(pendingCallMode) || isOnCall || isLineBusy
+          isCalling || Boolean(pendingCallMode) || isLineBusy
         }
       />
 
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={phoneToCall}
-        humanAvailable={softphone.enabled && !isSoftphoneBusy}
+        humanAvailable={false}
         pendingMode={pendingCallMode}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}

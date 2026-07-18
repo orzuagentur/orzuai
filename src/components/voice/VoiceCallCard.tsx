@@ -6,19 +6,12 @@ import {
   HistoryIcon,
   Loader2Icon,
   MessageSquareIcon,
-  MicIcon,
-  MicOffIcon,
-  PhoneIcon,
-  PhoneOffIcon,
   UserIcon,
-  Volume2Icon,
-  VolumeXIcon,
 } from "lucide-react";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { VoiceContactCallHistoryDialog } from "@/components/voice/VoiceContactCallHistoryDialog";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
@@ -26,7 +19,6 @@ import type { VoiceCallDetail, VoiceInboxCallListItem } from "@/types/voice-inbo
 import { formatContactIdentifier } from "@/utils/contact-display";
 import { getPhoneCountryLabel } from "@/utils/voice-call-display";
 import { getCallsForContact } from "@/utils/voice-contact-calls";
-import { formatVoiceCallDuration } from "@/utils/voice-call-display";
 
 type VoiceCallCardProps = {
   call: VoiceCallDetail | null;
@@ -47,12 +39,8 @@ export function VoiceCallCard({
   onSelectCall,
   className,
 }: VoiceCallCardProps) {
-  const softphone = useVoiceSoftphone();
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const isOnCall =
-    softphone.status === "on-call" || softphone.status === "connecting";
-  const isIncoming = softphone.status === "incoming";
   const activeCallStatuses = new Set([
     "active",
     "ringing",
@@ -64,8 +52,7 @@ export function VoiceCallCard({
     (call?.callMode === "ai" || call?.callMode === "handoff") &&
     activeCallStatuses.has((call?.status ?? "").toLowerCase());
 
-  const liveNumber = softphone.activePhoneNumber?.trim() || "";
-  const effectiveNumber = liveNumber || dialedNumber.trim();
+  const effectiveNumber = dialedNumber.trim();
 
   const displayName =
     call?.contactName ??
@@ -122,7 +109,7 @@ export function VoiceCallCard({
             <p className="mt-1 text-xs text-muted-foreground">{phoneCountry}</p>
           ) : null}
 
-          {hasQuickActions && !isOnCall && !isIncoming ? (
+          {hasQuickActions ? (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <Button
                 type="button"
@@ -166,31 +153,13 @@ export function VoiceCallCard({
             </div>
           ) : null}
 
-          {softphone.status === "on-call" && softphone.callElapsedSeconds !== null ? (
-            <p className="mt-2 font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              {formatVoiceCallDuration(softphone.callElapsedSeconds)}
-            </p>
-          ) : isAiCallLive ? (
+          {isAiCallLive ? (
             <p className="mt-2 flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
               <Loader2Icon className="size-4 animate-spin" />
               {VOICE_MESSAGES.aiCallLive}
             </p>
-          ) : softphone.status === "connecting" ? (
-            <p className="mt-2 text-sm font-medium text-sky-600 dark:text-sky-400">
-              {VOICE_MESSAGES.softphoneConnecting}
-            </p>
           ) : null}
         </div>
-
-        {(isOnCall || isIncoming) && softphone.enabled ? (
-          <InCallControls />
-        ) : null}
-
-        {softphone.error ? (
-          <p className="mx-auto mt-2 max-w-sm text-center text-xs text-destructive">
-            {softphone.error}
-          </p>
-        ) : null}
       </div>
 
       <VoiceContactCallHistoryDialog
@@ -202,82 +171,5 @@ export function VoiceCallCard({
         onSelectCall={onSelectCall}
       />
     </>
-  );
-}
-
-function InCallControls() {
-  const softphone = useVoiceSoftphone();
-  const isIncoming = softphone.status === "incoming";
-
-  if (isIncoming) {
-    return (
-      <div className="mx-auto mt-4 flex max-w-sm items-center justify-center gap-3">
-        <Button type="button" size="lg" className="rounded-full" onClick={softphone.acceptIncoming}>
-          <PhoneIcon className="mr-2 size-4" />
-          {VOICE_MESSAGES.softphoneAccept}
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          variant="outline"
-          className="rounded-full"
-          onClick={softphone.rejectIncoming}
-        >
-          <PhoneOffIcon className="mr-2 size-4" />
-          {VOICE_MESSAGES.softphoneReject}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto mt-4 flex max-w-sm items-center justify-center gap-2">
-      <Button
-        type="button"
-        size="icon"
-        variant={softphone.isMuted ? "default" : "outline"}
-        className="size-11 rounded-full"
-        onClick={softphone.toggleMute}
-        aria-label={
-          softphone.isMuted ? VOICE_MESSAGES.softphoneUnmute : VOICE_MESSAGES.softphoneMute
-        }
-      >
-        {softphone.isMuted ? (
-          <MicOffIcon className="size-5" />
-        ) : (
-          <MicIcon className="size-5" />
-        )}
-      </Button>
-
-      <Button
-        type="button"
-        size="icon"
-        variant={softphone.isSpeakerMuted ? "default" : "outline"}
-        className="size-11 rounded-full"
-        onClick={softphone.toggleSpeaker}
-        aria-label={
-          softphone.isSpeakerMuted
-            ? VOICE_MESSAGES.softphoneSpeaker
-            : VOICE_MESSAGES.softphoneSpeakerOff
-        }
-      >
-        {softphone.isSpeakerMuted ? (
-          <VolumeXIcon className="size-5" />
-        ) : (
-          <Volume2Icon className="size-5" />
-        )}
-      </Button>
-
-      <Button
-        type="button"
-        size="icon"
-        variant="destructive"
-        className="size-11 rounded-full"
-        onClick={softphone.hangUp}
-        aria-label={VOICE_MESSAGES.softphoneHangUp}
-      >
-        <PhoneOffIcon className="size-5" />
-      </Button>
-    </div>
   );
 }

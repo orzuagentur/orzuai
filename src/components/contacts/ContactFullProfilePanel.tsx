@@ -24,7 +24,8 @@ import {
   type VoiceCallMode,
   type VoiceCallModeSelection,
 } from "@/components/voice/VoiceCallModeDialog";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
+import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   Dialog,
   DialogContent,
@@ -38,8 +39,6 @@ import { deleteContactAction } from "@/features/contacts/actions/delete-contact"
 import { updateContactAction } from "@/features/contacts/actions/update-contact";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
-import { VOICE_MESSAGES } from "@/features/voice/constants";
 import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
@@ -91,7 +90,6 @@ export function ContactFullProfilePanel({
   const [editAdditionalContacts, setEditAdditionalContacts] = useState<
     AdditionalContactEntry[]
   >([]);
-  const softphone = useVoiceSoftphone();
   const router = useRouter();
 
   const { contact } = profile;
@@ -203,22 +201,7 @@ export function ContactFullProfilePanel({
     setPendingCallMode(mode);
 
     if (mode === "human") {
-      void softphone
-        .placeCall(phoneNumber)
-        .then(() => {
-          toast.success(VOICE_MESSAGES.callOutboundSuccess);
-          setCallModeOpen(false);
-        })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : VOICE_MESSAGES.callOutboundFailed,
-          );
-        })
-        .finally(() => {
-          setPendingCallMode(null);
-        });
+      setPendingCallMode(null);
       return;
     }
 
@@ -559,15 +542,7 @@ export function ContactFullProfilePanel({
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={contact.identifier ?? ""}
-        humanAvailable={
-          softphone.enabled &&
-          ![
-            "registering",
-            "connecting",
-            "on-call",
-            "incoming",
-          ].includes(softphone.status)
-        }
+        humanAvailable={false}
         pendingMode={pendingCallMode}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}

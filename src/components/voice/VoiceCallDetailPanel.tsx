@@ -32,7 +32,6 @@ import {
 } from "@/components/voice/VoiceCallModeDialog";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { triggerContactVoiceCallAction } from "@/features/voice/actions/trigger-contact-voice-call";
-import { useVoiceSoftphone } from "@/components/voice/voice-softphone-context";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 import type {
@@ -274,7 +273,6 @@ export function VoiceCallDetailPanel({
   const [smsBody, setSmsBody] = useState("");
   const [isSmsSending, setIsSmsSending] = useState(false);
   const [useLocalTime, setUseLocalTime] = useState(false);
-  const softphone = useVoiceSoftphone();
 
   useEffect(() => {
     setUseLocalTime(true);
@@ -291,7 +289,6 @@ export function VoiceCallDetailPanel({
   }
 
   const canHandoff =
-    softphone.enabled &&
     call.aiHandled &&
     isActiveVoiceCallStatus(call.status);
   const callStartedAtLabel = formatVoiceCallDateParts(call.createdAt, {
@@ -311,23 +308,7 @@ export function VoiceCallDetailPanel({
     setPendingCallMode(mode);
 
     if (mode === "human") {
-      void softphone
-        .placeCall(call.phoneNumber)
-        .then(() => {
-          toast.success(VOICE_MESSAGES.callOutboundSuccess);
-          setCallModeOpen(false);
-          scheduleVoiceInboxRefresh(() => router.refresh());
-        })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : VOICE_MESSAGES.callOutboundFailed,
-          );
-        })
-        .finally(() => {
-          setPendingCallMode(null);
-        });
+      setPendingCallMode(null);
       return;
     }
 
@@ -476,11 +457,6 @@ export function VoiceCallDetailPanel({
 
   const displayName =
     call.contactName ?? formatContactIdentifier(call.phoneNumber);
-  const isSoftphoneBusy =
-    softphone.status === "registering" ||
-    softphone.status === "connecting" ||
-    softphone.status === "on-call" ||
-    softphone.status === "incoming";
   const summaryPayload = parseSummaryPayload(
     call.events.find(
       (event) => event.eventType === "voice_post_call.summary.created",
@@ -501,10 +477,7 @@ export function VoiceCallDetailPanel({
   );
   const isLiveMonitoringVisible = isLive || isActiveVoiceCallStatus(call.status);
   const conferenceParticipants = getConferenceParticipants(call.events);
-  const liveDurationSeconds =
-    softphone.status === "on-call" && softphone.callElapsedSeconds !== null
-      ? softphone.callElapsedSeconds
-      : call.durationSeconds;
+  const liveDurationSeconds = call.durationSeconds;
   const transcriptionEnabled = call.turns.length > 0 || Boolean(eventTranscript);
   const hasPostCallAnalysis =
     Boolean(summaryPayload?.summary) ||
@@ -598,7 +571,7 @@ export function VoiceCallDetailPanel({
         <VoiceCallModeDialog
           open={callModeOpen}
           phoneNumber={call.phoneNumber}
-          humanAvailable={softphone.enabled && !isSoftphoneBusy}
+          humanAvailable={false}
           pendingMode={pendingCallMode}
           onOpenChange={setCallModeOpen}
           onSelectMode={handleCallModeSelect}
@@ -700,7 +673,7 @@ export function VoiceCallDetailPanel({
               <LiveMonitoringMetric
                 label={VOICE_MESSAGES.callMonitoringOperator}
                 value={
-                  softphone.enabled
+                  call.operatorUserId || call.humanHandled
                     ? VOICE_MESSAGES.callMonitoringReady
                     : VOICE_MESSAGES.callMonitoringUnavailable
                 }
