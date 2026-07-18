@@ -308,6 +308,7 @@ export async function buildClientOutboundTwiml(input: {
   }
 
   const parentCallSid = input.callSid.trim();
+  const webhooks = buildVoiceWebhookUrls(input.businessId);
   const recordingCallback = settings.recordingEnabled
     ? buildRecordingStatusCallbackUrl(input.businessId, parentCallSid)
     : null;
@@ -355,6 +356,7 @@ export async function buildClientOutboundTwiml(input: {
   return buildDialPhoneNumberTwiml({
     callerId: customerLeg.callerId,
     toNumber: to,
+    statusCallbackUrl: webhooks.customerLegStatusCallbackUrl(parentCallSid),
     recordingStatusCallback: recordingCallback,
   });
 }

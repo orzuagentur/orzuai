@@ -162,10 +162,14 @@ export function buildGoodbyeTwiml(speechLocale: string): string {
 export function buildDialPhoneNumberTwiml(input: {
   callerId: string;
   toNumber: string;
+  statusCallbackUrl?: string | null;
   recordingStatusCallback?: string | null;
 }): string {
   const callerId = escapeXml(input.callerId);
   const toNumber = escapeXml(input.toNumber);
+  const statusCallbackAttrs = input.statusCallbackUrl
+    ? ` statusCallback="${escapeXml(input.statusCallbackUrl)}" statusCallbackMethod="POST" statusCallbackEvent="initiated ringing answered completed"`
+    : "";
   const recordingAttrs = input.recordingStatusCallback
     ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(input.recordingStatusCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
@@ -173,7 +177,7 @@ export function buildDialPhoneNumberTwiml(input: {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial callerId="${callerId}"${recordingAttrs}>
-    <Number>${toNumber}</Number>
+    <Number${statusCallbackAttrs}>${toNumber}</Number>
   </Dial>
 </Response>`;
 }
