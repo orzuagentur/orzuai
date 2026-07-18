@@ -1,24 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { ENV_KEYS } from "@/constants/env-keys";
+import {
+  reportCronPartialFailures,
+  runAuthorizedCron,
+} from "@/lib/cron/run-authorized-cron";
 import { renewAllGmailWatches } from "@/services/gmail-integration.service";
 
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env[ENV_KEYS.CRON_SECRET]?.trim();
-  const authHeader = request.headers.get("authorization");
-  const provided =
-    authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  return runAuthorizedCron(
+    request,
+    { name: "gmail-watch-renew", path: "/api/cron/gmail-watch-renew" },
+    async () => {
+      const result = await renewAllGmailWatches();
+      reportCronPartialFailures({
+        name: "gmail-watch-renew",
+        path: "/api/cron/gmail-watch-renew",
+        failed: result.failed,
+        processed: result.processed,
+      });
 
-  if (!cronSecret || provided !== cronSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const result = await renewAllGmailWatches();
-
-  return NextResponse.json({
-    success: true,
-    processed: result.processed,
-    renewed: result.renewed,
-    failed: result.failed,
-  });
+      return NextResponse.json({
+        success: true,
+        processed: result.processed,
+        renewed: result.renewed,
+        failed: result.failed,
+      });
+    },
+  );
 }

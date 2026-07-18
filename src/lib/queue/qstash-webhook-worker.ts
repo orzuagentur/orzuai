@@ -66,6 +66,23 @@ export async function dispatchWebhookQueueWorker(
     return { dispatched: true };
   } catch (error) {
     console.error("[webhook-queue] QStash dispatch failed", error);
+    const { schedulePlatformErrorReport } = await import(
+      "@/services/error-intelligence.service"
+    );
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "messaging",
+      category: "webhook",
+      source: "qstash-webhook-worker",
+      title: "Webhook queue QStash dispatch failed",
+      message: error instanceof Error ? error.message : String(error),
+      stackTrace: error instanceof Error ? error.stack ?? null : null,
+      path: WORKER_PATH,
+      method: "POST",
+      context: { source },
+      rootCause: "Failed to publish inbound webhook drain job to QStash.",
+      suggestedFix: "Verify QSTASH_TOKEN and worker URL reachability.",
+    });
     return { dispatched: false };
   }
 }

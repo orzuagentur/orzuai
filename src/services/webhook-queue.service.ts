@@ -9,6 +9,7 @@ import {
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import { processTelegramWebhook } from "@/services/telegram.service";
 import { processWhatsAppWebhook } from "@/services/whatsapp.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
@@ -351,6 +352,25 @@ async function markWebhookJobRetry(
     })
     .eq("id", input.id);
 
+  if (exhausted) {
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "messaging",
+      category: "webhook",
+      source: "webhook-queue",
+      title: "Inbound webhook job exhausted retries",
+      message: input.error,
+      context: {
+        jobId: input.id,
+        attemptCount,
+        maxAttempts,
+      },
+      retryCount: attemptCount,
+      rootCause: "Inbound webhook processing failed until max attempts.",
+      suggestedFix: "Inspect last_error on inbound_webhook_queue and channel provider status.",
+    });
+  }
+
   return exhausted ? "failed" : "retried";
 }
 
@@ -362,6 +382,17 @@ function scheduleInboundWebhookProcessingInProcess(): void {
   webhookDrainPromise = drainInboundWebhookQueue()
     .catch((error) => {
       console.error("[webhook-queue] in-process drain failed", error);
+      schedulePlatformErrorReport({
+        severity: "high",
+        module: "messaging",
+        category: "webhook",
+        source: "webhook-queue",
+        title: "Inbound webhook drain failed",
+        message: error instanceof Error ? error.message : String(error),
+        stackTrace: error instanceof Error ? error.stack ?? null : null,
+        rootCause: "In-process webhook queue drain threw.",
+        suggestedFix: "Check webhook-queue service and database connectivity.",
+      });
       return {
         processed: 0,
         completed: 0,

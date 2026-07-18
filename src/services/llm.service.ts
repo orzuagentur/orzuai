@@ -32,11 +32,57 @@ import {
   generateOpenAiText,
   hasOpenAiEnv,
 } from "@/services/openai.service";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import type {
   GeminiServiceResult,
   GenerateAssistantReplyInput,
   GenerateTextInput,
 } from "@/types/gemini.types";
+
+function isExpectedLlmDenial(message: string | undefined): boolean {
+  return Boolean(message && /limit|quota|monthly/i.test(message));
+}
+
+function reportLlmFallbackFailure(input: {
+  callType?: AiCallType;
+  businessId?: string;
+  conversationId?: string | null;
+  attemptedProviders: AiProvider[];
+  error?: { code: string; message: string } | null;
+  mode: "assistant" | "text";
+}): void {
+  const message = input.error?.message ?? "LLM generation failed.";
+  if (isExpectedLlmDenial(message)) {
+    return;
+  }
+
+  const isMissingConfig = input.error?.code === "MISSING_CONFIG";
+
+  schedulePlatformErrorReport({
+    severity: isMissingConfig ? "warning" : "high",
+    module: "ai",
+    category: "llm",
+    source: "llm",
+    title: isMissingConfig
+      ? "No LLM provider configured"
+      : "LLM fallback exhausted",
+    message,
+    businessId: input.businessId ?? null,
+    conversationId: input.conversationId ?? null,
+    ai: {
+      mode: input.mode,
+      callType: input.callType ?? "other",
+      attemptedProviders: input.attemptedProviders,
+      errorCode: input.error?.code ?? null,
+    },
+    rootCause: isMissingConfig
+      ? "No ready LLM provider keys/config for this call."
+      : "All configured LLM providers failed for this request.",
+    suggestedFix: isMissingConfig
+      ? "Configure Gemini/OpenAI/Claude keys or platform AI overrides."
+      : "Check provider status, API keys, and model availability.",
+  });
+}
 
 export type LlmTrackingContext = {
   businessId?: string;
@@ -564,20 +610,37 @@ export async function generateAssistantReplyWithFallback(
   }
 
   if (lastError) {
+    reportLlmFallbackFailure({
+      callType: input.callType,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      attemptedProviders,
+      error: lastError.success ? null : lastError.error,
+      mode: "assistant",
+    });
     return {
       ...lastError,
       attemptedProviders,
     };
   }
 
-  return {
-    success: false,
+  const missing = {
+    success: false as const,
     error: {
-      code: "MISSING_CONFIG",
+      code: "MISSING_CONFIG" as const,
       message: "No LLM provider is configured.",
     },
     attemptedProviders,
   };
+  reportLlmFallbackFailure({
+    callType: input.callType,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    attemptedProviders,
+    error: missing.error,
+    mode: "assistant",
+  });
+  return missing;
 }
 
 export async function generateTextWithFallback(
@@ -630,18 +693,35 @@ export async function generateTextWithFallback(
   }
 
   if (lastError) {
+    reportLlmFallbackFailure({
+      callType: input.callType,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      attemptedProviders,
+      error: lastError.success ? null : lastError.error,
+      mode: "text",
+    });
     return {
       ...lastError,
       attemptedProviders,
     };
   }
 
-  return {
-    success: false,
+  const missing = {
+    success: false as const,
     error: {
-      code: "MISSING_CONFIG",
+      code: "MISSING_CONFIG" as const,
       message: "No LLM provider is configured.",
     },
     attemptedProviders,
   };
+  reportLlmFallbackFailure({
+    callType: input.callType,
+    businessId: input.businessId,
+    conversationId: input.conversationId,
+    attemptedProviders,
+    error: missing.error,
+    mode: "text",
+  });
+  return missing;
 }

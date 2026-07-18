@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  clearKnowledgeCategoryEntries,
   createKnowledgeCategory,
   deleteKnowledgeCategory,
 } from "@/services/knowledge-categories.service";
@@ -16,4 +17,8 @@ export async function createKnowledgeCategoryAction(input: {
 
 export async function deleteKnowledgeCategoryAction(categoryId: string) {
   return deleteKnowledgeCategory(categoryId);
+}
+
+export async function clearKnowledgeCategoryEntriesAction(categoryId: string) {
+  return clearKnowledgeCategoryEntries(categoryId);
 }

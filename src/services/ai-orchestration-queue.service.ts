@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runAutoReplyBackgroundOrchestration } from "@/services/auto-reply-pipeline.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
 import { buildAiOrchestrationIdempotencyKey } from "@/services/ai-reply-queue.service";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -317,6 +318,15 @@ function scheduleAiOrchestrationProcessingInProcess(): void {
   orchestrationDrainPromise = drainAiOrchestrationQueue()
     .catch((error) => {
       console.error("[ai-orchestration-queue] in-process drain failed", error);
+      schedulePlatformErrorReport({
+        severity: "high",
+        module: "ai",
+        category: "ai-orchestration-queue",
+        source: "ai-orchestration-queue",
+        title: "AI orchestration drain failed",
+        message: error instanceof Error ? error.message : String(error),
+        stackTrace: error instanceof Error ? error.stack ?? null : null,
+      });
       return {
         processed: 0,
         completed: 0,
@@ -364,6 +374,25 @@ async function markAiOrchestrationJobRetry(
       ).toISOString(),
     })
     .eq("id", input.id);
+
+  if (exhausted) {
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "ai",
+      category: "ai-orchestration-queue",
+      source: "ai-orchestration-queue",
+      title: "AI orchestration job exhausted retries",
+      message: input.error,
+      context: {
+        jobId: input.id,
+        attemptCount,
+        maxAttempts,
+      },
+      retryCount: attemptCount,
+      rootCause: "Background AI orchestration failed until max attempts.",
+      suggestedFix: "Inspect ai_orchestration_jobs.last_error and orchestrator logs.",
+    });
+  }
 
   return exhausted ? "failed" : "retried";
 }

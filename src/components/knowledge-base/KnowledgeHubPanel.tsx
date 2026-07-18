@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
+  EraserIcon,
   FileUpIcon,
   GlobeIcon,
   Loader2Icon,
@@ -34,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import {
+  clearKnowledgeCategoryEntriesAction,
   createKnowledgeCategoryAction,
   deleteKnowledgeCategoryAction,
 } from "@/features/knowledge-base/actions/manage-knowledge-category";
@@ -71,6 +73,7 @@ export function KnowledgeHubPanel({
   const [description, setDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingId, setClearingId] = useState<string | null>(null);
 
   const totals = useMemo(
     () => ({
@@ -110,6 +113,38 @@ export function KnowledgeHubPanel({
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleClear(category: KnowledgeCategoryCard) {
+    if (category.entryCount === 0) {
+      toast.message("This card is already empty.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Clear all rows in “${category.name}”? The card stays; only its knowledge is removed.`,
+      )
+    ) {
+      return;
+    }
+
+    setClearingId(category.id);
+    try {
+      const result = await clearKnowledgeCategoryEntriesAction(category.id);
+      if (!result.success) {
+        toast.error(result.message ?? "Unable to clear this card.");
+        return;
+      }
+      toast.success(
+        result.deletedCount === 1
+          ? "1 row cleared."
+          : `${result.deletedCount ?? 0} rows cleared.`,
+      );
+      router.refresh();
+    } finally {
+      setClearingId(null);
     }
   }
 
@@ -197,8 +232,8 @@ export function KnowledgeHubPanel({
             <div>
               <p className="text-sm font-medium">Website scan</p>
               <p className="text-xs text-muted-foreground">
-                Scans every page in the background, then AI fills category cards —
-                and creates new cards when the site has extra topics.
+                Scans pages in the background, then AI filters and sorts facts into
+                category cards — skipping menus, fluff, and duplicates.
                 {!geminiConfigured ? " Configure Gemini to enable scanning." : ""}
               </p>
             </div>
@@ -223,7 +258,7 @@ export function KnowledgeHubPanel({
             >
               <Link
                 href={DASHBOARD_ROUTES.aiAssistantKnowledgeCategory(category.slug)}
-                className="block p-4 pr-12"
+                className="block p-4 pr-20"
               >
                 <div className="flex items-start justify-between gap-2">
                   <span
@@ -245,21 +280,39 @@ export function KnowledgeHubPanel({
                   Open spreadsheet →
                 </p>
               </Link>
-              {!category.isSystem ? (
+              <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                 <button
                   type="button"
-                  className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                  aria-label={`Delete ${category.name}`}
-                  disabled={deletingId === category.id}
-                  onClick={() => void handleDelete(category)}
+                  className="rounded-md p-1.5 text-muted-foreground transition hover:bg-amber-500/10 hover:text-amber-700"
+                  aria-label={`Clear ${category.name}`}
+                  title="Clear knowledge in this card"
+                  disabled={
+                    clearingId === category.id || category.entryCount === 0
+                  }
+                  onClick={() => void handleClear(category)}
                 >
-                  {deletingId === category.id ? (
+                  {clearingId === category.id ? (
                     <Loader2Icon className="size-4 animate-spin" />
                   ) : (
-                    <Trash2Icon className="size-4" />
+                    <EraserIcon className="size-4" />
                   )}
                 </button>
-              ) : null}
+                {!category.isSystem ? (
+                  <button
+                    type="button"
+                    className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Delete ${category.name}`}
+                    disabled={deletingId === category.id}
+                    onClick={() => void handleDelete(category)}
+                  >
+                    {deletingId === category.id ? (
+                      <Loader2Icon className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2Icon className="size-4" />
+                    )}
+                  </button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

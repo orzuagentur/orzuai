@@ -17,6 +17,7 @@ import {
   notifyAutoReplyTyping,
 } from "@/services/auto-reply-inbox-status.service";
 import { isChannelAutoReplyEnabled } from "@/services/auto-reply-pipeline.service";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -286,6 +287,15 @@ function scheduleDebouncedAiReplyDrain(replyWaitMs: number): void {
   scheduleAfterResponse(getDebouncedDrainDelayMs(replyWaitMs), async () => {
     await drainAiReplyQueue().catch((error) => {
       console.error("[ai-reply-queue] deferred drain failed", error);
+      schedulePlatformErrorReport({
+        severity: "high",
+        module: "ai",
+        category: "ai-reply-queue",
+        source: "ai-reply-queue",
+        title: "AI reply deferred drain failed",
+        message: error instanceof Error ? error.message : String(error),
+        stackTrace: error instanceof Error ? error.stack ?? null : null,
+      });
     });
   });
 }
@@ -368,6 +378,17 @@ export async function scheduleDebouncedChannelAutoReply(
         error: message,
       }),
     );
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "ai",
+      category: "ai-reply-queue",
+      source: "ai-reply-queue",
+      title: "AI reply enqueue failed",
+      message,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      context: { channel: input.channel },
+    });
     void notifyAutoReplyError(input.conversationId, {
       errorCode: "queue_enqueue_failed",
       errorMessage: "Auto-reply queue failed. Check server configuration.",
@@ -394,6 +415,16 @@ export async function scheduleDebouncedChannelAutoReply(
         "[ai-reply-queue] inline drain failed after enqueue",
         formatSupabaseError(error),
       );
+      schedulePlatformErrorReport({
+        severity: "high",
+        module: "ai",
+        category: "ai-reply-queue",
+        source: "ai-reply-queue",
+        title: "AI reply inline drain failed",
+        message: formatSupabaseError(error),
+        businessId: input.businessId,
+        conversationId: input.conversationId,
+      });
     }
   }
 }
@@ -422,6 +453,25 @@ async function markAiReplyJobRetry(
       ).toISOString(),
     })
     .eq("id", input.id);
+
+  if (exhausted) {
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "ai",
+      category: "ai-reply-queue",
+      source: "ai-reply-queue",
+      title: "AI reply job exhausted retries",
+      message: input.error,
+      context: {
+        jobId: input.id,
+        attemptCount,
+        maxAttempts,
+      },
+      retryCount: attemptCount,
+      rootCause: "Auto-reply job failed until max attempts.",
+      suggestedFix: "Inspect ai_reply_jobs.last_error and LLM provider health.",
+    });
+  }
 
   return exhausted ? "failed" : "retried";
 }

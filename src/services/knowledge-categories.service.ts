@@ -279,6 +279,45 @@ export async function deleteKnowledgeCategory(
   return { success: true };
 }
 
+/** Clears all knowledge rows for a category card, keeping the card itself. */
+export async function clearKnowledgeCategoryEntries(
+  categoryId: string,
+): Promise<{ success: boolean; message?: string; deletedCount?: number }> {
+  const businessId = await getOwnedBusinessId();
+  if (!businessId || !hasSupabaseEnv()) {
+    return { success: false, message: "Configuration missing." };
+  }
+
+  const supabase = await createClient();
+  const { data: category } = await supabase
+    .from("knowledge_categories")
+    .select("*")
+    .eq("id", categoryId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!category) {
+    return { success: false, message: "Category not found." };
+  }
+
+  const { data: deleted, error } = await supabase
+    .from("knowledge_base")
+    .delete()
+    .eq("business_id", businessId)
+    .eq("category", category.name)
+    .select("id");
+
+  if (error) {
+    return { success: false, message: error.message };
+  }
+
+  revalidateKnowledgePaths(category.slug);
+  return {
+    success: true,
+    deletedCount: deleted?.length ?? 0,
+  };
+}
+
 /** Used by website sync / AI: ensure a category card exists for a free-form name. */
 export async function ensureKnowledgeCategoryForName(
   businessId: string,

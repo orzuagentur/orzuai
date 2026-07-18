@@ -3,6 +3,7 @@ import Stripe from "stripe";
 
 import { ENV_KEYS } from "@/constants/env-keys";
 import { getStripeClient, hasStripeEnv } from "@/lib/stripe/client";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import { handleStripeWebhookEvent } from "@/services/stripe.service";
 
 export async function POST(request: NextRequest) {
@@ -34,6 +35,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.error("[stripe-webhook]", error);
+    schedulePlatformErrorReport({
+      severity: "critical",
+      module: "billing",
+      category: "webhook",
+      source: "stripe-webhook",
+      title: "Stripe webhook handler failed",
+      message: error instanceof Error ? error.message : String(error),
+      stackTrace: error instanceof Error ? error.stack ?? null : null,
+      path: "/api/webhooks/stripe",
+      method: "POST",
+      httpStatus: 500,
+      rootCause: "Stripe webhook event processing threw after signature verification.",
+      suggestedFix: "Check Stripe event type handling and billing service logs.",
+    });
     return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
 }

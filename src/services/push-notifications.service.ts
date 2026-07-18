@@ -17,6 +17,7 @@ import {
   LEAD_NOTIFICATION_SOUND,
   MANAGER_CALLOUT_SOUND,
 } from "@/lib/push/notification-sounds";
+import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
 import { getMessagePreviewText } from "@/utils/chat-media";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -328,6 +329,25 @@ export async function notifyAgentActionPush(
     return await deliverPushToBusiness(input.businessId, payload);
   } catch (error) {
     console.error("[push] failed to notify agent action", error);
+    schedulePlatformErrorReport({
+      severity: "high",
+      module: "platform",
+      category: "push",
+      source: "push-notifications",
+      title: "Push notify agent action failed",
+      message: error instanceof Error ? error.message : String(error),
+      stackTrace: error instanceof Error ? error.stack ?? null : null,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+      context: {
+        channel: input.channel,
+        agentName: input.agentName,
+      },
+      suggestedFix:
+        "Verify VAPID_SUBJECT is mailto: or https:, and VAPID keys are valid.",
+      rootCause:
+        "Web push delivery failed while notifying operators about an AI action.",
+    });
     return { sent: 0, failed: 0, skipped: true };
   }
 }

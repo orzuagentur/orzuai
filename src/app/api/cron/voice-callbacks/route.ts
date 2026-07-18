@@ -1,22 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { ENV_KEYS } from "@/constants/env-keys";
+import { runAuthorizedCron } from "@/lib/cron/run-authorized-cron";
 import { processVoiceCallQueue } from "@/services/voice-agent.service";
 
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env[ENV_KEYS.CRON_SECRET]?.trim();
-  const authHeader = request.headers.get("authorization");
-  const provided =
-    authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  return runAuthorizedCron(
+    request,
+    { name: "voice-callbacks", path: "/api/cron/voice-callbacks" },
+    async () => {
+      const result = await processVoiceCallQueue();
 
-  if (!cronSecret || provided !== cronSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const result = await processVoiceCallQueue();
-
-  return NextResponse.json({
-    success: true,
-    processed: result.processed,
-  });
+      return NextResponse.json({
+        success: true,
+        processed: result.processed,
+      });
+    },
+  );
 }
