@@ -68,6 +68,8 @@ const BROWSER_PHONE_APP_NAME = "OrzuX Browser Phone";
 type TwilioWebhookValidationContext = {
   authToken: string | null;
   expectedAccountSid: string | null;
+  /** Connect softphone callbacks use the platform AC; inbound uses the Connect AC. */
+  allowedAccountSids?: string[];
 };
 
 export type TwilioBrowserPhoneRuntimeConfig = {
@@ -297,6 +299,7 @@ export async function resolveTwilioWebhookValidationContext(
   businessId: string,
   options?: { softphoneClient?: boolean },
 ): Promise<TwilioWebhookValidationContext | null> {
+  void options;
   const connection = await getTwilioConnection(businessId);
 
   if (!connection || connection.status === "disconnected") {
@@ -307,20 +310,30 @@ export async function resolveTwilioWebhookValidationContext(
     return {
       authToken: await readCustomerTwilioAuthToken(connection),
       expectedAccountSid: connection.connectedAccountSid,
+      allowedAccountSids: connection.connectedAccountSid
+        ? [connection.connectedAccountSid]
+        : undefined,
     };
   }
 
-  // Connect softphone TwiML Apps live on the OrzuX platform account.
-  if (options?.softphoneClient) {
-    return {
-      authToken: getTwilioPlatformAuthToken() ?? null,
-      expectedAccountSid: getTwilioPlatformAccountSid() ?? null,
-    };
-  }
+  const platformAccountSid = getTwilioPlatformAccountSid() ?? null;
+  const connectAccountSid = connection.connectedAccountSid;
+  const allowedAccountSids = [
+    ...new Set(
+      [connectAccountSid, platformAccountSid].filter(
+        (value): value is string => Boolean(value?.trim()),
+      ),
+    ),
+  ];
 
+  // Connect softphone runs on the platform AC; inbound numbers use the Connect
+  // AC. Both are signed with the platform Auth Token. Leave expectedAccountSid
+  // unset so status/client callbacks are not rejected for AccountSid mismatch;
+  // HMAC (and orzuSig fallback) still authenticate the request.
   return {
     authToken: getTwilioPlatformAuthToken() ?? null,
-    expectedAccountSid: connection.connectedAccountSid,
+    expectedAccountSid: null,
+    allowedAccountSids,
   };
 }
 

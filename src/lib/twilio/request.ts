@@ -31,17 +31,27 @@ export function isTwilioWebhookSignatureValid(input: {
   authToken: string | null | undefined;
   businessId?: string | null;
   expectedAccountSid?: string | null;
+  allowedAccountSids?: string[] | null;
 }): boolean {
   const authToken = input.authToken?.trim();
   const businessId = input.businessId?.trim();
-  const expectedAccountSid = input.expectedAccountSid?.trim();
   const receivedAccountSid = input.params.AccountSid?.trim();
   const localBypass = isSignatureValidationBypassedForLocalDevelopment();
+  const allowedAccountSids = [
+    ...new Set(
+      [
+        ...(input.allowedAccountSids ?? []),
+        input.expectedAccountSid,
+      ]
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
 
   if (
-    expectedAccountSid &&
+    allowedAccountSids.length > 0 &&
     receivedAccountSid &&
-    receivedAccountSid !== expectedAccountSid
+    !allowedAccountSids.includes(receivedAccountSid)
   ) {
     logTwilioSignatureFailure(input.request, {
       businessId,
@@ -51,24 +61,34 @@ export function isTwilioWebhookSignatureValid(input: {
     return false;
   }
 
+  const orzuSigned = isOrzuSignedRequestValid(input.request, businessId);
+
   if (!authToken) {
+    if (orzuSigned || localBypass) {
+      return true;
+    }
+
     logTwilioSignatureFailure(input.request, {
       businessId,
       accountSid: receivedAccountSid,
       reason: "missing_auth_token",
     });
-    return localBypass;
+    return false;
   }
 
   const signature = input.request.headers.get("x-twilio-signature");
 
   if (!signature) {
+    if (orzuSigned || localBypass) {
+      return true;
+    }
+
     logTwilioSignatureFailure(input.request, {
       businessId,
       accountSid: receivedAccountSid,
       reason: "missing_twilio_signature",
     });
-    return localBypass;
+    return false;
   }
 
   for (const url of getTwilioSignatureUrlCandidates(input.request)) {
@@ -84,12 +104,24 @@ export function isTwilioWebhookSignatureValid(input: {
     }
   }
 
+  // Softphone status callbacks may be signed by the platform account while the
+  // URL still carries a valid orzuSig for the business — accept that fallback.
+  if (orzuSigned) {
+    console.warn(
+      "[twilio-webhook] X-Twilio-Signature failed; accepted orzuSig fallback",
+      JSON.stringify({
+        businessId: businessId ?? null,
+        path: input.request.nextUrl.pathname,
+        accountSid: receivedAccountSid ?? null,
+      }),
+    );
+    return true;
+  }
+
   logTwilioSignatureFailure(input.request, {
     businessId,
     accountSid: receivedAccountSid,
-    reason: isOrzuSignedRequestValid(input.request, businessId)
-      ? "twilio_signature_failed_with_valid_orzu_url_signature"
-      : "twilio_signature_failed",
+    reason: "twilio_signature_failed",
   });
 
   return localBypass;

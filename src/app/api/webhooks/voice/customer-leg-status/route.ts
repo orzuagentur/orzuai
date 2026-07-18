@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       authToken: validation.authToken,
       businessId,
       expectedAccountSid: validation.expectedAccountSid,
+      allowedAccountSids: validation.allowedAccountSids,
     })
   ) {
     return new NextResponse("Invalid Twilio signature", { status: 403 });
