@@ -265,7 +265,7 @@ function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
     const message = error.message.toLowerCase();
 
     if (error.code === 21215 || error.code === 13227) {
-      return "This destination country is blocked in Twilio Voice Geo Permissions on the account that places the call. For OrzuX Connect softphone, enable the country under the connected Twilio account (Voice → Geo Permissions), then save and retry.";
+      return "This destination country is blocked in Twilio Voice Geo Permissions on the OrzuX platform Twilio account used for Browser Phone. Open that account in Twilio Console → Voice → Geo Permissions, enable the country, save, and retry.";
     }
 
     if (
@@ -274,7 +274,7 @@ function resolveOutboundCustomerLegErrorSpeech(error: unknown): string {
       || message.includes("primary customer profile")
       || message.includes("trust hub")
     ) {
-      return "Twilio blocked this call to a plus-one destination. Approve a Business Primary Customer Profile in Trust Hub on the Twilio account placing the call, then retry.";
+      return "Twilio blocked this call to a plus-one destination. Approve a Business Primary Customer Profile in Trust Hub on the OrzuX platform Twilio account, then retry.";
     }
 
     if (
@@ -342,29 +342,11 @@ async function resolveSoftphoneCustomerLeg(input: {
   callerId: string;
   dialAccount: "connect" | "platform" | "customer";
 } | null> {
-  const connection = await getTwilioConnection(input.businessId);
-  const preferredCallerId = input.preferredCallerId.trim();
-
-  // Connect softphone: operator stays on platform TwiML App, but the PSTN
-  // customer leg must be placed on the Connect account so Geo Permissions and
-  // caller ID follow the business number the customer authorized.
-  if (
-    connection?.authMode === "connect" &&
-    connection.connectedAccountSid &&
-    preferredCallerId
-  ) {
-    const authToken = getTwilioPlatformAuthToken();
-    if (authToken) {
-      return {
-        credentials: {
-          accountSid: connection.connectedAccountSid,
-          authToken,
-        },
-        callerId: preferredCallerId,
-        dialAccount: "connect",
-      };
-    }
-  }
+  // Conference names are account-scoped. Softphone Client calls always run on
+  // the browserPhone account (platform for Connect). The PSTN customer leg MUST
+  // be created on that same account or both sides hear hold music forever and
+  // never bridge.
+  void input.businessId;
 
   const credentials = buildBrowserPhoneRestCredentials(input.browserPhone);
   if (!credentials) {
@@ -373,7 +355,7 @@ async function resolveSoftphoneCustomerLeg(input: {
 
   const callerId = await resolveBrowserPhoneOutboundCallerId({
     mode: input.browserPhone.mode,
-    preferredCallerId,
+    preferredCallerId: input.preferredCallerId,
   });
 
   if (!callerId) {

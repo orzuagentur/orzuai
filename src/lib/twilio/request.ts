@@ -37,6 +37,7 @@ export function isTwilioWebhookSignatureValid(input: {
   const businessId = input.businessId?.trim();
   const receivedAccountSid = input.params.AccountSid?.trim();
   const localBypass = isSignatureValidationBypassedForLocalDevelopment();
+  const requestMethod = input.request.method.toUpperCase();
   const allowedAccountSids = [
     ...new Set(
       [
@@ -91,21 +92,23 @@ export function isTwilioWebhookSignatureValid(input: {
     return false;
   }
 
+  // Twilio GET callbacks sign only the full URL. POST signs URL + body params.
+  // Re-appending query params for GET breaks validation.
+  const signatureParams = requestMethod === "GET" ? {} : input.params;
+
   for (const url of getTwilioSignatureUrlCandidates(input.request)) {
     if (
       validateTwilioRequestSignature({
         authToken,
         signature,
         url,
-        params: input.params,
+        params: signatureParams,
       })
     ) {
       return true;
     }
   }
 
-  // Softphone status callbacks may be signed by the platform account while the
-  // URL still carries a valid orzuSig for the business — accept that fallback.
   if (orzuSigned) {
     console.warn(
       "[twilio-webhook] X-Twilio-Signature failed; accepted orzuSig fallback",
@@ -113,6 +116,7 @@ export function isTwilioWebhookSignatureValid(input: {
         businessId: businessId ?? null,
         path: input.request.nextUrl.pathname,
         accountSid: receivedAccountSid ?? null,
+        method: requestMethod,
       }),
     );
     return true;

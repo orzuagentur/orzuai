@@ -140,12 +140,24 @@ export function isOrzuSignedTwilioWebhookValid(input: {
   }
 
   return getWebhookSigningSecrets().some((secret) => {
-    const expected = signBusinessWebhook({
-      businessId: input.businessId,
-      method: input.method,
-      pathname: input.pathname,
-      secret,
+    // Twilio Conference (and some retries) may call with GET even when TwiML
+    // requested POST. Accept either method for orzuSig.
+    const methods = Array.from(
+      new Set(
+        [input.method, "POST", "GET"]
+          .map((method) => normalizeWebhookMethod(method))
+          .filter(Boolean),
+      ),
+    );
+
+    return methods.some((method) => {
+      const expected = signBusinessWebhook({
+        businessId: input.businessId,
+        method,
+        pathname: input.pathname,
+        secret,
+      });
+      return expected ? safeEqual(provided, expected) : false;
     });
-    return expected ? safeEqual(provided, expected) : false;
   });
 }
