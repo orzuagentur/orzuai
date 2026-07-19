@@ -137,6 +137,13 @@ export const EMAIL_TEMPLATE_REGISTRY: EmailTemplateDefinition[] = [
     defaultSubject: "Your OrzuX plan was updated",
   },
   {
+    id: "trial_ended",
+    name: "Trial ended",
+    category: "billing",
+    description: "Sent when the 3-day signup trial expires and a paid plan is required.",
+    defaultSubject: "Your OrzuX 3-day trial has ended",
+  },
+  {
     id: "payment_card_failed",
     name: "Card payment failed",
     category: "billing",

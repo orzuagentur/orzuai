@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { CalendarClockIcon, CheckIcon, ExternalLinkIcon } from "lucide-react";
 
+import { useNestedScrollPassthrough } from "@/hooks/use-nested-scroll-passthrough";
 import { ORZUX_CALENDAR_MESSAGES } from "@/features/google-calendar/orzux-calendar-messages";
 import { cn } from "@/lib/utils";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
@@ -62,6 +63,7 @@ export function OrzuxCalendarDayGrid({
   updatingTaskId = null,
 }: OrzuxCalendarDayGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  useNestedScrollPassthrough(scrollRef);
   const gridRef = useRef<HTMLDivElement>(null);
   const isToday = isSameDay(selectedDate, new Date());
   const hours = Array.from(

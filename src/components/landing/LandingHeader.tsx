@@ -20,7 +20,6 @@ import {
   type IntegrationChannelConfig,
 } from "@/features/integrations/constants";
 import type { LandingMegaPanel } from "@/features/landing/i18n";
-import { LANDING_BOOK_DEMO } from "@/features/landing/constants";
 import { cn } from "@/lib/utils";
 
 type LandingHeaderProps = {
@@ -198,19 +197,29 @@ export function LandingHeader({ onStartFree }: LandingHeaderProps) {
           </Button>
         </div>
 
-        <button
-          type="button"
-          className="inline-flex size-10 items-center justify-center rounded-full border border-[var(--landing-line)] bg-white text-[var(--landing-ink)] shadow-sm lg:hidden"
-          aria-label={mobileOpen ? copy.header.closeMenu : copy.header.openMenu}
-          aria-expanded={mobileOpen}
-          aria-controls={`${menuId}-mobile`}
-          onClick={() => {
-            setMobileOpen((open) => !open);
-            setActivePanel(null);
-          }}
-        >
-          {mobileOpen ? <XIcon className="size-4" /> : <MenuIcon className="size-4" />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 rounded-full border-[var(--landing-line)] bg-white px-3.5 text-sm text-[var(--landing-ink)] shadow-sm"
+            asChild
+          >
+            <Link href={AUTH_ROUTES.login}>{copy.header.login}</Link>
+          </Button>
+          <button
+            type="button"
+            className="inline-flex size-10 items-center justify-center rounded-full border border-[var(--landing-line)] bg-white text-[var(--landing-ink)] shadow-sm"
+            aria-label={mobileOpen ? copy.header.closeMenu : copy.header.openMenu}
+            aria-expanded={mobileOpen}
+            aria-controls={`${menuId}-mobile`}
+            onClick={() => {
+              setMobileOpen((open) => !open);
+              setActivePanel(null);
+            }}
+          >
+            {mobileOpen ? <XIcon className="size-4" /> : <MenuIcon className="size-4" />}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -247,7 +256,7 @@ export function LandingHeader({ onStartFree }: LandingHeaderProps) {
             transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden border-t border-[var(--landing-line)] bg-white lg:hidden"
           >
-            <MobileNavigation onStartFree={onStartFree} onNavigate={closeNavigation} />
+            <MobileNavigation onNavigate={closeNavigation} />
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -497,26 +506,14 @@ function MobileMarketplaceServices({
 }
 
 function MobileNavigation({
-  onStartFree,
   onNavigate,
 }: {
-  onStartFree: () => void;
   onNavigate: () => void;
 }) {
   const { copy } = useLandingLocale();
 
   return (
     <div className="space-y-5 px-4 py-5">
-      <div className="flex items-center justify-end gap-3">
-        <Button
-          variant="ghost"
-          className="rounded-full text-[var(--landing-muted-text)] hover:bg-[var(--landing-soft)] hover:text-[var(--landing-ink)]"
-          asChild
-        >
-          <Link href={AUTH_ROUTES.login}>{copy.header.login}</Link>
-        </Button>
-      </div>
-
       <div className="space-y-2">
         {MEGA_PANEL_KEYS.map((key) => {
           return (
@@ -573,28 +570,6 @@ function MobileNavigation({
             {copy.header.nav[item.key]}
           </a>
         ))}
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button
-          type="button"
-          className="h-11 rounded-full bg-[var(--landing-primary)] text-white hover:bg-[#1d5148]"
-          onClick={() => {
-            onStartFree();
-            onNavigate();
-          }}
-        >
-          {copy.header.startFree}
-        </Button>
-        <Button
-          variant="outline"
-          className="h-11 rounded-full border-[var(--landing-line)] bg-white text-[var(--landing-ink)] hover:bg-[var(--landing-soft)]"
-          asChild
-        >
-          <a href={LANDING_BOOK_DEMO.href} onClick={onNavigate}>
-            {copy.header.bookDemo}
-          </a>
-        </Button>
       </div>
     </div>
   );

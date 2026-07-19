@@ -54,10 +54,10 @@ export function LandingArchitecture() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-40px" }}
                   transition={{ delay: index * 0.04, duration: 0.3 }}
-                  className="grid gap-4 bg-white/70 px-5 py-6 sm:grid-cols-[88px_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-start sm:px-8"
+                  className="group grid gap-4 bg-white/70 px-5 py-6 transition duration-220 hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_48px_rgba(24,24,27,0.1)] sm:grid-cols-[88px_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-start sm:px-8"
                 >
                   <div className="flex items-center gap-3 sm:block">
-                    <span className="inline-flex size-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <span className="inline-flex size-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white transition group-hover:scale-105 group-hover:bg-[var(--landing-primary)]">
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     {index < nodes.length - 1 ? (
@@ -104,7 +104,7 @@ export function LandingArchitecture() {
               <LandingReveal key={principle.title} delay={index * 0.04}>
                 <article
                   className={cn(
-                    "h-full rounded-xl border border-zinc-200 bg-white p-5",
+                    "landing-panel-hover h-full rounded-xl border border-zinc-200 bg-white p-5",
                   )}
                 >
                   <p className="text-sm font-semibold text-zinc-900">{principle.title}</p>

@@ -129,6 +129,8 @@ export type Database = {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           subscription_addons: Json;
+          trial_ends_at: string | null;
+          trial_ended_email_sent_at: string | null;
           twilio_wallet_balance_cents: number;
           prefer_customer_ai_keys: boolean;
           order_form_fields: Json;
@@ -147,6 +149,8 @@ export type Database = {
           logo_url?: string | null;
           subscription_plan?: string;
           subscription_status?: string;
+          trial_ends_at?: string | null;
+          trial_ended_email_sent_at?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
@@ -171,6 +175,8 @@ export type Database = {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           subscription_addons?: Json;
+          trial_ends_at?: string | null;
+          trial_ended_email_sent_at?: string | null;
           twilio_wallet_balance_cents?: number;
           prefer_customer_ai_keys?: boolean;
           order_form_fields?: Json;

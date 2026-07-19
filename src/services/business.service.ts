@@ -15,6 +15,7 @@ import { getDefaultGeminiModel } from "@/lib/env.schema";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
+import { getTrialEndsAt } from "@/services/trial.service";
 import type {
   BusinessPayload,
   CreateBusinessResult,
@@ -183,6 +184,9 @@ export async function createBusiness(
     .from("businesses")
     .insert({
       user_id: user.id,
+      subscription_plan: "free",
+      subscription_status: "trialing",
+      trial_ends_at: getTrialEndsAt(),
       ...mapPayloadToRow(parsed.data),
     })
     .select("*")

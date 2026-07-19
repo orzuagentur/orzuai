@@ -4,7 +4,6 @@ import { ArrowRightIcon } from "lucide-react";
 
 import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
 import { Button } from "@/components/ui/button";
-import { LANDING_BOOK_DEMO } from "@/features/landing/constants";
 
 export function LandingFinalCta({ onStartFree }: { onStartFree: () => void }) {
   const { copy } = useLandingLocale();
@@ -26,13 +25,6 @@ export function LandingFinalCta({ onStartFree }: { onStartFree: () => void }) {
           >
             {copy.finalCta.primaryCta}
             <ArrowRightIcon className="size-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant="outline"
-            className="h-12 rounded-full border-white/20 bg-transparent px-6 text-white hover:bg-white/10"
-            asChild
-          >
-            <a href={LANDING_BOOK_DEMO.href}>{copy.finalCta.secondaryCta}</a>
           </Button>
         </div>
       </div>

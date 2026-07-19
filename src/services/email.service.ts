@@ -10,6 +10,7 @@ import {
   renderSubscriptionPurchasedEmail,
   renderSubscriptionRenewedEmail,
 } from "@/lib/email/templates/subscription-billing-email";
+import { renderTrialEndedEmail } from "@/lib/email/templates/trial-ended-email";
 import {
   renderCardExpiringEmail,
   renderPaymentBankFailedEmail,
@@ -423,6 +424,23 @@ export async function sendSubscriptionPlanChangedEmail(input: {
       planLabel: input.planLabel,
       previousPlanLabel: input.previousPlanLabel,
     },
+  });
+}
+
+export async function sendTrialEndedEmail(input: {
+  to: string;
+  userId: string;
+  businessId: string;
+}): Promise<EmailServiceResult> {
+  const { subject, html } = renderTrialEndedEmail();
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject,
+    html,
+    templateId: "trial_ended",
+    userId: input.userId,
+    businessId: input.businessId,
   });
 }
 

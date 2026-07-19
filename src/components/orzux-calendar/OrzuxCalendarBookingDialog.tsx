@@ -51,13 +51,22 @@ type OrzuxCalendarBookingDialogProps = {
   initialStart?: Date | null;
 };
 
+function createGuestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `guest-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function createGuest(): GuestEntry {
   return {
-    id: crypto.randomUUID(),
+    id: createGuestId(),
     name: "",
     email: "",
   };
 }
+
+const EMPTY_GUEST: GuestEntry = { id: "guest-0", name: "", email: "" };
 
 function defaultEndFromStart(startValue: string, durationMinutes: number): string {
   const startDate = new Date(startValue);
@@ -75,7 +84,7 @@ export function OrzuxCalendarBookingDialog({
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
-  const [guests, setGuests] = useState<GuestEntry[]>([createGuest()]);
+  const [guests, setGuests] = useState<GuestEntry[]>([EMPTY_GUEST]);
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [start, setStart] = useState("");

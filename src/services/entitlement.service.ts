@@ -39,6 +39,7 @@ type BusinessSubscriptionRow = {
   subscription_plan: string | null;
   subscription_status: string | null;
   subscription_addons: unknown;
+  trial_ends_at: string | null;
 };
 
 async function getBusinessSubscription(
@@ -48,7 +49,7 @@ async function getBusinessSubscription(
     const planId: SubscriptionPlanId = "free";
     return {
       planId,
-      status: "active",
+      status: "trialing",
       entitlements: await getPlanEntitlementsForBusiness(planId),
     };
   }
@@ -56,13 +57,23 @@ async function getBusinessSubscription(
   const admin = createAdminClient();
   const { data } = await admin
     .from("businesses")
-    .select("subscription_plan, subscription_status, subscription_addons")
+    .select("subscription_plan, subscription_status, subscription_addons, trial_ends_at")
     .eq("id", businessId)
     .maybeSingle();
 
   const row = data as BusinessSubscriptionRow | null;
   const planId = resolveSubscriptionPlan(row?.subscription_plan);
-  const status = row?.subscription_status?.trim().toLowerCase() || "active";
+  let status = row?.subscription_status?.trim().toLowerCase() || "active";
+
+  // Soft-expire in entitlement checks even before cron runs.
+  if (
+    status === "trialing" &&
+    row?.trial_ends_at &&
+    Date.parse(row.trial_ends_at) <= Date.now()
+  ) {
+    status = "expired";
+  }
+
   const baseEntitlements = await getPlanEntitlementsForBusiness(planId);
   const activeAddons = parseBusinessSubscriptionAddons(row?.subscription_addons);
   const addonCatalog = await listPlatformAddons({ activeOnly: true });
@@ -102,18 +113,25 @@ export async function assertSubscriptionBillingActive(
 ): Promise<EntitlementResult> {
   const { status, planId } = await getBusinessSubscription(businessId);
 
-  if (planId === "free") {
+  if (status === "trialing") {
     return { allowed: true };
   }
 
-  if (BILLING_ACTIVE_STATUSES.has(status)) {
+  if (BILLING_ACTIVE_STATUSES.has(status) && planId !== "free") {
+    return { allowed: true };
+  }
+
+  // Legacy free accounts that never had a trial stay usable.
+  if (planId === "free" && status === "active") {
     return { allowed: true };
   }
 
   return {
     allowed: false,
     message:
-      "Your subscription payment is past due. Update billing in Subscription settings to restore AI features.",
+      status === "expired"
+        ? "Your 3-day trial has ended. Choose a paid plan in Subscription to continue."
+        : "Your subscription payment is past due. Update billing in Subscription settings to restore AI features.",
   };
 }
 

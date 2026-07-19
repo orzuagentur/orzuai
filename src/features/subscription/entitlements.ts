@@ -35,13 +35,14 @@ export type PlanEntitlements = {
 };
 
 export const PLAN_ENTITLEMENTS: Record<SubscriptionPlanId, PlanEntitlements> = {
+  /** Signup trial (3 days) uses the free plan id with these caps. */
   free: {
-    maxMessagingChannels: 1,
+    maxMessagingChannels: 3,
     maxTeamSeats: 1,
-    monthlyAiReplies: 150,
-    monthlyVoiceMinutes: 0,
+    monthlyAiReplies: 100,
+    monthlyVoiceMinutes: 20,
     maxAutomationRules: 0,
-    voiceAi: false,
+    voiceAi: true,
     automations: false,
     followUpAgent: false,
     analyticsAiAsk: false,

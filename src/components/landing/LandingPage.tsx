@@ -12,6 +12,7 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingLocaleProvider } from "@/components/landing/LandingLocaleProvider";
 import { LandingMinimalHero } from "@/components/landing/LandingMinimalHero";
+import { LandingMobileCtaBar } from "@/components/landing/LandingMobileCtaBar";
 import {
   LandingPricing,
   type LandingPlanCard,
@@ -40,7 +41,7 @@ function LandingPageContent({
   }, [router]);
 
   return (
-    <div className="landing landing-art-shell relative flex min-h-full flex-1 flex-col overflow-x-hidden">
+    <div className="landing landing-art-shell relative flex min-h-full flex-1 flex-col overflow-x-hidden pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
       <div className="landing-grid-wash pointer-events-none absolute inset-0 z-0" aria-hidden="true" />
       <LandingCursorAura />
       <LandingSkipLink />
@@ -51,16 +52,21 @@ function LandingPageContent({
         <LandingTrustBar />
         <LandingProductShowcase />
         <LandingSolutions />
-        <LandingArchitecture />
+        <div className="hidden lg:block">
+          <LandingArchitecture />
+        </div>
         <LandingEnterprise />
         <LandingPricing onStartFree={goRegister} plans={plans} />
         <section id="faq" aria-labelledby="faq-heading" className="w-full bg-white/35">
           <LandingFaq />
         </section>
-        <LandingFinalCta onStartFree={goRegister} />
+        <div className="hidden sm:block">
+          <LandingFinalCta onStartFree={goRegister} />
+        </div>
       </main>
 
       <LandingFooter legalFooterLinks={legalFooterLinks} />
+      <LandingMobileCtaBar onStartFree={goRegister} />
     </div>
   );
 }

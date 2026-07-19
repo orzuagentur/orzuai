@@ -4,11 +4,12 @@ import {
   CalendarCheckIcon,
   CalendarClockIcon,
   CheckSquareIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   PlusIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { OrzuxCalendarDayGrid } from "@/components/orzux-calendar/OrzuxCalendarDayGrid";
 import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,20 +27,34 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useNestedScrollPassthrough } from "@/hooks/use-nested-scroll-passthrough";
 import type { LandingLiveEvent } from "@/features/landing/demo";
+import { cn } from "@/lib/utils";
 import type { OrzuxCalendarEvent } from "@/types/calendar-events.types";
 
 type CalendarStageProps = {
   event: LandingLiveEvent;
   allEvents: LandingLiveEvent[];
+  compact?: boolean;
 };
 
 type CreateKind = "booking" | "event" | "task";
 
-function startOfToday(): Date {
-  const d = new Date();
+const DAY_START = 8;
+const DAY_END = 20;
+const HOUR_PX = 56;
+const HOUR_PX_COMPACT = 44;
+
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function addDays(date: Date, amount: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return startOfDay(next);
 }
 
 function atHour(day: Date, hour: number, minute = 0): Date {
@@ -52,11 +67,32 @@ function toIso(date: Date): string {
   return date.toISOString();
 }
 
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function formatRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const fmt = (d: Date) =>
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${fmt(start)}–${fmt(end)}`;
+}
+
 function buildSeedEvents(
   day: Date,
   allEvents: LandingLiveEvent[],
 ): OrzuxCalendarEvent[] {
   const seeded: OrzuxCalendarEvent[] = [];
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   for (const item of allEvents) {
     for (const booking of item.bookings ?? []) {
@@ -65,7 +101,7 @@ function buildSeedEvents(
       const start = atHour(day, hours ?? 10, minutes ?? 0);
       const end = new Date(start.getTime() + 45 * 60 * 1000);
       seeded.push({
-        id: booking.id,
+        id: `${booking.id}-${day.toDateString()}`,
         recordId: booking.id,
         kind: "booking",
         summary: booking.title,
@@ -78,14 +114,14 @@ function buildSeedEvents(
         source: "local",
         isBooking: true,
         customerName: booking.customer || item.customer,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone: timeZone,
       });
     }
   }
 
   const taskStart = atHour(day, 14, 0);
   seeded.push({
-    id: "demo-task-followup",
+    id: `demo-task-followup-${day.toDateString()}`,
     recordId: "demo-task-followup",
     kind: "task",
     summary: "Send confirmation SMS",
@@ -98,26 +134,180 @@ function buildSeedEvents(
     source: "local",
     isTask: true,
     taskStatus: "open",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: timeZone,
   });
 
   return seeded;
 }
 
-export function CalendarStage({ event, allEvents }: CalendarStageProps) {
+export function CalendarStage({ event, allEvents, compact = false }: CalendarStageProps) {
   const { copy } = useLandingLocale();
-  const selectedDate = useMemo(() => startOfToday(), []);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [events, setEvents] = useState<OrzuxCalendarEvent[]>(() =>
-    buildSeedEvents(selectedDate, allEvents),
-  );
+  const [eventsByDay, setEventsByDay] = useState<Record<string, OrzuxCalendarEvent[]>>({});
   const [createKind, setCreateKind] = useState<CreateKind | null>(null);
   const [title, setTitle] = useState("");
   const [customer, setCustomer] = useState("");
   const [hour, setHour] = useState("15");
   const [minute, setMinute] = useState("30");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useNestedScrollPassthrough(scrollRef);
+  const liveTickRef = useRef(0);
+  const [liveFlashId, setLiveFlashId] = useState<string | null>(null);
 
-  function openCreate(kind: CreateKind) {
+  const dayKey = selectedDate.toDateString();
+  const hourPx = compact ? HOUR_PX_COMPACT : HOUR_PX;
+  const hours = useMemo(
+    () => Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i),
+    [],
+  );
+
+  const events = useMemo(() => {
+    if (eventsByDay[dayKey]) return eventsByDay[dayKey]!;
+    return buildSeedEvents(selectedDate, allEvents);
+  }, [allEvents, dayKey, eventsByDay, selectedDate]);
+
+  useEffect(() => {
+    if (createKind !== null) return;
+
+    const names = ["Amina", "Daniil", "Mira", "Visitor", "Elena", "Marcus", "Sara", "Omar"];
+    const titles = [
+      "Consultation",
+      "Discovery call",
+      "Follow-up SMS",
+      "Pricing review",
+      "Clinic tour",
+      "Onboarding",
+      "Demo walkthrough",
+      "Reschedule",
+    ];
+
+    const timer = window.setInterval(() => {
+      liveTickRef.current += 1;
+      const tick = liveTickRef.current;
+      const mode = tick % 4;
+
+      setEventsByDay((prev) => {
+        const base = prev[dayKey] ?? buildSeedEvents(selectedDate, allEvents);
+        let next = [...base];
+
+        if (mode === 0 || mode === 2) {
+          const hourValue = 9 + (tick % 10);
+          const minuteValue = (tick * 7) % 60;
+          const start = atHour(selectedDate, hourValue, minuteValue);
+          const isTask = mode === 2;
+          const id = `live-${isTask ? "task" : "booking"}-${tick}`;
+          const created: OrzuxCalendarEvent = {
+            id,
+            recordId: id,
+            kind: isTask ? "task" : "booking",
+            summary: titles[tick % titles.length]!,
+            description: null,
+            location: null,
+            start: toIso(start),
+            end: toIso(new Date(start.getTime() + (isTask ? 30 : 45) * 60 * 1000)),
+            isAllDay: false,
+            htmlLink: null,
+            source: "local",
+            isBooking: !isTask,
+            isTask,
+            taskStatus: isTask ? "open" : undefined,
+            customerName: isTask ? null : names[tick % names.length]!,
+            timezone: timeZone,
+          };
+          next = [...next, created];
+          setLiveFlashId(id);
+        } else if (mode === 1) {
+          const openTask = [...next].reverse().find(
+            (item) => item.isTask && item.taskStatus !== "done",
+          );
+          if (openTask) {
+            next = next.map((item) =>
+              item.id === openTask.id ? { ...item, taskStatus: "done" as const } : item,
+            );
+            setLiveFlashId(openTask.id);
+          } else {
+            const id = `live-event-${tick}`;
+            const start = atHour(selectedDate, 11 + (tick % 6), 0);
+            next = [
+              ...next,
+              {
+                id,
+                recordId: id,
+                kind: "event",
+                summary: titles[tick % titles.length]!,
+                description: null,
+                location: null,
+                start: toIso(start),
+                end: toIso(new Date(start.getTime() + 45 * 60 * 1000)),
+                isAllDay: false,
+                htmlLink: null,
+                source: "local",
+                customerName: null,
+                timezone: timeZone,
+              },
+            ];
+            setLiveFlashId(id);
+          }
+        } else {
+          const id = `live-event-${tick}`;
+          const start = atHour(selectedDate, 12 + (tick % 5), 15);
+          next = [
+            ...next,
+            {
+              id,
+              recordId: id,
+              kind: "event",
+              summary: titles[(tick + 3) % titles.length]!,
+              description: null,
+              location: null,
+              start: toIso(start),
+              end: toIso(new Date(start.getTime() + 30 * 60 * 1000)),
+              isAllDay: false,
+              htmlLink: null,
+              source: "local",
+              customerName: null,
+              timezone: timeZone,
+            },
+          ];
+          setLiveFlashId(id);
+        }
+
+        if (next.length > 14) {
+          next = next.slice(next.length - 14);
+        }
+        return { ...prev, [dayKey]: next };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [allEvents, createKind, dayKey, selectedDate, timeZone]);
+
+  useEffect(() => {
+    if (!liveFlashId) return;
+    const timer = window.setTimeout(() => setLiveFlashId(null), 900);
+    return () => window.clearTimeout(timer);
+  }, [liveFlashId]);
+
+  const dayLabel = useMemo(
+    () =>
+      selectedDate.toLocaleDateString(undefined, {
+        weekday: compact ? "short" : "long",
+        month: "short",
+        day: "numeric",
+      }),
+    [compact, selectedDate],
+  );
+
+  function ensureDaySeeded() {
+    setEventsByDay((prev) => {
+      if (prev[dayKey]) return prev;
+      return { ...prev, [dayKey]: buildSeedEvents(selectedDate, allEvents) };
+    });
+  }
+
+  function openCreate(kind: CreateKind, at?: Date) {
+    ensureDaySeeded();
     setCreateKind(kind);
     setTitle(
       kind === "task"
@@ -127,16 +317,17 @@ export function CalendarStage({ event, allEvents }: CalendarStageProps) {
           : "Team sync",
     );
     setCustomer(event.customer);
-    setHour("15");
-    setMinute("30");
+    if (at) {
+      setHour(String(at.getHours()).padStart(2, "0"));
+      setMinute(String(Math.floor(at.getMinutes() / 15) * 15).padStart(2, "0"));
+    } else {
+      setHour("15");
+      setMinute("30");
+    }
   }
 
-  function handleSlotClick(time: Date) {
-    setCreateKind("booking");
-    setTitle("Consultation");
-    setCustomer(event.customer);
-    setHour(String(time.getHours()).padStart(2, "0"));
-    setMinute(String(Math.floor(time.getMinutes() / 15) * 15).padStart(2, "0"));
+  function handleSlotClick(hourValue: number) {
+    openCreate("booking", atHour(selectedDate, hourValue, 0));
   }
 
   function saveCreate() {
@@ -165,64 +356,194 @@ export function CalendarStage({ event, allEvents }: CalendarStageProps) {
       timezone: timeZone,
     };
 
-    setEvents((prev) => [...prev, next]);
+    setEventsByDay((prev) => {
+      const base = prev[dayKey] ?? buildSeedEvents(selectedDate, allEvents);
+      return { ...prev, [dayKey]: [...base, next] };
+    });
     setCreateKind(null);
   }
 
-  function handleTaskStatusChange(
-    calendarEvent: OrzuxCalendarEvent,
-    status: "open" | "done",
-  ) {
-    setEvents((prev) =>
-      prev.map((item) =>
-        item.id === calendarEvent.id ? { ...item, taskStatus: status } : item,
-      ),
-    );
+  function toggleTask(calendarEvent: OrzuxCalendarEvent) {
+    if (!calendarEvent.isTask) return;
+    setEventsByDay((prev) => {
+      const base = prev[dayKey] ?? buildSeedEvents(selectedDate, allEvents);
+      return {
+        ...prev,
+        [dayKey]: base.map((item) =>
+          item.id === calendarEvent.id
+            ? {
+                ...item,
+                taskStatus: item.taskStatus === "done" ? "open" : "done",
+              }
+            : item,
+        ),
+      };
+    });
   }
+
+  function eventStyle(calendarEvent: OrzuxCalendarEvent) {
+    const start = new Date(calendarEvent.start);
+    const end = new Date(calendarEvent.end);
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    const endMinutes = end.getHours() * 60 + end.getMinutes();
+    const top = ((startMinutes - DAY_START * 60) / 60) * hourPx;
+    const height = Math.max(((endMinutes - startMinutes) / 60) * hourPx, compact ? 34 : 40);
+    return { top, height };
+  }
+
+  const createMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          className={cn(
+            "gap-1.5 rounded-full",
+            compact ? "h-7 px-2.5 text-[11px]" : "h-8 px-3",
+          )}
+        >
+          <PlusIcon className={compact ? "size-3" : "size-3.5"} aria-hidden="true" />
+          {copy.liveDemo.addCalendarItem}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => openCreate("booking")}>
+          <CalendarClockIcon className="mr-2 size-4" />
+          {copy.liveDemo.addBooking}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openCreate("event")}>
+          <CalendarCheckIcon className="mr-2 size-4" />
+          {copy.liveDemo.addEvent}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openCreate("task")}>
+          <CheckSquareIcon className="mr-2 size-4" />
+          {copy.liveDemo.addTask}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-white">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-100 px-4 py-2.5">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-            {copy.liveDemo.calendar}
-          </p>
-          <h2 className="text-sm font-semibold text-zinc-900">
-            {copy.liveDemo.calendarTitle}
-          </h2>
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100",
+          compact ? "px-2 py-1.5" : "px-4 py-2.5",
+        )}
+      >
+        <div className="min-w-0">
+          {!compact ? (
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+              {copy.liveDemo.calendar}
+            </p>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Previous day"
+              onClick={() => setSelectedDate((d) => addDays(d, -1))}
+              className="inline-flex size-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"
+            >
+              <ChevronLeftIcon className="size-4" />
+            </button>
+            <div className="min-w-0 text-center">
+              <p className={cn("truncate font-semibold text-zinc-900", compact ? "text-xs" : "text-sm")}>
+                {dayLabel}
+              </p>
+              {!compact ? (
+                <p className="text-[10px] text-zinc-400">{copy.liveDemo.calendarSync}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              aria-label="Next day"
+              onClick={() => setSelectedDate((d) => addDays(d, 1))}
+              className="inline-flex size-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"
+            >
+              <ChevronRightIcon className="size-4" />
+            </button>
+            {!sameDay(selectedDate, new Date()) ? (
+              <button
+                type="button"
+                onClick={() => setSelectedDate(startOfDay(new Date()))}
+                className="ml-0.5 rounded-full border border-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-600"
+              >
+                Today
+              </button>
+            ) : null}
+          </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" size="sm" className="h-8 gap-1.5 rounded-full px-3">
-              <PlusIcon className="size-3.5" aria-hidden="true" />
-              {copy.liveDemo.addCalendarItem}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => openCreate("booking")}>
-              <CalendarClockIcon className="mr-2 size-4" />
-              {copy.liveDemo.addBooking}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openCreate("event")}>
-              <CalendarCheckIcon className="mr-2 size-4" />
-              {copy.liveDemo.addEvent}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openCreate("task")}>
-              <CheckSquareIcon className="mr-2 size-4" />
-              {copy.liveDemo.addTask}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {createMenu}
       </div>
 
-      <div className="min-h-0 flex-1 p-3">
-        <OrzuxCalendarDayGrid
-          selectedDate={selectedDate}
-          events={events}
-          timeZone={timeZone}
-          onSlotClick={handleSlotClick}
-          onTaskStatusChange={handleTaskStatusChange}
-        />
+      <div
+        ref={scrollRef}
+        className={cn("min-h-0 flex-1 overflow-y-auto overscroll-y-auto", compact ? "px-1.5 py-1.5" : "px-3 py-3")}
+      >
+        <div
+          className="relative rounded-xl border border-zinc-200/80 bg-zinc-50/40"
+          style={{ height: hours.length * hourPx }}
+        >
+          {hours.map((hourValue, index) => (
+            <button
+              key={hourValue}
+              type="button"
+              onClick={() => handleSlotClick(hourValue)}
+              className="absolute inset-x-0 flex border-b border-zinc-200/70 text-left transition hover:bg-white/70"
+              style={{ top: index * hourPx, height: hourPx }}
+            >
+              <span
+                className={cn(
+                  "shrink-0 px-1.5 pt-1 font-medium tabular-nums text-zinc-400",
+                  compact ? "w-10 text-[9px]" : "w-12 text-[10px]",
+                )}
+              >
+                {formatHour(hourValue)}
+              </span>
+              <span className="min-w-0 flex-1" />
+            </button>
+          ))}
+
+          {events.map((calendarEvent) => {
+            const style = eventStyle(calendarEvent);
+            const done = calendarEvent.isTask && calendarEvent.taskStatus === "done";
+            return (
+              <button
+                key={calendarEvent.id}
+                type="button"
+                onClick={() => toggleTask(calendarEvent)}
+                className={cn(
+                  "absolute left-[2.75rem] right-1.5 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition sm:left-14",
+                  calendarEvent.isBooking && "border-emerald-500/35 bg-emerald-500/15",
+                  calendarEvent.isTask &&
+                    (done
+                      ? "border-amber-500/25 bg-amber-500/5 opacity-70"
+                      : "border-amber-500/40 bg-amber-500/15"),
+                  !calendarEvent.isBooking &&
+                    !calendarEvent.isTask &&
+                    "border-violet-500/40 bg-violet-500/15",
+                  compact && "left-11 right-1 px-1.5 py-0.5",
+                  liveFlashId === calendarEvent.id &&
+                    "scale-[1.02] ring-2 ring-[var(--landing-coral)]/70",
+                )}
+                style={{ top: style.top, height: style.height, zIndex: 2 }}
+              >
+                <p
+                  className={cn(
+                    "truncate font-semibold text-zinc-900",
+                    compact ? "text-[10px] leading-3" : "text-[11px] leading-4",
+                  )}
+                >
+                  {calendarEvent.summary}
+                </p>
+                <p className={cn("truncate text-zinc-600", compact ? "text-[9px]" : "text-[10px]")}>
+                  {formatRange(calendarEvent.start, calendarEvent.end)}
+                  {calendarEvent.customerName ? ` · ${calendarEvent.customerName}` : ""}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <Dialog open={createKind !== null} onOpenChange={(open) => !open && setCreateKind(null)}>

@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
+import { useNestedScrollPassthrough } from "@/hooks/use-nested-scroll-passthrough";
 import type { LandingLiveEvent, LiveSystemView } from "@/features/landing/demo";
 import {
   getChatBubbleClassName,
@@ -25,6 +26,7 @@ type LeftMenuProps = {
   activeView: LiveSystemView;
   onSelect: (id: string) => void;
   onOpenCalendar: () => void;
+  compact?: boolean;
 };
 
 export function LeftMenu({
@@ -33,11 +35,21 @@ export function LeftMenu({
   activeView,
   onSelect,
   onOpenCalendar,
+  compact = false,
 }: LeftMenuProps) {
   const { copy } = useLandingLocale();
+  const listRef = useRef<HTMLDivElement>(null);
+  useNestedScrollPassthrough(listRef);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-b border-zinc-200/80 bg-zinc-50/90 lg:border-b-0 lg:border-r">
+    <aside
+      className={cn(
+        "flex h-full min-h-0 flex-col bg-zinc-50/90",
+        compact
+          ? "border-r border-zinc-200/80"
+          : "border-b border-zinc-200/80 lg:border-b-0 lg:border-r",
+      )}
+    >
       <div className="flex items-center justify-between px-3 pt-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
           {copy.liveDemo.inbox}
@@ -47,7 +59,8 @@ export function LeftMenu({
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+      <div ref={listRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto px-2 py-2">
         <div className="grid gap-1">
           {events.map((event) => {
             const active = activeId === event.id && activeView !== "calendar";
@@ -77,7 +90,7 @@ export function LeftMenu({
                     </span>
                   </span>
                 </span>
-                <span className="mt-1.5 line-clamp-2 block text-[11px] leading-4 text-zinc-600">
+                <span className={cn("mt-1.5 line-clamp-2 block leading-4 text-zinc-600", compact ? "text-[9px]" : "text-[11px]")}>
                   {event.preview}
                 </span>
               </button>
@@ -122,9 +135,10 @@ type ConversationStageProps = {
   messages: LandingLiveEvent["messages"];
 };
 
-export function ConversationStage({ event, messages }: ConversationStageProps) {
+export function ConversationStage({ event, messages, compact = false }: ConversationStageProps & { compact?: boolean }) {
   const { copy } = useLandingLocale();
   const scrollRef = useRef<HTMLDivElement>(null);
+  useNestedScrollPassthrough(scrollRef);
   const channel = toMessagingChannel(event.channel);
   const isEmail = isEmailChatChannel(channel);
 
@@ -136,27 +150,29 @@ export function ConversationStage({ event, messages }: ConversationStageProps) {
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-white">
+      {!compact ? (
       <div className={cn("flex shrink-0 items-center justify-between gap-3 px-4 py-2.5", getChatHeaderClassName(channel))}>
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-white/80 ring-1 ring-black/5">
             <ChannelBrandIcon channel={event.channel} className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-zinc-900">{event.customer}</h2>
-            <p className="truncate text-[11px] text-zinc-500">
+            <h2 className="truncate text-sm font-semibold">{event.customer}</h2>
+            <p className="truncate text-[11px] opacity-70">
               {isEmail ? event.preview : event.label}
             </p>
           </div>
         </div>
-        <span className="hidden shrink-0 rounded-full bg-black/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-600 sm:inline">
+        <span className="hidden shrink-0 rounded-full bg-black/[0.04] px-2.5 py-1 text-[10px] font-medium opacity-80 sm:inline">
           {event.metric}
         </span>
       </div>
+      ) : null}
 
       <div
         ref={scrollRef}
         className={cn(
-          "min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4",
+          "min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-auto px-3 py-3 sm:px-4",
           getChatPaneClassName(channel),
         )}
       >
@@ -170,7 +186,12 @@ export function ConversationStage({ event, messages }: ConversationStageProps) {
                 key={`${event.id}-sys-${index}-${message.text.slice(0, 20)}`}
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mx-auto max-w-[92%] rounded-md bg-black/[0.06] px-3 py-1.5 text-center text-[10px] font-medium text-zinc-600"
+                className={cn(
+                  "mx-auto max-w-[92%] rounded-md px-3 py-1.5 text-center text-[10px] font-medium",
+                  channel === "telegram"
+                    ? "bg-white/10 text-[#7f91a4]"
+                    : "bg-black/[0.06] text-zinc-600",
+                )}
               >
                 {message.text}
               </motion.div>
@@ -260,7 +281,8 @@ export function ConversationStage({ event, messages }: ConversationStageProps) {
           <div className="flex items-center gap-2">
             <div
               className={cn(
-                "flex min-h-10 flex-1 items-center px-3 text-[13px] text-zinc-400",
+                "flex min-h-10 flex-1 items-center px-3 text-[13px]",
+                channel === "telegram" ? "text-[#7f91a4]" : "text-zinc-400",
                 getChatComposerFieldClassName(channel),
               )}
             >

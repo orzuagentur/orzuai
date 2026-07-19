@@ -2,14 +2,13 @@ import { cn } from "@/lib/utils";
 
 import type { MessagingChannel } from "@/types/database.types";
 
-type ChatThemeId = "whatsapp" | "email";
+type ChatThemeId = "whatsapp" | "telegram" | "website_chat" | "email";
 
-/**
- * All messenger channels share the WhatsApp-style chat chrome.
- * Email keeps a mail-thread layout.
- */
 function resolveThemeId(channel?: MessagingChannel | null): ChatThemeId {
-  return channel === "email" ? "email" : "whatsapp";
+  if (channel === "email") return "email";
+  if (channel === "telegram") return "telegram";
+  if (channel === "website_chat") return "website_chat";
+  return "whatsapp";
 }
 
 const WHATSAPP = {
@@ -23,6 +22,33 @@ const WHATSAPP = {
   meta: "text-[#667781]",
   accent: "#00a884",
   unreadRing: "ring-[#00a884]/35 ring-offset-[#e7ddd2]",
+} as const;
+
+const TELEGRAM = {
+  pane: "bg-[#0e1621]",
+  header:
+    "border-b border-[#242f3d] bg-[#17212b] text-[#e4ecf2] [&_h2]:text-[#e4ecf2] [&_p]:text-[#7f91a4]",
+  composer: "border-t border-[#242f3d] bg-[#17212b]",
+  field: "rounded-2xl border border-white/10 bg-[#242f3d] text-[#e4ecf2] placeholder:text-[#7f91a4]",
+  send: "bg-[#2AABEE] text-white hover:bg-[#229ed9]",
+  outgoing: "rounded-tr-md bg-[#2b5278] text-[#e4ecf2]",
+  incoming: "rounded-tl-md bg-[#182533] text-[#e4ecf2]",
+  meta: "text-[#7f91a4]",
+  accent: "#2AABEE",
+  unreadRing: "ring-[#2AABEE]/40 ring-offset-[#0e1621]",
+} as const;
+
+const WEBSITE_CHAT = {
+  pane: "bg-[#f3f7f6]",
+  header: "border-b border-[#d7e3e0] bg-white",
+  composer: "border-t border-[#d7e3e0] bg-white",
+  field: "rounded-xl border border-[#c9d9d4] bg-[#f8fbfa] shadow-sm",
+  send: "bg-[#123c35] text-white hover:bg-[#1d5148]",
+  outgoing: "rounded-tr-md bg-[#123c35] text-white",
+  incoming: "rounded-tl-md border border-[#d7e3e0] bg-white text-[#123c35]",
+  meta: "text-[#5f736e]",
+  accent: "#123c35",
+  unreadRing: "ring-[#123c35]/30 ring-offset-[#f3f7f6]",
 } as const;
 
 const EMAIL = {
@@ -40,6 +66,8 @@ const EMAIL = {
 
 const THEMES = {
   whatsapp: WHATSAPP,
+  telegram: TELEGRAM,
+  website_chat: WEBSITE_CHAT,
   email: EMAIL,
 } as const;
 
@@ -49,8 +77,19 @@ function theme(channel?: MessagingChannel | null) {
 
 export function getChatPaneClassName(channel?: MessagingChannel | null): string {
   const t = theme(channel);
-  if (resolveThemeId(channel) === "email") {
-    return t.pane;
+  const id = resolveThemeId(channel);
+  if (id === "email") return t.pane;
+  if (id === "telegram") {
+    return cn(
+      t.pane,
+      "[background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.04)_1px,transparent_0)] [background-size:16px_16px]",
+    );
+  }
+  if (id === "website_chat") {
+    return cn(
+      t.pane,
+      "[background-image:linear-gradient(180deg,rgba(18,60,53,0.03),transparent_42%)]",
+    );
   }
   return cn(
     t.pane,
@@ -99,8 +138,15 @@ export const chatSendButtonClassName = getChatSendButtonClassName("whatsapp");
 export function getChatActionButtonClassName(
   channel?: MessagingChannel | null,
 ): string {
-  if (resolveThemeId(channel) === "email") {
+  const id = resolveThemeId(channel);
+  if (id === "email") {
     return "size-9 rounded-full text-[#5f6368] hover:bg-black/[0.06] hover:text-[#202124]";
+  }
+  if (id === "telegram") {
+    return "size-9 rounded-full text-[#7f91a4] hover:bg-white/10 hover:text-[#e4ecf2]";
+  }
+  if (id === "website_chat") {
+    return "size-9 rounded-full text-[#5f736e] hover:bg-[#123c35]/8 hover:text-[#123c35]";
   }
   return "size-9 rounded-full text-[#54656f] hover:bg-black/[0.06] hover:text-[#111b21]";
 }
@@ -108,8 +154,15 @@ export function getChatActionButtonClassName(
 export function getChatHeaderActionButtonClassName(
   channel?: MessagingChannel | null,
 ): string {
-  if (resolveThemeId(channel) === "email") {
+  const id = resolveThemeId(channel);
+  if (id === "email") {
     return "size-8 rounded-full text-[#5f6368] hover:bg-black/[0.06] hover:text-[#202124]";
+  }
+  if (id === "telegram") {
+    return "size-8 rounded-full text-[#7f91a4] hover:bg-white/10 hover:text-[#e4ecf2]";
+  }
+  if (id === "website_chat") {
+    return "size-8 rounded-full text-[#5f736e] hover:bg-[#123c35]/8 hover:text-[#123c35]";
   }
   return "size-8 rounded-full text-[#54656f] hover:bg-black/[0.06] hover:text-[#111b21]";
 }
@@ -241,10 +294,23 @@ export function getChatMediaDownloadButtonClassName(
 export function getChatUnreadDividerClassName(
   channel?: MessagingChannel | null,
 ) {
-  if (resolveThemeId(channel) === "email") {
+  const id = resolveThemeId(channel);
+  if (id === "email") {
     return {
       line: "bg-[#1a73e8]/30",
       pill: "border-[#1a73e8]/25 bg-white text-[#202124]",
+    };
+  }
+  if (id === "telegram") {
+    return {
+      line: "bg-[#2AABEE]/35",
+      pill: "border-[#2AABEE]/30 bg-[#17212b] text-[#e4ecf2]",
+    };
+  }
+  if (id === "website_chat") {
+    return {
+      line: "bg-[#123c35]/30",
+      pill: "border-[#123c35]/25 bg-white text-[#123c35]",
     };
   }
   return {

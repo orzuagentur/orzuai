@@ -119,6 +119,9 @@ export type LandingCopy = {
       label: string;
     }[];
   };
+  cardDetail: {
+    hide: string;
+  };
   trust: {
     eyebrow: string;
     items: string[];
@@ -179,6 +182,13 @@ export type LandingCopy = {
     resume: string;
     takeOver: string;
     endCall: string;
+    startCall: string;
+    callLive: string;
+    callYourTurn: string;
+    callAiSpeaking: string;
+    callEmptyHint: string;
+    callMicDenied: string;
+    callUnsupported: string;
   };
   platform: {
     eyebrow: string;
@@ -231,6 +241,7 @@ export type LandingCopy = {
     title: string;
     subtitle: string;
     startCta: string;
+    subscribeCta: string;
     freeLabel: string;
     perMonth: string;
     highlight: string;
@@ -295,7 +306,7 @@ const EN: LandingCopy = {
   skipToContent: "Skip to main content",
   header: {
     login: "Log in",
-    startFree: "Start free",
+    startFree: "Trial period",
     bookDemo: "Book a demo",
     openMenu: "Open navigation",
     closeMenu: "Close navigation",
@@ -528,7 +539,7 @@ const EN: LandingCopy = {
     title: "One AI workspace for every customer conversation.",
     subtitle:
       "OrzuX answers messages and calls, updates CRM, books appointments, triggers follow-ups, and keeps humans in control across WhatsApp, Instagram, Telegram, voice, forms, email, and calendar.",
-    primaryCta: "Start free",
+    primaryCta: "Trial period",
     secondaryCta: "Book a demo",
     badge: "Live platform preview",
     metrics: [
@@ -536,6 +547,9 @@ const EN: LandingCopy = {
       { value: "24/7", label: "AI response coverage" },
       { value: "1", label: "shared customer record" },
     ],
+  },
+  cardDetail: {
+    hide: "Hide",
   },
   trust: {
     eyebrow: "Designed for high-touch teams",
@@ -608,6 +622,13 @@ const EN: LandingCopy = {
     resume: "Resume",
     takeOver: "Take over",
     endCall: "End call",
+    startCall: "Call",
+    callLive: "Live call",
+    callYourTurn: "Your turn — speak",
+    callAiSpeaking: "AI speaking",
+    callEmptyHint: "Press Call to talk with AI live (1 min), or Play to hear the demo.",
+    callMicDenied: "Microphone access is required for the live demo call.",
+    callUnsupported: "Live voice needs Chrome, Edge, or Safari with speech recognition.",
   },
   platform: {
     eyebrow: "Product platform",
@@ -875,17 +896,18 @@ const EN: LandingCopy = {
     title: "Start with one channel. Scale into the full platform.",
     subtitle:
       "Simple plans for teams moving from manual replies to AI-assisted communication, voice, CRM, and booking.",
-    startCta: "Start free",
+    startCta: "Trial period",
+    subscribeCta: "Subscribe",
     freeLabel: "Free",
     perMonth: "/mo",
     highlight: "Recommended",
-    note: "Provider fees for WhatsApp, telephony, and messaging are billed separately by your connected providers.",
+    note: "",
   },
   finalCta: {
     title: "Bring every customer conversation into one AI operating system.",
     subtitle:
       "Launch the free workspace, connect a channel, and see OrzuX turn messages, calls, bookings, and CRM updates into one flow.",
-    primaryCta: "Start free",
+    primaryCta: "Trial period",
     secondaryCta: "Book a demo",
   },
   auth: {
@@ -955,7 +977,7 @@ const RU: LandingCopy = {
   header: {
     ...EN.header,
     login: "Войти",
-    startFree: "Начать бесплатно",
+    startFree: "Пробный период",
     bookDemo: "Записаться на демо",
     openMenu: "Открыть навигацию",
     closeMenu: "Закрыть навигацию",
@@ -975,7 +997,7 @@ const RU: LandingCopy = {
     title: "Одно AI-пространство для всех разговоров с клиентами.",
     subtitle:
       "OrzuX отвечает на сообщения и звонки, обновляет CRM, бронирует встречи, запускает follow-up и оставляет команде полный контроль в WhatsApp, Instagram, Telegram, голосе, формах, email и календаре.",
-    primaryCta: "Начать бесплатно",
+    primaryCta: "Пробный период",
     secondaryCta: "Записаться на демо",
     badge: "Живая демонстрация платформы",
     metrics: [
@@ -983,6 +1005,9 @@ const RU: LandingCopy = {
       { value: "24/7", label: "AI-покрытие ответов" },
       { value: "1", label: "общая карточка клиента" },
     ],
+  },
+  cardDetail: {
+    hide: "Скрыть",
   },
   trust: {
     eyebrow: "Создано для команд с высоким уровнем сервиса",
@@ -1048,6 +1073,13 @@ const RU: LandingCopy = {
     resume: "Продолжить",
     takeOver: "Перехватить",
     endCall: "Завершить",
+    startCall: "Звонить",
+    callLive: "Живой звонок",
+    callYourTurn: "Ваша очередь — говорите",
+    callAiSpeaking: "AI отвечает",
+    callEmptyHint: "Нажмите «Звонить», чтобы говорить с AI (1 мин), или Play для демо.",
+    callMicDenied: "Для живого звонка нужен доступ к микрофону.",
+    callUnsupported: "Живой голос работает в Chrome, Edge или Safari.",
   },
   platform: {
     eyebrow: "Продуктовая платформа",
@@ -1157,17 +1189,18 @@ const RU: LandingCopy = {
     title: "Начните с одного канала. Дорастите до полной платформы.",
     subtitle:
       "Понятные планы для команд, которые переходят от ручных ответов к AI-коммуникациям, голосу, CRM и бронированию.",
-    startCta: "Начать бесплатно",
+    startCta: "Пробный период",
+    subscribeCta: "Оформить подписку",
     freeLabel: "Бесплатно",
     perMonth: "/мес",
     highlight: "Рекомендуем",
-    note: "Комиссии WhatsApp, телефонии и сообщений оплачиваются отдельно у подключенных провайдеров.",
+    note: "",
   },
   finalCta: {
     title: "Соберите все разговоры с клиентами в одну AI-операционную систему.",
     subtitle:
       "Запустите бесплатное пространство, подключите канал и посмотрите, как OrzuX превращает сообщения, звонки, брони и CRM в один поток.",
-    primaryCta: "Начать бесплатно",
+    primaryCta: "Пробный период",
     secondaryCta: "Записаться на демо",
   },
   auth: {
@@ -1236,7 +1269,7 @@ const UZ: LandingCopy = {
   header: {
     ...EN.header,
     login: "Kirish",
-    startFree: "Bepul boshlash",
+    startFree: "Sinov davri",
     bookDemo: "Demo bron qilish",
     openMenu: "Navigatsiyani ochish",
     closeMenu: "Navigatsiyani yopish",
@@ -1256,7 +1289,7 @@ const UZ: LandingCopy = {
     title: "Har bir mijoz suhbati uchun yagona AI ish maydoni.",
     subtitle:
       "OrzuX xabar va qo'ng'iroqlarga javob beradi, CRMni yangilaydi, uchrashuv bron qiladi, follow-up ishga tushiradi va WhatsApp, Instagram, Telegram, ovoz, formalar, email va taqvimda jamoaga nazorat beradi.",
-    primaryCta: "Bepul boshlash",
+    primaryCta: "Sinov davri",
     secondaryCta: "Demo bron qilish",
     badge: "Jonli platforma ko'rinishi",
     metrics: [
@@ -1264,6 +1297,9 @@ const UZ: LandingCopy = {
       { value: "24/7", label: "AI javob qamrovi" },
       { value: "1", label: "umumiy mijoz kartasi" },
     ],
+  },
+  cardDetail: {
+    hide: "Yashirish",
   },
   trust: {
     eyebrow: "Yuqori servisli jamoalar uchun",
@@ -1329,6 +1365,13 @@ const UZ: LandingCopy = {
     resume: "Davom ettirish",
     takeOver: "O‘zlashtirish",
     endCall: "Yakunlash",
+    startCall: "Qo‘ng‘iroq",
+    callLive: "Jonli qo‘ng‘iroq",
+    callYourTurn: "Sizning navbatingiz — gapiring",
+    callAiSpeaking: "AI javob bermoqda",
+    callEmptyHint: "AI bilan gaplashish uchun Call bosing (1 daqiqa) yoki demo uchun Play.",
+    callMicDenied: "Jonli qo‘ng‘iroq uchun mikrofon ruxsati kerak.",
+    callUnsupported: "Jonli ovoz Chrome, Edge yoki Safari’da ishlaydi.",
   },
   platform: {
     eyebrow: "Mahsulot platformasi",
@@ -1424,17 +1467,18 @@ const UZ: LandingCopy = {
     title: "Bitta kanaldan boshlang. To'liq platformagacha kengaying.",
     subtitle:
       "Manual javoblardan AI-assisted communication, voice, CRM va bookingga o'tayotgan jamoalar uchun sodda planlar.",
-    startCta: "Bepul boshlash",
+    startCta: "Sinov davri",
+    subscribeCta: "Obuna bolish",
     freeLabel: "Bepul",
     perMonth: "/oy",
     highlight: "Tavsiya etiladi",
-    note: "WhatsApp, telefoniya va messaging provider to'lovlari ulangan providerlar tomonidan alohida billing qilinadi.",
+    note: "",
   },
   finalCta: {
     title: "Har bir mijoz suhbatini bitta AI operating systemga olib kiring.",
     subtitle:
       "Bepul workspace oching, kanal ulang va OrzuX xabar, qo'ng'iroq, booking va CRM update'larni bitta oqimga aylantirishini ko'ring.",
-    primaryCta: "Bepul boshlash",
+    primaryCta: "Sinov davri",
     secondaryCta: "Demo bron qilish",
   },
   auth: {

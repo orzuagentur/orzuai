@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import type { LandingDemoMessage } from "@/features/landing/demo/types";
 
-const REVEAL_MS = 4200;
-const HISTORY_CAP = 12;
+const REVEAL_MS = 2400;
+const HISTORY_CAP = 18;
 
 /**
  * Accumulates demo messages slowly (messenger-like), looping endlessly.

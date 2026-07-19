@@ -2,53 +2,67 @@
 
 import { LandingIcon } from "@/components/landing/LandingIcon";
 import { useLandingLocale } from "@/components/landing/LandingLocaleProvider";
+import {
+  LandingMarqueeCardShell,
+  LandingMarqueeRow,
+} from "@/components/landing/LandingMarqueeRow";
 import { LandingReveal } from "@/components/landing/ui/landing-motion";
 
 export function LandingProductShowcase() {
   const { copy } = useLandingLocale();
+  const cards = copy.platform.cards;
+  const mid = Math.ceil(cards.length / 2);
+  const rowA = cards.slice(0, mid);
+  const rowB = cards.slice(mid);
+
+  function Card({ card }: { card: (typeof cards)[number] }) {
+    return (
+      <article className="landing-panel flex h-full min-h-[168px] flex-col justify-between p-3.5 sm:min-h-[200px] sm:p-5">
+        <div>
+          <span className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--landing-line)] bg-[var(--landing-soft)] text-[var(--landing-teal)]">
+            <LandingIcon icon={card.icon} className="size-4" />
+          </span>
+          <h3 className="mt-3 text-base font-semibold leading-6 text-[var(--landing-ink)]">
+            {card.title}
+          </h3>
+          <p className="landing-copy mt-1.5 line-clamp-3 text-xs leading-5 sm:text-sm sm:leading-6">
+            {card.description}
+          </p>
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <section id="platform" className="w-full bg-white/30 px-4 py-12 sm:px-6 sm:py-24">
-      <div className="mx-auto max-w-7xl">
+    <section id="platform" className="w-full overflow-x-hidden bg-white/30 py-8 sm:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <LandingReveal className="max-w-3xl">
-          <p className="landing-eyebrow">
-            {copy.platform.eyebrow}
-          </p>
-          <h2 className="landing-heading mt-4 text-3xl font-semibold leading-tight sm:text-5xl">
+          <p className="landing-eyebrow">{copy.platform.eyebrow}</p>
+          <h2 className="landing-heading mt-3 text-2xl font-semibold leading-tight sm:mt-4 sm:text-5xl">
             {copy.platform.title}
           </h2>
-          <p className="landing-copy mt-5 text-base leading-8 sm:text-lg">
+          <p className="landing-copy mt-3 text-sm leading-6 sm:mt-5 sm:text-lg sm:leading-8">
             {copy.platform.subtitle}
           </p>
         </LandingReveal>
+      </div>
 
-        <div className="mt-12 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {copy.platform.cards.map((card, index) => (
-            <LandingReveal key={card.id} delay={index * 0.04}>
-              <article className="landing-panel landing-panel-hover flex min-h-0 flex-col justify-between p-4 sm:min-h-[260px] sm:p-5">
-                <div>
-                  <div className="flex items-start justify-between gap-4">
-                    <span className="inline-flex size-10 items-center justify-center rounded-lg border border-[var(--landing-line)] bg-[var(--landing-soft)] text-[var(--landing-teal)]">
-                      <LandingIcon icon={card.icon} className="size-5" />
-                    </span>
-                    <span className="rounded-full bg-[var(--landing-warm)] px-2.5 py-1 text-xs font-semibold text-[#8a3f31]">
-                      {card.metric}
-                    </span>
-                  </div>
-                  <h3 className="mt-5 text-xl font-semibold leading-7 text-[var(--landing-ink)]">
-                    {card.title}
-                  </h3>
-                  <p className="landing-copy mt-3 text-sm leading-7">
-                    {card.description}
-                  </p>
-                </div>
-                <p className="mt-7 border-t border-[var(--landing-line)] pt-4 text-xs font-semibold uppercase text-[var(--landing-muted-text)]">
-                  {card.detail}
-                </p>
-              </article>
-            </LandingReveal>
+      <div className="mt-6 space-y-2.5 sm:mt-12 sm:space-y-3">
+        <LandingMarqueeRow direction="left" speed={26}>
+          {[...rowA, ...rowA, ...rowA].map((card, index) => (
+            <LandingMarqueeCardShell key={`${card.id}-a-${index}`}>
+              <Card card={card} />
+            </LandingMarqueeCardShell>
           ))}
-        </div>
+        </LandingMarqueeRow>
+
+        <LandingMarqueeRow direction="right" speed={24}>
+          {[...rowB, ...rowB, ...rowB].map((card, index) => (
+            <LandingMarqueeCardShell key={`${card.id}-b-${index}`}>
+              <Card card={card} />
+            </LandingMarqueeCardShell>
+          ))}
+        </LandingMarqueeRow>
       </div>
     </section>
   );

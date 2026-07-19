@@ -80,14 +80,16 @@ export default async function Home({ searchParams }: HomePageProps) {
   const baseCopy = getLandingCopy(locale);
   const copyOverride = await getLandingCopyWithCms(locale, baseCopy);
 
-  const planCards = plans.map((plan) => ({
-    id: plan.id,
-    label: plan.label,
-    tagline: plan.tagline,
-    priceMonthly: plan.priceMonthly,
-    highlighted: plan.highlighted,
-    features: plan.features,
-  }));
+  const planCards = plans
+    .filter((plan) => plan.id !== "free" && plan.priceMonthly > 0)
+    .map((plan) => ({
+      id: plan.id,
+      label: plan.label,
+      tagline: plan.tagline,
+      priceMonthly: plan.priceMonthly,
+      highlighted: plan.highlighted,
+      features: plan.features,
+    }));
 
   return (
     <>
