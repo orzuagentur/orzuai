@@ -385,7 +385,7 @@ export function VoiceLiveCallCard({
               asChild
             >
               <Link
-                href={`${DASHBOARD_ROUTES.chatsVoiceMonitor}?call=${call.id}`}
+                href={`${DASHBOARD_ROUTES.voiceMonitor}?call=${call.id}`}
               >
                 <HeadphonesIcon className="mr-2 size-4" />
                 {VOICE_MESSAGES.callListenLive}

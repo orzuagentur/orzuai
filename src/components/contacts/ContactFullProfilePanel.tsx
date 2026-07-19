@@ -197,13 +197,7 @@ export function ContactFullProfilePanel({
       return;
     }
 
-    const mode = selection.mode;
-    setPendingCallMode(mode);
-
-    if (mode === "human") {
-      setPendingCallMode(null);
-      return;
-    }
+    setPendingCallMode("ai");
 
     void (async () => {
       const result = await triggerContactVoiceCallAction({
@@ -221,7 +215,7 @@ export function ContactFullProfilePanel({
       setCallModeOpen(false);
 
       if (result.callLogId) {
-        router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+        router.push(`${DASHBOARD_ROUTES.voice}?call=${result.callLogId}`);
       }
 
       await onRefresh();
@@ -542,7 +536,6 @@ export function ContactFullProfilePanel({
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={contact.identifier ?? ""}
-        humanAvailable={false}
         pendingMode={pendingCallMode}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}

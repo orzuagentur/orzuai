@@ -1939,6 +1939,76 @@ export type Database = {
           },
         ];
       };
+      crm_orders: {
+        Row: {
+          id: string;
+          business_id: string;
+          contact_id: string | null;
+          conversation_id: string | null;
+          title: string;
+          description: string | null;
+          source: string;
+          status: string;
+          amount: number | null;
+          currency: string;
+          payload: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          contact_id?: string | null;
+          conversation_id?: string | null;
+          title?: string;
+          description?: string | null;
+          source?: string;
+          status?: string;
+          amount?: number | null;
+          currency?: string;
+          payload?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          contact_id?: string | null;
+          conversation_id?: string | null;
+          title?: string;
+          description?: string | null;
+          source?: string;
+          status?: string;
+          amount?: number | null;
+          currency?: string;
+          payload?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "crm_orders_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "crm_orders_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "crm_orders_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       crm_tasks: {
         Row: {
           id: string;

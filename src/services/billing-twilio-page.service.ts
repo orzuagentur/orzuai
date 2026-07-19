@@ -131,7 +131,7 @@ export async function getTwilioBillingPageData(): Promise<TwilioBillingData> {
     0,
   );
 
-  let connectUrl = "/dashboard/integrations/voice";
+  const connectUrl = "/dashboard/integrations/voice";
   let balanceCents: number | null = null;
   let balanceCurrency: string | null = null;
   let balanceError: string | null = null;

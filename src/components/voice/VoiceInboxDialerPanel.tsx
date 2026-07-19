@@ -148,10 +148,6 @@ export function VoiceInboxDialerPanel({
       return;
     }
 
-    if (selection.mode === "human") {
-      return;
-    }
-
     setPendingCallMode("ai");
 
     startCalling(async () => {
@@ -171,7 +167,7 @@ export function VoiceInboxDialerPanel({
         setCallModeOpen(false);
 
         if (result.callLogId) {
-          router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+          router.push(`${DASHBOARD_ROUTES.voice}?call=${result.callLogId}`);
         }
 
         scheduleVoiceInboxRefresh(() => router.refresh());
@@ -248,7 +244,6 @@ export function VoiceInboxDialerPanel({
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={phoneToCall}
-        humanAvailable={false}
         pendingMode={pendingCallMode}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}

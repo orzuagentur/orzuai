@@ -38,7 +38,7 @@ export function VoiceActiveCallBanner({ call }: VoiceActiveCallBannerProps) {
           </p>
         </div>
         <Button asChild size="sm" variant="outline">
-          <Link href={`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`}>
+          <Link href={`${DASHBOARD_ROUTES.voice}?call=${call.id}`}>
             {VOICE_MESSAGES.callLiveBadge}
           </Link>
         </Button>
@@ -54,7 +54,7 @@ export function VoiceActiveAiCallChip({ call }: VoiceActiveCallBannerProps) {
   return (
     <div className="shrink-0 border-b px-4 py-2">
       <Link
-        href={`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`}
+        href={`${DASHBOARD_ROUTES.voice}?call=${call.id}`}
         className="flex items-center gap-2 rounded-lg border border-red-200/80 bg-red-50/80 px-3 py-1.5 text-xs transition-colors hover:bg-red-100/80 dark:border-red-900/60 dark:bg-red-950/20 dark:hover:bg-red-950/40"
       >
         <span className="relative flex size-2 shrink-0">

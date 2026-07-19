@@ -71,7 +71,7 @@ export function VoiceCallList({
                 : PhoneOutgoingIcon;
           const displayName =
             call.contactName ?? formatContactIdentifier(call.phoneNumber);
-          const href = `${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`;
+          const href = `${DASHBOARD_ROUTES.voice}?call=${call.id}`;
           const directionLabel =
             directionKind === "missed"
               ? VOICE_MESSAGES.callHistoryMissedLabel

@@ -10,6 +10,7 @@ export {
   isInboxMessagingChannel,
   AI_AGENT_CHANNELS,
   MESSAGING_INTEGRATION_CHANNELS,
+  INBOX_MESSAGING_CHANNELS,
   isAiAgentChannel,
   INTEGRATION_SECTION_LIST,
   INTEGRATION_SECTIONS,
@@ -27,6 +28,7 @@ export type {
   LegacyIntegrationWorkspaceSectionId,
   AiAgentChannelId,
   MessagingIntegrationChannelId,
+  InboxMessagingChannelId,
 } from "./constants";
 export {
   getActivatedIntegrationChannels,
@@ -36,6 +38,7 @@ export {
 export {
   buildIntegrationChannelStatuses,
   getActiveMessagingChannelIds,
+  getActiveInboxChannelIds,
   isActiveMessagingChannel,
   isChannelConnectedForWorkspace,
 } from "./channel-status";

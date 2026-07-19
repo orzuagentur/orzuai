@@ -313,12 +313,6 @@ export function VoiceWorkspacePanel({
         return;
       }
       onPrepareNewCall?.();
-      const mode = selection.mode;
-
-      if (mode === "human") {
-        setCallModeOpen(false);
-        return;
-      }
 
       openOptimisticLiveView(phoneToCall, {
         callMode: "ai",
@@ -570,7 +564,6 @@ export function VoiceWorkspacePanel({
       <VoiceCallModeDialog
         open={callModeOpen}
         phoneNumber={phoneToCall}
-        humanAvailable={false}
         pendingMode={null}
         onOpenChange={setCallModeOpen}
         onSelectMode={handleCallModeSelect}

@@ -116,7 +116,7 @@ function VoiceCallMonitorContent({
 
   const handleSelectCall = useCallback(
     (callId: string) => {
-      router.push(`${DASHBOARD_ROUTES.chatsVoiceMonitor}?call=${callId}`);
+      router.push(`${DASHBOARD_ROUTES.voiceMonitor}?call=${callId}`);
     },
     [router],
   );
@@ -141,7 +141,7 @@ function VoiceCallMonitorContent({
       <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" type="button" asChild>
-            <Link href={DASHBOARD_ROUTES.chatsVoice}>
+            <Link href={DASHBOARD_ROUTES.voice}>
               <ArrowLeftIcon className="size-4" />
               {VOICE_MESSAGES.inboxTabLabel}
             </Link>

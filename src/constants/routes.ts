@@ -33,9 +33,14 @@ export const DASHBOARD_ROUTES = {
   chats: "/dashboard/chats",
   chatsMonitor: "/dashboard/chats",
   chatsFavorites: "/dashboard/chats/favorites",
-  chatsVoice: "/dashboard/chats/voice",
-  chatsVoiceMonitor: "/dashboard/chats/voice/monitor",
+  /** @deprecated Use `voice` — kept as alias for existing links. */
+  chatsVoice: "/dashboard/voice",
+  /** @deprecated Use `voiceMonitor`. */
+  chatsVoiceMonitor: "/dashboard/voice/monitor",
+  voice: "/dashboard/voice",
+  voiceMonitor: "/dashboard/voice/monitor",
   chatsSms: "/dashboard/chats/sms",
+  orders: "/dashboard/orders",
   contacts: "/dashboard/contacts",
   knowledgeBase: "/dashboard/knowledge-base",
   integrations: "/dashboard/integrations",

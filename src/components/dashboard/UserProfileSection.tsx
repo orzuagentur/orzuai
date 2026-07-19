@@ -6,8 +6,11 @@ import { useTransition } from "react";
 import {
   Building2Icon,
   ChevronsUpDownIcon,
+  CreditCardIcon,
+  HeadphonesIcon,
   Loader2Icon,
   LogOutIcon,
+  SettingsIcon,
   UserIcon,
 } from "lucide-react";
 
@@ -22,12 +25,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { usePlatformSupport } from "@/contexts/platform-support-context";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { signOutAction } from "@/features/auth/actions/sign-out";
-import { ACCOUNT_SETTINGS_MESSAGES } from "@/features/settings/constants";
+import {
+  ACCOUNT_SETTINGS_MESSAGES,
+  SETTINGS_MESSAGES,
+} from "@/features/settings/constants";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 import { cn } from "@/lib/utils";
 import { getUserDisplayName, getUserInitials } from "@/utils/dashboard";
@@ -39,6 +47,8 @@ type UserProfileSectionProps = {
 export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
   const pathname = usePathname();
   const [isSigningOut, startSignOutTransition] = useTransition();
+  const { toggle: toggleSupport, unreadCount: supportUnreadCount } =
+    usePlatformSupport();
   const displayName = getUserDisplayName(
     userProfile.fullName,
     userProfile.email,
@@ -46,6 +56,12 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
   const initials = getUserInitials(userProfile.fullName, userProfile.email);
   const isAccountPage = pathname === DASHBOARD_ROUTES.account;
   const isProfilePage = pathname === DASHBOARD_ROUTES.profile;
+  const isSettingsPage =
+    pathname === DASHBOARD_ROUTES.settings ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.settings}/`);
+  const isBillingPage =
+    pathname === DASHBOARD_ROUTES.subscription ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.subscription}/`);
 
   return (
     <SidebarMenu>
@@ -71,6 +87,11 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
                   {userProfile.email}
                 </span>
               </div>
+              {supportUnreadCount > 0 ? (
+                <SidebarMenuBadge>
+                  {supportUnreadCount > 99 ? "99+" : supportUnreadCount}
+                </SidebarMenuBadge>
+              ) : null}
               <ChevronsUpDownIcon className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -129,6 +150,38 @@ export function UserProfileSection({ userProfile }: UserProfileSectionProps) {
                 <UserIcon className="size-4" />
                 {ACCOUNT_SETTINGS_MESSAGES.accountNav}
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              asChild
+              className={cn(isSettingsPage && "bg-accent font-medium")}
+            >
+              <Link href={DASHBOARD_ROUTES.settings}>
+                <SettingsIcon className="size-4" />
+                {SETTINGS_MESSAGES.pageTitle}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              asChild
+              className={cn(isBillingPage && "bg-accent font-medium")}
+            >
+              <Link href={DASHBOARD_ROUTES.subscription}>
+                <CreditCardIcon className="size-4" />
+                Billing
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                toggleSupport();
+              }}
+            >
+              <HeadphonesIcon className="size-4" />
+              <span className="flex-1">Поддержка OrzuX</span>
+              {supportUnreadCount > 0 ? (
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                  {supportUnreadCount > 99 ? "99+" : supportUnreadCount}
+                </span>
+              ) : null}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

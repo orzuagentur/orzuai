@@ -27,17 +27,9 @@ import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
-import { scheduleInboundMessagePush } from "@/services/push-notifications.service";
-import { scheduleCrmOrchestration } from "@/services/ai-orchestration-queue.service";
-import { scheduleFollowUpJobsAfterAiReply } from "@/services/follow-up-agent.service";
-import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
-import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import {
   findContactForChannel,
   incrementMessagingAnalytics,
-  insertChannelMessage,
-  scheduleChannelAutoReply,
-  resolveInboundConversation,
 } from "@/services/messaging.service";
 import type { WebsiteFormConnection } from "@/types/database.types";
 import type {
@@ -53,7 +45,6 @@ import { normalizeWebsiteOrigin, extractRequestWebsiteOrigin } from "@/utils/web
 import { parseWebsiteFormSubmissionPayload } from "@/types/website-forms.types";
 import { mapWebsiteFormConnection } from "@/utils/website-forms";
 import { normalizePhoneNumber } from "@/utils/whatsapp";
-import { sanitizeCustomerFacingReply } from "@/utils/customer-facing-reply-guard";
 
 function getWebsiteFormWebhookBaseUrl(): string {
   return buildAppUrl("/api/webhooks/website-forms");
@@ -425,19 +416,11 @@ async function processWebsiteFormFollowUp(input: {
   businessId: string;
   connection: WebsiteFormConnection;
   submission: WebsiteFormSubmissionInput;
-  conversationId: string;
   clientMessage: string;
 }): Promise<void> {
-  const { admin, businessId, connection, submission, conversationId, clientMessage } =
-    input;
+  const { admin, businessId, connection, submission, clientMessage } = input;
 
   if (!connection.auto_follow_up_enabled || connection.follow_up_channel === "none") {
-    await scheduleChannelAutoReply({
-      businessId,
-      channel: "website_forms",
-      conversationId,
-      clientMessage,
-    });
     return;
   }
 
@@ -452,36 +435,12 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
-  const reply = await generateFastAssistantReply({
-    admin,
-    businessId,
-    channel: "website_forms",
-    conversationId,
-    clientMessage,
-  });
+  // Form leads go to Orders only — no Chats conversation. Use a short outbound
+  // acknowledgement without inbox message history.
+  const followUpText =
+    "Thanks for your request — we received it and will get back to you shortly.";
+  void clientMessage;
 
-  if (!reply.success) {
-    return;
-  }
-
-  const safeFollowUp = sanitizeCustomerFacingReply(reply.text);
-
-  if (!safeFollowUp.text) {
-    return;
-  }
-
-  if (safeFollowUp.blocked) {
-    console.warn(
-      "[website-forms] blocked unsafe AI follow-up",
-      JSON.stringify({
-        businessId,
-        conversationId,
-        reason: safeFollowUp.reason,
-      }),
-    );
-  }
-
-  const followUpText = safeFollowUp.text;
   const channel = connection.follow_up_channel as WebsiteFormFollowUpChannel;
   let outboundSent = false;
 
@@ -532,48 +491,10 @@ async function processWebsiteFormFollowUp(input: {
     });
   }
 
-  await insertChannelMessage(admin, {
-    conversationId,
-    channel: "website_forms",
-    senderType: "ai",
-    content: outboundSent
-      ? followUpText
-      : `${followUpText}\n\n(Follow-up via ${channel} was not sent — check channel connection or lead contact details.)`,
-    aiGenerated: true,
-  });
-
-  await incrementMessagingAnalytics(admin, businessId, "website_forms", {
-    totalMessages: 1,
-    aiReplies: 1,
-  });
-
-  if (!reply.orchestrationCompleted) {
-    await scheduleCrmOrchestration({
-      businessId,
-      channel: "website_forms",
-      conversationId,
-      clientMessage,
-    }).catch((error) => {
-      console.error(
-        "[website-forms] failed to enqueue CRM orchestration",
-        error,
-      );
-    });
-  }
-
   if (outboundSent) {
-    void scheduleFollowUpJobsAfterAiReply({
-      admin,
-      businessId,
-      conversationId,
-      channel: "website_forms",
-      outboundContent: followUpText,
-      contactName: submission.name?.trim() || undefined,
-    }).catch((error) => {
-      console.warn(
-        "[website-forms] schedule follow-up jobs failed",
-        error instanceof Error ? error.message : "unknown",
-      );
+    await incrementMessagingAnalytics(admin, businessId, "website_forms", {
+      totalMessages: 1,
+      aiReplies: 1,
     });
   }
 }
@@ -632,22 +553,40 @@ export async function ingestWebsiteFormSubmission(
     return { success: false };
   }
 
-  const conversationId = await resolveInboundConversation(
-    admin,
+  const { createCrmOrder } = await import("@/services/crm-orders.service");
+  const orderTitle =
+    submission.formName?.trim() ||
+    `Website form request — ${displayName}`;
+  const fieldEntries = submission.fields ?? {};
+  const serviceTypeCandidate =
+    fieldEntries.serviceType ??
+    fieldEntries.service_type ??
+    fieldEntries.service ??
+    fieldEntries.type ??
+    fieldEntries.услуга;
+  const serviceType =
+    typeof serviceTypeCandidate === "string" ||
+    typeof serviceTypeCandidate === "number"
+      ? String(serviceTypeCandidate).trim()
+      : "";
+
+  await createCrmOrder({
     businessId,
     contactId,
-    "website_forms",
-  );
-
-  if (!conversationId) {
-    return { success: false };
-  }
-
-  await insertChannelMessage(admin, {
-    conversationId,
-    channel: "website_forms",
-    senderType: "client",
-    content: body,
+    conversationId: null,
+    title: orderTitle,
+    description: body,
+    source: "website_forms",
+    payload: {
+      formName: submission.formName ?? null,
+      sourceUrl: submission.sourceUrl ?? null,
+      email: submission.email ?? null,
+      phone: submission.phone ?? null,
+      message: submission.message ?? null,
+      customerName: displayName,
+      serviceType: serviceType || null,
+      fields: fieldEntries,
+    },
   });
 
   const { processFormSubmitAutomations } = await import(
@@ -655,33 +594,14 @@ export async function ingestWebsiteFormSubmission(
   );
   await processFormSubmitAutomations({
     businessId,
-    conversationId,
+    conversationId: null,
     contactId,
     contactName: displayName,
     message: body,
   });
 
   await incrementMessagingAnalytics(admin, businessId, "website_forms", {
-    totalMessages: 1,
     totalContacts: createdContact ? 1 : 0,
-  });
-
-  scheduleInboundMessagePush({
-    businessId,
-    contactId,
-    contactName: displayName,
-    conversationId,
-    channel: "website_forms",
-    preview: body,
-    isNewContact: createdContact,
-  });
-
-  scheduleInboundMessageEffects({
-    admin,
-    businessId,
-    channel: "website_forms",
-    conversationId,
-    clientMessage: body,
   });
 
   await admin
@@ -697,7 +617,6 @@ export async function ingestWebsiteFormSubmission(
     businessId,
     connection,
     submission,
-    conversationId,
     clientMessage: body,
   });
 
@@ -713,6 +632,7 @@ export async function ingestWebsiteFormSubmission(
   }
 
   revalidateWebsiteFormsPaths();
+  revalidatePath(DASHBOARD_ROUTES.orders);
   return { success: true };
 }
 

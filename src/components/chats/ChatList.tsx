@@ -63,7 +63,7 @@ function buildConversationHref(
 
   const channel = linkToConversationChannel ? conversationChannel : channelId;
   if (channel === "voice") {
-    return `${DASHBOARD_ROUTES.chatsVoice}?conversation=${conversationId}`;
+    return `${DASHBOARD_ROUTES.voice}?conversation=${conversationId}`;
   }
 
   if (channel === "sms") {

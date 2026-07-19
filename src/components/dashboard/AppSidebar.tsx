@@ -28,10 +28,8 @@ import {
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { UserProfileSection } from "./UserProfileSection";
-import { ThemeToggle } from "./ThemeToggle";
 import { AiHumanRequestsButton } from "./AiHumanRequestsButton";
 import { PlatformCopilotSidebarButton } from "./PlatformCopilotSidebarButton";
-import { PlatformSupportSidebarButton } from "./PlatformSupportSidebarButton";
 
 type AppSidebarProps = {
   userProfile: DashboardUserProfile;
@@ -152,9 +150,7 @@ function AppSidebarContent({
           </div>
         ) : null}
         <PlatformCopilotSidebarButton />
-        <PlatformSupportSidebarButton />
         <AiHumanRequestsButton />
-        <ThemeToggle />
         <UserProfileSection userProfile={userProfile} />
       </SidebarFooter>
     </>

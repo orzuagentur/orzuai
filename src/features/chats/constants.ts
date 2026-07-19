@@ -1,5 +1,5 @@
 export const CHAT_MESSAGES = {
-  pageTitle: "Inbox",
+  pageTitle: "Chats",
   pageDescription:
     "All channels in one place — open WhatsApp, Instagram, Telegram, or Website Forms inboxes.",
   inboxSubtitle: "All your conversations in one place.",
@@ -7,9 +7,9 @@ export const CHAT_MESSAGES = {
   monitorDescription:
     "Summary of conversations and activity across every connected channel.",
   channelsTitle: "Channels",
-  openChannel: "Open inbox",
+  openChannel: "Open chats",
   viewMonitor: "All channels",
-  channelInbox: "Inbox",
+  channelInbox: "Chats",
   conversationsCount: "conversations",
   messagesToday: "messages",
   notConnectedHint: "Connect this channel in Integrations to receive messages.",

@@ -39,6 +39,14 @@ export const executorCreateDealActionSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
 });
 
+export const executorCreateOrderActionSchema = z.object({
+  type: z.literal("create_order"),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  serviceType: z.string().trim().max(120).optional(),
+  amount: z.number().min(0).max(999999999).optional(),
+});
+
 export const executorAddNoteActionSchema = z.object({
   type: z.literal("add_note"),
   content: z.string().trim().min(1).max(2000),
@@ -155,6 +163,7 @@ export const executorActionSchema = z.discriminatedUnion("type", [
   executorCreateLeadActionSchema,
   executorCreateTaskActionSchema,
   executorCreateDealActionSchema,
+  executorCreateOrderActionSchema,
   executorAddNoteActionSchema,
   executorAddInternalNoteActionSchema,
   executorCreateCalendarEventActionSchema,

@@ -1,25 +1,25 @@
-import { VoiceCallMonitorPanel } from "@/components/voice/VoiceCallMonitorPanel";
-import { resolveInboxBusinessContext } from "@/services/chat.service";
-import { getVoiceInboxPageData } from "@/services/voice-inbox.service";
+import { redirect } from "next/navigation";
 
-type VoiceMonitorPageProps = {
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+
+type LegacyVoiceMonitorPageProps = {
   searchParams: Promise<{ call?: string }>;
 };
 
-export default async function VoiceMonitorPage({
+export default async function LegacyVoiceMonitorPage({
   searchParams,
-}: VoiceMonitorPageProps) {
+}: LegacyVoiceMonitorPageProps) {
   const { call: callId } = await searchParams;
-  const inboxContext = await resolveInboxBusinessContext();
-  const data = await getVoiceInboxPageData(inboxContext, callId?.trim() || null);
+  const query = new URLSearchParams();
 
-  return (
-    <VoiceCallMonitorPanel
-      hasBusiness={data.hasBusiness}
-      businessId={data.businessId}
-      voiceInboxEnabled={data.voiceInboxEnabled}
-      calls={data.calls}
-      activeCall={data.activeCall}
-    />
+  if (callId?.trim()) {
+    query.set("call", callId.trim());
+  }
+
+  const suffix = query.toString();
+  redirect(
+    suffix
+      ? `${DASHBOARD_ROUTES.voiceMonitor}?${suffix}`
+      : DASHBOARD_ROUTES.voiceMonitor,
   );
 }

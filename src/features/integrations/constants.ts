@@ -25,6 +25,14 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
   "email",
 ] as const;
 
+/** Channels shown in Chats inbox (website forms go to Orders, not Chats). */
+export const INBOX_MESSAGING_CHANNELS = [
+  "whatsapp",
+  "telegram",
+  "website_chat",
+  "email",
+] as const;
+
 /** All channels the AI Agent can be enabled on (messaging + SMS + voice calls). */
 export const AI_AGENT_CHANNELS = [
   ...MESSAGING_INTEGRATION_CHANNELS,
@@ -44,6 +52,9 @@ export const INTEGRATION_CHANNELS = [
 export type MessagingIntegrationChannelId =
   (typeof MESSAGING_INTEGRATION_CHANNELS)[number];
 
+export type InboxMessagingChannelId =
+  (typeof INBOX_MESSAGING_CHANNELS)[number];
+
 export type AiAgentChannelId = (typeof AI_AGENT_CHANNELS)[number];
 
 export type IntegrationChannelId = (typeof INTEGRATION_CHANNELS)[number];
@@ -62,8 +73,8 @@ export function isAiAgentChannel(
 
 export function isInboxMessagingChannel(
   channel: MessagingChannel,
-): channel is MessagingIntegrationChannelId {
-  return (MESSAGING_INTEGRATION_CHANNELS as readonly string[]).includes(channel);
+): channel is InboxMessagingChannelId {
+  return (INBOX_MESSAGING_CHANNELS as readonly string[]).includes(channel);
 }
 
 export const INTEGRATION_SECTIONS = ["activate", "contacts"] as const;

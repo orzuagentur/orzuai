@@ -45,7 +45,7 @@ export const TEAM_PERMISSION_LABELS: Record<
   { label: string; description: string }
 > = {
   inbox: {
-    label: "Inbox",
+    label: "Chats",
     description: "Read and reply to customer conversations.",
   },
   crm: {

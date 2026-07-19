@@ -21,7 +21,7 @@ import { buildPendingOutboundChatMessage } from "@/services/outbound-message.ser
 import { sendTelegramChatMessage } from "@/services/telegram.service";
 import type { MessagingChannel as DbMessagingChannel } from "@/types/database.types";
 import {
-  getActiveMessagingChannelIds,
+  getActiveInboxChannelIds,
   MESSAGING_INTEGRATION_CHANNELS,
 } from "@/features/integrations";
 import { isInboxMessagingChannel } from "@/features/integrations/constants";
@@ -464,7 +464,7 @@ export async function getChatsMonitorData(
     isVoiceInboxVisible(resolvedBusinessId),
     isSmsInboxVisible(resolvedBusinessId),
   ]);
-  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
+  const visibleChannelIds = getActiveInboxChannelIds(channelStatuses);
   const channels: ChatMonitorChannelStats[] = [];
 
   for (const channel of visibleChannelIds) {
@@ -697,7 +697,7 @@ export async function getChatsChannelPageData(
     isVoiceInboxVisible(ctx.businessId),
     isSmsInboxVisible(ctx.businessId),
   ]);
-  const visibleChannelIds = getActiveMessagingChannelIds(channelStatuses);
+  const visibleChannelIds = getActiveInboxChannelIds(channelStatuses);
 
   const [conversationsPage, channelConnected, cannedResponses, aiEnabled] =
     await Promise.all([

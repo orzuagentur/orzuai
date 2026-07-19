@@ -11,7 +11,7 @@ import { requireUser } from "@/services/auth.service";
 function revalidateVoiceInboxPaths(): void {
   revalidatePath(APP_ROUTES.dashboard);
   revalidatePath(DASHBOARD_ROUTES.chats);
-  revalidatePath(DASHBOARD_ROUTES.chatsVoice);
+  revalidatePath(DASHBOARD_ROUTES.voice);
 }
 
 export async function deleteVoicePhoneHistory(

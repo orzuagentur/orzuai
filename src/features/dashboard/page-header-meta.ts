@@ -17,6 +17,8 @@ import {
   SETTINGS_MESSAGES,
 } from "@/features/settings/constants";
 import { TEAM_MESSAGES } from "@/features/team/constants";
+import { VOICE_MESSAGES } from "@/features/voice/constants";
+import { ORDERS_MESSAGES } from "@/features/orders/constants";
 
 export type DashboardPageHeaderMeta = {
   title: string;
@@ -30,6 +32,26 @@ export function getDashboardPageHeaderMeta(
     return {
       title: OVERVIEW_MESSAGES.title,
       description: OVERVIEW_MESSAGES.description,
+    };
+  }
+
+  if (
+    pathname === DASHBOARD_ROUTES.orders ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.orders}/`)
+  ) {
+    return {
+      title: ORDERS_MESSAGES.pageTitle,
+      description: ORDERS_MESSAGES.pageSubtitle,
+    };
+  }
+
+  if (
+    pathname === DASHBOARD_ROUTES.voice ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.voice}/`)
+  ) {
+    return {
+      title: VOICE_MESSAGES.inboxTabLabel,
+      description: VOICE_MESSAGES.inboxEmptyDescription,
     };
   }
 

@@ -37,7 +37,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "inbox",
-    label: "Open Inbox",
+    label: "Open Chats",
     href: DASHBOARD_ROUTES.chats,
     icon: MessageSquareIcon,
   },

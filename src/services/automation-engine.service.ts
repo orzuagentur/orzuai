@@ -31,7 +31,7 @@ export type AutomationTriggerContext = {
   businessId: string;
   trigger: AutomationTriggerType;
   channel: MessagingChannel;
-  conversationId: string;
+  conversationId: string | null;
   contactId: string;
   contactName: string;
   message?: string;
@@ -159,6 +159,13 @@ async function executeWorkflowAction(
   }
 
   if (action === "notify") {
+    if (!context.conversationId) {
+      return {
+        success: true,
+        detail: "Skipped notify: no conversation (order-only lead)",
+      };
+    }
+
     await notifyInboundMessagePush({
       businessId: context.businessId,
       contactId: context.contactId,
@@ -383,7 +390,7 @@ export async function processInboundMessageAutomations(input: {
 
 export async function processFormSubmitAutomations(input: {
   businessId: string;
-  conversationId: string;
+  conversationId?: string | null;
   contactId: string;
   contactName: string;
   message: string;
@@ -392,7 +399,7 @@ export async function processFormSubmitAutomations(input: {
     businessId: input.businessId,
     trigger: "form_submit",
     channel: "website_forms",
-    conversationId: input.conversationId,
+    conversationId: input.conversationId ?? null,
     contactId: input.contactId,
     contactName: input.contactName,
     message: input.message,

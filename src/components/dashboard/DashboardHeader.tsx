@@ -11,6 +11,8 @@ import { CrmEntityTabs } from "@/components/contacts/CrmEntityTabs";
 import { useOptionalAiAssistantChrome } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { useOptionalContactsChrome } from "@/components/contacts/contacts-chrome-context";
 import { useOptionalInboxChrome } from "@/components/chats/inbox/use-optional-inbox-chrome";
+import { OrdersToolbar } from "@/components/orders/OrdersToolbar";
+import { useOptionalOrdersChrome } from "@/components/orders/orders-chrome-context";
 import { DashboardPageHeading } from "@/components/dashboard/DashboardPageHeading";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -38,6 +40,13 @@ function isCalendarPath(pathname: string): boolean {
   );
 }
 
+function isOrdersPath(pathname: string): boolean {
+  return (
+    pathname === DASHBOARD_ROUTES.orders ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.orders}/`)
+  );
+}
+
 export function DashboardHeader() {
   const pathname = usePathname();
   const pageMeta = getDashboardPageHeaderMeta(pathname);
@@ -45,6 +54,7 @@ export function DashboardHeader() {
   const contactsChrome = useOptionalContactsChrome();
   const aiAssistantChrome = useOptionalAiAssistantChrome();
   const calendarChrome = useOptionalCalendarChrome();
+  const ordersChrome = useOptionalOrdersChrome();
   const showInboxToolbar = isInboxPath(pathname) && inboxChrome !== null;
   const showContactsToolbar =
     isContactsPath(pathname) && contactsChrome !== null;
@@ -52,11 +62,13 @@ export function DashboardHeader() {
     isAiAssistantPath(pathname) && aiAssistantChrome !== null;
   const showCalendarToolbar =
     isCalendarPath(pathname) && calendarChrome !== null;
+  const showOrdersToolbar = isOrdersPath(pathname) && ordersChrome !== null;
   const compactHeading =
     showInboxToolbar ||
     showContactsToolbar ||
     showAiAssistantToolbar ||
-    showCalendarToolbar;
+    showCalendarToolbar ||
+    showOrdersToolbar;
 
   return (
     <header className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b px-3 sm:gap-3 sm:px-4">
@@ -92,6 +104,10 @@ export function DashboardHeader() {
                 {...aiAssistantChrome}
                 className="justify-end"
               />
+            </div>
+          ) : showOrdersToolbar && ordersChrome ? (
+            <div className="min-w-0 flex-1">
+              <OrdersToolbar {...ordersChrome} className="justify-end" />
             </div>
           ) : (
             <div className="min-w-0 flex-1" />

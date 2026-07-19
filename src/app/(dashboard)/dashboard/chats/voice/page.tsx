@@ -1,25 +1,27 @@
-import { VoiceCallsPanel } from "@/components/voice/VoiceCallsPanel";
-import { resolveInboxBusinessContext } from "@/services/chat.service";
-import { getVoiceInboxPageData } from "@/services/voice-inbox.service";
+import { redirect } from "next/navigation";
 
-type VoiceInboxPageProps = {
+import { DASHBOARD_ROUTES } from "@/constants/routes";
+
+type LegacyVoiceInboxPageProps = {
   searchParams: Promise<{ call?: string; phone?: string }>;
 };
 
-export default async function VoiceInboxPage({ searchParams }: VoiceInboxPageProps) {
-  const { call: callId } = await searchParams;
-  const inboxContext = await resolveInboxBusinessContext();
-  const data = await getVoiceInboxPageData(inboxContext, callId?.trim() || null);
+export default async function LegacyVoiceInboxPage({
+  searchParams,
+}: LegacyVoiceInboxPageProps) {
+  const params = await searchParams;
+  const query = new URLSearchParams();
 
-  return (
-    <VoiceCallsPanel
-      hasBusiness={data.hasBusiness}
-      businessId={data.businessId}
-      voiceInboxEnabled={data.voiceInboxEnabled}
-      smsInboxEnabled={data.smsInboxEnabled}
-      visibleChannelIds={data.visibleChannelIds}
-      calls={data.calls}
-      activeCall={data.activeCall}
-    />
+  if (params.call?.trim()) {
+    query.set("call", params.call.trim());
+  }
+
+  if (params.phone?.trim()) {
+    query.set("phone", params.phone.trim());
+  }
+
+  const suffix = query.toString();
+  redirect(
+    suffix ? `${DASHBOARD_ROUTES.voice}?${suffix}` : DASHBOARD_ROUTES.voice,
   );
 }

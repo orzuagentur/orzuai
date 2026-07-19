@@ -28,7 +28,7 @@ export type PhoneContactListItem = {
 function revalidateContactPaths(): void {
   revalidatePath(APP_ROUTES.dashboard);
   revalidatePath(DASHBOARD_ROUTES.chats);
-  revalidatePath(DASHBOARD_ROUTES.chatsVoice);
+  revalidatePath(DASHBOARD_ROUTES.voice);
   revalidatePath(DASHBOARD_ROUTES.chatsSms);
   revalidatePath(DASHBOARD_ROUTES.contacts);
 }

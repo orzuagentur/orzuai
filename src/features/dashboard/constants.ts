@@ -3,11 +3,11 @@ import {
   BarChart3,
   Bot,
   Calendar,
-  CreditCard,
+  ClipboardList,
   LayoutDashboard,
   MessageSquare,
+  Phone,
   Plug,
-  Settings,
   UserCog,
   Users,
 } from "lucide-react";
@@ -36,9 +36,21 @@ export const DASHBOARD_NAV_ITEMS = [
   },
   {
     id: "chats",
-    label: "Inbox",
+    label: "Chats",
     href: DASHBOARD_ROUTES.chats,
     icon: MessageSquare,
+  },
+  {
+    id: "orders",
+    label: "Orders",
+    href: DASHBOARD_ROUTES.orders,
+    icon: ClipboardList,
+  },
+  {
+    id: "voice",
+    label: "Calls",
+    href: DASHBOARD_ROUTES.voice,
+    icon: Phone,
   },
   {
     id: "contacts",
@@ -75,18 +87,6 @@ export const DASHBOARD_NAV_ITEMS = [
     label: "Integrations",
     href: DASHBOARD_ROUTES.integrations,
     icon: Plug,
-  },
-  {
-    id: "subscription",
-    label: "Billing",
-    href: DASHBOARD_ROUTES.subscription,
-    icon: CreditCard,
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    href: DASHBOARD_ROUTES.settings,
-    icon: Settings,
   },
 ] as const satisfies ReadonlyArray<{
   id: string;

@@ -8,6 +8,7 @@ import { InboxChromeProvider } from "@/components/chats/inbox/inbox-chrome-conte
 import { AiAssistantChromeProvider } from "@/components/ai-assistant/ai-assistant-chrome-context";
 import { CalendarChromeProvider } from "@/components/orzux-calendar/calendar-chrome-context";
 import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-context";
+import { OrdersChromeProvider } from "@/components/orders/orders-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
@@ -97,6 +98,7 @@ export function DashboardShell({
             <DashboardAiHumanAlerts />
             <InboxChromeProvider>
               <ContactsChromeProvider>
+                <OrdersChromeProvider>
                 <AiAssistantChromeProvider>
                   <CalendarChromeProvider>
                     <AnalyticsChromeProvider>
@@ -132,6 +134,7 @@ export function DashboardShell({
                     </AnalyticsChromeProvider>
                   </CalendarChromeProvider>
                 </AiAssistantChromeProvider>
+                </OrdersChromeProvider>
               </ContactsChromeProvider>
             </InboxChromeProvider>
         </AiHumanRequestsProvider>

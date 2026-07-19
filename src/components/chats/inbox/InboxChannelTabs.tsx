@@ -4,14 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { LayoutGridIcon, StarIcon } from "lucide-react";
 
-import { SmsIcon, VoiceIcon } from "@/components/icons/channel-brand-icons";
+import { SmsIcon } from "@/components/icons/channel-brand-icons";
 import { ChannelRailItem } from "@/components/navigation/ChannelRailItem";
 import { useOptionalDashboardNavBadges } from "@/hooks/use-dashboard-nav-badges";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { CHAT_CHANNEL_LIST, CHAT_MESSAGES } from "@/features/chats";
 import type { ChatChannelId } from "@/features/chats";
 import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
-import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { SMS_MESSAGES } from "@/features/sms/constants";
 import {
   CHANNEL_RAIL_NAV_CLASS,
@@ -22,12 +21,13 @@ import { cn } from "@/lib/utils";
 import type { MessagingChannel } from "@/types/database.types";
 import { countChannelsWithUnread } from "@/utils/conversation-unread";
 
-export type InboxChannelTabId = ChatChannelId | "all" | "favorites" | "voice" | "sms";
+export type InboxChannelTabId = ChatChannelId | "all" | "favorites" | "sms";
 
 type InboxChannelTabsProps = {
   activeChannel: InboxChannelTabId;
   unreadByChannel?: Partial<Record<MessagingChannel, number>>;
   visibleChannelIds?: MessagingChannel[];
+  /** @deprecated Voice lives in the sidebar Calls section. */
   voiceInboxEnabled?: boolean;
   smsInboxEnabled?: boolean;
   className?: string;
@@ -37,7 +37,6 @@ export function InboxChannelTabs({
   activeChannel,
   unreadByChannel: localUnreadByChannel = {},
   visibleChannelIds = [],
-  voiceInboxEnabled = false,
   smsInboxEnabled = false,
   className,
 }: InboxChannelTabsProps) {
@@ -54,10 +53,6 @@ export function InboxChannelTabs({
     router.prefetch(DASHBOARD_ROUTES.chats);
     router.prefetch(DASHBOARD_ROUTES.chatsFavorites);
 
-    if (voiceInboxEnabled) {
-      router.prefetch(DASHBOARD_ROUTES.chatsVoice);
-    }
-
     if (smsInboxEnabled) {
       router.prefetch(DASHBOARD_ROUTES.chatsSms);
     }
@@ -65,7 +60,7 @@ export function InboxChannelTabs({
     for (const channel of visibleChannels) {
       router.prefetch(`${DASHBOARD_ROUTES.chats}/${channel.id}`);
     }
-  }, [router, visibleChannels, voiceInboxEnabled, smsInboxEnabled]);
+  }, [router, visibleChannels, smsInboxEnabled]);
 
   return (
     <nav
@@ -133,25 +128,6 @@ export function InboxChannelTabs({
           />
         );
       })}
-
-      {voiceInboxEnabled ? (
-        <ChannelRailItem
-          href={DASHBOARD_ROUTES.chatsVoice}
-          isActive={activeChannel === "voice"}
-          label={VOICE_MESSAGES.inboxTabLabel}
-          ariaLabel={VOICE_MESSAGES.inboxTabLabel}
-          iconShell={
-            <div
-              className={getChannelRailIconShellClassName(
-                activeChannel === "voice",
-                getChannelIconContainerClassName("voice"),
-              )}
-            >
-              <VoiceIcon className="size-5" />
-            </div>
-          }
-        />
-      ) : null}
 
       {smsInboxEnabled ? (
         <ChannelRailItem

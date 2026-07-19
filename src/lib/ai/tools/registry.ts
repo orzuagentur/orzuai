@@ -6,6 +6,7 @@ import {
   executorCreateContactActionSchema,
   executorCreateDealActionSchema,
   executorCreateLeadActionSchema,
+  executorCreateOrderActionSchema,
   executorCreateTaskActionSchema,
   executorGetBookingStatusActionSchema,
   executorListUpcomingActionSchema,
@@ -69,6 +70,19 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     schema: executorCreateDealActionSchema,
   },
   {
+    name: "create_order",
+    permission: "canCreateDeal",
+    customerVisible: true,
+    runsWithoutContact: false,
+    description:
+      "Create a customer order/request (product or service fulfillment) — NEVER a calendar booking.",
+    orchestratorHint:
+      "CRITICAL: Orders and bookings are mutually exclusive. Use create_order ONLY for product/service requests (delivery, quote, repair, purchase) with NO appointment slot. NEVER use create_order for appointments, reservations, visits, or scheduled times — those require create_calendar_event. NEVER use create_calendar_event for orders. Prefer create_deal for sales pipeline quotes when tracking value/stage; use create_order for the operational Orders queue.",
+    executorHint:
+      "Capture a clear order title, optional serviceType, description, and amount. Never create a calendar event for the same request.",
+    schema: executorCreateOrderActionSchema,
+  },
+  {
     name: "update_deal",
     permission: "canCreateDeal",
     customerVisible: true,
@@ -111,11 +125,11 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     customerVisible: true,
     runsWithoutContact: false,
     description:
-      "Book instantly via OrzuX calendar with slot resolution and email confirmation.",
+      "Book instantly via OrzuX calendar with slot resolution and email confirmation — NEVER for product/service orders.",
     orchestratorHint:
-      "Use when booking is enabled and the customer gave a usable date/time.",
+      "Use ONLY for appointments/reservations when booking is enabled and the customer gave a usable date/time. NEVER use for orders/requests (заявка/заказ) — those use create_order.",
     executorHint:
-      "Deterministic booking: code resolves conflicts and sends confirmation email.",
+      "Deterministic booking: code resolves conflicts and sends confirmation email. Never create an order for the same request.",
     schema: executorCreateCalendarEventActionSchema,
   },
   {

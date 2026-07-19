@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import {
   InboxLayoutProvider,
@@ -41,7 +40,6 @@ import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { listPhoneContactsAction } from "@/features/voice/actions/phone-contact";
 import { useVoiceCallsRealtime } from "@/hooks/use-voice-calls-realtime";
 import type { VoiceCallDetail, VoiceInboxCallListItem, VoiceInboxPageData } from "@/types/voice-inbox.types";
-import type { MessagingChannel } from "@/types/database.types";
 import type { PhoneContactListItem } from "@/services/phone-contact.service";
 import {
   filterVoiceCalls,
@@ -79,8 +77,6 @@ function VoiceCallsPanelContent({
   hasBusiness = true,
   businessId = null,
   voiceInboxEnabled = false,
-  smsInboxEnabled = false,
-  visibleChannelIds = [] as MessagingChannel[],
   calls: initialCalls = [],
   activeCall: initialActiveCall = null,
 }: VoiceCallsPanelProps) {
@@ -127,7 +123,7 @@ function VoiceCallsPanelContent({
         action: {
           label: VOICE_MESSAGES.inboundCallOpen,
           onClick: () => {
-            router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${call.id}`);
+            router.push(`${DASHBOARD_ROUTES.voice}?call=${call.id}`);
           },
         },
       });
@@ -297,7 +293,7 @@ function VoiceCallsPanelContent({
   const handleCallSelect = useCallback(
     (callId: string) => {
       const selected = calls.find((item) => item.id === callId);
-      router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${callId}`);
+      router.push(`${DASHBOARD_ROUTES.voice}?call=${callId}`);
       if (selected && isActiveVoiceCallStatus(selected.status)) {
         setWorkspaceView({ mode: "live", callId });
       } else {
@@ -308,7 +304,7 @@ function VoiceCallsPanelContent({
   );
 
   const handleBackToList = useCallback(() => {
-    router.push(DASHBOARD_ROUTES.chatsVoice);
+    router.push(DASHBOARD_ROUTES.voice);
   }, [router]);
 
   const handleOpenSms = useCallback(
@@ -327,7 +323,7 @@ function VoiceCallsPanelContent({
     (contact: PhoneContactListItem) => {
       setWorkspaceView({ mode: "home" });
       router.push(
-        `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.phoneNumber)}`,
+        `${DASHBOARD_ROUTES.voice}?phone=${encodeURIComponent(contact.phoneNumber)}`,
       );
     },
     [router],
@@ -345,7 +341,7 @@ function VoiceCallsPanelContent({
 
       if (!activeCallId && phoneDraft) {
         router.push(
-          `${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(input.phoneNumber)}`,
+          `${DASHBOARD_ROUTES.voice}?phone=${encodeURIComponent(input.phoneNumber)}`,
         );
       }
     },
@@ -356,7 +352,7 @@ function VoiceCallsPanelContent({
     (_contactId: string) => {
       refreshPhonebookContacts();
       setWorkspaceView({ mode: "dialpad" });
-      router.push(DASHBOARD_ROUTES.chatsVoice);
+      router.push(DASHBOARD_ROUTES.voice);
       router.refresh();
     },
     [refreshPhonebookContacts, router],
@@ -366,7 +362,7 @@ function VoiceCallsPanelContent({
     (_phoneNumber: string) => {
       refreshPhonebookContacts();
       setWorkspaceView({ mode: "dialpad" });
-      router.push(DASHBOARD_ROUTES.chatsVoice);
+      router.push(DASHBOARD_ROUTES.voice);
       router.refresh();
     },
     [refreshPhonebookContacts, router],
@@ -393,14 +389,6 @@ function VoiceCallsPanelContent({
   if (!voiceInboxEnabled) {
     return (
       <InboxShell
-        channelTabs={
-          <InboxChannelTabs
-            activeChannel="voice"
-            visibleChannelIds={visibleChannelIds}
-            voiceInboxEnabled={false}
-            smsInboxEnabled={smsInboxEnabled}
-          />
-        }
         listColumn={
           <div className="flex h-full items-center justify-center p-6">
             <Card className="w-full max-w-md shadow-none">
@@ -441,14 +429,6 @@ function VoiceCallsPanelContent({
       <InboxShell
         showChatOnMobile={showDetailOnMobile}
         showRightColumn={showRightPanel}
-        channelTabs={
-          <InboxChannelTabs
-            activeChannel="voice"
-            visibleChannelIds={visibleChannelIds}
-            voiceInboxEnabled
-            smsInboxEnabled={smsInboxEnabled}
-          />
-        }
         listColumn={
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">

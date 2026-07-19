@@ -42,7 +42,7 @@ export const EMAIL_MESSAGES = {
   inboxHint:
     "Only emails received in your Gmail inbox appear here (not outgoing-only). Send a test to your connected address.",
   lastSynced: "Last synced",
-  openInbox: "Open Inbox",
+  openInbox: "Open Chats",
 } as const;
 
 export const GMAIL_SCOPES = [

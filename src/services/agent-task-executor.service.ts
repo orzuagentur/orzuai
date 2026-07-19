@@ -1478,6 +1478,62 @@ async function applyCreateDeal(
   return `Deal created: ${title}`;
 }
 
+async function applyCreateOrder(
+  admin: MessagingDbClient,
+  businessId: string,
+  contactId: string,
+  action: Extract<ExecutorAction, { type: "create_order" }>,
+  idempotencyContext: {
+    conversationId?: string | null;
+    clientMessage: string;
+    channel?: MessagingChannel;
+  },
+): Promise<string | null> {
+  const title = action.title.trim();
+
+  if (!title || GENERIC_DEAL_TITLES.has(title.toLowerCase())) {
+    return null;
+  }
+
+  const idempotencyKey = buildCrmActionIdempotencyKey({
+    conversationId: idempotencyContext.conversationId,
+    clientMessage: idempotencyContext.clientMessage,
+    actionType: "create_order",
+    actionFingerprint: title,
+  });
+
+  if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const { toCrmOrderSource } = await import("@/types/crm-order.types");
+  const { createCrmOrder } = await import("@/services/crm-orders.service");
+  const result = await createCrmOrder({
+    businessId,
+    contactId,
+    conversationId: idempotencyContext.conversationId ?? null,
+    title,
+    description: action.description?.trim() || null,
+    source: toCrmOrderSource(idempotencyContext.channel),
+    amount: action.amount ?? null,
+    payload: {
+      serviceType: action.serviceType?.trim() || null,
+    },
+  });
+
+  if (!result.success) {
+    throw new Error(result.message);
+  }
+
+  await recordCrmIdempotencyKey(admin, {
+    businessId,
+    idempotencyKey,
+    actionType: "create_order",
+  });
+
+  return `Order created: ${title}`;
+}
+
 async function applyAddNote(
   admin: MessagingDbClient,
   businessId: string,
@@ -1747,6 +1803,7 @@ async function applyExecutorPlan(
     if (
       !requiredComplete &&
       (action.type === "create_deal" ||
+        action.type === "create_order" ||
         action.type === "update_deal" ||
         action.type === "create_calendar_event")
     ) {
@@ -1770,6 +1827,14 @@ async function applyExecutorPlan(
       );
     } else if (action.type === "create_deal") {
       result = await applyCreateDeal(
+        admin,
+        businessId,
+        workingContact.id,
+        action,
+        idempotencyContext,
+      );
+    } else if (action.type === "create_order") {
+      result = await applyCreateOrder(
         admin,
         businessId,
         workingContact.id,

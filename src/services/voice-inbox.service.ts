@@ -21,7 +21,7 @@ import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import { dispatchVoicePostCallWorker } from "@/services/voice-post-call-queue.service";
 import { updateConversationLastMessageFromInsert } from "@/services/conversation-last-message.service";
 import {
-  getActiveMessagingChannelIds,
+  getActiveInboxChannelIds,
 } from "@/features/integrations";
 import { isActiveVoiceCallStatus } from "@/utils/voice-call-display";
 import type {
@@ -76,7 +76,7 @@ export async function isVoiceInboxVisible(businessId: string): Promise<boolean> 
 
 async function resolveVisibleChannelIds(businessId: string) {
   const channelStatuses = await getChannelConnectionStatuses(businessId);
-  return getActiveMessagingChannelIds(channelStatuses);
+  return getActiveInboxChannelIds(channelStatuses);
 }
 
 export async function isSmsInboxVisible(businessId: string): Promise<boolean> {

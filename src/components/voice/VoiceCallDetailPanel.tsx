@@ -304,13 +304,7 @@ export function VoiceCallDetailPanel({
       return;
     }
 
-    const mode = selection.mode;
-    setPendingCallMode(mode);
-
-    if (mode === "human") {
-      setPendingCallMode(null);
-      return;
-    }
+    setPendingCallMode("ai");
 
     startCalling(async () => {
       try {
@@ -329,7 +323,7 @@ export function VoiceCallDetailPanel({
         setCallModeOpen(false);
 
         if (result.callLogId) {
-          router.push(`${DASHBOARD_ROUTES.chatsVoice}?call=${result.callLogId}`);
+          router.push(`${DASHBOARD_ROUTES.voice}?call=${result.callLogId}`);
         }
 
         scheduleVoiceInboxRefresh(() => router.refresh());
@@ -571,7 +565,6 @@ export function VoiceCallDetailPanel({
         <VoiceCallModeDialog
           open={callModeOpen}
           phoneNumber={call.phoneNumber}
-          humanAvailable={false}
           pendingMode={pendingCallMode}
           onOpenChange={setCallModeOpen}
           onSelectMode={handleCallModeSelect}

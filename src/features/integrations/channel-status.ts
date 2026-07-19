@@ -223,3 +223,11 @@ export function getActiveMessagingChannelIds(
     isActiveMessagingChannel(channel, statuses),
   );
 }
+
+export function getActiveInboxChannelIds(
+  statuses: IntegrationChannelStatusMap,
+): MessagingIntegrationChannelId[] {
+  return getActiveMessagingChannelIds(statuses).filter(
+    (channel) => channel !== "website_forms",
+  );
+}

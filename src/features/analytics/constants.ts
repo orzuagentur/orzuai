@@ -56,7 +56,7 @@ export const ANALYTICS_MESSAGES = {
   pipelineOpen: "Open deals",
   attentionTitle: "Needs attention",
   attentionEmpty: "No urgent issues. Metrics update as new activity arrives.",
-  attentionOpenInbox: "Open Inbox",
+  attentionOpenInbox: "Open Chats",
   attentionViewCrm: "View CRM",
   attentionViewAnalytics: "View Analytics",
   attentionConnectChannel: "Connect channel",

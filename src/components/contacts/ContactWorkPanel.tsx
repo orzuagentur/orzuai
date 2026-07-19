@@ -138,7 +138,7 @@ export function ContactWorkPanel({
                   aria-label={VOICE_MESSAGES.dialpadTitle}
                 >
                   <Link
-                    href={`${DASHBOARD_ROUTES.chatsVoice}?phone=${encodeURIComponent(contact.identifier)}`}
+                    href={`${DASHBOARD_ROUTES.voice}?phone=${encodeURIComponent(contact.identifier)}`}
                   >
                     <KeyboardIcon className="size-4" />
                   </Link>

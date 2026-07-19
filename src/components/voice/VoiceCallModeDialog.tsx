@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   BotIcon,
-  HeadphonesIcon,
   Loader2Icon,
   type LucideIcon,
 } from "lucide-react";
@@ -19,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VOICE_MESSAGES } from "@/features/voice/constants";
 import { cn } from "@/lib/utils";
 
-export type VoiceCallMode = "ai" | "human";
+export type VoiceCallMode = "ai";
 
 export type VoiceCallModeSelection = {
   mode: VoiceCallMode;
@@ -29,7 +28,6 @@ export type VoiceCallModeSelection = {
 type VoiceCallModeDialogProps = {
   open: boolean;
   phoneNumber: string;
-  humanAvailable: boolean;
   pendingMode: VoiceCallMode | null;
   onOpenChange: (open: boolean) => void;
   onSelectMode: (selection: VoiceCallModeSelection) => void;
@@ -38,7 +36,6 @@ type VoiceCallModeDialogProps = {
 export function VoiceCallModeDialog({
   open,
   phoneNumber,
-  humanAvailable,
   pendingMode,
   onOpenChange,
   onSelectMode,
@@ -58,7 +55,7 @@ export function VoiceCallModeDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{VOICE_MESSAGES.callModeTitle}</DialogTitle>
+          <DialogTitle>{VOICE_MESSAGES.callModeAiTitle}</DialogTitle>
           <DialogDescription>
             {normalizedPhone
               ? VOICE_MESSAGES.callModeDescription.replace(
@@ -93,7 +90,7 @@ export function VoiceCallModeDialog({
 
           <CallModeButton
             icon={BotIcon}
-            title={VOICE_MESSAGES.callModeAiTitle}
+            title={VOICE_MESSAGES.callOutbound}
             description={VOICE_MESSAGES.callModeAiDescription}
             disabled={Boolean(pendingMode)}
             pending={pendingMode === "ai"}
@@ -103,18 +100,6 @@ export function VoiceCallModeDialog({
                 customPrompt: customPrompt.trim() || undefined,
               })
             }
-          />
-          <CallModeButton
-            icon={HeadphonesIcon}
-            title={VOICE_MESSAGES.callModeHumanTitle}
-            description={
-              humanAvailable
-                ? VOICE_MESSAGES.callModeHumanDescription
-                : VOICE_MESSAGES.callModeHumanUnavailable
-            }
-            disabled={Boolean(pendingMode) || !humanAvailable}
-            pending={pendingMode === "human"}
-            onClick={() => onSelectMode({ mode: "human" })}
           />
         </div>
       </DialogContent>
