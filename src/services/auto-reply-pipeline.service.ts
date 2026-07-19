@@ -1042,6 +1042,26 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     ? await formatAvailabilityForAiPrompt(input.businessId)
     : "";
 
+  const { getEnabledOrderFormFields, formatOrderFormFieldPromptLine } =
+    await import("@/features/orders/order-form-fields");
+  const { getOrderFormFieldsForBusiness } = await import(
+    "@/services/order-form-fields.service"
+  );
+  const orderFormFields = getEnabledOrderFormFields(
+    await getOrderFormFieldsForBusiness(input.businessId),
+  );
+  const orderFormFieldsText =
+    orderFormFields.length > 0
+      ? [
+          "ORDER FORM FIELDS (business settings — fill these on create_order):",
+          ...orderFormFields.map((field) =>
+            formatOrderFormFieldPromptLine(field),
+          ),
+          "When a field lists options, prefer an exact matching option value.",
+          "Put custom field values in create_order.fields{key:value}. Built-in keys can also be top-level action properties.",
+        ].join("\n")
+      : undefined;
+
   const orchestrationResult = await runAutoReplyOrchestrator({
     businessId: input.businessId,
     message: input.clientMessage,
@@ -1052,6 +1072,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     bookableResourcesText,
     bookingPagesText,
     availabilityText,
+    orderFormFieldsText,
     collectionContext: formatCollectionGapsForPrompt(
       computeCollectionGaps({
         niche: profile.collectionNiche ?? "generic",

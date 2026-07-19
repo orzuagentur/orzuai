@@ -23,14 +23,14 @@ export default async function ForgotPasswordPage() {
 
   return (
     <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md">
+      <Card className="flex min-h-[520px] w-full max-w-md flex-col">
         <CardHeader className="text-center">
           <CardTitle>{PASSWORD_RESET_MESSAGES.requestTitle}</CardTitle>
           <CardDescription>
             {PASSWORD_RESET_MESSAGES.requestDescription}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="flex flex-1 flex-col justify-between space-y-6">
           <ForgotPasswordForm />
           <Button asChild variant="ghost" className="w-full">
             <Link href={APP_ROUTES.home}>Back to home</Link>

@@ -128,7 +128,7 @@ export const AI_ASSISTANT_MESSAGES = {
   channelAiBehaviorSave: "Save",
   channelAiBehaviorSaved: "Channel AI settings saved. The agent will use them on this channel.",
   channelAiBehaviorSaveFailed: "Unable to save channel AI settings.",
-  voiceAgentTitle: "Voice AI agent",
+  voiceAgentTitle: "Calls AI agent",
   voiceAgentDescription:
     "AI voice for phone calls only. Chat replies stay text.",
   voiceAgentBack: "Settings",
@@ -166,7 +166,7 @@ export const AI_ASSISTANT_MESSAGES = {
   voiceAgentLoadFailed: "Unable to load ElevenLabs voices.",
   voiceAgentPreviewUnavailable: "Preview not available for this voice.",
   voiceAgentPreviewFailed: "Unable to play voice preview.",
-  settingsTabVoice: "Voice AI",
+  settingsTabVoice: "Calls AI",
   settingsTabVoiceHint: "Call-only AI voice agent, numbers, and voice.",
   channelsTitle: "Channels",
   channelAgentActive: "AI Agent enabled on this channel",

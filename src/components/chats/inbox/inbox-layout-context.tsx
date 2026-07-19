@@ -16,6 +16,10 @@ type InboxLayoutContextValue = {
   detailsOpen: boolean;
   setDetailsOpen: (open: boolean) => void;
   toggleDetails: () => void;
+  /** Mobile-only: full-screen contact/details pane (defaults closed). */
+  mobileDetailsOpen: boolean;
+  setMobileDetailsOpen: (open: boolean) => void;
+  toggleMobileDetails: () => void;
   chatFullscreen: boolean;
   setChatFullscreen: (open: boolean) => void;
   toggleChatFullscreen: () => void;
@@ -25,6 +29,7 @@ const InboxLayoutContext = createContext<InboxLayoutContextValue | null>(null);
 
 export function InboxLayoutProvider({ children }: { children: ReactNode }) {
   const [detailsOpen, setDetailsOpenState] = useState(true);
+  const [mobileDetailsOpen, setMobileDetailsOpenState] = useState(false);
   const [chatFullscreen, setChatFullscreenState] = useState(false);
 
   useEffect(() => {
@@ -48,6 +53,14 @@ export function InboxLayoutProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setMobileDetailsOpen = useCallback((open: boolean) => {
+    setMobileDetailsOpenState(open);
+  }, []);
+
+  const toggleMobileDetails = useCallback(() => {
+    setMobileDetailsOpenState((current) => !current);
+  }, []);
+
   const setChatFullscreen = useCallback((open: boolean) => {
     setChatFullscreenState(open);
   }, []);
@@ -61,6 +74,9 @@ export function InboxLayoutProvider({ children }: { children: ReactNode }) {
       detailsOpen,
       setDetailsOpen,
       toggleDetails,
+      mobileDetailsOpen,
+      setMobileDetailsOpen,
+      toggleMobileDetails,
       chatFullscreen,
       setChatFullscreen,
       toggleChatFullscreen,
@@ -68,10 +84,13 @@ export function InboxLayoutProvider({ children }: { children: ReactNode }) {
     [
       chatFullscreen,
       detailsOpen,
+      mobileDetailsOpen,
       setChatFullscreen,
       setDetailsOpen,
+      setMobileDetailsOpen,
       toggleChatFullscreen,
       toggleDetails,
+      toggleMobileDetails,
     ],
   );
 

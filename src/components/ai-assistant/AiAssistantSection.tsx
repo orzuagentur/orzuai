@@ -197,7 +197,7 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
 
   if (shouldShowActivation) {
     return (
-      <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
         <ActivationGate
           onActivated={() => {
             setActivated(true);
@@ -209,7 +209,7 @@ export function AiAssistantSection({ data }: AiAssistantSectionProps) {
   }
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-hidden bg-background">
+    <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-hidden bg-background">
       {activeTab === "dashboard" ? (
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
           <AgentDashboardPanel

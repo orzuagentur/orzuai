@@ -6,7 +6,7 @@ export const UNLIMITED_QUOTA = -1;
 /**
  * Internal unit economics (USD, conservative estimates):
  * - Customer-facing AI reply (Gemini + orchestrator): ~$0.004
- * - Voice AI minute (Twilio + Deepgram + LLM + TTS): ~$0.09
+ * - Calls AI minute (Twilio + Deepgram + LLM + TTS): ~$0.09
  * - Platform overhead per active tenant: ~$1.50/mo (Supabase, Vercel, QStash)
  *
  * Target blended gross margin: 55–85% depending on tier.

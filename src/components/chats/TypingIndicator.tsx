@@ -2,17 +2,20 @@
 
 import { cn } from "@/lib/utils";
 import { getChatTypingBubbleClassName } from "@/features/chats/chat-theme";
+import type { MessagingChannel } from "@/types/database.types";
 
 type TypingIndicatorProps = {
   label: string;
   className?: string;
   variant?: "incoming" | "outgoing";
+  channel?: MessagingChannel | null;
 };
 
 export function TypingIndicator({
   label,
   className,
   variant = "incoming",
+  channel,
 }: TypingIndicatorProps) {
   return (
     <div
@@ -22,7 +25,7 @@ export function TypingIndicator({
         className,
       )}
     >
-      <div className={getChatTypingBubbleClassName(variant)}>
+      <div className={getChatTypingBubbleClassName(variant, channel)}>
         <span className="truncate">{label}</span>
         <span className="inline-flex items-center gap-0.5" aria-hidden>
           <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:0ms]" />

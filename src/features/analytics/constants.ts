@@ -152,7 +152,7 @@ export const ANALYTICS_MESSAGES = {
   aiAgentSummaryDescription:
     "Text and voice replies, contacts served, and call time.",
   aiAgentTextReplies: "AI text replies",
-  aiAgentVoiceReplies: "Voice AI replies",
+  aiAgentVoiceReplies: "Calls AI replies",
   aiAgentContactsServed: "Contacts served",
   aiAgentCallTime: "Call time",
   channelsTitle: "Channels",

@@ -336,6 +336,7 @@ export const RESERVED_LEGAL_SLUGS = new Set([
   "auth",
   "book",
   "dashboard",
+  "docs",
   "login",
   "logout",
   "register",

@@ -48,10 +48,10 @@ function deltaTone(deltaPercent: number | null, kpiId: string) {
   }
 
   if (kpiId === "avg_first_response") {
-    return deltaPercent < 0 ? "text-emerald-600" : "text-amber-600";
+    return deltaPercent < 0 ? "text-zinc-600" : "text-amber-600";
   }
 
-  return deltaPercent > 0 ? "text-emerald-600" : "text-amber-600";
+  return deltaPercent > 0 ? "text-zinc-600" : "text-amber-600";
 }
 
 export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
@@ -154,7 +154,7 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
                 <p className="text-xs text-muted-foreground">
                   {ANALYTICS_MESSAGES.pipelineWon}
                 </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-700">
                   {formatMetricValue(wonStage?.count ?? 0)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">

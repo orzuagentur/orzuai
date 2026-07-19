@@ -66,7 +66,14 @@ function isPendingHumanRequest(
   );
 }
 
-export function AiHumanRequestsButton() {
+type AiHumanRequestsButtonProps = {
+  /** sidebar = full nav row; icon = compact header control (mobile) */
+  variant?: "sidebar" | "icon";
+};
+
+export function AiHumanRequestsButton({
+  variant = "sidebar",
+}: AiHumanRequestsButtonProps) {
   const router = useRouter();
   const {
     notifications,
@@ -126,8 +133,24 @@ export function AiHumanRequestsButton() {
     router.push(buildChatHref(channel, conversationId));
   }
 
-  return (
-    <>
+  const trigger =
+    variant === "icon" ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="relative size-9 shrink-0"
+        aria-label={AI_HUMAN_REQUEST_MESSAGES.buttonLabel}
+        onClick={() => handleOpenChange(true)}
+      >
+        <BellIcon className="size-5" />
+        {unreadCount > 0 ? (
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : null}
+      </Button>
+    ) : (
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
@@ -146,6 +169,11 @@ export function AiHumanRequestsButton() {
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
+    );
+
+  return (
+    <>
+      {trigger}
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">

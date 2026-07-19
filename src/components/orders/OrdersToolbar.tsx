@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FilterIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { FilterIcon, PlusIcon, SearchIcon, Settings2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export function OrdersToolbar({
   activeStatus,
   onStatusChange,
   onAddOrder,
+  onOpenFormSettings,
   className,
 }: OrdersToolbarProps) {
   const [filterOpen, setFilterOpen] = useState(false);
@@ -120,6 +121,17 @@ export function OrdersToolbar({
           </div>
         ) : null}
       </div>
+
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="size-9 shrink-0"
+        aria-label={ORDERS_MESSAGES.formSettingsLabel}
+        onClick={onOpenFormSettings}
+      >
+        <Settings2Icon className="size-4" />
+      </Button>
 
       <Button type="button" size="sm" className="shrink-0" onClick={onAddOrder}>
         <PlusIcon className="mr-1.5 size-4" />

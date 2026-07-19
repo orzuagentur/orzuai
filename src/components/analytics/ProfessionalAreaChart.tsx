@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { Clock3Icon, Loader2Icon, TrendingUpIcon } from "lucide-react";
@@ -58,6 +59,9 @@ type ProfessionalAreaChartProps = {
   accentClassName?: string;
   strokeColor?: string;
   fillId?: string;
+  /** Extra header controls rendered left of the period clock. */
+  headerActions?: ReactNode;
+  showRangePicker?: boolean;
 };
 
 type ChartCoordinate = {
@@ -71,7 +75,7 @@ function SegmentIcon({ id, className }: { id: string; className?: string }) {
     return (
       <span
         className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-semibold text-emerald-700",
+          "flex size-4 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[9px] font-semibold text-zinc-700",
           className,
         )}
       >
@@ -222,7 +226,7 @@ function RangePicker({
 
   return (
     <div
-      className="absolute top-3 right-3 z-30"
+      className="relative"
       onMouseEnter={() => {
         cancelClose();
         setOpen(true);
@@ -234,7 +238,11 @@ function RangePicker({
         title={`Period: ${activeLabel}`}
         className="flex size-8 items-center justify-center rounded-lg border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted/40 hover:text-foreground"
       >
-        <Clock3Icon className="size-4" />
+        {isLoading ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : (
+          <Clock3Icon className="size-4" />
+        )}
       </button>
       {open ? (
         <div
@@ -288,6 +296,8 @@ export function ProfessionalAreaChart({
   initialDays = 7,
   strokeColor = "rgb(124 58 237)",
   fillId = "analyticsAreaFill",
+  headerActions,
+  showRangePicker = true,
 }: ProfessionalAreaChartProps) {
   const [days, setDays] = useState<AnalyticsChartRangeDays>(initialDays);
   const [points, setPoints] = useState(() =>
@@ -331,7 +341,9 @@ export function ProfessionalAreaChart({
       setIsLoading(true);
       try {
         const response = await fetch(
-          `/api/analytics/series?metric=${metric}&days=${days}`,
+          `/api/analytics/series?metric=${metric}&days=${days}${
+            metric === "calls" ? "&format=area" : ""
+          }`,
         );
         const payload = (await response.json()) as {
           success: boolean;
@@ -480,10 +492,18 @@ export function ProfessionalAreaChart({
   const rangeLabel =
     RANGE_OPTIONS.find((option) => option.days === days)?.label ?? "7 days";
 
+  const headerOffsetClass =
+    headerActions || showRangePicker ? "pr-24" : undefined;
+
   return (
-    <Card className="relative overflow-hidden shadow-none">
-      <RangePicker days={days} isLoading={isLoading} onChange={setDays} />
-      <CardHeader className="pb-2 pr-14">
+    <Card className="relative overflow-visible shadow-none">
+      <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5">
+        {headerActions}
+        {showRangePicker ? (
+          <RangePicker days={days} isLoading={isLoading} onChange={setDays} />
+        ) : null}
+      </div>
+      <CardHeader className={cn("pb-2", headerOffsetClass)}>
         <CardTitle className="text-base">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>

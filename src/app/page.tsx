@@ -12,6 +12,8 @@ import {
 } from "@/features/landing/seo";
 import { getCurrentUser } from "@/services/auth.service";
 import { listFooterLegalLinks } from "@/services/legal-pages.service";
+import { listPlatformPlans } from "@/services/platform-plans.service";
+import { getLandingCopyWithCms } from "@/services/site-content.service";
 
 type HomePageProps = {
   searchParams: Promise<{ lang?: string | string[] }>;
@@ -62,10 +64,11 @@ export async function generateMetadata({
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const [user, legalFooterLinks, params] = await Promise.all([
+  const [user, legalFooterLinks, params, plans] = await Promise.all([
     getCurrentUser(),
     listFooterLegalLinks(),
     searchParams,
+    listPlatformPlans({ activeOnly: true, publicOnly: true }),
   ]);
 
   if (user) {
@@ -74,6 +77,17 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   const locale = resolveLocaleFromSearchParam(params.lang);
   const structuredData = buildLandingStructuredData(locale);
+  const baseCopy = getLandingCopy(locale);
+  const copyOverride = await getLandingCopyWithCms(locale, baseCopy);
+
+  const planCards = plans.map((plan) => ({
+    id: plan.id,
+    label: plan.label,
+    tagline: plan.tagline,
+    priceMonthly: plan.priceMonthly,
+    highlighted: plan.highlighted,
+    features: plan.features,
+  }));
 
   return (
     <>
@@ -84,7 +98,11 @@ export default async function Home({ searchParams }: HomePageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
       ))}
-      <LandingPage legalFooterLinks={legalFooterLinks} />
+      <LandingPage
+        legalFooterLinks={legalFooterLinks}
+        plans={planCards}
+        copyOverride={copyOverride}
+      />
     </>
   );
 }

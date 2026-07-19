@@ -57,7 +57,7 @@ export function WebsiteChatWidgetPreview({
         style={{ backgroundColor: appearance.primaryColor }}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <span className="size-2 shrink-0 rounded-full bg-emerald-300" />
+          <span className="size-2 shrink-0 rounded-full bg-zinc-300" />
           <span className="truncate">{appearance.widgetTitle}</span>
         </div>
         <span className="text-white/80">×</span>
@@ -106,7 +106,7 @@ export function WebsiteChatWidgetPreview({
       <div className="absolute inset-x-0 top-0 flex h-8 items-center gap-1.5 border-b bg-white/80 px-3">
         <span className="size-2 rounded-full bg-red-400" />
         <span className="size-2 rounded-full bg-amber-400" />
-        <span className="size-2 rounded-full bg-emerald-400" />
+        <span className="size-2 rounded-full bg-zinc-400" />
         <span className="ml-2 truncate text-[10px] text-muted-foreground">
           your-website.com
         </span>

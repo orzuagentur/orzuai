@@ -9,7 +9,7 @@ import {
   isIntervalFree,
   isWithinOperatingHours,
   mergeBusyIntervals,
-  parseIsoDateTime,
+  parseBookingDateTime,
   type OperatingHoursConfig,
   type TimeInterval,
 } from "@/lib/calendar/slot-engine";
@@ -504,7 +504,8 @@ export async function formatAvailabilityForAiPrompt(
     setup?.businessHoursEnabled
       ? `Business hours: ${setup.businessHoursStart}–${setup.businessHoursEnd} (${timeZone}), days ${setup.businessDays.join(", ")}.`
       : "Business hours: not restricted in settings.",
-    "When booking, pick a slot from this list when possible. endDateTime = start + resource duration.",
+    "When booking a short appointment, pick a slot from this list when possible.",
+    "For multi-day stays (hotels / date ranges), set startDateTime = check-in and endDateTime = check-out — do NOT replace end with resource duration.",
   ].join("\n");
 }
 
@@ -550,8 +551,14 @@ export async function resolveBookingSlot(input: {
       : listBusinessCalendarResources(input.businessId),
   ]);
 
-  const start = parseIsoDateTime(input.startDateTime);
-  let end = parseIsoDateTime(input.endDateTime);
+  const timeZone =
+    input.timeZone?.trim() ||
+    bookingPage?.bookingTimezone ||
+    setup?.bookingTimezone ||
+    "UTC";
+
+  const start = parseBookingDateTime(input.startDateTime, timeZone);
+  let end = parseBookingDateTime(input.endDateTime, timeZone);
 
   if (!start) {
     return {
@@ -568,21 +575,27 @@ export async function resolveBookingSlot(input: {
     matchResourceByName(resources, input.resourceName) ??
     matchResourceFromSummary(resources, input.summary);
 
-  const durationMinutes =
+  const appointmentDurationMinutes =
     resource?.durationMinutes ??
     bookingPage?.slotDurationMinutes ??
     setup?.slotDurationMinutes ??
     60;
 
   if (!end || end.getTime() <= start.getTime()) {
-    end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+    end = new Date(start.getTime() + appointmentDurationMinutes * 60 * 1000);
   }
+
+  const requestedSpanMs = end.getTime() - start.getTime();
+  const isMultiDayStay = requestedSpanMs >= 12 * 60 * 60 * 1000;
+  const durationMinutes = isMultiDayStay
+    ? Math.max(Math.round(requestedSpanMs / 60_000), appointmentDurationMinutes)
+    : appointmentDurationMinutes;
 
   const candidate: TimeInterval = { start, end };
   const daysAhead =
     bookingPage?.advanceBookingDays ?? setup?.advanceBookingDays ?? 14;
   const windowEnd = new Date();
-  windowEnd.setDate(windowEnd.getDate() + daysAhead);
+  windowEnd.setDate(windowEnd.getDate() + Math.max(daysAhead, isMultiDayStay ? 60 : daysAhead));
   windowEnd.setHours(23, 59, 59, 999);
 
   const bufferMinutes =
@@ -598,16 +611,18 @@ export async function resolveBookingSlot(input: {
   const operatingHours = bookingPage
     ? buildOperatingHoursFromBookingPage(bookingPage)
     : buildOperatingHoursFromSetup(setup);
-  const timeZone =
-    input.timeZone || bookingPage?.bookingTimezone || setup?.bookingTimezone || "UTC";
 
+  // Multi-day stays (hotel check-in → check-out): only validate check-in day hours.
+  // Checking the check-out midnight against business hours collapses ranges incorrectly.
   const withinHours =
     !operatingHours.enabled ||
-    (isWithinOperatingHours(candidate.start, operatingHours) &&
-      isWithinOperatingHours(
-        new Date(candidate.end.getTime() - 60_000),
-        operatingHours,
-      ));
+    (isMultiDayStay
+      ? isWithinOperatingHours(candidate.start, operatingHours)
+      : isWithinOperatingHours(candidate.start, operatingHours) &&
+        isWithinOperatingHours(
+          new Date(candidate.end.getTime() - 60_000),
+          operatingHours,
+        ));
   const isFree = isIntervalFree(candidate, busy, bufferMinutes);
 
   if (isFree && withinHours) {
@@ -620,36 +635,88 @@ export async function resolveBookingSlot(input: {
   }
 
   if (input.preferNearestSlot !== false) {
-    const nearest = findNearestAvailableSlot({
-      requestedStart: start,
-      durationMinutes,
-      busy,
-      windowEnd,
-      bufferMinutes,
-      operatingHours,
-    });
+    if (isMultiDayStay) {
+      const stayMs = requestedSpanMs;
+      for (let dayOffset = 1; dayOffset <= 21; dayOffset += 1) {
+        const shiftedStart = new Date(start.getTime() + dayOffset * 86_400_000);
+        const shiftedEnd = new Date(shiftedStart.getTime() + stayMs);
+        const shifted: TimeInterval = { start: shiftedStart, end: shiftedEnd };
+        const shiftedWithinHours =
+          !operatingHours.enabled ||
+          isWithinOperatingHours(shiftedStart, operatingHours);
+        if (
+          shiftedWithinHours &&
+          isIntervalFree(shifted, busy, bufferMinutes)
+        ) {
+          return {
+            status: "rescheduled",
+            startDateTime: shiftedStart.toISOString(),
+            endDateTime: shiftedEnd.toISOString(),
+            resourceName: resource?.name ?? null,
+            originalStartDateTime: candidate.start.toISOString(),
+          };
+        }
+      }
+    } else {
+      const nearest = findNearestAvailableSlot({
+        requestedStart: start,
+        durationMinutes,
+        busy,
+        windowEnd,
+        bufferMinutes,
+        operatingHours,
+      });
 
-    if (nearest) {
-      return {
-        status: "rescheduled",
-        startDateTime: nearest.start.toISOString(),
-        endDateTime: nearest.end.toISOString(),
-        resourceName: resource?.name ?? null,
-        originalStartDateTime: candidate.start.toISOString(),
-      };
+      if (nearest) {
+        return {
+          status: "rescheduled",
+          startDateTime: nearest.start.toISOString(),
+          endDateTime: nearest.end.toISOString(),
+          resourceName: resource?.name ?? null,
+          originalStartDateTime: candidate.start.toISOString(),
+        };
+      }
     }
   }
 
-  const alternatives = findAvailableSlots({
-    busy,
-    windowStart: start,
-    windowEnd,
-    durationMinutes,
-    stepMinutes: 15,
-    bufferMinutes,
-    maxSlots: 5,
-    operatingHours,
-  }).map((slot) => formatSlotForDisplay(slot, timeZone));
+  const alternatives = (
+    isMultiDayStay
+      ? (() => {
+          const labels: string[] = [];
+          const stayMs = requestedSpanMs;
+          for (let dayOffset = 0; dayOffset <= 21 && labels.length < 5; dayOffset += 1) {
+            const shiftedStart = new Date(start.getTime() + dayOffset * 86_400_000);
+            const shiftedEnd = new Date(shiftedStart.getTime() + stayMs);
+            if (
+              (!operatingHours.enabled ||
+                isWithinOperatingHours(shiftedStart, operatingHours)) &&
+              isIntervalFree(
+                { start: shiftedStart, end: shiftedEnd },
+                busy,
+                bufferMinutes,
+              )
+            ) {
+              labels.push(
+                formatSlotForDisplay(
+                  { start: shiftedStart, end: shiftedEnd },
+                  timeZone,
+                ),
+              );
+            }
+          }
+          return labels;
+        })()
+      : findAvailableSlots({
+          busy,
+          windowStart: start,
+          windowEnd,
+          durationMinutes,
+          stepMinutes: 15,
+          bufferMinutes,
+          maxSlots: 5,
+          operatingHours,
+        }).map((slot) => formatSlotForDisplay(slot, timeZone))
+  );
 
   return {
     status: "unavailable",

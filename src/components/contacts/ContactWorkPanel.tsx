@@ -92,38 +92,37 @@ export function ContactWorkPanel({
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
-      {onBack ? (
-        <div className="shrink-0 border-b px-4 py-3 lg:hidden">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 px-0"
-            onClick={onBack}
-          >
-            <ArrowLeftIcon className="size-4" />
-            {CONTACTS_MESSAGES.backToList}
-          </Button>
-        </div>
-      ) : null}
-
-      <div className="shrink-0 border-b px-6 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
+      <div className="shrink-0 border-b px-3 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
+            {onBack ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9 shrink-0 lg:hidden"
+                aria-label={CONTACTS_MESSAGES.backToList}
+                onClick={onBack}
+              >
+                <ArrowLeftIcon className="size-5" />
+              </Button>
+            ) : null}
             <ContactAvatar
               name={contact.name}
               avatarUrl={contact.avatarUrl}
-              className="size-11 shrink-0"
+              className="size-10 shrink-0 sm:size-11"
               size="lg"
             />
             <div className="min-w-0 flex-1">
-            <p className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
-              {CONTACTS_MESSAGES.workPanelTitle}
-            </p>
-            <h2 className="truncate text-lg font-semibold">{contact.name}</h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {formatContactIdentifier(contact.identifier)}
-            </p>
+              <p className="hidden text-caption font-medium uppercase tracking-wide text-muted-foreground sm:block">
+                {CONTACTS_MESSAGES.workPanelTitle}
+              </p>
+              <h2 className="truncate text-base font-semibold sm:text-lg">
+                {contact.name}
+              </h2>
+              <p className="truncate text-sm text-muted-foreground">
+                {formatContactIdentifier(contact.identifier)}
+              </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -207,7 +206,7 @@ export function ContactWorkPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overflow-x-hidden px-6 py-5">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-3 py-4 sm:space-y-8 sm:px-6 sm:py-5">
         <ContactClientDescriptionCard
           contactId={contact.id}
           aiSummary={contact.aiSummary}

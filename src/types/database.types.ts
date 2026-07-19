@@ -131,6 +131,7 @@ export type Database = {
           subscription_addons: Json;
           twilio_wallet_balance_cents: number;
           prefer_customer_ai_keys: boolean;
+          order_form_fields: Json;
           created_at: string;
           updated_at: string;
         };
@@ -151,6 +152,7 @@ export type Database = {
           subscription_addons?: Json;
           twilio_wallet_balance_cents?: number;
           prefer_customer_ai_keys?: boolean;
+          order_form_fields?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -171,6 +173,7 @@ export type Database = {
           subscription_addons?: Json;
           twilio_wallet_balance_cents?: number;
           prefer_customer_ai_keys?: boolean;
+          order_form_fields?: Json;
           created_at?: string;
           updated_at?: string;
         };

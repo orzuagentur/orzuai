@@ -795,7 +795,7 @@ export function VoiceCallDetailPanel({
                   <ul className="space-y-2">
                     {extractedActionItems.map((item, index) => (
                       <li key={`${item.title}-${index}`} className="flex gap-2">
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-zinc-600" />
                         <span>
                           {item.title}
                           <span className="ml-2 text-xs text-muted-foreground">
@@ -806,7 +806,7 @@ export function VoiceCallDetailPanel({
                     ))}
                     {summaryActionItems.map((item, index) => (
                       <li key={`${item}-${index}`} className="flex gap-2">
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-zinc-600" />
                         <span>{item}</span>
                       </li>
                     ))}

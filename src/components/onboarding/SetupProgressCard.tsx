@@ -39,7 +39,7 @@ export function SetupProgressCard({ progress }: SetupProgressCardProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-24 right-4 z-[48] w-[min(100vw-2rem,20rem)]",
+        "fixed bottom-36 right-4 z-[48] w-[min(100vw-2rem,20rem)] md:bottom-24",
         "rounded-xl border bg-background/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80",
       )}
     >

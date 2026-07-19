@@ -4,11 +4,17 @@ import { revalidatePath } from "next/cache";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { ORDERS_MESSAGES, readOrderPayloadString } from "@/features/orders/constants";
+import {
+  getEnabledOrderFormFields,
+  isOrderFormBuiltinKey,
+  resolveOrderTitle,
+} from "@/features/orders/order-form-fields";
 import { hasSupabaseEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
+import { getOrderFormFieldsForBusiness } from "@/services/order-form-fields.service";
 import type {
   CreateCrmOrderInput,
   CreateManualCrmOrderInput,
@@ -129,10 +135,15 @@ export async function createCrmOrder(
     return { success: false, message: "Database is not configured." };
   }
 
-  const title = input.title.trim();
-  if (!title) {
-    return { success: false, message: "Title is required." };
-  }
+  const payload = input.payload ?? {};
+  const title = resolveOrderTitle({
+    title: input.title,
+    customerName:
+      typeof payload.customerName === "string" ? payload.customerName : null,
+    serviceType:
+      typeof payload.serviceType === "string" ? payload.serviceType : null,
+    description: input.description,
+  });
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -147,7 +158,7 @@ export async function createCrmOrder(
       status: "new",
       amount: input.amount ?? null,
       currency: input.currency ?? "EUR",
-      payload: input.payload ?? {},
+      payload,
     })
     .select("id")
     .single();
@@ -193,10 +204,57 @@ export async function createManualCrmOrder(
   }
 
   const data = parsed.data;
+  const formFields = await getOrderFormFieldsForBusiness(business.id);
+  const enabledFields = getEnabledOrderFormFields(formFields);
+  const valuesByKey: Record<string, string> = {
+    customerName: data.customerName?.trim() ?? "",
+    phone: data.phone?.trim() ?? "",
+    email: data.email?.trim() ?? "",
+    title: data.title?.trim() ?? "",
+    serviceType: data.serviceType?.trim() ?? "",
+    description: data.description?.trim() ?? "",
+    amount: data.amount != null ? String(data.amount) : "",
+    source: data.source ?? "manual",
+    ...Object.fromEntries(
+      Object.entries(data.customFields ?? {}).map(([key, value]) => [
+        key,
+        value == null ? "" : String(value).trim(),
+      ]),
+    ),
+  };
+
+  for (const field of enabledFields) {
+    if (!field.required) continue;
+    const value = valuesByKey[field.key] ?? "";
+    if (!value) {
+      return {
+        success: false,
+        error: {
+          code: "REQUIRED_FIELD",
+          message: `${field.label} is required.`,
+        },
+      };
+    }
+  }
+
+  const customerName = data.customerName?.trim() || null;
   const email = data.email?.trim() || null;
   const phone = data.phone?.trim() || null;
   const serviceType = data.serviceType?.trim() || null;
   const source = data.source ?? "manual";
+  const title = resolveOrderTitle({
+    title: data.title,
+    customerName,
+    serviceType,
+    description: data.description,
+  });
+
+  const customPayloadFields: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(data.customFields ?? {})) {
+    if (isOrderFormBuiltinKey(key)) continue;
+    if (value === "" || value == null) continue;
+    customPayloadFields[key] = value;
+  }
 
   const supabase = await createClient();
   const { data: row, error } = await supabase
@@ -204,17 +262,18 @@ export async function createManualCrmOrder(
     .insert({
       business_id: business.id,
       contact_id: data.contactId ?? null,
-      title: data.title.trim(),
+      title,
       description: data.description?.trim() || null,
       source,
       status: "new",
       amount: data.amount ?? null,
       currency: "EUR",
       payload: {
-        customerName: data.customerName.trim(),
+        customerName,
         phone,
         email,
         serviceType,
+        fields: customPayloadFields,
       },
     })
     .select("id")

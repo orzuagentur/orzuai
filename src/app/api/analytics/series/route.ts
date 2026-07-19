@@ -9,7 +9,13 @@ import type {
   AnalyticsSeriesMetric,
 } from "@/types/analytics-chart.types";
 
-const METRICS: AnalyticsSeriesMetric[] = ["messages", "clients", "deals", "calls"];
+const METRICS: AnalyticsSeriesMetric[] = [
+  "messages",
+  "clients",
+  "deals",
+  "calls",
+  "orders",
+];
 
 function parseDays(value: string | null): AnalyticsChartRangeDays {
   const parsed = Number(value);
@@ -55,6 +61,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const metric = parseMetric(searchParams.get("metric"));
   const days = parseDays(searchParams.get("days"));
+  const format = searchParams.get("format");
 
   if (!metric) {
     return NextResponse.json(
@@ -64,7 +71,7 @@ export async function GET(request: Request) {
   }
 
   const points =
-    metric === "calls"
+    metric === "calls" && format !== "area"
       ? await getAnalyticsCallsSeries(business.id, days)
       : await getAnalyticsSeries(business.id, metric, days);
 

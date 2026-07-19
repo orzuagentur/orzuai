@@ -7,13 +7,11 @@ import { useCallback, useEffect, useState } from "react";
 import { ContactPipelineBoard } from "@/components/contacts/ContactPipelineBoard";
 import { ContactProfileDrawer } from "@/components/contacts/ContactProfileDrawer";
 import { ContactRecordWorkspace } from "@/components/contacts/ContactRecordWorkspace";
-import { ContactsChannelTabs } from "@/components/contacts/ContactsChannelTabs";
 import { DealsWorkspace } from "@/components/contacts/DealsWorkspace";
 import { useContactsChromeRegistration } from "@/components/contacts/contacts-chrome-context";
 import { UnifiedContactsPanel } from "@/components/contacts/UnifiedContactsPanel";
 import { Button } from "@/components/ui/button";
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
-import { ChannelRailAside } from "@/components/navigation/ChannelRailAside";
 import { cn } from "@/lib/utils";
 import type {
   ContactPipelinePageData,
@@ -104,6 +102,32 @@ export function ContactRecordHub({
   useEffect(() => {
     setSearchValue(currentListData?.searchQuery ?? dealsData?.searchQuery ?? "");
   }, [currentListData?.searchQuery, dealsData?.searchQuery]);
+
+  // Refresh / hard reload always resets channel filter to All.
+  useEffect(() => {
+    if (!currentListData?.activeChannelFilter) {
+      return;
+    }
+
+    const nav = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type !== "reload") {
+      return;
+    }
+
+    const href =
+      activeTab === "leads"
+        ? buildLeadsHubHref(currentListData as LeadsPageData, {
+            channel: null,
+            page: 1,
+          })
+        : buildContactsHubHref(currentListData, {
+            channel: null,
+            page: 1,
+          });
+    router.replace(href);
+  }, [activeTab, currentListData, router]);
 
   useEffect(() => {
     if (activeTab === "deals" || !currentListData) {
@@ -200,6 +224,32 @@ export function ContactRecordHub({
     [leadsData, router],
   );
 
+  const handleChannelChange = useCallback(
+    (channel: MessagingChannel | null) => {
+      if (!currentListData) {
+        return;
+      }
+
+      const href =
+        activeTab === "leads"
+          ? buildLeadsHubHref(currentListData as LeadsPageData, {
+              channel,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            })
+          : buildContactsHubHref(currentListData, {
+              channel,
+              page: 1,
+              contact: currentListData.activeContactId,
+              profile: currentListData.showProfilePanel,
+            });
+
+      router.push(href);
+    },
+    [activeTab, currentListData, router],
+  );
+
   useContactsChromeRegistration(
     activeTab === "deals"
       ? null
@@ -220,6 +270,11 @@ export function ContactRecordHub({
                 : undefined,
             onLeadSegmentChange:
               activeTab === "leads" ? handleLeadSegmentChange : undefined,
+            activeChannel: currentListData.activeChannelFilter,
+            onChannelChange: handleChannelChange,
+            visibleChannelIds,
+            voiceInboxEnabled,
+            smsInboxEnabled,
             crmListData: activeTab === "leads" ? leadsData : listData,
             crmDealsData: dealsData,
           }
@@ -277,7 +332,7 @@ export function ContactRecordHub({
 
   if (activeTab === "deals" && dealsData) {
     return (
-      <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
         <DealsWorkspace dealsData={dealsData} />
       </div>
     );
@@ -288,23 +343,8 @@ export function ContactRecordHub({
   }
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+    <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <ChannelRailAside>
-          <ContactsChannelTabs
-            activeTab={activeTab}
-            activeChannel={currentListData.activeChannelFilter}
-            activeSegment={listData?.activeSegment ?? "all"}
-            activeLeadSegment={leadsData?.activeLeadSegment}
-            activeView={currentListData.activeView}
-            activeContactId={currentListData.activeContactId}
-            showProfilePanel={currentListData.showProfilePanel}
-            searchQuery={currentListData.searchQuery}
-            visibleChannelIds={visibleChannelIds}
-            voiceInboxEnabled={voiceInboxEnabled}
-            smsInboxEnabled={smsInboxEnabled}
-          />
-        </ChannelRailAside>
 
         <div
           className={cn(

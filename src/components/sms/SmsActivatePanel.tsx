@@ -111,8 +111,8 @@ export function SmsActivatePanel({
           </Badge>
         </div>
 
-        <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
-          <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+        <div className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 text-sm dark:border-zinc-900 dark:bg-zinc-950/30">
+          <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-zinc-600" />
           <div className="space-y-1">
             <p className="font-medium">
               {smsEnabled ? SMS_MESSAGES.smsEnabled : SMS_MESSAGES.smsDisabled}

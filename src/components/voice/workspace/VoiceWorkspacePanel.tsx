@@ -659,14 +659,14 @@ function WorkspaceContactInfo({
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 border-b p-4">
+      <div className="grid grid-cols-1 gap-2 border-b p-4 sm:grid-cols-3">
         <QuickChip icon={HistoryIcon} label={VOICE_MESSAGES.callHistoryButton} onClick={onOpenHistory} />
         <QuickChip icon={VoicemailIcon} label={VOICE_MESSAGES.callRecordingTitle} onClick={onOpenRecordings} />
         <QuickChip icon={FileTextIcon} label={VOICE_MESSAGES.callTranscriptLive} onClick={onOpenTranscripts} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4">
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="hidden min-h-0 flex-1 overflow-y-auto lg:block">
           {recentCalls.length > 0 ? (
             <ul className="divide-y rounded-xl border">
               {recentCalls.map((item) => (
@@ -687,9 +687,13 @@ function WorkspaceContactInfo({
           )}
         </div>
 
+        <p className="mb-4 text-center text-sm text-muted-foreground lg:hidden">
+          Open History, Recording, or Transcript for this number.
+        </p>
+
         <div
           className={cn(
-            "mt-4 shrink-0 gap-3",
+            "mt-auto shrink-0 gap-3 lg:mt-4",
             showAddContact
               ? "grid grid-cols-3"
               : "mx-auto flex w-full max-w-sm justify-center",
@@ -698,7 +702,7 @@ function WorkspaceContactInfo({
           <Button
             type="button"
             className={cn(
-              "h-14 flex-col gap-1 bg-emerald-600 text-base hover:bg-emerald-700",
+              "h-14 flex-col gap-1 bg-zinc-600 text-base hover:bg-zinc-700",
               !showAddContact && "min-w-[9.5rem] flex-1",
             )}
             disabled={!phoneToCall || callDisabled}
@@ -841,7 +845,7 @@ function WorkspaceLiveView({
                     : getVoiceCallStatusLabel(call.status)}
                 </span>
                 {isConnected && displaySeconds !== null ? (
-                  <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="font-mono text-sm font-semibold text-zinc-600 dark:text-zinc-400">
                     {formatVoiceCallDuration(displaySeconds)}
                   </span>
                 ) : isRinging ? (
@@ -1053,9 +1057,9 @@ function QuickChip({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-center gap-2 rounded-xl border bg-background px-2 py-2 text-xs font-medium transition-colors hover:bg-muted/40"
+      className="flex items-center justify-center gap-2 rounded-xl border bg-background px-3 py-3 text-sm font-medium transition-colors hover:bg-muted/40 sm:px-2 sm:py-2 sm:text-xs"
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-4 sm:size-3.5" />
       <span className="truncate">{label}</span>
     </button>
   );

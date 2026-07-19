@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 
 import { ChatList } from "@/components/chats/ChatList";
-import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
 import { InboxPageSkeleton } from "@/components/chats/inbox/InboxPageSkeleton";
@@ -59,8 +58,8 @@ function SmsInboxPanelContent({
   hasBusiness = true,
   businessId = null,
   smsInboxEnabled = false,
-  voiceInboxEnabled = false,
-  visibleChannelIds = [] as MessagingChannel[],
+  voiceInboxEnabled: _voiceInboxEnabled = false,
+  visibleChannelIds: _visibleChannelIds = [] as MessagingChannel[],
   conversations: initialConversations = [],
   activeConversation: initialActiveConversation = null,
 }: SmsInboxPanelProps) {
@@ -68,6 +67,15 @@ function SmsInboxPanelContent({
   const searchParams = useSearchParams();
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
   const phoneDraft = searchParams.get("phone")?.trim() || "";
+
+  useEffect(() => {
+    const nav = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "reload") {
+      router.replace(DASHBOARD_ROUTES.chats);
+    }
+  }, [router]);
 
   const [conversations, setConversations] = useState(initialConversations);
   const [contactsOpen, setContactsOpen] = useState(false);
@@ -258,14 +266,6 @@ function SmsInboxPanelContent({
   if (!smsInboxEnabled) {
     return (
       <InboxShell
-        channelTabs={
-          <InboxChannelTabs
-            activeChannel="sms"
-            visibleChannelIds={visibleChannelIds}
-            voiceInboxEnabled={voiceInboxEnabled}
-            smsInboxEnabled={false}
-          />
-        }
         listColumn={
           <div className="flex h-full items-center justify-center p-6">
             <Card className="w-full max-w-md shadow-none">
@@ -294,14 +294,6 @@ function SmsInboxPanelContent({
       <InboxShell
         showChatOnMobile={showThread}
         showRightColumn={detailsOpen && Boolean(activeConversation)}
-        channelTabs={
-          <InboxChannelTabs
-            activeChannel="sms"
-            visibleChannelIds={visibleChannelIds}
-            voiceInboxEnabled={voiceInboxEnabled}
-            smsInboxEnabled
-          />
-        }
         listColumn={
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">

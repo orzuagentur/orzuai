@@ -27,6 +27,8 @@ export const SETTINGS_MESSAGES = {
   tabLanguage: "Language",
   tabProfile: "Business profile",
   tabAccount: "Account",
+  openDocumentation: "Documentation",
+  openDocumentationHint: "Guides for inbox, AI, CRM, calls, and setup",
   languageTitle: "Interface language",
   languageDescription:
     "Choose the language used across your dashboard. Saved on this device.",

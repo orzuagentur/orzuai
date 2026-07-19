@@ -6,6 +6,7 @@ import {
   CalendarIcon,
   Loader2Icon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 
 import { ContactAdditionalContactsSection } from "@/components/contacts/ContactAdditionalContactsSection";
@@ -41,6 +42,8 @@ import {
 type InboxDetailsPanelProps = {
   conversation: ConversationDetail | null;
   className?: string;
+  onClose?: () => void;
+  showCloseButton?: boolean;
 };
 
 function DetailSection({
@@ -48,7 +51,7 @@ function DetailSection({
   children,
   className,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -56,9 +59,11 @@ function DetailSection({
     <section
       className={cn("space-y-3 border-b px-4 py-4 last:border-b-0", className)}
     >
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+      {title ? (
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+      ) : null}
       {children}
     </section>
   );
@@ -67,6 +72,8 @@ function DetailSection({
 export function InboxDetailsPanel({
   conversation,
   className,
+  onClose,
+  showCloseButton = false,
 }: InboxDetailsPanelProps) {
   const conversationId = conversation?.id ?? null;
   const [details, setDetails] = useState<InboxDetailsPanelData | null>(() =>
@@ -176,8 +183,29 @@ export function InboxDetailsPanel({
         className,
       )}
     >
+      {showCloseButton && onClose ? (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5 xl:hidden">
+          <p className="truncate text-sm font-semibold">
+            {CHAT_MESSAGES.contactDetailsTitle}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <DetailSection title={CHAT_MESSAGES.contactDetailsTitle}>
+        <DetailSection
+          title={
+            showCloseButton ? undefined : CHAT_MESSAGES.contactDetailsTitle
+          }
+        >
           <div className="flex items-start gap-3">
             <ContactAvatar
               name={contact?.name ?? conversation.contactName}

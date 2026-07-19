@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import {
-  PASSWORD_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-} from "@/features/auth/constants";
+import { PASSWORD_MAX_LENGTH } from "@/features/auth/constants";
+import { passwordPolicyMessage } from "@/features/auth/password-strength";
 
 export const authCallbackQuerySchema = z.object({
   code: z.string().trim().min(1).optional(),
@@ -27,6 +25,21 @@ export const resendVerificationEmailSchema = z.object({
     .email("Enter a valid email address")
     .max(320, "Email address is too long"),
 });
+
+export const verifyEmailOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Enter a valid email address")
+    .max(320, "Email address is too long"),
+  code: z
+    .string()
+    .trim()
+    .min(4, "Enter the verification code from your email")
+    .max(12, "Code is too long"),
+});
+
+export const verifyRecoveryOtpSchema = verifyEmailOtpSchema;
 
 export const signInWithEmailSchema = z.object({
   email: z
@@ -52,10 +65,17 @@ export const signInWithMagicLinkSchema = z.object({
 export const passwordSchema = z
   .string()
   .trim()
-  .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+  .min(1, "Password is required")
   .max(PASSWORD_MAX_LENGTH, "Password is too long")
-  .regex(/[A-Za-z]/, "Password must contain at least one letter")
-  .regex(/[0-9]/, "Password must contain at least one number");
+  .superRefine((value, ctx) => {
+    const message = passwordPolicyMessage(value);
+    if (message) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message,
+      });
+    }
+  });
 
 export const requestPasswordResetSchema = z.object({
   email: z
@@ -118,6 +138,8 @@ export type SignInWithMagicLinkInput = z.infer<typeof signInWithMagicLinkSchema>
 export type ResendVerificationEmailInput = z.infer<
   typeof resendVerificationEmailSchema
 >;
+export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
+export type VerifyRecoveryOtpInput = z.infer<typeof verifyRecoveryOtpSchema>;
 export type RequestPasswordResetInput = z.infer<
   typeof requestPasswordResetSchema
 >;

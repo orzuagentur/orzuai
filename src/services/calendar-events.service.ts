@@ -182,7 +182,20 @@ export async function syncGoogleCalendarEventsForBusiness(
   businessId: string,
   options?: { revalidate?: boolean },
 ): Promise<{ synced: number; removed: number; syncError?: string }> {
-  const result = await getGoogleCalendarEventsForBusiness(businessId);
+  let result: Awaited<ReturnType<typeof getGoogleCalendarEventsForBusiness>>;
+
+  try {
+    result = await getGoogleCalendarEventsForBusiness(businessId);
+  } catch (error) {
+    return {
+      synced: 0,
+      removed: 0,
+      syncError:
+        error instanceof Error
+          ? error.message
+          : "Google Calendar sync failed.",
+    };
+  }
 
   if (!result) {
     return { synced: 0, removed: 0 };
@@ -363,6 +376,47 @@ export async function listCalendarTasksForBusiness(
   }
 
   return (data ?? []).map(mapTaskRow);
+}
+
+/** Wider window for dashboard mini-month event dots. */
+export async function listDashboardCalendarMarkers(
+  businessId: string,
+): Promise<OrzuxCalendarEvent[]> {
+  const admin = createAdminClient();
+  const timeMin = new Date();
+  timeMin.setMonth(timeMin.getMonth() - 1);
+  timeMin.setDate(1);
+  timeMin.setHours(0, 0, 0, 0);
+
+  const [eventsResult, tasksResult] = await Promise.all([
+    admin
+      .from("calendar_events")
+      .select("*")
+      .eq("business_id", businessId)
+      .gte("start_at", timeMin.toISOString())
+      .order("start_at", { ascending: true }),
+    admin
+      .from("calendar_tasks")
+      .select("*")
+      .eq("business_id", businessId)
+      .or(
+        `start_at.gte.${timeMin.toISOString()},due_at.gte.${timeMin.toISOString()}`,
+      )
+      .order("start_at", { ascending: true, nullsFirst: false }),
+  ]);
+
+  if (eventsResult.error) {
+    throw new Error(eventsResult.error.message);
+  }
+  if (tasksResult.error) {
+    throw new Error(tasksResult.error.message);
+  }
+
+  return mergeCalendarEvents({
+    localEvents: (eventsResult.data ?? []).map(mapEventRow),
+    localTasks: (tasksResult.data ?? []).map(mapTaskRow),
+    googleEvents: [],
+  });
 }
 
 async function getGoogleConnectionForBusiness(businessId: string) {

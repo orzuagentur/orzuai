@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { ResendVerificationEmailField } from "@/components/auth/ResendVerificationForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,7 @@ export function EmailLoginForm({
             disabled={isLoading}
             defaultValue={unverifiedEmail}
             aria-invalid={Boolean(errors.email)}
+            className="h-10 bg-white/72"
           />
           {errors.email ? (
             <p className="text-sm text-destructive">{errors.email}</p>
@@ -119,14 +121,14 @@ export function EmailLoginForm({
                 Forgot password?
               </Link>
             </div>
-            <Input
+            <PasswordInput
               id="login-password"
               name="password"
-              type="password"
               autoComplete="current-password"
               placeholder="Enter your password"
               disabled={isLoading}
               aria-invalid={Boolean(errors.password)}
+              className="h-10 bg-white/72"
             />
             {errors.password ? (
               <p className="text-sm text-destructive">{errors.password}</p>
@@ -138,7 +140,7 @@ export function EmailLoginForm({
           </p>
         )}
 
-        <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
+        <Button type="submit" size="lg" className="h-11 w-full" disabled={isLoading}>
           {isLoading ? (
             <>
               <Loader2Icon className="size-4 animate-spin" />

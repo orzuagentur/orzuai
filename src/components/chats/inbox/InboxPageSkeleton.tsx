@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function InboxPageSkeleton() {
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col overflow-hidden bg-background">
+    <div className="flex dashboard-main-frame min-h-0 flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className="flex min-h-0 shrink-0 overflow-hidden border-r">
           <div className="flex w-[4.75rem] flex-col gap-2 border-r bg-muted/15 px-1.5 py-2 xl:w-40">

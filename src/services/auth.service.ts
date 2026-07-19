@@ -43,6 +43,8 @@ import type {
   SignInWithEmailInput,
   SignInWithMagicLinkInput,
   VerificationResult,
+  VerifyEmailOtpInput,
+  VerifyRecoveryOtpInput,
 } from "@/types/auth.types";
 import {
   deleteAccountSchema,
@@ -52,6 +54,8 @@ import {
   resetPasswordInputSchema,
   signInWithEmailSchema,
   signInWithMagicLinkSchema,
+  verifyEmailOtpSchema,
+  verifyRecoveryOtpSchema,
 } from "@/types/auth.types";
 import type { AuthActionResult } from "@/types/auth.types";
 import { buildAuthCallbackUrl } from "@/utils/auth";
@@ -257,6 +261,97 @@ export async function verifyEmailWithTokenHash(
   }
 
   return { success: true };
+}
+
+export async function verifyEmailWithOtpCode(
+  input: VerifyEmailOtpInput,
+): Promise<VerificationResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message:
+          "Authentication services are not configured. Missing required environment variables.",
+      },
+    };
+  }
+
+  const parsed = verifyEmailOtpSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: parsed.data.email,
+    token: parsed.data.code,
+    type: "signup",
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: "VERIFICATION_FAILED",
+        message: error.message || REGISTRATION_MESSAGES.otpInvalid,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    data: { email: parsed.data.email },
+  };
+}
+
+export async function verifyRecoveryOtpCode(
+  input: VerifyRecoveryOtpInput,
+): Promise<PasswordResetRequestResult> {
+  if (!hasSupabaseEnv()) {
+    return missingConfigPasswordResetError();
+  }
+
+  const parsed = verifyRecoveryOtpSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: parsed.data.email,
+    token: parsed.data.code,
+    type: "recovery",
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_SESSION",
+        message: error.message || PASSWORD_RESET_MESSAGES.invalidSession,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    data: { email: parsed.data.email },
+  };
 }
 
 export async function resendVerificationEmail(
@@ -654,6 +749,7 @@ export async function requestPasswordReset(
   }
 
   const resetUrl = data.properties.action_link;
+  const resetCode = data.properties.email_otp;
 
   if (!resetUrl) {
     return {
@@ -667,6 +763,7 @@ export async function requestPasswordReset(
   const emailResult = await sendPasswordResetEmail({
     to: parsed.data.email,
     resetUrl,
+    resetCode,
   });
 
   if (!emailResult.success) {

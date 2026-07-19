@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, useCallback } from "react";
 import { toast } from "sonner";
 import {
+  ArrowLeftIcon,
   Maximize2Icon,
   MessageSquareIcon,
   Minimize2Icon,
@@ -31,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { chatHeaderClassName } from "@/features/chats/chat-theme";
+import { getChatHeaderActionButtonClassName, getChatHeaderClassName } from "@/features/chats/chat-theme";
 import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
@@ -88,6 +89,8 @@ type ChatWindowProps = {
   onConversationViewed?: () => void;
   onReadProgress?: (readAt: string) => void;
   onQuickRepliesOpen?: () => void;
+  /** Mobile: back to conversation list */
+  onBack?: () => void;
   className?: string;
 };
 
@@ -140,6 +143,7 @@ export function ChatWindow({
   onConversationViewed,
   onReadProgress,
   onQuickRepliesOpen,
+  onBack,
   className,
 }: ChatWindowProps) {
   const canSend = channelConnected;
@@ -148,6 +152,7 @@ export function ChatWindow({
   const [internalDraft, setInternalDraft] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
+  const [emailComposeOpen, setEmailComposeOpen] = useState(false);
   const [internalSuggestOpen, setInternalSuggestOpen] = useState(false);
   const suggestOpen = controlledSuggestOpen ?? internalSuggestOpen;
   const setSuggestOpen = onSuggestReplyOpenChange ?? setInternalSuggestOpen;
@@ -182,10 +187,18 @@ export function ChatWindow({
   }, [conversation?.id, conversation?.channel, conversation?.messages]);
 
   useEffect(() => {
+    setEmailComposeOpen(false);
+  }, [conversation?.id, conversation?.channel]);
+
+  useEffect(() => {
     if (!conversation && inboxLayout?.chatFullscreen) {
       inboxLayout.setChatFullscreen(false);
     }
   }, [conversation, inboxLayout]);
+
+  useEffect(() => {
+    inboxLayout?.setMobileDetailsOpen(false);
+  }, [conversation?.id, inboxLayout]);
 
   const { sendMessage, isLoading } = useSendChatMessage({
     onSuccess: (result) => {
@@ -403,7 +416,12 @@ export function ChatWindow({
             className,
           )}
         >
-          <div className="shrink-0 border-b bg-background px-4 py-3">
+          <div
+            className={cn(
+              "shrink-0 px-4 py-3",
+              getChatHeaderClassName(loadingPreview.channel),
+            )}
+          >
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -469,6 +487,9 @@ export function ChatWindow({
       }),
     );
     setDraft("");
+    if (conversation.channel === "email") {
+      setEmailComposeOpen(false);
+    }
     scrollToLatestMessage();
     requestAnimationFrame(scrollToLatestMessage);
 
@@ -488,6 +509,7 @@ export function ChatWindow({
       setDraft(content);
       if (conversation.channel === "email") {
         setEmailSubject(subject);
+        setEmailComposeOpen(true);
       }
     })();
   }
@@ -498,40 +520,77 @@ export function ChatWindow({
 
   return (
       <div className={cn("flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden", className)}>
-        <div className={cn("shrink-0 px-4 py-3", chatHeaderClassName)}>
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <ContactAvatar
-              name={conversation.contactName}
-              avatarUrl={conversation.contactAvatarUrl}
-              className="size-10 shrink-0"
-              size="lg"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate font-medium">{conversation.contactName}</p>
-                <Badge
-                  variant="outline"
-                  className={`gap-1 ${getChannelBadgeClassName(conversation.channel)}`}
-                >
-                  <ChannelBrandIcon
-                    channel={conversation.channel}
-                    className="size-3.5"
-                  />
-                  {getChannelBadgeLabel(conversation.channel)}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {isClientTyping
-                  ? CHAT_MESSAGES.customerTyping(conversation.contactName)
-                  : formatContactIdentifier(conversation.contactPhone)}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
+        <div
+          className={cn(
+            "shrink-0 px-2 py-2.5 sm:px-4 sm:py-3",
+            getChatHeaderClassName(conversation.channel),
+          )}
+        >
+          <div className="flex min-w-0 items-center justify-between gap-1.5 sm:gap-2">
+            {onBack ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8"
+                className={cn(
+                  "size-9 shrink-0 lg:hidden",
+                  getChatHeaderActionButtonClassName(conversation.channel),
+                )}
+                aria-label={CHAT_MESSAGES.pageTitle}
+                onClick={onBack}
+              >
+                <ArrowLeftIcon className="size-5" />
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring xl:pointer-events-none"
+              onClick={() => {
+                if (!inboxLayout) return;
+                setSuggestOpen(false);
+                if (typeof window !== "undefined" && window.innerWidth < 1280) {
+                  inboxLayout.setMobileDetailsOpen(true);
+                } else {
+                  inboxLayout.setDetailsOpen(true);
+                }
+              }}
+            >
+              <ContactAvatar
+                name={conversation.contactName}
+                avatarUrl={conversation.contactAvatarUrl}
+                className="size-9 shrink-0 sm:size-10"
+                size="lg"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate font-medium">{conversation.contactName}</p>
+                  <Badge
+                    variant="outline"
+                    className={`hidden gap-1 sm:inline-flex ${getChannelBadgeClassName(conversation.channel)}`}
+                  >
+                    <ChannelBrandIcon
+                      channel={conversation.channel}
+                      className="size-3.5"
+                    />
+                    {getChannelBadgeLabel(conversation.channel)}
+                  </Badge>
+                </div>
+                <p className="truncate text-xs text-[#667781]">
+                  {isClientTyping
+                    ? CHAT_MESSAGES.customerTyping(conversation.contactName)
+                    : formatContactIdentifier(conversation.contactPhone)}
+                </p>
+              </div>
+            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "hidden sm:inline-flex",
+                  getChatHeaderActionButtonClassName(conversation.channel),
+                )}
                 disabled={!conversation.contactId || isFavoritePending}
                 aria-label={CHAT_MESSAGES.favoriteToggleLabel}
                 aria-pressed={isFavorite}
@@ -542,7 +601,7 @@ export function ChatWindow({
                     "size-4",
                     isFavorite
                       ? "fill-amber-400 text-amber-400"
-                      : "text-muted-foreground",
+                      : "text-[#54656f]",
                   )}
                 />
               </Button>
@@ -551,7 +610,10 @@ export function ChatWindow({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-8"
+                  className={cn(
+                    "hidden lg:inline-flex",
+                    getChatHeaderActionButtonClassName(conversation.channel),
+                  )}
                   aria-label={
                     inboxLayout.chatFullscreen
                       ? CHAT_MESSAGES.chatExitFullscreen
@@ -576,19 +638,29 @@ export function ChatWindow({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="hidden size-8 xl:inline-flex"
+                  className={getChatHeaderActionButtonClassName(conversation.channel)}
                   aria-label={
-                    inboxLayout.detailsOpen
+                    inboxLayout.detailsOpen || inboxLayout.mobileDetailsOpen
                       ? CHAT_MESSAGES.hideContactDetails
                       : CHAT_MESSAGES.showContactDetails
                   }
-                  aria-pressed={inboxLayout.detailsOpen && !suggestOpen}
+                  aria-pressed={
+                    (inboxLayout.detailsOpen || inboxLayout.mobileDetailsOpen) &&
+                    !suggestOpen
+                  }
                   onClick={() => {
                     setSuggestOpen(false);
-                    inboxLayout.toggleDetails();
+                    if (
+                      typeof window !== "undefined" &&
+                      window.innerWidth < 1280
+                    ) {
+                      inboxLayout.toggleMobileDetails();
+                    } else {
+                      inboxLayout.toggleDetails();
+                    }
                   }}
                 >
-                  {inboxLayout.detailsOpen ? (
+                  {inboxLayout.detailsOpen || inboxLayout.mobileDetailsOpen ? (
                     <PanelRightCloseIcon className="size-4" />
                   ) : (
                     <PanelRightOpenIcon className="size-4" />
@@ -607,6 +679,7 @@ export function ChatWindow({
               conversationId={conversation.id}
               messages={conversation.messages}
               variant="inbox"
+              channel={conversation.channel}
               lastReadAt={conversation.lastReadAt}
               className="min-h-0 flex-1"
               scrollContainerRef={scrollContainerRef}
@@ -617,6 +690,11 @@ export function ChatWindow({
               typingContactName={conversation.contactName}
               contactName={conversation.contactName}
               contactAvatarUrl={conversation.contactAvatarUrl}
+              onEmailReply={
+                conversation.channel === "email"
+                  ? () => setEmailComposeOpen(true)
+                  : undefined
+              }
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
               hasOlderMessages={hasOlderMessages}
@@ -683,11 +761,20 @@ export function ChatWindow({
                 isSending={isLoading}
                 composerTab={composerTab}
                 onComposerTabChange={setComposerTab}
+                composeOpen={emailComposeOpen}
+                onComposeOpenChange={setEmailComposeOpen}
                 onSubmit={() => {
                   void handleInboxSend();
                 }}
                 onOpenAiSuggest={() => {
-                  inboxLayout?.setDetailsOpen(false);
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 1280
+                  ) {
+                    inboxLayout?.setMobileDetailsOpen(true);
+                  } else {
+                    inboxLayout?.setDetailsOpen(false);
+                  }
                   setSuggestOpen(true);
                 }}
                 onQuickRepliesOpen={onQuickRepliesOpen}
@@ -713,7 +800,14 @@ export function ChatWindow({
                   void handleInboxSend();
                 }}
                 onOpenAiSuggest={() => {
-                  inboxLayout?.setDetailsOpen(false);
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 1280
+                  ) {
+                    inboxLayout?.setMobileDetailsOpen(true);
+                  } else {
+                    inboxLayout?.setDetailsOpen(false);
+                  }
                   setSuggestOpen(true);
                 }}
                 onQuickRepliesOpen={onQuickRepliesOpen}

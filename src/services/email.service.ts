@@ -223,6 +223,7 @@ export async function sendPasswordResetEmail(
 
   const { subject, html } = renderPasswordResetEmail({
     resetUrl: parsed.data.resetUrl,
+    resetCode: parsed.data.resetCode,
   });
 
   return sendTransactionalEmail({

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CreateOrderDialog } from "@/components/orders/CreateOrderDialog";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
+import { OrderFormSettingsDialog } from "@/components/orders/OrderFormSettingsDialog";
 import { OrderSourceIcon } from "@/components/orders/OrderSourceIcon";
 import { useOrdersChromeRegistration } from "@/components/orders/orders-chrome-context";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +16,13 @@ import {
   getOrderStatusLabel,
   ORDERS_MESSAGES,
 } from "@/features/orders/constants";
+import type { OrderFormField } from "@/features/orders/order-form-fields";
 import { cn } from "@/lib/utils";
 import type { CrmOrderStatus, CrmOrdersPageData } from "@/types/crm-order.types";
 
 type OrdersPanelProps = {
   data: CrmOrdersPageData;
+  formFields: OrderFormField[];
 };
 
 function statusBadgeClass(status: CrmOrderStatus): string {
@@ -29,7 +32,7 @@ function statusBadgeClass(status: CrmOrderStatus): string {
     case "in_progress":
       return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200";
     case "done":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200";
+      return "border-zinc-200 bg-zinc-100 text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
     case "cancelled":
       return "border-muted bg-muted text-muted-foreground";
   }
@@ -58,10 +61,12 @@ function buildOrdersHref(input: {
   return suffix ? `${DASHBOARD_ROUTES.orders}?${suffix}` : DASHBOARD_ROUTES.orders;
 }
 
-export function OrdersPanel({ data }: OrdersPanelProps) {
+export function OrdersPanel({ data, formFields: initialFormFields }: OrdersPanelProps) {
   const router = useRouter();
   const [query, setQuery] = useState(data.searchQuery);
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [formFields, setFormFields] = useState(initialFormFields);
 
   const selectedOrder =
     data.orders.find((order) => order.id === data.activeOrderId) ?? null;
@@ -69,6 +74,10 @@ export function OrdersPanel({ data }: OrdersPanelProps) {
   useEffect(() => {
     setQuery(data.searchQuery);
   }, [data.searchQuery]);
+
+  useEffect(() => {
+    setFormFields(initialFormFields);
+  }, [initialFormFields]);
 
   const pushFilters = useCallback(
     (next: { status?: string; q?: string; order?: string | null }) => {
@@ -98,6 +107,10 @@ export function OrdersPanel({ data }: OrdersPanelProps) {
     setCreateOpen(true);
   }, []);
 
+  const handleOpenFormSettings = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
   useEffect(() => {
     const trimmed = query.trim();
 
@@ -119,11 +132,12 @@ export function OrdersPanel({ data }: OrdersPanelProps) {
     activeStatus: data.activeStatus,
     onStatusChange: handleStatusChange,
     onAddOrder: handleAddOrder,
+    onOpenFormSettings: handleOpenFormSettings,
   });
 
   return (
     <>
-      <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
         <div
           className={cn(
             "grid min-h-0 min-w-0 flex-1 overflow-hidden",
@@ -239,8 +253,19 @@ export function OrdersPanel({ data }: OrdersPanelProps) {
       <CreateOrderDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+        formFields={formFields}
         onCreated={(orderId) => {
           router.push(buildOrdersHref({ order: orderId }));
+          router.refresh();
+        }}
+      />
+
+      <OrderFormSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        initialFields={formFields}
+        onSaved={(fields) => {
+          setFormFields(fields);
           router.refresh();
         }}
       />

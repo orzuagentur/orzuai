@@ -277,12 +277,12 @@ function isValidFutureIsoRange(input: {
   const start = new Date(input.startDateTime);
   const end = new Date(input.endDateTime);
 
-  return (
-    !Number.isNaN(start.getTime()) &&
-    !Number.isNaN(end.getTime()) &&
-    start.getTime() > Date.now() &&
-    end.getTime() > start.getTime()
-  );
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return false;
+  }
+
+  // Allow same-day stays; reject ranges that already ended.
+  return end.getTime() > start.getTime() && end.getTime() > Date.now();
 }
 
 function parseContactCustomFields(value: unknown): ContactCustomFields {
@@ -759,12 +759,14 @@ export async function createVoicePostCallBooking(
     systemInstruction:
       "You extract confirmed booking intent from call transcripts. Return valid JSON only.",
     prompt: [
-      `Current time: ${new Date().toISOString()}`,
+      `Current time (UTC): ${new Date().toISOString()}`,
       `Customer: ${contact.name}, phone ${contact.phoneNumber}, email ${contact.email ?? "none"}`,
       bookingPagesText || "No published booking pages listed.",
       availabilityText,
       "",
       "Create a booking ONLY when the customer explicitly agreed to a specific future date/time or date range.",
+      "For multi-day stays: startDateTime = check-in, endDateTime = check-out — keep the FULL range, never one night only.",
+      "Use the business IANA timezone. Prefer local datetime with offset.",
       "Do not infer uncertain dates. Do not book if the customer only asked for options or said maybe.",
       'Return JSON: {"shouldBook":boolean,"explicitlyConfirmed":boolean,"confidence":0-1,"summary":"short booking title","startDateTime":"ISO or null","endDateTime":"ISO or null","timeZone":"IANA timezone or null","description":"short note or null","resourceName":"resource or null","bookingPageId":"id or null","formAnswers":{"guestCount":"2"}}',
       "",

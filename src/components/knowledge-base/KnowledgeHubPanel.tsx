@@ -45,7 +45,7 @@ import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 
 const LAYOUT_TONES: Record<string, string> = {
   services: "bg-sky-500/10 text-sky-700",
-  pricing: "bg-emerald-500/10 text-emerald-700",
+  pricing: "bg-zinc-500/10 text-zinc-700",
   faq: "bg-indigo-500/10 text-indigo-700",
   hours: "bg-orange-500/10 text-orange-700",
   contact: "bg-violet-500/10 text-violet-700",

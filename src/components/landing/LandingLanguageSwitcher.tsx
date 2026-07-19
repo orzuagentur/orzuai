@@ -25,7 +25,7 @@ export function LandingLanguageSwitcher() {
 
   return (
     <div
-      className="flex items-center gap-1 rounded-full border border-[#d9e3dc] bg-white p-1"
+      className="flex items-center gap-1 rounded-full border border-[var(--landing-line)] bg-white/80 p-1 shadow-sm backdrop-blur"
       role="group"
       aria-label="Language"
     >
@@ -40,8 +40,8 @@ export function LandingLanguageSwitcher() {
           className={cn(
             "h-7 min-w-9 rounded-full px-2 text-xs",
             activeLocale === locale
-              ? "bg-[#101815] text-white"
-              : "text-[#66746d] hover:bg-[#edf3ef] hover:text-[#101815]",
+              ? "bg-[var(--landing-primary)] text-white"
+              : "text-[var(--landing-muted-text)] hover:bg-[var(--landing-soft)] hover:text-[var(--landing-ink)]",
           )}
           onClick={() => setLocale(locale)}
         >

@@ -1,13 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { AuthPlatformShell } from "@/components/auth/AuthPlatformShell";
 import { RegisterAuthSection } from "@/components/auth/RegisterAuthSection";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth.service";
 import { resolveAuthenticatedLandingPathForUser } from "@/utils/post-auth-redirect";
 
@@ -19,18 +13,12 @@ export default async function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle>Create your OrzuX account</CardTitle>
-          <CardDescription>
-            Create an account to launch your multi-channel AI assistant.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RegisterAuthSection />
-        </CardContent>
-      </Card>
-    </div>
+    <AuthPlatformShell
+      hideBrandMark
+      title="Create your OrzuX account"
+      description="Launch a multi-channel AI assistant with inbox, CRM, calls, calendar, and analytics ready to grow."
+    >
+      <RegisterAuthSection />
+    </AuthPlatformShell>
   );
 }

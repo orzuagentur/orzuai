@@ -102,6 +102,13 @@ function segmentLabel(metric: AnalyticsSeriesMetric, segmentId: string): string 
     if (segmentId === "lost") return "Lost";
   }
 
+  if (metric === "orders") {
+    if (segmentId === "new") return "New";
+    if (segmentId === "in_progress") return "In progress";
+    if (segmentId === "done") return "Done";
+    if (segmentId === "cancelled") return "Cancelled";
+  }
+
   if (metric === "calls") {
     if (segmentId === "ai") return "AI calls";
     if (segmentId === "manager") return "Manager calls";
@@ -256,6 +263,23 @@ async function loadDealEvents(
   return (contacts ?? []).map((contact) => ({
     timestamp: contact.last_message_at ?? contact.created_at,
     segmentId: contact.pipeline_stage === "won" ? "won" : "lost",
+  }));
+}
+
+async function loadOrderEvents(
+  businessId: string,
+  sinceIso: string,
+): Promise<SeriesEvent[]> {
+  const supabase = await createClient();
+  const { data: orders } = await supabase
+    .from("crm_orders")
+    .select("created_at, status")
+    .eq("business_id", businessId)
+    .gte("created_at", sinceIso);
+
+  return (orders ?? []).map((order) => ({
+    timestamp: order.created_at,
+    segmentId: order.status || "new",
   }));
 }
 
@@ -417,6 +441,8 @@ export async function getAnalyticsSeries(
     events = await loadMessageEvents(businessId, sinceIso);
   } else if (metric === "clients") {
     events = await loadClientEvents(businessId, sinceIso);
+  } else if (metric === "orders") {
+    events = await loadOrderEvents(businessId, sinceIso);
   } else {
     events = await loadDealEvents(businessId, sinceIso);
   }

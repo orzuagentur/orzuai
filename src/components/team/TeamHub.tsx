@@ -160,18 +160,18 @@ export function TeamHub({ data }: TeamHubProps) {
   }
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col overflow-hidden bg-background">
-      <div className="shrink-0 border-b px-4 py-4 md:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex dashboard-main-frame min-h-0 flex-col overflow-hidden bg-background">
+      <div className="shrink-0 border-b px-3 py-3 md:px-8 md:py-4">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary sm:size-10">
               <UserCogIcon className="size-5" />
             </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">
                 {TEAM_MESSAGES.pageTitle}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="hidden text-sm text-muted-foreground sm:block">
                 {TEAM_MESSAGES.pageDescription}
               </p>
             </div>

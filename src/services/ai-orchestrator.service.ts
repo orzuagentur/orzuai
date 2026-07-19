@@ -70,6 +70,13 @@ function parseJsonObject(text: string): unknown | null {
   }
 }
 
+function formatOrderFormFieldsForPrompt(fieldsText: string | undefined): string {
+  if (!fieldsText?.trim()) {
+    return "";
+  }
+  return fieldsText.trim();
+}
+
 function buildOrchestratorPrompt(input: {
   message: string;
   conversationHistory: ConversationTurn[];
@@ -80,6 +87,7 @@ function buildOrchestratorPrompt(input: {
   bookingPagesText?: string;
   availabilityText?: string;
   collectionContext?: string;
+  orderFormFieldsText?: string;
   outputMode?: "tools" | "json";
 }): string {
   const outputMode = input.outputMode ?? "json";
@@ -127,6 +135,10 @@ function buildOrchestratorPrompt(input: {
           '{"intent":"general|booking|sales|support|registration|none","confidence":0.0,"managerAlert":false,"handoffConfirmed":false,"humanReason":"","contactUpdates":{},"actions":[],"clientSummary":""}',
         ].join("\n");
 
+  const orderFormSection = formatOrderFormFieldsForPrompt(
+    input.orderFormFieldsText,
+  );
+
   return [
     getPlatformPromptContent("orchestrator") || WORKER_ORCHESTRATOR_RULES,
     "",
@@ -137,7 +149,7 @@ function buildOrchestratorPrompt(input: {
     "  • ORDER / request / заявка / заказ / delivery / repair / purchase without a visit slot → create_order ONLY. Never create_calendar_event.",
     "  • Never plan both create_order and create_calendar_event for the same customer request.",
     "- If booking is enabled and the customer gave usable date/time for an appointment, plan create_calendar_event.",
-    "- If the customer needs a product/service order or request (not a timed booking), plan create_order with title + optional serviceType.",
+    "- If the customer needs a product/service order or request (not a timed booking), plan create_order and fill every configured order-form field from the conversation (required fields must not be empty).",
     "- Do not use clientSummary to say a booking is confirmed unless create_calendar_event is planned.",
     "- Never write that a manager/staff member will check availability, confirm, contact, or answer later.",
     "- Prefer update_collected_fields when the customer provides data-collection values.",
@@ -153,7 +165,8 @@ function buildOrchestratorPrompt(input: {
     "- Never tell the customer a booking/meeting is confirmed in clientSummary unless you also planned create_calendar_event this turn; the executor confirms only after a real calendar write.",
     "",
     "Analyze the customer's latest message for agent routing and CRM actions.",
-    `Current time: ${new Date().toISOString()}`,
+    `Current time (UTC): ${new Date().toISOString()}`,
+    "When emitting startDateTime/endDateTime/dueAt, use the business booking timezone (IANA) and include an offset OR a local datetime without Z. Never use bare YYYY-MM-DD for timed appointments; for hotels date-only check-in/check-out is OK.",
     "",
     "Recent conversation:",
     historySection,
@@ -169,6 +182,7 @@ function buildOrchestratorPrompt(input: {
           "Otherwise return empty actions.",
           "",
         ].join("\n"),
+    orderFormSection ? [orderFormSection, ""].join("\n") : "",
     input.collectionContext?.trim()
       ? [input.collectionContext.trim(), ""].join("\n")
       : "",
@@ -178,12 +192,12 @@ function buildOrchestratorPrompt(input: {
           "OrzuX calendar booking is ENABLED — you must book instantly via create_calendar_event when the customer gives a date/time (or check-in/check-out for hotels).",
           "Never tell the customer that someone will contact them, that booking is queued, or that a manager will confirm.",
           "Fill guest name, email, phone, guestCount/partySize from contact + message. Use bookingPageId when a matching page is listed below.",
-          "For hotels: startDateTime = check-in, endDateTime = check-out, include guestCount in formAnswers.",
+          "For hotels / date ranges: startDateTime = check-in, endDateTime = check-out (keep the FULL stay — never shorten to one night or one hour). Include guestCount in formAnswers.",
           input.googleCalendarConnected
             ? "Google Calendar is also connected — slots include Google busy times."
             : "Google Calendar is not connected — OrzuX calendar still works for instant bookings.",
           "If the customer asks what times are free, answer in clientSummary using the availability list below.",
-          "If they pick a time, use create_calendar_event immediately — the system picks the nearest free slot and sends a confirmation email when email is known.",
+          "If they pick a time or stay range, use create_calendar_event immediately with that exact range — the system resolves conflicts and sends a confirmation email when email is known.",
         ].join(" ")
       : "Calendar booking is not configured yet. For booking intent, create_task with requested time in dueAt and ask for date/time details — do NOT promise a manager callback.",
     "",
@@ -228,7 +242,7 @@ function buildOrchestratorPrompt(input: {
     "- booking intent when customer asks for open times: answer in clientSummary using the availability list; do not invent slots",
     "- booking intent without calendar configured: create_task only to capture the request until calendar is set up — still never create_order for appointments",
     "- booking/support intent: create_task and add_note only when calendar booking is not configured or time is completely unknown",
-    "- order intent (заявка/заказ): use create_order with title and serviceType; never create_calendar_event for the same request",
+    "- order intent (заявка/заказ): use create_order and fill configured order-form fields (required ones must be set); put custom keys in fields{}; never create_calendar_event for the same request",
     "- sales intent: prefer update_deal when an open deal exists; otherwise create_deal once. When the customer wants fulfillment of a product/service request without a booking slot, also plan create_order. Use create_task/add_note when needed and required collection fields are complete",
     "- clientSummary must not claim booking success by itself — only describe the planned time; confirmation is applied after Booking confirmed",
     "- registration intent: create_contact/create_lead when no contact exists, plus contactUpdates.pipelineStage=new",
@@ -236,7 +250,7 @@ function buildOrchestratorPrompt(input: {
     "- add_internal_note: team-only context for managers (not sent to customer). Use for impatience, owner requests, or internal observations.",
     "- Do not invent contact data. Omit uncertain fields.",
     "- create_calendar_event requires summary, startDateTime, endDateTime, timeZone, optional description, resourceName, bookingPageId, formAnswers (guestCount, partySize, etc.). Use ISO date-times. Never use for product/service orders.",
-    "- create_order requires title; optional serviceType, description, amount. Never use for appointments or reservations.",
+    "- create_order: fill every enabled order-form field from conversation/contact. Required configured fields must not be empty. Use fields{key:value} for custom keys. Title can be omitted if another field identifies the request. Never use for appointments or reservations.",
     "- clientSummary: confirm bookings directly to the customer (I/we). State exact date, time, and resource. Never mention managers, escalation, queued bookings, or internal systems. Leave empty only when the main reply already covers it.",
   ].join("\n");
 }
@@ -306,6 +320,7 @@ async function requestOrchestratorViaTools(input: {
   bookingPagesText?: string;
   availabilityText?: string;
   collectionContext?: string;
+  orderFormFieldsText?: string;
 }): Promise<OrchestratorRunResult | null> {
   const providers = (await getPlatformAiFallbackProviders("orchestrator")).filter(
     (provider) => {
@@ -441,6 +456,7 @@ async function requestOrchestratorJson(input: {
   bookingPagesText?: string;
   availabilityText?: string;
   collectionContext?: string;
+  orderFormFieldsText?: string;
 }): Promise<
   | { success: true; text: string; usedProvider?: string }
   | { success: false; errorMessage: string; attemptedProviders: string[] }
@@ -484,6 +500,7 @@ export async function runAutoReplyOrchestrator(input: {
   bookingPagesText?: string;
   availabilityText?: string;
   collectionContext?: string;
+  orderFormFieldsText?: string;
 }): Promise<OrchestratorRunResult> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
     return {
@@ -515,6 +532,7 @@ export async function runAutoReplyOrchestrator(input: {
     bookingPagesText,
     availabilityText,
     collectionContext: input.collectionContext,
+    orderFormFieldsText: input.orderFormFieldsText,
   };
 
   const toolAttempt = await requestOrchestratorViaTools(promptInput);

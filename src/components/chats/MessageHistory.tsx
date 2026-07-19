@@ -19,6 +19,7 @@ import {
   ChevronDownIcon,
   Clock3Icon,
   Loader2Icon,
+  ReplyIcon,
 } from "lucide-react";
 
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
@@ -32,11 +33,12 @@ import { ChatMessageActionsMenu } from "@/components/chats/ChatMessageActionsMen
 import { TypingIndicator } from "@/components/chats/TypingIndicator";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
-  chatPaneClassName,
-  chatUnreadDividerClassName,
+  getChatPaneClassName,
   getChatBubbleClassName,
   getChatBubbleMetaClassName,
   getChatBubbleMutedActionClassName,
+  getChatUnreadDividerClassName,
+  isEmailChatChannel,
 } from "@/features/chats/chat-theme";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMessageUploadProgress } from "@/hooks/use-message-upload-progress";
@@ -44,6 +46,7 @@ import { usePrefetchVisibleConversationMedia } from "@/hooks/use-prefetch-conver
 import { cn } from "@/lib/utils";
 import { scrollChatToBottom, setChatScrollToBottomInstant } from "@/utils/chat-scroll";
 import type { ChatMessageData } from "@/types/chat.types";
+import type { MessagingChannel } from "@/types/database.types";
 import { parseMediaMessage, isMediaPendingHydration } from "@/utils/chat-media";
 import {
   formatUploadPercent,
@@ -65,6 +68,7 @@ type MessageHistoryProps = {
   conversationId?: string;
   messages: ChatMessageData[];
   variant?: "default" | "inbox";
+  channel?: MessagingChannel | null;
   lastReadAt?: string | null;
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
   firstUnreadRef?: RefObject<HTMLDivElement | null>;
@@ -76,6 +80,7 @@ type MessageHistoryProps = {
   typingContactName?: string;
   contactName?: string;
   contactAvatarUrl?: string | null;
+  onEmailReply?: () => void;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
   hasOlderMessages?: boolean;
@@ -211,9 +216,11 @@ function MessageUploadOverlay({ messageId }: { messageId: string }) {
 function MessageUploadStatus({
   message,
   isOutgoing,
+  channel,
 }: {
   message: ChatMessageData;
   isOutgoing: boolean;
+  channel?: MessagingChannel | null;
 }) {
   const uploadProgress = useMessageUploadProgress(
     message.id,
@@ -225,7 +232,7 @@ function MessageUploadStatus({
     !uploadProgress;
 
   return (
-    <p className={getChatBubbleMetaClassName(isOutgoing)}>
+    <p className={getChatBubbleMetaClassName(isOutgoing, channel)}>
       {message.isPending && !showInstantSent ? (
         <Clock3Icon className="size-3 shrink-0" aria-hidden />
       ) : null}
@@ -280,6 +287,8 @@ type MessageHistoryItemProps = {
   showMessageActions: boolean;
   contactName: string;
   contactAvatarUrl?: string | null;
+  channel?: MessagingChannel | null;
+  onEmailReply?: () => void;
   onMessageRemoved?: (messageId: string) => void;
   onMessageUpdated?: (message: ChatMessageData) => void;
   onReadProgress?: (readAt: string) => void;
@@ -296,6 +305,8 @@ function MessageHistoryItem({
   showMessageActions,
   contactName,
   contactAvatarUrl,
+  channel,
+  onEmailReply,
   onMessageRemoved,
   onMessageUpdated,
   onReadProgress,
@@ -304,8 +315,11 @@ function MessageHistoryItem({
   const isOutgoing =
     message.senderType === "user" || message.senderType === "ai";
   const isDeleted = isChatMessageDeletedForAll(message);
+  const themeChannel = message.channel ?? channel;
+  const isEmail = isEmailChatChannel(themeChannel);
+  const unreadDivider = getChatUnreadDividerClassName(themeChannel);
   const emailParts =
-    message.channel === "email"
+    themeChannel === "email"
       ? resolveEmailMessageParts(message)
       : { subject: null, body: message.content };
   const { media, text: mediaCaptionText } = parseMediaMessage(emailParts.body);
@@ -357,27 +371,131 @@ function MessageHistoryItem({
     scrollRootRef,
   ]);
 
+  const unreadDividerNode = showUnreadDivider ? (
+    <div
+      ref={firstUnreadRef}
+      className="flex items-center gap-3 py-1"
+      role="separator"
+      aria-label={CHAT_MESSAGES.unreadDivider}
+    >
+      <div className={cn("h-px flex-1", unreadDivider.line)} />
+      <span
+        className={cn(
+          "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+          unreadDivider.pill,
+        )}
+      >
+        {CHAT_MESSAGES.unreadDivider}
+      </span>
+      <div className={cn("h-px flex-1", unreadDivider.line)} />
+    </div>
+  ) : null;
+
+  if (isEmail) {
+    return (
+      <div ref={messageRef} className="flex min-w-0 w-full flex-col gap-2 pb-3">
+        {unreadDividerNode}
+        <article
+          className={cn(
+            getChatBubbleClassName({
+              isOutgoing,
+              isDeleted,
+              isUnread: isInbox && isUnreadMessage,
+              hasMedia: Boolean(media),
+              isAudioMessage,
+              channel: themeChannel,
+            }),
+            "w-full",
+            message.isPending && media && "opacity-80",
+          )}
+        >
+          <header className="mb-2 flex items-start justify-between gap-3 border-b border-[#e0e3e8] pb-2 dark:border-white/10">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[#202124] dark:text-[#e8eaed]">
+                {isOutgoing ? "You" : contactName}
+              </p>
+              <p className="mt-0.5 text-xs text-[#5f6368]">
+                <MessageDateTime value={message.sentAt} />
+              </p>
+            </div>
+            {!isOutgoing && onEmailReply && !isDeleted ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 shrink-0 gap-1.5 border-[#dadce0] text-[#202124]"
+                onClick={onEmailReply}
+              >
+                <ReplyIcon className="size-3.5" />
+                {CHAT_MESSAGES.emailReplyAction}
+              </Button>
+            ) : null}
+          </header>
+
+          {isDeleted ? (
+            <p className="text-sm italic text-[#5f6368]">
+              {CHAT_MESSAGES.messageDeletedForAll}
+            </p>
+          ) : media ? (
+            <div className="relative">
+              <ChatMediaMessage
+                media={media}
+                messageId={message.id}
+                caption={text}
+                isOutgoing={isOutgoing}
+                showDownloadButton={
+                  !isOutgoing ||
+                  (!message.isPending && !message.attachmentPending)
+                }
+                isHydrating={
+                  Boolean(message.attachmentPending) ||
+                  isMediaPendingHydration(media)
+                }
+                isFailed={Boolean(message.attachmentFailed)}
+                onRetryStateChange={
+                  onMessageUpdated
+                    ? (state) => {
+                        onMessageUpdated({
+                          ...message,
+                          attachmentPending: state.attachmentPending,
+                          attachmentFailed: state.attachmentFailed,
+                        });
+                      }
+                    : undefined
+                }
+              />
+              {message.isPending && media ? (
+                <MessageUploadOverlay messageId={message.id} />
+              ) : null}
+            </div>
+          ) : (
+            <>
+              {emailParts.subject ? (
+                <h3 className="mb-2 text-base font-semibold tracking-tight text-[#202124] dark:text-[#e8eaed]">
+                  {emailParts.subject}
+                </h3>
+              ) : null}
+              <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-[#202124] dark:text-[#e8eaed]">
+                {text}
+              </div>
+            </>
+          )}
+
+          {message.isPending ? (
+            <MessageUploadStatus
+              message={message}
+              isOutgoing={isOutgoing}
+              channel={themeChannel}
+            />
+          ) : null}
+        </article>
+      </div>
+    );
+  }
+
   return (
     <div ref={messageRef} className="flex min-w-0 w-full flex-col gap-2 pb-2">
-      {showUnreadDivider ? (
-        <div
-          ref={firstUnreadRef}
-          className="flex items-center gap-3 py-1"
-          role="separator"
-          aria-label={CHAT_MESSAGES.unreadDivider}
-        >
-          <div className={cn("h-px flex-1", chatUnreadDividerClassName.line)} />
-          <span
-            className={cn(
-              "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-              chatUnreadDividerClassName.pill,
-            )}
-          >
-            {CHAT_MESSAGES.unreadDivider}
-          </span>
-          <div className={cn("h-px flex-1", chatUnreadDividerClassName.line)} />
-        </div>
-      ) : null}
+      {unreadDividerNode}
       <div
         className={cn(
           "group/message flex min-w-0 w-full items-end gap-1",
@@ -405,6 +523,7 @@ function MessageHistoryItem({
               isUnread: isInbox && isUnreadMessage,
               hasMedia: Boolean(media),
               isAudioMessage: isAudioMessage,
+              channel: themeChannel,
             }),
             message.isPending && media && "opacity-80",
           )}
@@ -449,21 +568,18 @@ function MessageHistoryItem({
               ) : null}
             </div>
           ) : (
-            <>
-              {message.channel === "email" && emailParts.subject ? (
-                <p className="mb-1 text-xs font-semibold opacity-90">
-                  {emailParts.subject}
-                </p>
-              ) : null}
-              <ExpandableMessageText
-                text={text}
-                mutedActionClassName={getChatBubbleMutedActionClassName(isOutgoing)}
-              />
-            </>
+            <ExpandableMessageText
+              text={text}
+              mutedActionClassName={getChatBubbleMutedActionClassName(
+                isOutgoing,
+                themeChannel,
+              )}
+            />
           )}
           <MessageUploadStatus
             message={message}
             isOutgoing={isOutgoing}
+            channel={themeChannel}
           />
         </div>
         {canShowMessageActions && !isOutgoing ? (
@@ -488,6 +604,8 @@ const MemoMessageHistoryItem = memo(
     previous.showMessageActions === next.showMessageActions &&
     previous.contactName === next.contactName &&
     previous.contactAvatarUrl === next.contactAvatarUrl &&
+    previous.channel === next.channel &&
+    previous.onEmailReply === next.onEmailReply &&
     previous.onMessageRemoved === next.onMessageRemoved &&
     previous.onMessageUpdated === next.onMessageUpdated &&
     previous.onReadProgress === next.onReadProgress &&
@@ -503,6 +621,7 @@ export const MessageHistory = forwardRef<
     conversationId,
     messages,
     variant = "default",
+    channel = null,
     lastReadAt = null,
     scrollContainerRef,
     firstUnreadRef,
@@ -512,6 +631,7 @@ export const MessageHistory = forwardRef<
     typingContactName = "Customer",
     contactName = typingContactName,
     contactAvatarUrl = null,
+    onEmailReply,
     onMessageRemoved,
     onMessageUpdated,
     hasOlderMessages = false,
@@ -647,8 +767,9 @@ export const MessageHistory = forwardRef<
   }
 
   const scrollAreaClassName = cn(
-    "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-4 sm:py-4",
-    chatPaneClassName,
+    "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto py-3",
+    isEmailChatChannel(channel) ? "px-2 sm:px-3" : "px-3 sm:px-4 sm:py-4",
+    getChatPaneClassName(channel),
     !isScrollAnchored && "invisible",
   );
 
@@ -733,6 +854,8 @@ export const MessageHistory = forwardRef<
                   showMessageActions={showMessageActions}
                   contactName={contactName}
                   contactAvatarUrl={contactAvatarUrl}
+                  channel={channel}
+                  onEmailReply={onEmailReply}
                   onMessageRemoved={onMessageRemoved}
                   onMessageUpdated={onMessageUpdated}
                   onReadProgress={onReadProgress}
@@ -756,6 +879,8 @@ export const MessageHistory = forwardRef<
               showMessageActions={showMessageActions}
               contactName={contactName}
               contactAvatarUrl={contactAvatarUrl}
+              channel={channel}
+              onEmailReply={onEmailReply}
               onMessageRemoved={onMessageRemoved}
               onMessageUpdated={onMessageUpdated}
               onReadProgress={onReadProgress}
@@ -767,15 +892,18 @@ export const MessageHistory = forwardRef<
 
       {isClientTyping && isInbox ? (
         <div className="flex min-w-0 w-full items-end justify-start gap-1">
-          <ContactAvatar
-            name={contactName}
-            avatarUrl={contactAvatarUrl}
-            size="sm"
-            className="mb-0.5 size-7 shrink-0"
-            aria-hidden
-          />
+          {!isEmailChatChannel(channel) ? (
+            <ContactAvatar
+              name={contactName}
+              avatarUrl={contactAvatarUrl}
+              size="sm"
+              className="mb-0.5 size-7 shrink-0"
+              aria-hidden
+            />
+          ) : null}
           <TypingIndicator
             label={CHAT_MESSAGES.customerTyping(typingContactName)}
+            channel={channel}
           />
         </div>
       ) : null}
@@ -784,6 +912,7 @@ export const MessageHistory = forwardRef<
           <TypingIndicator
             label={CHAT_MESSAGES.replyTypingLabel}
             variant="outgoing"
+            channel={channel}
           />
         </div>
       ) : null}

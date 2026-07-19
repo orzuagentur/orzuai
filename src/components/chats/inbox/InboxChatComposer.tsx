@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ImageIcon,
   Loader2Icon,
   MessageSquareQuoteIcon,
   MicIcon,
@@ -37,9 +38,10 @@ import { CANNED_RESPONSES_MESSAGES } from "@/features/canned-responses/constants
 import { CHAT_ATTACHMENT_ACCEPT } from "@/features/chats/chat-attachments";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import {
-  chatComposerFieldClassName,
-  chatComposerShellClassName,
-  chatSendButtonClassName,
+  getChatActionButtonClassName,
+  getChatComposerFieldClassName,
+  getChatComposerShellClassName,
+  getChatSendButtonClassName,
 } from "@/features/chats/chat-theme";
 import { cn } from "@/lib/utils";
 import type { MediaUploadProgress } from "@/hooks/use-send-chat-media";
@@ -51,7 +53,7 @@ const QUICK_EMOJIS = [
   "😉", "🤝", "💯", "⭐", "📎",
 ];
 
-const TEXTAREA_MAX_HEIGHT_PX = 160;
+const TEXTAREA_MAX_HEIGHT_PX = 120;
 
 type PendingAttachment = {
   file: File;
@@ -161,8 +163,10 @@ export function InboxChatComposer({
   const mediaSupported = supportsMediaChannel(channel) && !hideMediaActions;
   const isBusy = isSending;
   const hasPendingAttachment = pendingAttachment !== null;
+  const hasDraft = draft.trim().length > 0;
   const readyToSubmit =
-    canSubmit ?? (canSend && draft.trim().length > 0);
+    canSubmit ?? (canSend && hasDraft);
+  const showMic = mediaSupported && !hasDraft && !hasPendingAttachment;
 
   useEffect(() => {
     setLocalCannedResponses(cannedResponses);
@@ -394,232 +398,227 @@ export function InboxChatComposer({
     }
   }
 
+  const actionBtn = getChatActionButtonClassName(channel);
+
   return (
     <div
-      className={cn("mt-auto shrink-0", chatComposerShellClassName)}
+      className={cn("mt-auto shrink-0", getChatComposerShellClassName(channel))}
       data-inbox-chat-composer
     >
-      <div className="space-y-2 p-3">
-          {!canSend ? (
-            <p className="text-xs text-muted-foreground">{channelNotConnectedMessage}</p>
-          ) : websiteFormsHint ? (
-            <p className="text-xs text-muted-foreground">
-              {CHAT_MESSAGES.websiteFormsReplyHint}
-            </p>
-          ) : null}
+      <div className="space-y-2 px-2 py-2 sm:px-3 sm:py-3">
+        {!canSend ? (
+          <p className="px-1 text-xs text-muted-foreground">
+            {channelNotConnectedMessage}
+          </p>
+        ) : websiteFormsHint ? (
+          <p className="px-1 text-xs text-muted-foreground">
+            {CHAT_MESSAGES.websiteFormsReplyHint}
+          </p>
+        ) : null}
 
-          {isRecording ? (
-            <ComposerRecordingBar
-              elapsedSeconds={recordingElapsed}
-              onStop={stopVoiceRecording}
-            />
-          ) : null}
+        {isRecording ? (
+          <ComposerRecordingBar
+            elapsedSeconds={recordingElapsed}
+            onStop={stopVoiceRecording}
+          />
+        ) : null}
 
-          {pendingAttachment ? (
-            <ComposerAttachmentPreview
-              file={pendingAttachment.file}
-              previewUrl={pendingAttachment.previewUrl}
-              kind={pendingAttachment.kind}
-              durationMs={pendingAttachment.durationMs}
-              caption={mediaCaption}
-              onCaptionChange={setMediaCaption}
-              isSending={isSendingMedia}
-              uploadProgress={mediaUploadProgress?.percent}
-              uploadSpeedBps={mediaUploadProgress?.bytesPerSecond}
-              uploadPhase={mediaUploadProgress?.phase}
-              onCancel={clearPendingAttachment}
-              onSend={() => {
-                void handleSendPendingAttachment();
-              }}
-            />
-          ) : null}
+        {pendingAttachment ? (
+          <ComposerAttachmentPreview
+            file={pendingAttachment.file}
+            previewUrl={pendingAttachment.previewUrl}
+            kind={pendingAttachment.kind}
+            durationMs={pendingAttachment.durationMs}
+            caption={mediaCaption}
+            onCaptionChange={setMediaCaption}
+            isSending={isSendingMedia}
+            uploadProgress={mediaUploadProgress?.percent}
+            uploadSpeedBps={mediaUploadProgress?.bytesPerSecond}
+            uploadPhase={mediaUploadProgress?.phase}
+            onCancel={clearPendingAttachment}
+            onSend={() => {
+              void handleSendPendingAttachment();
+            }}
+          />
+        ) : null}
 
-          <div className="flex items-end gap-2">
-            <div className="flex shrink-0 items-center gap-0.5 pb-1">
+        <div className="flex items-end gap-1.5 sm:gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-9 rounded-full"
-                disabled={isBusy || isRecording || hasPendingAttachment || !contactId}
-                aria-label={CHAT_MESSAGES.contactNotesTitle}
-                title={CHAT_MESSAGES.contactNotesTitle}
-                onClick={() => setNoteDialogOpen(true)}
-              >
-                <StickyNoteIcon className="size-5 text-muted-foreground" />
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 rounded-full"
-                    disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
-                    aria-label={CHAT_MESSAGES.emojiPickerLabel}
-                  >
-                    <SmileIcon className="size-5 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel>{CHAT_MESSAGES.emojiPickerLabel}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <div className="grid grid-cols-5 gap-1 p-2">
-                    {QUICK_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        className="flex size-9 items-center justify-center rounded-md text-lg hover:bg-muted"
-                        onClick={() => insertEmoji(emoji)}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9 rounded-full"
+                className={cn("size-10 shrink-0 rounded-full", actionBtn)}
                 disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
                 aria-label={CHAT_MESSAGES.attachFileLabel}
-                onClick={handleAttachClick}
               >
-                <PaperclipIcon className="size-5 text-muted-foreground" />
+                <PlusIcon className="size-5" />
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept={CHAT_ATTACHMENT_ACCEPT}
-                onChange={handleFileChange}
-              />
-
-              <Button
-                type="button"
-                variant={isRecording ? "destructive" : "ghost"}
-                size="icon"
-                className="size-9 rounded-full"
-                disabled={!canSend || isBusy || hasPendingAttachment}
-                aria-label={CHAT_MESSAGES.voiceMessageLabel}
-                onClick={handleVoiceClick}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Media & tools</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {mediaSupported ? (
+                <DropdownMenuItem
+                  className="gap-2"
+                  disabled={!onSendMedia}
+                  onClick={handleAttachClick}
+                >
+                  <ImageIcon className="size-4" />
+                  {CHAT_MESSAGES.attachFileLabel}
+                </DropdownMenuItem>
+              ) : null}
+              {mediaSupported ? (
+                <DropdownMenuItem
+                  className="gap-2"
+                  disabled={!onSendMedia}
+                  onClick={handleAttachClick}
+                >
+                  <PaperclipIcon className="size-4" />
+                  Document
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={!contactId}
+                onClick={() => setNoteDialogOpen(true)}
               >
-                {isRecording ? (
-                  <SquareIcon className="size-5" />
-                ) : (
-                  <MicIcon className="size-5 text-muted-foreground" />
-                )}
-              </Button>
-
-              <DropdownMenu
-                onOpenChange={(open) => {
-                  if (open) {
-                    onQuickRepliesOpen?.();
-                  }
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 rounded-full"
-                    disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
-                    aria-label={CANNED_RESPONSES_MESSAGES.pickerLabel}
-                  >
-                    <MessageSquareQuoteIcon className="size-5 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-72">
-                  <DropdownMenuLabel>
-                    {CANNED_RESPONSES_MESSAGES.pickerLabel}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {localCannedResponses.length === 0 ? (
-                    <p className="px-2 py-2 text-xs text-muted-foreground">
-                      {CANNED_RESPONSES_MESSAGES.pickerEmpty}
-                    </p>
-                  ) : (
-                    localCannedResponses.map((item) => (
-                      <DropdownMenuItem
-                        key={item.id}
-                        className="flex flex-col items-start gap-0.5"
-                        onClick={() => onDraftChange(item.content)}
-                      >
-                        <span className="font-medium">{item.title}</span>
-                        <span className="line-clamp-2 text-xs text-muted-foreground">
-                          {item.content}
-                        </span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="gap-2 font-medium"
-                    onClick={() => setQuickRepliesManageOpen(true)}
-                  >
-                    <PlusIcon className="size-4" />
-                    {CANNED_RESPONSES_MESSAGES.addButton}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9 rounded-full"
-                disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
-                aria-label={CHAT_MESSAGES.suggestReplyButton}
+                <StickyNoteIcon className="size-4" />
+                {CHAT_MESSAGES.contactNotesTitle}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
                 onClick={onOpenAiSuggest}
               >
-                <SparklesIcon className="size-5 text-muted-foreground" />
-              </Button>
-            </div>
-
-            <div
-              className={cn(
-                "flex min-w-0 flex-1 items-end gap-2 px-3 py-2",
-                chatComposerFieldClassName,
-              )}
-            >
-              <Textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(event) => onDraftChange(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={composerPlaceholder ?? CHAT_MESSAGES.composerPlaceholder}
-                rows={1}
-                disabled={isBusy || !canSend || isRecording}
-                className={cn(
-                  "min-h-[24px] flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 shadow-none outline-none",
-                  "focus-visible:border-0 focus-visible:ring-0",
-                  "dark:bg-transparent dark:disabled:bg-transparent",
-                )}
-                style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
-              />
-              <Button
-                type="button"
-                size="icon"
-                className={cn("size-10 shrink-0 rounded-full", chatSendButtonClassName)}
-                disabled={
-                  isBusy || !readyToSubmit || isRecording || hasPendingAttachment
-                }
-                aria-label={CHAT_MESSAGES.sendLabel}
-                onClick={onSubmit}
+                <SparklesIcon className="size-4" />
+                {CHAT_MESSAGES.suggestReplyButton}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                onClick={() => {
+                  onQuickRepliesOpen?.();
+                  setQuickRepliesManageOpen(true);
+                }}
               >
-                {isBusy ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <SendIcon className="size-4" />
-                )}
-              </Button>
-            </div>
+                <MessageSquareQuoteIcon className="size-4" />
+                {CANNED_RESPONSES_MESSAGES.pickerLabel}
+              </DropdownMenuItem>
+              {localCannedResponses.slice(0, 4).map((item) => (
+                <DropdownMenuItem
+                  key={item.id}
+                  className="flex flex-col items-start gap-0.5 pl-8"
+                  onClick={() => onDraftChange(item.content)}
+                >
+                  <span className="font-medium">{item.title}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept={CHAT_ATTACHMENT_ACCEPT}
+            onChange={handleFileChange}
+          />
+
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-end gap-1 rounded-[1.4rem] px-2.5 py-1.5 sm:gap-1.5 sm:px-3 sm:py-2",
+              getChatComposerFieldClassName(channel),
+            )}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn("size-8 shrink-0 rounded-full", actionBtn)}
+                  disabled={!canSend || isBusy || isRecording || hasPendingAttachment}
+                  aria-label={CHAT_MESSAGES.emojiPickerLabel}
+                >
+                  <SmileIcon className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>{CHAT_MESSAGES.emojiPickerLabel}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="grid grid-cols-5 gap-1 p-2">
+                  {QUICK_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="flex size-9 items-center justify-center rounded-md text-lg hover:bg-muted"
+                      onClick={() => insertEmoji(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={composerPlaceholder ?? CHAT_MESSAGES.composerPlaceholder}
+              rows={1}
+              disabled={isBusy || !canSend || isRecording}
+              className={cn(
+                "min-h-[28px] flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0 py-1.5 text-[15px] shadow-none outline-none",
+                "focus-visible:border-0 focus-visible:ring-0",
+                "dark:bg-transparent dark:disabled:bg-transparent",
+              )}
+              style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
+            />
           </div>
+
+          {showMic || isRecording ? (
+            <Button
+              type="button"
+              variant={isRecording ? "destructive" : "default"}
+              size="icon"
+              className={cn(
+                "size-10 shrink-0 rounded-full",
+                !isRecording && getChatSendButtonClassName(channel),
+              )}
+              disabled={!canSend || isBusy || hasPendingAttachment}
+              aria-label={CHAT_MESSAGES.voiceMessageLabel}
+              onClick={handleVoiceClick}
+            >
+              {isRecording ? (
+                <SquareIcon className="size-4" />
+              ) : (
+                <MicIcon className="size-5" />
+              )}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="icon"
+              className={cn(
+                "size-10 shrink-0 rounded-full",
+                getChatSendButtonClassName(channel),
+              )}
+              disabled={
+                isBusy || !readyToSubmit || isRecording || hasPendingAttachment
+              }
+              aria-label={CHAT_MESSAGES.sendLabel}
+              onClick={onSubmit}
+            >
+              {isBusy ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <SendIcon className="size-4" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       <InboxContactNotesCard

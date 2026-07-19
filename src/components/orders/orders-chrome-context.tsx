@@ -20,6 +20,7 @@ export type OrdersChromeConfig = {
   activeStatus: CrmOrderStatus | "all";
   onStatusChange: (status: CrmOrderStatus | "all") => void;
   onAddOrder: () => void;
+  onOpenFormSettings: () => void;
 };
 
 type OrdersChromeContextValue = {
@@ -45,7 +46,8 @@ export function OrdersChromeProvider({ children }: { children: ReactNode }) {
         prev.onSearchChange === next.onSearchChange &&
         prev.onSearchSubmit === next.onSearchSubmit &&
         prev.onStatusChange === next.onStatusChange &&
-        prev.onAddOrder === next.onAddOrder
+        prev.onAddOrder === next.onAddOrder &&
+        prev.onOpenFormSettings === next.onOpenFormSettings
       ) {
         return prev;
       }
@@ -74,12 +76,14 @@ export function useOrdersChromeRegistration(config: OrdersChromeConfig) {
     onSearchSubmit: config.onSearchSubmit,
     onStatusChange: config.onStatusChange,
     onAddOrder: config.onAddOrder,
+    onOpenFormSettings: config.onOpenFormSettings,
   });
   callbacksRef.current = {
     onSearchChange: config.onSearchChange,
     onSearchSubmit: config.onSearchSubmit,
     onStatusChange: config.onStatusChange,
     onAddOrder: config.onAddOrder,
+    onOpenFormSettings: config.onOpenFormSettings,
   };
 
   useEffect(() => {
@@ -94,6 +98,7 @@ export function useOrdersChromeRegistration(config: OrdersChromeConfig) {
       onSearchSubmit: () => callbacksRef.current.onSearchSubmit(),
       onStatusChange: (status) => callbacksRef.current.onStatusChange(status),
       onAddOrder: () => callbacksRef.current.onAddOrder(),
+      onOpenFormSettings: () => callbacksRef.current.onOpenFormSettings(),
     });
 
     return () => {

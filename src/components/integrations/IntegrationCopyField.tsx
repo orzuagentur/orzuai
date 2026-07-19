@@ -74,7 +74,7 @@ export function IntegrationCopyField({
           onClick={() => void handleCopy()}
         >
           {copied ? (
-            <CheckIcon className="size-4 text-green-600" />
+            <CheckIcon className="size-4 text-zinc-700" />
           ) : (
             <CopyIcon className="size-4" />
           )}

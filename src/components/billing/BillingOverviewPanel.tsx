@@ -82,7 +82,7 @@ export function BillingOverviewPanel({ data }: BillingOverviewPanelProps) {
               className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
             >
               <div className="flex items-center gap-3">
-                <MessageCircleIcon className="size-5 text-emerald-600" />
+                <MessageCircleIcon className="size-5 text-zinc-600" />
                 <div>
                   <p className="font-medium">{BILLING_MESSAGES.whatsappCardTitle}</p>
                   <p className="text-sm text-muted-foreground">

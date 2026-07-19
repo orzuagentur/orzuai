@@ -158,7 +158,7 @@ export function AddContactDialog({
           </div>
 
           {verifiedLabel ? (
-            <p className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+            <p className="rounded-md border border-zinc-500/30 bg-zinc-500/5 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300">
               {verifyMessage ?? CHAT_MESSAGES.addContactVerifySuccess}
               <span className="mt-1 block font-medium">{verifiedLabel}</span>
             </p>

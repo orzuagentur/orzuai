@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Suspense } from "react";
 import type { DashboardUserProfile } from "@/types/dashboard.types";
 
 import { AnalyticsChromeProvider } from "@/components/analytics/analytics-chrome-context";
@@ -11,6 +12,8 @@ import { ContactsChromeProvider } from "@/components/contacts/contacts-chrome-co
 import { OrdersChromeProvider } from "@/components/orders/orders-chrome-context";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
+import { MobileOverflowMenu } from "@/components/dashboard/MobileOverflowMenu";
 import { DashboardNavBadgesProvider } from "@/contexts/dashboard-nav-badges-context";
 import { AiHumanRequestsProvider } from "@/contexts/ai-human-requests-context";
 import { DashboardProfileProvider } from "@/contexts/dashboard-profile-context";
@@ -107,22 +110,33 @@ export function DashboardShell({
                           <PlatformSupportProvider
                             initialUnreadCount={supportUnreadCount}
                           >
-                            <SidebarProvider>
+                            <SidebarProvider
+                              defaultOpen={false}
+                              className="dashboard-workspace text-foreground"
+                            >
                               <AppSidebar
                                 userProfile={userProfile}
                                 googleCalendarConnected={googleCalendarConnected}
                               />
-                              <SidebarInset>
-                                <DashboardHeader />
+                              <SidebarInset className="bg-transparent">
+                                <Suspense
+                                  fallback={
+                                    <header className="glass-header h-14 min-h-14 shrink-0" />
+                                  }
+                                >
+                                  <DashboardHeader />
+                                </Suspense>
                                 <PlatformAnnouncementsBanner
                                   announcements={announcements}
                                 />
                                 <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                                   {children}
                                 </div>
+                                <MobileBottomNav />
                               </SidebarInset>
                             </SidebarProvider>
                             <PlatformCopilotWidget />
+                            <MobileOverflowMenu />
                             <PlatformSupportWidget />
                             {onboardingProgress && !onboardingProgress.isComplete ? (
                               <SetupProgressCard progress={onboardingProgress} />

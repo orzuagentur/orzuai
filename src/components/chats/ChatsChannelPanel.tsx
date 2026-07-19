@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
 
 import { fetchMonitorConversationsAction } from "@/features/chats/actions/fetch-monitor-conversations";
 import {
@@ -17,7 +16,6 @@ import {
   setCachedConversationList,
 } from "@/lib/client-cache/inbox-messenger-cache";
 import { ChatWindow } from "@/components/chats/ChatWindow";
-import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxConversationList } from "@/components/chats/inbox/InboxConversationList";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
@@ -74,9 +72,9 @@ function ChatsChannelPanelContent({
   businessId: initialBusinessId = null,
   channel: initialChannel,
   channelStats: initialChannelStats,
-  visibleChannelIds: initialVisibleChannelIds,
-  voiceInboxEnabled: initialVoiceInboxEnabled = false,
-  smsInboxEnabled: initialSmsInboxEnabled = false,
+  visibleChannelIds: _initialVisibleChannelIds,
+  voiceInboxEnabled: _initialVoiceInboxEnabled = false,
+  smsInboxEnabled: _initialSmsInboxEnabled = false,
   channelConnected: initialChannelConnected,
   aiEnabled: initialAiEnabled,
   conversations: initialConversations,
@@ -98,9 +96,9 @@ function ChatsChannelPanelContent({
   const [channel, setChannel] = useState<MessagingChannel>(
     initialChannel ?? channelId,
   );
-  const [visibleChannelIds, setVisibleChannelIds] = useState<MessagingChannel[]>(
+  const [_visibleChannelIds, setVisibleChannelIds] = useState<MessagingChannel[]>(
     () =>
-      initialVisibleChannelIds ??
+      _initialVisibleChannelIds ??
       initialChannelStats?.map((item) => item.channel) ??
       [],
   );
@@ -216,7 +214,7 @@ function ChatsChannelPanelContent({
 
   const resolvedConversationAiEnabled = aiEnabled ?? channelAiEnabled;
 
-  const { detailsOpen } = useInboxLayout();
+  const { detailsOpen, setMobileDetailsOpen } = useInboxLayout();
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -234,7 +232,7 @@ function ChatsChannelPanelContent({
     setBusinessId(initialBusinessId);
     setChannel(initialChannel ?? channelId);
     setVisibleChannelIds(
-      initialVisibleChannelIds ??
+      _initialVisibleChannelIds ??
         initialChannelStats?.map((item) => item.channel) ??
         [],
     );
@@ -259,13 +257,13 @@ function ChatsChannelPanelContent({
     initialChannel,
     initialChannelConnected,
     initialChannelStats,
-    initialVisibleChannelIds,
+    _initialVisibleChannelIds,
     initialConversations,
     initialHasBusiness,
     initialBusinessId,
   ]);
 
-  const unreadByChannel = useMemo(
+  const _unreadByChannel = useMemo(
     () => countUnreadByChannel(conversations),
     [conversations],
   );
@@ -339,15 +337,6 @@ function ChatsChannelPanelContent({
     <InboxShell
       showChatOnMobile={showChatOnMobile}
       showRightColumn={detailsOpen || suggestReplyOpen}
-      channelTabs={
-        <InboxChannelTabs
-          activeChannel={channelId}
-          unreadByChannel={unreadByChannel}
-          visibleChannelIds={visibleChannelIds}
-          voiceInboxEnabled={initialVoiceInboxEnabled}
-          smsInboxEnabled={initialSmsInboxEnabled}
-        />
-      }
       listColumn={
         <InboxConversationList
           conversations={conversations}
@@ -364,20 +353,6 @@ function ChatsChannelPanelContent({
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">
-          {showChatOnMobile ? (
-            <div className="shrink-0 border-b px-3 py-2 lg:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={() => handleConversationSelect(null)}
-              >
-                <ArrowLeftIcon className="size-4" />
-                {CHAT_MESSAGES.pageTitle}
-              </Button>
-            </div>
-          ) : null}
-
           <ChatWindow
             conversation={activeConversation}
             isClientTyping={isClientTyping}
@@ -408,6 +383,11 @@ function ChatsChannelPanelContent({
             className="min-h-0 min-w-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
+            onBack={
+              showChatOnMobile
+                ? () => handleConversationSelect(null)
+                : undefined
+            }
             onOptimisticMessage={appendMessage}
             onMessageSent={(message, pendingId) => {
               if (pendingId) {
@@ -438,11 +418,20 @@ function ChatsChannelPanelContent({
           <AiSuggestReplyPanel
             conversationId={activeConversation.id}
             open
-            onOpenChange={setSuggestReplyOpen}
+            onOpenChange={(open) => {
+              setSuggestReplyOpen(open);
+              if (!open) {
+                setMobileDetailsOpen(false);
+              }
+            }}
             onUseSuggestion={setDraft}
           />
         ) : (
-          <InboxDetailsPanel conversation={activeConversation} />
+          <InboxDetailsPanel
+            conversation={activeConversation}
+            onClose={() => setMobileDetailsOpen(false)}
+            showCloseButton
+          />
         )
       }
     />

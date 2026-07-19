@@ -1,21 +1,118 @@
 import { cn } from "@/lib/utils";
 
-/** WhatsApp / Telegram inspired styling — chat column only (messages + header + composer). */
+import type { MessagingChannel } from "@/types/database.types";
 
-export const chatPaneClassName =
-  "bg-[#e8ece9] dark:bg-[#1c252e] [background-image:radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.022)_1px,transparent_0)] [background-size:20px_20px] dark:[background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.018)_1px,transparent_0)]";
+type ChatThemeId = "whatsapp" | "email";
 
-export const chatHeaderClassName =
-  "border-b border-black/[0.06] bg-[#f3f4f6] dark:border-white/[0.08] dark:bg-[#252f38]";
+/**
+ * All messenger channels share the WhatsApp-style chat chrome.
+ * Email keeps a mail-thread layout.
+ */
+function resolveThemeId(channel?: MessagingChannel | null): ChatThemeId {
+  return channel === "email" ? "email" : "whatsapp";
+}
 
-export const chatComposerShellClassName =
-  "border-t border-black/[0.06] bg-[#f3f4f6] dark:border-white/[0.08] dark:bg-[#252f38]";
+const WHATSAPP = {
+  pane: "bg-[#e7ddd2]",
+  header: "border-b border-[#d1c7bb] bg-[#f0f2f5]",
+  composer: "border-t border-[#d1c7bb] bg-[#f0f2f5]",
+  field: "rounded-2xl border border-black/5 bg-white shadow-sm",
+  send: "bg-[#00a884] text-white hover:bg-[#008f72]",
+  outgoing: "rounded-tr-md bg-[#d9fdd3] text-[#111b21]",
+  incoming: "rounded-tl-md bg-white text-[#111b21]",
+  meta: "text-[#667781]",
+  accent: "#00a884",
+  unreadRing: "ring-[#00a884]/35 ring-offset-[#e7ddd2]",
+} as const;
 
-export const chatComposerFieldClassName =
-  "rounded-2xl border border-black/[0.06] bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#303d47]";
+const EMAIL = {
+  pane: "bg-[#f6f8fc]",
+  header: "border-b border-[#e0e3e8] bg-white",
+  composer: "border-t border-[#e0e3e8] bg-white",
+  field: "rounded-md border border-[#dadce0] bg-white",
+  send: "bg-[#1a73e8] text-white hover:bg-[#1765cc]",
+  outgoing: "rounded-md border border-[#e0e3e8] bg-[#e8f0fe] text-[#202124]",
+  incoming: "rounded-md border border-[#e0e3e8] bg-white text-[#202124]",
+  meta: "text-[#5f6368]",
+  accent: "#1a73e8",
+  unreadRing: "ring-[#1a73e8]/25 ring-offset-[#f6f8fc]",
+} as const;
 
-export const chatSendButtonClassName =
-  "bg-[#00a884] text-white hover:bg-[#008f72] dark:bg-[#2aab8e] dark:hover:bg-[#34b896]";
+const THEMES = {
+  whatsapp: WHATSAPP,
+  email: EMAIL,
+} as const;
+
+function theme(channel?: MessagingChannel | null) {
+  return THEMES[resolveThemeId(channel)];
+}
+
+export function getChatPaneClassName(channel?: MessagingChannel | null): string {
+  const t = theme(channel);
+  if (resolveThemeId(channel) === "email") {
+    return t.pane;
+  }
+  return cn(
+    t.pane,
+    "[background-image:radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.035)_1px,transparent_0)] [background-size:18px_18px]",
+  );
+}
+
+/** @deprecated Prefer getChatPaneClassName(channel) */
+export const chatPaneClassName = getChatPaneClassName("whatsapp");
+
+export function getChatHeaderClassName(channel?: MessagingChannel | null): string {
+  return theme(channel).header;
+}
+
+/** @deprecated Prefer getChatHeaderClassName(channel) */
+export const chatHeaderClassName = getChatHeaderClassName("whatsapp");
+
+export function getChatComposerShellClassName(
+  channel?: MessagingChannel | null,
+): string {
+  return theme(channel).composer;
+}
+
+/** @deprecated Prefer getChatComposerShellClassName(channel) */
+export const chatComposerShellClassName = getChatComposerShellClassName("whatsapp");
+
+export function getChatComposerFieldClassName(
+  channel?: MessagingChannel | null,
+): string {
+  return theme(channel).field;
+}
+
+/** @deprecated Prefer getChatComposerFieldClassName(channel) */
+export const chatComposerFieldClassName = getChatComposerFieldClassName("whatsapp");
+
+export function getChatSendButtonClassName(
+  channel?: MessagingChannel | null,
+): string {
+  return theme(channel).send;
+}
+
+/** @deprecated Prefer getChatSendButtonClassName(channel) */
+export const chatSendButtonClassName = getChatSendButtonClassName("whatsapp");
+
+/** Unified readable icon buttons in chat header / composer (WhatsApp-style). */
+export function getChatActionButtonClassName(
+  channel?: MessagingChannel | null,
+): string {
+  if (resolveThemeId(channel) === "email") {
+    return "size-9 rounded-full text-[#5f6368] hover:bg-black/[0.06] hover:text-[#202124]";
+  }
+  return "size-9 rounded-full text-[#54656f] hover:bg-black/[0.06] hover:text-[#111b21]";
+}
+
+export function getChatHeaderActionButtonClassName(
+  channel?: MessagingChannel | null,
+): string {
+  if (resolveThemeId(channel) === "email") {
+    return "size-8 rounded-full text-[#5f6368] hover:bg-black/[0.06] hover:text-[#202124]";
+  }
+  return "size-8 rounded-full text-[#54656f] hover:bg-black/[0.06] hover:text-[#111b21]";
+}
 
 export function getChatBubbleClassName(input: {
   isOutgoing: boolean;
@@ -23,108 +120,148 @@ export function getChatBubbleClassName(input: {
   isUnread?: boolean;
   hasMedia?: boolean;
   isAudioMessage?: boolean;
+  channel?: MessagingChannel | null;
 }): string {
-  const { isOutgoing, isDeleted, isUnread, hasMedia, isAudioMessage } = input;
+  const {
+    isOutgoing,
+    isDeleted,
+    isUnread,
+    hasMedia,
+    isAudioMessage,
+    channel,
+  } = input;
+  const t = theme(channel);
+  const isEmail = resolveThemeId(channel) === "email";
 
   return cn(
-    "max-w-[min(85%,28rem)] min-w-0 shrink text-sm shadow-[0_1px_0.5px_rgba(11,20,26,0.1)] dark:shadow-[0_1px_0.5px_rgba(0,0,0,0.28)]",
+    isEmail
+      ? "w-full min-w-0 max-w-none text-[15px] leading-relaxed shadow-sm"
+      : "max-w-[min(85%,28rem)] min-w-0 shrink text-sm shadow-[0_1px_0.5px_rgba(11,20,26,0.1)]",
     hasMedia
       ? isAudioMessage
         ? "rounded-2xl px-2 py-1"
-        : "rounded-2xl px-1.5 py-1.5"
-      : "rounded-2xl px-3 py-2",
+        : isEmail
+          ? "rounded-md px-3 py-3"
+          : "rounded-2xl px-1.5 py-1.5"
+      : isEmail
+        ? "px-4 py-3"
+        : "rounded-2xl px-3 py-2",
     isDeleted
-      ? "border border-dashed border-black/10 bg-white/80 text-muted-foreground dark:border-white/12 dark:bg-[#2e3b45]/85"
+      ? "border border-dashed border-black/10 bg-white/80 text-muted-foreground"
       : isOutgoing
-        ? "rounded-tr-md bg-[#d4edd0] text-[#243028] dark:bg-[#1f6656] dark:text-[#e8f0ee]"
-        : "rounded-tl-md bg-[#f6f7f7] text-[#243028] dark:bg-[#2e3b45] dark:text-[#e8ecef]",
+        ? t.outgoing
+        : t.incoming,
     isUnread &&
       !isDeleted &&
       !isOutgoing &&
-      "ring-2 ring-[#00a884]/30 ring-offset-2 ring-offset-[#e8ece9] dark:ring-[#2aab8e]/40 dark:ring-offset-[#1c252e]",
+      cn("ring-2 ring-offset-2", t.unreadRing),
   );
 }
 
-export function getChatBubbleMetaClassName(isOutgoing: boolean): string {
+export function getChatBubbleMetaClassName(
+  _isOutgoing: boolean,
+  channel?: MessagingChannel | null,
+): string {
   return cn(
     "mt-1 flex items-center justify-end gap-1 text-[10px]",
-    isOutgoing
-      ? "text-[#5f6f78] dark:text-[#9ab5ad]"
-      : "text-[#5f6f78] dark:text-[#8b9aa6]",
+    theme(channel).meta,
   );
 }
 
-export function getChatBubbleMutedActionClassName(isOutgoing: boolean): string {
-  return isOutgoing
-    ? "text-[#5f6f78] hover:text-[#3b4a54] dark:text-[#9ab5ad] dark:hover:text-[#c8ddd8]"
-    : "text-[#5f6f78] dark:text-[#8b9aa6]";
+export function getChatBubbleMutedActionClassName(
+  isOutgoing: boolean,
+  channel?: MessagingChannel | null,
+): string {
+  return getChatBubbleMetaClassName(isOutgoing, channel);
 }
 
-export function getChatTypingBubbleClassName(variant: "incoming" | "outgoing"): string {
+export function getChatTypingBubbleClassName(
+  variant: "incoming" | "outgoing",
+  channel?: MessagingChannel | null,
+): string {
+  const t = theme(channel);
   return cn(
-    "inline-flex max-w-[min(85%,20rem)] items-center gap-2 rounded-2xl px-3 py-2 text-xs shadow-[0_1px_0.5px_rgba(11,20,26,0.1)] dark:shadow-[0_1px_0.5px_rgba(0,0,0,0.28)]",
-    variant === "outgoing"
-      ? "rounded-tr-md bg-[#d4edd0] text-[#5f6f78] dark:bg-[#1f6656] dark:text-[#9ab5ad]"
-      : "rounded-tl-md bg-[#f6f7f7] text-[#5f6f78] dark:bg-[#2e3b45] dark:text-[#8b9aa6]",
+    "inline-flex max-w-[min(85%,20rem)] items-center gap-2 rounded-2xl px-3 py-2 text-xs shadow-sm",
+    variant === "outgoing" ? t.outgoing : t.incoming,
+    "opacity-90",
   );
 }
 
-export function getChatMediaShellClassName(isOutgoing: boolean): string {
+export function getChatMediaShellClassName(
+  isOutgoing: boolean,
+  _channel?: MessagingChannel | null,
+): string {
   return isOutgoing
-    ? "bg-[#c8e6c3] text-[#243028] dark:bg-[#1a5a4c] dark:text-[#e8f0ee]"
-    : "bg-black/[0.04] text-[#5f6f78] dark:bg-black/15 dark:text-[#8b9aa6]";
+    ? "bg-black/5 text-inherit"
+    : "bg-black/[0.04] text-inherit";
 }
 
-export function getChatMediaPanelClassName(isOutgoing: boolean): string {
-  return isOutgoing
-    ? "bg-[#bddfb8] dark:bg-[#185448]"
-    : "bg-[#f6f7f7] dark:bg-[#303d47]";
+export function getChatMediaPanelClassName(
+  isOutgoing: boolean,
+  _channel?: MessagingChannel | null,
+): string {
+  return isOutgoing ? "bg-black/5" : "bg-black/[0.03]";
 }
 
-export function getChatMediaCardClassName(isOutgoing: boolean): string {
+export function getChatMediaCardClassName(
+  isOutgoing: boolean,
+  _channel?: MessagingChannel | null,
+): string {
   return cn(
-    "overflow-hidden rounded-xl border",
-    isOutgoing
-      ? "border-[#a8d4a0]/70 bg-[#c8e6c3]/55 dark:border-[#2aab8e]/22 dark:bg-[#1a5a4c]/65"
-      : "border-black/[0.06] bg-[#f6f7f7] dark:border-white/[0.08] dark:bg-[#2e3b45]",
+    "overflow-hidden rounded-xl border border-black/10",
+    isOutgoing ? "bg-black/5" : "bg-white/80",
   );
 }
 
-export function getChatMessageActionHoverClassName(isOutgoing: boolean): string {
-  return isOutgoing
-    ? "text-[#5f6f78] hover:bg-[#bddfb8] dark:text-[#9ab5ad] dark:hover:bg-[#185448]"
-    : "";
+export function getChatMessageActionHoverClassName(
+  isOutgoing: boolean,
+): string {
+  return isOutgoing ? "text-[#5f6f78] hover:bg-black/5" : "";
 }
 
 export function getChatVoicePlayerClasses(isOutgoing: boolean) {
   return {
-    bar: isOutgoing
-      ? "bg-[#243028]/65 dark:bg-white/80"
-      : "bg-foreground/65",
-    barMuted: isOutgoing
-      ? "bg-[#243028]/22 dark:bg-white/28"
-      : "bg-foreground/18",
+    bar: isOutgoing ? "bg-current/65" : "bg-foreground/65",
+    barMuted: isOutgoing ? "bg-current/22" : "bg-foreground/18",
     button: isOutgoing
-      ? "bg-[#243028]/10 text-[#243028] hover:bg-[#243028]/14 dark:bg-white/18 dark:text-white dark:hover:bg-white/26"
+      ? "bg-current/10 text-current hover:bg-current/14"
       : "bg-foreground/10 text-foreground hover:bg-foreground/14",
-    duration: isOutgoing
-      ? "text-[#5f6f78] dark:text-[#9ab5ad]"
-      : "text-[#5f6f78] dark:text-[#8b9aa6]",
+    duration: "text-current/70",
   };
 }
 
-export function getChatMediaDownloadButtonClassName(isOutgoing: boolean): string {
+export function getChatMediaDownloadButtonClassName(
+  isOutgoing: boolean,
+): string {
   return isOutgoing
-    ? "bg-[#00a884]/14 text-[#243028] hover:bg-[#00a884]/22 dark:bg-white/14 dark:text-white dark:hover:bg-white/22"
-    : "bg-white hover:bg-black/[0.04] dark:bg-[#303d47] dark:hover:bg-[#384752]";
+    ? "bg-black/10 text-inherit hover:bg-black/15"
+    : "bg-white hover:bg-black/[0.04]";
 }
 
-export const chatUnreadDividerClassName = {
-  line: "bg-[#00a884]/28 dark:bg-[#2aab8e]/38",
-  pill: "border-[#00a884]/25 bg-[#00a884]/8 text-[#008f72] dark:border-[#2aab8e]/35 dark:bg-[#2aab8e]/12 dark:text-[#5ec9a8]",
-};
+export function getChatUnreadDividerClassName(
+  channel?: MessagingChannel | null,
+) {
+  if (resolveThemeId(channel) === "email") {
+    return {
+      line: "bg-[#1a73e8]/30",
+      pill: "border-[#1a73e8]/25 bg-white text-[#202124]",
+    };
+  }
+  return {
+    line: "bg-[#00a884]/28",
+    pill: "border-[#00a884]/25 bg-[#00a884]/8 text-[#008f72]",
+  };
+}
 
-export const chatAccentProgressClassName = "bg-[#00a884] dark:bg-[#2aab8e]";
+export const chatUnreadDividerClassName = getChatUnreadDividerClassName("whatsapp");
+
+export const chatAccentProgressClassName = "bg-[#00a884]";
 
 export const chatMicIconShellClassName =
-  "bg-[#00a884]/12 text-[#008f72] dark:bg-[#2aab8e]/18 dark:text-[#5ec9a8]";
+  "bg-[#00a884]/12 text-[#008f72]";
+
+export function isEmailChatChannel(
+  channel?: MessagingChannel | null,
+): boolean {
+  return channel === "email";
+}

@@ -8,31 +8,41 @@ import { getLandingArchitecture } from "@/features/landing/live-copy";
 import {
   getLandingCopy,
   resolveLandingLocale,
+  type LandingCopy,
   type LandingLocale,
 } from "@/features/landing/i18n";
 
 type LandingLocaleContextValue = {
   locale: LandingLocale;
-  copy: ReturnType<typeof getLandingCopy>;
+  copy: LandingCopy;
   architecture: ReturnType<typeof getLandingArchitecture>;
 };
 
 const LandingLocaleContext = createContext<LandingLocaleContextValue | null>(null);
 
-export function LandingLocaleProvider({ children }: { children: ReactNode }) {
+type LandingLocaleProviderProps = {
+  children: ReactNode;
+  /** Server-merged CMS overrides for the active locale. */
+  copyOverride?: LandingCopy | null;
+};
+
+export function LandingLocaleProvider({
+  children,
+  copyOverride = null,
+}: LandingLocaleProviderProps) {
   const searchParams = useSearchParams();
   const locale = resolveLandingLocale(searchParams.get("lang"));
 
   useDocumentLang(searchParams.get("lang"));
 
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    const copy = copyOverride ?? getLandingCopy(locale);
+    return {
       locale,
-      copy: getLandingCopy(locale),
-      architecture: getLandingArchitecture(locale),
-    }),
-    [locale],
-  );
+      copy,
+      architecture: copy.architecture,
+    };
+  }, [locale, copyOverride]);
 
   return (
     <LandingLocaleContext.Provider value={value}>{children}</LandingLocaleContext.Provider>

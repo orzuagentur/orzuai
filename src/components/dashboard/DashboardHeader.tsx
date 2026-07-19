@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { InboxToolbar } from "@/components/chats/inbox/InboxToolbar";
 import { AiAssistantToolbar } from "@/components/ai-assistant/AiAssistantToolbar";
@@ -13,10 +13,12 @@ import { useOptionalContactsChrome } from "@/components/contacts/contacts-chrome
 import { useOptionalInboxChrome } from "@/components/chats/inbox/use-optional-inbox-chrome";
 import { OrdersToolbar } from "@/components/orders/OrdersToolbar";
 import { useOptionalOrdersChrome } from "@/components/orders/orders-chrome-context";
+import { AiHumanRequestsButton } from "@/components/dashboard/AiHumanRequestsButton";
 import { DashboardPageHeading } from "@/components/dashboard/DashboardPageHeading";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { MobileAccountMenu } from "@/components/dashboard/MobileAccountMenu";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { getDashboardPageHeaderMeta } from "@/features/dashboard/page-header-meta";
+import { cn } from "@/lib/utils";
 
 function isInboxPath(pathname: string): boolean {
   return (
@@ -49,6 +51,7 @@ function isOrdersPath(pathname: string): boolean {
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const pageMeta = getDashboardPageHeaderMeta(pathname);
   const inboxChrome = useOptionalInboxChrome();
   const contactsChrome = useOptionalContactsChrome();
@@ -63,51 +66,79 @@ export function DashboardHeader() {
   const showCalendarToolbar =
     isCalendarPath(pathname) && calendarChrome !== null;
   const showOrdersToolbar = isOrdersPath(pathname) && ordersChrome !== null;
-  const compactHeading =
-    showInboxToolbar ||
-    showContactsToolbar ||
-    showAiAssistantToolbar ||
-    showCalendarToolbar ||
-    showOrdersToolbar;
+  const conversationOpen = Boolean(searchParams.get("conversation")?.trim());
+  const contactOpen = Boolean(searchParams.get("contact")?.trim());
+  const hideChromeOnMobileThread =
+    (isInboxPath(pathname) && conversationOpen) ||
+    (isContactsPath(pathname) && contactOpen);
+  const isHome = pathname === DASHBOARD_ROUTES.overview;
+  /** Mobile: top chrome only on Home (notifications + account). Other sections fill to the top. */
+  const showOnMobile = isHome;
 
   return (
-    <header className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b px-3 sm:gap-3 sm:px-4">
-      <SidebarTrigger className="-ml-1 shrink-0 md:hidden" />
-
+    <header
+      className={cn(
+        "glass-header shrink-0 items-center gap-2 px-3 sm:gap-3 sm:px-4",
+        showOnMobile ? "flex h-14 min-h-14" : "hidden h-14 min-h-14 md:flex",
+        hideChromeOnMobileThread && "max-md:hidden",
+      )}
+      data-dashboard-header={showOnMobile || undefined}
+      data-mobile-header={showOnMobile ? "home" : "hidden"}
+    >
       {showCalendarToolbar && calendarChrome ? (
         <CalendarToolbar chrome={calendarChrome} />
+      ) : showContactsToolbar && contactsChrome ? (
+        <div
+          className={cn(
+            "min-w-0 flex-1 items-center gap-2 sm:gap-3",
+            hideChromeOnMobileThread ? "hidden lg:flex" : "flex",
+          )}
+        >
+          <ContactsToolbar
+            {...contactsChrome}
+            className="min-w-0 justify-start sm:max-w-md md:max-w-lg"
+          />
+          <CrmEntityTabs
+            activeTab={contactsChrome.activeTab}
+            listData={contactsChrome.crmListData}
+            dealsData={contactsChrome.crmDealsData}
+            variant="header"
+            className="shrink-0"
+          />
+        </div>
       ) : pageMeta ? (
         <>
-          <DashboardPageHeading title={pageMeta.title} compact={compactHeading} />
+          {!showInboxToolbar &&
+          !showAiAssistantToolbar &&
+          !showOrdersToolbar ? (
+            <DashboardPageHeading
+              title={pageMeta.title}
+              className={cn(
+                "min-w-0 truncate",
+                hideChromeOnMobileThread && "hidden lg:block",
+              )}
+            />
+          ) : null}
 
           {showInboxToolbar && inboxChrome ? (
-            <div className="min-w-0 flex-1">
-              <InboxToolbar {...inboxChrome} className="justify-end" />
-            </div>
-          ) : showContactsToolbar && contactsChrome ? (
-            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-              <CrmEntityTabs
-                activeTab={contactsChrome.activeTab}
-                listData={contactsChrome.crmListData}
-                dealsData={contactsChrome.crmDealsData}
-                variant="header"
-                className="ml-3 shrink-0 sm:ml-6 md:ml-10"
-              />
-              <ContactsToolbar
-                {...contactsChrome}
-                className="min-w-0 flex-1 justify-end"
-              />
+            <div
+              className={cn(
+                "min-w-0 flex-1",
+                hideChromeOnMobileThread && "hidden lg:block",
+              )}
+            >
+              <InboxToolbar {...inboxChrome} className="justify-start" />
             </div>
           ) : showAiAssistantToolbar && aiAssistantChrome ? (
             <div className="min-w-0 flex-1">
               <AiAssistantToolbar
                 {...aiAssistantChrome}
-                className="justify-end"
+                className="justify-start"
               />
             </div>
           ) : showOrdersToolbar && ordersChrome ? (
             <div className="min-w-0 flex-1">
-              <OrdersToolbar {...ordersChrome} className="justify-end" />
+              <OrdersToolbar {...ordersChrome} className="justify-start" />
             </div>
           ) : (
             <div className="min-w-0 flex-1" />
@@ -116,6 +147,13 @@ export function DashboardHeader() {
       ) : (
         <div className="flex-1" />
       )}
+
+      {isHome ? (
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 md:hidden">
+          <AiHumanRequestsButton variant="icon" />
+          <MobileAccountMenu />
+        </div>
+      ) : null}
     </header>
   );
 }

@@ -13,6 +13,7 @@ import {
 
 import type { ChatInboxFilter } from "@/features/chats/constants";
 import type { MessagingChannel } from "@/types/database.types";
+import type { InboxChannelTabId } from "@/components/chats/inbox/InboxChannelTabs";
 
 export type InboxChromeConfig = {
   searchQuery: string;
@@ -22,6 +23,11 @@ export type InboxChromeConfig = {
   aiChannel: MessagingChannel | null;
   aiEnabled: boolean | null;
   onAiToggle?: () => void;
+  channelTab?: InboxChannelTabId;
+  onChannelTabChange?: (tab: InboxChannelTabId) => void;
+  visibleChannelIds?: MessagingChannel[];
+  unreadByChannel?: Partial<Record<MessagingChannel, number>>;
+  smsInboxEnabled?: boolean;
 };
 
 type InboxChromeContextValue = {
@@ -36,7 +42,13 @@ function chromePrimitivesEqual(a: InboxChromeConfig, b: InboxChromeConfig): bool
     a.searchQuery === b.searchQuery &&
     a.activeFilter === b.activeFilter &&
     a.aiChannel === b.aiChannel &&
-    a.aiEnabled === b.aiEnabled
+    a.aiEnabled === b.aiEnabled &&
+    a.channelTab === b.channelTab &&
+    a.smsInboxEnabled === b.smsInboxEnabled &&
+    JSON.stringify(a.visibleChannelIds ?? []) ===
+      JSON.stringify(b.visibleChannelIds ?? []) &&
+    JSON.stringify(a.unreadByChannel ?? {}) ===
+      JSON.stringify(b.unreadByChannel ?? {})
   );
 }
 
@@ -60,7 +72,8 @@ export function InboxChromeProvider({ children }: { children: ReactNode }) {
       if (
         prev.onSearchChange !== next.onSearchChange ||
         prev.onFilterChange !== next.onFilterChange ||
-        prev.onAiToggle !== next.onAiToggle
+        prev.onAiToggle !== next.onAiToggle ||
+        prev.onChannelTabChange !== next.onChannelTabChange
       ) {
         return next;
       }
@@ -110,9 +123,14 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
   const activeFilter = config?.activeFilter ?? "all";
   const aiChannel = config?.aiChannel ?? null;
   const aiEnabled = config?.aiEnabled ?? null;
+  const channelTab = config?.channelTab ?? "all";
+  const visibleChannelIds = config?.visibleChannelIds;
+  const unreadByChannel = config?.unreadByChannel;
+  const smsInboxEnabled = config?.smsInboxEnabled ?? false;
   const onSearchChange = config?.onSearchChange;
   const onFilterChange = config?.onFilterChange;
   const onAiToggle = config?.onAiToggle;
+  const onChannelTabChange = config?.onChannelTabChange;
 
   useEffect(() => {
     const setChrome = setChromeRef.current;
@@ -134,6 +152,11 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
       aiChannel,
       aiEnabled,
       onAiToggle,
+      channelTab,
+      onChannelTabChange,
+      visibleChannelIds,
+      unreadByChannel,
+      smsInboxEnabled,
     });
 
     return () => {
@@ -145,8 +168,13 @@ export function useInboxChromeRegistration(config: InboxChromeConfig | null) {
     activeFilter,
     aiChannel,
     aiEnabled,
+    channelTab,
+    visibleChannelIds,
+    unreadByChannel,
+    smsInboxEnabled,
     onSearchChange,
     onFilterChange,
     onAiToggle,
+    onChannelTabChange,
   ]);
 }

@@ -14,7 +14,13 @@ export type AnalyticsChartPoint = {
   segments: AnalyticsChartSegment[];
 };
 
-export type AnalyticsSeriesMetric = "messages" | "clients" | "deals" | "calls";
+export type AnalyticsSeriesMetric =
+  | "messages"
+  | "clients"
+  | "deals"
+  | "calls"
+  | "orders";
+
 
 export type AnalyticsCallSeriesKey =
   | "ai"

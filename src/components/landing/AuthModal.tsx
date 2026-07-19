@@ -40,7 +40,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border/70 bg-card/95 shadow-[0_28px_90px_rgba(18,60,53,0.18)] sm:max-w-md">
         <DialogHeader className="text-center sm:text-left">
           <DialogTitle>{copy.auth.modalTitle}</DialogTitle>
           <DialogDescription>{copy.auth.modalDescription}</DialogDescription>
@@ -48,7 +48,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
         <div className="space-y-6">
           <div
-            className="grid grid-cols-2 rounded-lg bg-muted p-1"
+            className="grid grid-cols-2 rounded-lg border border-border/70 bg-muted/70 p-1"
             role="tablist"
             aria-label="Authentication mode"
           >
@@ -82,7 +82,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">
               {copy.auth.orEmail}
             </span>
             <Separator className="flex-1" />

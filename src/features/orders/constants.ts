@@ -33,10 +33,32 @@ export const ORDERS_MESSAGES = {
   noContact: "No contact",
   searchPlaceholder: "Search orders…",
   filtersLabel: "Filters",
+  formSettingsLabel: "Order form settings",
+  formSettingsTitle: "Configure order form",
+  formSettingsDescription:
+    "Choose which fields appear when creating an order. Add ready-made options for services, prices, and custom fields. Mark fields as required for managers and AI.",
+  formSettingsSave: "Save settings",
+  formSettingsSaved: "Order form settings saved.",
+  formSettingsFailed: "Unable to save order form settings.",
+  formAddBuiltin: "Add ready-made field",
+  formAddCustom: "Add custom field",
+  formEnabled: "Show",
+  formRequired: "Required",
+  formCustomLabel: "Custom field label",
+  formOptionsLabel: "Ready-made options",
+  formOptionsHint: "Managers and AI can pick from these variants.",
+  formOptionPlaceholder: "Add an option…",
+  formAddOption: "Add",
+  formImportFromKbServices: "Import services from Knowledge",
+  formImportFromKbPrices: "Import prices from Knowledge",
+  formImportEmpty: "Nothing found in Knowledge Base.",
+  formAtLeastOne: "Fill at least one field to create an order.",
+  formSelectOption: "Select…",
+  formOrTypeCustom: "Or type a custom value",
   addOrder: "Add order",
   createTitle: "Add order",
   createDescription:
-    "Create a customer request or order. Use Calendar for appointments and bookings.",
+    "Create a customer request or order. Fill any field — only configured required fields are mandatory.",
   customerNameLabel: "Customer name",
   phoneLabel: "Phone",
   emailLabel: "Email",
@@ -69,6 +91,10 @@ export const ORDERS_MESSAGES = {
   closeDetail: "Close",
   notSpecified: "—",
 } as const;
+
+export function formatOrderFormImportSuccess(count: number): string {
+  return `Imported ${count} option${count === 1 ? "" : "s"} from Knowledge.`;
+}
 
 export function getOrderStatusLabel(
   status: "new" | "in_progress" | "done" | "cancelled",

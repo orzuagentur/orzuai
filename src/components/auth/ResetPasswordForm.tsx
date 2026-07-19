@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
+import { PasswordInput } from "@/components/auth/PasswordInput";
+import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PASSWORD_MIN_LENGTH } from "@/features/auth/constants";
 import { usePasswordReset } from "@/hooks/use-password-reset";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ type FormErrors = {
 
 export function ResetPasswordForm({ className }: ResetPasswordFormProps) {
   const [errors, setErrors] = useState<FormErrors>({});
+  const [password, setPassword] = useState("");
   const { resetPassword, isLoading } = usePasswordReset();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -28,10 +29,13 @@ export function ResetPasswordForm({ className }: ResetPasswordFormProps) {
     setErrors({});
 
     const formData = new FormData(event.currentTarget);
-    const password = String(formData.get("password") ?? "");
+    const nextPassword = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-    const result = await resetPassword({ password, confirmPassword });
+    const result = await resetPassword({
+      password: nextPassword,
+      confirmPassword,
+    });
 
     if (!result.success && result.error.code === "VALIDATION_ERROR") {
       const message = result.error.message.toLowerCase();
@@ -60,15 +64,17 @@ export function ResetPasswordForm({ className }: ResetPasswordFormProps) {
     >
       <div className="space-y-2">
         <Label htmlFor="reset-password">New password</Label>
-        <Input
+        <PasswordInput
           id="reset-password"
           name="password"
-          type="password"
           autoComplete="new-password"
-          placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
+          placeholder="5 letters · 3 symbols · 2 digits"
           disabled={isLoading}
           aria-invalid={Boolean(errors.password)}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
         />
+        <PasswordStrengthMeter password={password} />
         {errors.password ? (
           <p className="text-sm text-destructive">{errors.password}</p>
         ) : null}
@@ -76,10 +82,9 @@ export function ResetPasswordForm({ className }: ResetPasswordFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="reset-confirm-password">Confirm new password</Label>
-        <Input
+        <PasswordInput
           id="reset-confirm-password"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           placeholder="Repeat your new password"
           disabled={isLoading}

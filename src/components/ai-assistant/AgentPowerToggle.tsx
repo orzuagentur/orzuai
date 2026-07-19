@@ -27,8 +27,8 @@ export function AgentPowerToggle({
       className={cn(
         "relative inline-flex h-8 w-[4.25rem] shrink-0 items-center rounded-full border-2 transition-colors",
         enabled
-          ? "border-emerald-500 bg-emerald-500"
-          : "border-neutral-900 bg-neutral-900",
+          ? "border-zinc-900 bg-zinc-900"
+          : "border-zinc-300 bg-zinc-300",
         disabled && "cursor-not-allowed opacity-60",
         className,
       )}

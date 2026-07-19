@@ -167,7 +167,7 @@ export function PlatformSupportWidget() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-50 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
+      className="fixed bottom-20 right-4 z-50 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl md:bottom-4"
       style={{
         width: PANEL_WIDTH,
         maxWidth: "calc(100vw - 2rem)",

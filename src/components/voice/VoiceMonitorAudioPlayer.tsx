@@ -61,8 +61,8 @@ export function VoiceMonitorAudioPlayer({
           <p className="text-sm font-medium">{VOICE_MESSAGES.callListenLive}</p>
           {monitor.isListening ? (
             <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-600" />
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-zinc-500 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-zinc-600" />
             </span>
           ) : null}
         </div>

@@ -19,6 +19,8 @@ type OrzuxCalendarMiniMonthProps = {
   onSelectDate: (date: Date) => void;
   onVisibleMonthChange: (month: Date) => void;
   daysWithEvents?: Set<string>;
+  /** Larger day cells for dashboard home. */
+  size?: "default" | "comfortable";
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -29,9 +31,11 @@ export function OrzuxCalendarMiniMonth({
   onSelectDate,
   onVisibleMonthChange,
   daysWithEvents,
+  size = "default",
 }: OrzuxCalendarMiniMonthProps) {
   const days = getMonthGridDays(visibleMonth);
   const today = new Date();
+  const comfortable = size === "comfortable";
 
   const monthLabel = visibleMonth.toLocaleDateString(undefined, {
     month: "long",
@@ -41,13 +45,20 @@ export function OrzuxCalendarMiniMonth({
   return (
     <div className="select-none space-y-3">
       <div className="flex items-center justify-between px-1">
-        <span className="text-sm font-medium capitalize">{monthLabel}</span>
+        <span
+          className={cn(
+            "font-medium capitalize",
+            comfortable ? "text-base" : "text-sm",
+          )}
+        >
+          {monthLabel}
+        </span>
         <div className="flex items-center gap-0.5">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7"
+            className={comfortable ? "size-8" : "size-7"}
             aria-label={ORZUX_CALENDAR_MESSAGES.prevMonth}
             onClick={() => onVisibleMonthChange(addMonths(visibleMonth, -1))}
           >
@@ -57,7 +68,7 @@ export function OrzuxCalendarMiniMonth({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7"
+            className={comfortable ? "size-8" : "size-7"}
             aria-label={ORZUX_CALENDAR_MESSAGES.nextMonth}
             onClick={() => onVisibleMonthChange(addMonths(visibleMonth, 1))}
           >
@@ -66,11 +77,14 @@ export function OrzuxCalendarMiniMonth({
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-1 text-center">
+      <div className={cn("grid grid-cols-7 text-center", comfortable ? "gap-y-2" : "gap-y-1")}>
         {WEEKDAY_LABELS.map((label) => (
           <span
             key={label}
-            className="text-[11px] font-medium text-muted-foreground"
+            className={cn(
+              "font-medium text-muted-foreground",
+              comfortable ? "text-xs" : "text-[11px]",
+            )}
           >
             {label}
           </span>
@@ -93,7 +107,8 @@ export function OrzuxCalendarMiniMonth({
                 }
               }}
               className={cn(
-                "relative mx-auto flex size-8 items-center justify-center rounded-full text-xs transition-colors",
+                "relative mx-auto flex items-center justify-center rounded-full transition-colors",
+                comfortable ? "size-10 text-sm" : "size-8 text-xs",
                 !inMonth && "text-muted-foreground/50",
                 inMonth && "hover:bg-muted",
                 selected && "bg-primary text-primary-foreground hover:bg-primary",

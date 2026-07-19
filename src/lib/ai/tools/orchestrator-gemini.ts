@@ -72,15 +72,18 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
   },
   startDateTime: {
     type: SchemaType.STRING,
-    description: "ISO start for create_calendar_event.",
+    description:
+      "ISO start for create_calendar_event (check-in for hotels).",
   },
   endDateTime: {
     type: SchemaType.STRING,
-    description: "ISO end for create_calendar_event.",
+    description:
+      "ISO end for create_calendar_event. Hotels: check-out (full stay). Appointments: start + duration.",
   },
   timeZone: {
     type: SchemaType.STRING,
-    description: "IANA timezone for create_calendar_event.",
+    description:
+      "IANA timezone for create_calendar_event (business booking timezone preferred).",
   },
   description: {
     type: SchemaType.STRING,

@@ -169,36 +169,38 @@ async function getValidAccessToken(
     return null;
   }
 
-  const refreshed = await refreshGoogleCalendarAccessToken(
-    refreshToken,
-  );
-  const nextRefreshToken = refreshed.refreshToken ?? refreshToken;
-  const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
-    storeIntegrationSecret(admin, {
-      businessId: connection.business_id,
-      kind: "GOOGLE_CALENDAR_ACCESS_TOKEN",
-      value: refreshed.accessToken,
-    }),
-    storeIntegrationSecret(admin, {
-      businessId: connection.business_id,
-      kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
-      value: nextRefreshToken,
-    }),
-  ]);
+  try {
+    const refreshed = await refreshGoogleCalendarAccessToken(refreshToken);
+    const nextRefreshToken = refreshed.refreshToken ?? refreshToken;
+    const [accessSecretKeyName, refreshSecretKeyName] = await Promise.all([
+      storeIntegrationSecret(admin, {
+        businessId: connection.business_id,
+        kind: "GOOGLE_CALENDAR_ACCESS_TOKEN",
+        value: refreshed.accessToken,
+      }),
+      storeIntegrationSecret(admin, {
+        businessId: connection.business_id,
+        kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
+        value: nextRefreshToken,
+      }),
+    ]);
 
-  await admin
-    .from("google_calendar_connections")
-    .update({
-      access_token: null,
-      access_token_secret_key_name: accessSecretKeyName,
-      refresh_token: null,
-      refresh_token_secret_key_name: refreshSecretKeyName,
-      token_expires_at: refreshed.expiresAt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", connection.id);
+    await admin
+      .from("google_calendar_connections")
+      .update({
+        access_token: null,
+        access_token_secret_key_name: accessSecretKeyName,
+        refresh_token: null,
+        refresh_token_secret_key_name: refreshSecretKeyName,
+        token_expires_at: refreshed.expiresAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", connection.id);
 
-  return refreshed.accessToken;
+    return refreshed.accessToken;
+  } catch {
+    return null;
+  }
 }
 
 export async function getGoogleCalendarAccessToken(
@@ -348,6 +350,15 @@ export async function getGoogleCalendarEventsForBusiness(
     return null;
   }
 
+  if (!hasGoogleOAuthEnv()) {
+    return {
+      events: [],
+      timeMin: new Date().toISOString(),
+      timeMax: new Date().toISOString(),
+      syncError: GOOGLE_CALENDAR_MESSAGES.notConfiguredTitle,
+    };
+  }
+
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("google_calendar_connections")
@@ -361,10 +372,29 @@ export async function getGoogleCalendarEventsForBusiness(
     return null;
   }
 
-  const accessToken = await getValidAccessToken(row);
+  let accessToken: string | null = null;
+
+  try {
+    accessToken = await getValidAccessToken(row);
+  } catch (error) {
+    return {
+      events: [],
+      timeMin: new Date().toISOString(),
+      timeMax: new Date().toISOString(),
+      syncError:
+        error instanceof Error
+          ? error.message
+          : GOOGLE_CALENDAR_MESSAGES.oauthError,
+    };
+  }
 
   if (!accessToken) {
-    return null;
+    return {
+      events: [],
+      timeMin: new Date().toISOString(),
+      timeMax: new Date().toISOString(),
+      syncError: GOOGLE_CALENDAR_MESSAGES.oauthError,
+    };
   }
 
   const timeMin = new Date();

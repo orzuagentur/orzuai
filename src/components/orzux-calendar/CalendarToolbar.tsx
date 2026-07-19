@@ -24,7 +24,7 @@ export function CalendarToolbar({ chrome }: CalendarToolbarProps) {
     chrome.variant === "day" ? chrome.dateLabel : chrome.weekLabel;
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+    <div className="hidden min-w-0 flex-1 items-center gap-2 sm:gap-3 md:flex">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         {chrome.variant === "day" ? (
           <div className="flex shrink-0 items-center gap-2.5">

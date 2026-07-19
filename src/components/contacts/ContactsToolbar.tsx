@@ -1,56 +1,33 @@
 "use client";
 
-import { FilterIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { useRef, useState } from "react";
+import { FilterIcon, LayoutGridIcon, PlusIcon, SearchIcon } from "lucide-react";
 
+import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  CONTACT_SEGMENT_FILTERS,
-  CONTACTS_MESSAGES,
-  LEAD_SEGMENT_FILTERS,
-} from "@/features/contacts/constants";
-import { cn } from "@/lib/utils";
-import type { ContactSegment, LeadSegment } from "@/types/contact.types";
 import type { ContactsChromeConfig } from "@/components/contacts/contacts-chrome-context";
+import {
+  CONTACT_CHANNEL_FILTERS,
+  CONTACTS_MESSAGES,
+} from "@/features/contacts/constants";
+import { getChannelIconContainerClassName } from "@/features/chats/channel-ui";
+import { cn } from "@/lib/utils";
+import type { MessagingChannel } from "@/types/database.types";
 
 type ContactsToolbarProps = ContactsChromeConfig & {
   className?: string;
 };
 
-function activeFilterSummary(config: ContactsChromeConfig): string {
-  if (config.activeTab === "deals") {
-    return config.dealsView === "list"
-      ? CONTACTS_MESSAGES.viewList
-      : CONTACTS_MESSAGES.viewKanban;
+function activeChannelLabel(activeChannel: MessagingChannel | null): string {
+  if (!activeChannel) {
+    return CONTACTS_MESSAGES.filterAll;
   }
 
-  if (config.activeView === "pipeline") {
-    return CONTACTS_MESSAGES.viewPipeline;
-  }
-
-  if (config.activeTab === "leads" && config.activeLeadSegment !== "all_leads") {
-    return (
-      LEAD_SEGMENT_FILTERS.find((item) => item.id === config.activeLeadSegment)
-        ?.label ?? CONTACTS_MESSAGES.segmentAllLeads
-    );
-  }
-
-  if (config.activeTab === "contacts" && config.activeSegment !== "all") {
-    return (
-      CONTACT_SEGMENT_FILTERS.find((item) => item.id === config.activeSegment)
-        ?.label ?? CONTACTS_MESSAGES.filterAll
-    );
-  }
-
-  return CONTACTS_MESSAGES.viewList;
+  return (
+    CONTACT_CHANNEL_FILTERS.find((item) => item.id === activeChannel)?.label ??
+    CONTACTS_MESSAGES.filterAll
+  );
 }
 
 export function ContactsToolbar({
@@ -58,18 +35,67 @@ export function ContactsToolbar({
   onSearchChange,
   searchPlaceholder,
   activeTab,
-  activeView = "list",
-  onViewChange,
-  activeSegment = "all",
-  onSegmentChange,
-  activeLeadSegment = "all_leads",
-  onLeadSegmentChange,
-  dealsView = "kanban",
-  onDealsViewChange,
   onNewDeal,
+  activeChannel = null,
+  onChannelChange,
+  visibleChannelIds = [],
+  voiceInboxEnabled = false,
+  smsInboxEnabled = false,
   className,
 }: ContactsToolbarProps) {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
   const placeholder = searchPlaceholder ?? CONTACTS_MESSAGES.searchPlaceholder;
+
+  function openFilter() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setFilterOpen(true);
+  }
+
+  function scheduleCloseFilter() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setFilterOpen(false);
+      closeTimerRef.current = null;
+    }, 120);
+  }
+
+  const showChannelFilters = activeTab !== "deals" && Boolean(onChannelChange);
+  const visibleChannels = CONTACT_CHANNEL_FILTERS.filter((filter) => {
+    if (filter.id === null) return false;
+    if (filter.id === "voice") return voiceInboxEnabled;
+    if (filter.id === "sms") return smsInboxEnabled;
+    return visibleChannelIds.includes(filter.id);
+  });
+
+  const hasActiveFilter = Boolean(activeChannel);
+
+  function selectChannel(channel: MessagingChannel | null) {
+    onChannelChange?.(channel);
+    setFilterOpen(false);
+  }
+
+  if (!showChannelFilters && activeTab !== "deals") {
+    return (
+      <div className={cn("flex min-w-0 items-center gap-1.5 sm:gap-2", className)}>
+        <div className="relative min-w-0 flex-1 sm:max-w-[9rem] md:max-w-xs lg:max-w-sm">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={placeholder}
+            className="h-8 pl-8 text-sm"
+            aria-label={placeholder}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex min-w-0 items-center gap-1.5 sm:gap-2", className)}>
@@ -84,91 +110,85 @@ export function ContactsToolbar({
         />
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1 px-2">
+      {showChannelFilters ? (
+        <div
+          className="relative shrink-0"
+          onMouseEnter={openFilter}
+          onMouseLeave={scheduleCloseFilter}
+        >
+          <Button
+            type="button"
+            size="icon"
+            variant={hasActiveFilter ? "default" : "outline"}
+            className="size-8"
+            aria-label={CONTACTS_MESSAGES.filtersLabel}
+            aria-expanded={filterOpen}
+          >
             <FilterIcon className="size-3.5" />
-            <span className="hidden lg:inline">
-              {activeFilterSummary({
-                activeTab,
-                searchQuery,
-                onSearchChange,
-                activeView,
-                onViewChange,
-                activeSegment,
-                onSegmentChange,
-                activeLeadSegment,
-                onLeadSegmentChange,
-                dealsView,
-                onDealsViewChange,
-                onNewDeal,
-              })}
-            </span>
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel>{CONTACTS_MESSAGES.filtersLabel}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
 
-          {activeTab === "deals" ? (
-            <>
-              <DropdownMenuItem
-                onClick={() => onDealsViewChange?.("kanban")}
-              >
-                {CONTACTS_MESSAGES.viewKanban}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDealsViewChange?.("list")}>
-                {CONTACTS_MESSAGES.viewList}
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <>
-              <DropdownMenuItem onClick={() => onViewChange?.("list")}>
-                {CONTACTS_MESSAGES.viewList}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onViewChange?.("pipeline")}>
-                {CONTACTS_MESSAGES.viewPipeline}
-              </DropdownMenuItem>
-              {activeView === "list" && activeTab === "contacts" ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>
-                    {CONTACTS_MESSAGES.segmentsLabel}
-                  </DropdownMenuLabel>
-                  {CONTACT_SEGMENT_FILTERS.map((filter) => (
-                    <DropdownMenuItem
-                      key={filter.id}
-                      onClick={() =>
-                        onSegmentChange?.(filter.id as ContactSegment)
-                      }
+          {filterOpen ? (
+            <div
+              className="absolute top-full right-0 z-50 mt-1.5 w-60 rounded-xl border bg-popover p-3 text-popover-foreground shadow-md"
+              onMouseEnter={openFilter}
+              onMouseLeave={scheduleCloseFilter}
+            >
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {CONTACTS_MESSAGES.channelsLabel}
+              </p>
+              <div className="grid gap-1">
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted",
+                    !activeChannel && "bg-muted font-medium",
+                  )}
+                  onClick={() => selectChannel(null)}
+                >
+                  <span className="flex size-7 items-center justify-center rounded-md bg-muted/60">
+                    <LayoutGridIcon className="size-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {CONTACTS_MESSAGES.filterAll}
+                  </span>
+                </button>
+
+                {visibleChannels.map((filter) => {
+                  const channel = filter.id!;
+                  const isActive = activeChannel === channel;
+                  return (
+                    <button
+                      key={channel}
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted",
+                        isActive && "bg-muted font-medium",
+                      )}
+                      onClick={() => selectChannel(channel)}
                     >
-                      {filter.label}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
-              {activeView === "list" && activeTab === "leads" ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>
-                    {CONTACTS_MESSAGES.segmentsLabel}
-                  </DropdownMenuLabel>
-                  {LEAD_SEGMENT_FILTERS.map((filter) => (
-                    <DropdownMenuItem
-                      key={filter.id}
-                      onClick={() =>
-                        onLeadSegmentChange?.(filter.id as LeadSegment)
-                      }
-                    >
-                      {filter.label}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                      <span
+                        className={cn(
+                          "flex size-7 items-center justify-center rounded-md",
+                          getChannelIconContainerClassName(channel),
+                        )}
+                      >
+                        <ChannelBrandIcon channel={channel} className="size-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {filter.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="mt-2 truncate px-1 text-[11px] text-muted-foreground">
+                {activeChannelLabel(activeChannel)}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {activeTab === "deals" && onNewDeal ? (
         <Button

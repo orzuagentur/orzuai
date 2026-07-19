@@ -1,37 +1,18 @@
-import { ChatsMonitorPanel } from "@/components/chats/ChatsMonitorPanel";
-import {
-  getChatsFavoritesPageData,
-  resolveInboxActiveConversationContext,
-} from "@/services/chat.service";
+import { redirect } from "next/navigation";
+
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 
 type ChatsFavoritesPageProps = {
   searchParams: Promise<{ conversation?: string }>;
 };
 
+/** Favorites is a client filter on /chats so refresh always resets to All. */
 export default async function ChatsFavoritesPage({
   searchParams,
 }: ChatsFavoritesPageProps) {
-  const { conversation: conversationId } = await searchParams;
-  const [data, activeContext] = await Promise.all([
-    getChatsFavoritesPageData(),
-    resolveInboxActiveConversationContext(conversationId?.trim()),
-  ]);
-
-  return (
-    <ChatsMonitorPanel
-      favoritesOnly
-      hasBusiness={data.hasBusiness}
-      channels={data.channels}
-      voiceInboxEnabled={data.voiceInboxEnabled}
-      smsInboxEnabled={data.smsInboxEnabled}
-      conversations={data.conversations}
-      conversationsTotalCount={data.conversationsTotalCount}
-      conversationsHasMore={data.conversationsHasMore}
-      needsAttentionConversations={data.needsAttentionConversations}
-      activeConversation={activeContext.activeConversation}
-      activeChannelConnected={activeContext.activeChannelConnected}
-      activeAiEnabled={activeContext.activeAiEnabled}
-      activeCannedResponses={activeContext.activeCannedResponses}
-    />
-  );
+  const { conversation } = await searchParams;
+  const query = conversation?.trim()
+    ? `?conversation=${encodeURIComponent(conversation.trim())}`
+    : "";
+  redirect(`${DASHBOARD_ROUTES.chats}${query}`);
 }

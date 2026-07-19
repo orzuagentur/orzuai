@@ -52,13 +52,13 @@ const STAGE_BADGE_CLASSNAMES: Record<PipelineStage, string> = {
     "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
   proposal:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
-  won: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  won: "border-zinc-200 bg-zinc-100 text-zinc-800 dark:border-zinc-600/40 dark:bg-zinc-800/40 dark:text-zinc-100",
   lost: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
 const STATUS_BADGE_CLASSNAMES: Record<CrmDealStatus, string> = {
   open: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200",
-  won: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  won: "border-zinc-200 bg-zinc-100 text-zinc-800 dark:border-zinc-600/40 dark:bg-zinc-800/40 dark:text-zinc-100",
   lost: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
 };
 

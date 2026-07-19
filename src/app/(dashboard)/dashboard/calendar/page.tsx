@@ -21,15 +21,24 @@ import { getCalendarAvailabilityPageData } from "@/services/calendar-availabilit
 import { listAllBusinessCalendarResources } from "@/services/business-calendar-resources.service";
 import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 
-export default function CalendarPage() {
+export default function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
   return (
     <Suspense fallback={<DashboardPageSkeleton />}>
-      <CalendarPageContent />
+      <CalendarPageContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function CalendarPageContent() {
+async function CalendarPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const params = await searchParams;
   const user = await getCurrentUser();
   const business = user ? await getPrimaryBusiness(user.id) : null;
 
@@ -44,8 +53,15 @@ async function CalendarPageContent() {
   let syncError: string | null = null;
 
   if (googleConnected) {
-    const syncResult = await syncGoogleCalendarEventsForBusiness(business.id);
-    syncError = syncResult.syncError ?? null;
+    try {
+      const syncResult = await syncGoogleCalendarEventsForBusiness(business.id);
+      syncError = syncResult.syncError ?? null;
+    } catch (error) {
+      syncError =
+        error instanceof Error
+          ? error.message
+          : "Google Calendar sync failed.";
+    }
   }
 
   const refreshedConnection = googleConnected
@@ -113,6 +129,7 @@ async function CalendarPageContent() {
         googleConnected={googleConnected}
         lastSyncedAt={refreshedConnection?.lastSyncedAt}
         syncError={syncError}
+        initialDate={params.date ?? null}
       />
     </>
   );

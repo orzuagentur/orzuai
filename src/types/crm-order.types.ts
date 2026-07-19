@@ -94,25 +94,51 @@ export const updateCrmOrderStatusSchema = z.object({
   status: z.enum(CRM_ORDER_STATUSES),
 });
 
-export const createManualCrmOrderSchema = z.object({
-  contactId: z.string().uuid().optional().nullable(),
-  customerName: z.string().trim().min(1, "Customer name is required.").max(200),
-  phone: z.string().trim().max(40).optional().nullable(),
-  email: z
-    .union([z.string().trim().email(), z.literal(""), z.null()])
-    .optional()
-    .transform((value) => {
-      if (!value) {
-        return null;
-      }
-      return value;
-    }),
-  title: z.string().trim().min(1, "Order title is required.").max(200),
-  serviceType: z.string().trim().max(120).optional().nullable(),
-  description: z.string().trim().max(4000).optional().nullable(),
-  amount: z.number().min(0).max(999999999).optional().nullable(),
-  source: z.enum(CRM_ORDER_MANUAL_SOURCES).default("manual"),
-});
+export const createManualCrmOrderSchema = z
+  .object({
+    contactId: z.string().uuid().optional().nullable(),
+    customerName: z.string().trim().max(200).optional().nullable(),
+    phone: z.string().trim().max(40).optional().nullable(),
+    email: z
+      .union([z.string().trim().email(), z.literal(""), z.null()])
+      .optional()
+      .transform((value) => {
+        if (!value) {
+          return null;
+        }
+        return value;
+      }),
+    title: z.string().trim().max(200).optional().nullable(),
+    serviceType: z.string().trim().max(120).optional().nullable(),
+    description: z.string().trim().max(4000).optional().nullable(),
+    amount: z.number().min(0).max(999999999).optional().nullable(),
+    source: z.enum(CRM_ORDER_MANUAL_SOURCES).default("manual"),
+    customFields: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional()
+      .default({}),
+  })
+  .superRefine((value, ctx) => {
+    const hasValue = [
+      value.customerName,
+      value.phone,
+      value.email,
+      value.title,
+      value.serviceType,
+      value.description,
+      value.amount != null ? String(value.amount) : null,
+      ...Object.values(value.customFields ?? {}).map((entry) =>
+        entry == null ? "" : String(entry),
+      ),
+    ].some((entry) => typeof entry === "string" && entry.trim().length > 0);
+
+    if (!hasValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Fill at least one field to create an order.",
+      });
+    }
+  });
 
 export type UpdateCrmOrderStatusInput = z.infer<
   typeof updateCrmOrderStatusSchema
@@ -129,7 +155,7 @@ export type CreateCrmOrderInput = {
   businessId: string;
   contactId?: string | null;
   conversationId?: string | null;
-  title: string;
+  title?: string | null;
   description?: string | null;
   source: CrmOrderSource;
   amount?: number | null;

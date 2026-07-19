@@ -9,11 +9,10 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useSearchParams } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChatWindow } from "@/components/chats/ChatWindow";
-import { InboxChannelTabs } from "@/components/chats/inbox/InboxChannelTabs";
+import type { InboxChannelTabId } from "@/components/chats/inbox/InboxChannelTabs";
 import { InboxConversationList } from "@/components/chats/inbox/InboxConversationList";
 import { InboxDetailsPanel } from "@/components/chats/inbox/InboxDetailsPanel";
 import { InboxShell } from "@/components/chats/inbox/InboxShell";
@@ -68,7 +67,7 @@ function ChatsMonitorPanelContent({
   hasBusiness: initialHasBusiness,
   businessId: initialBusinessId = null,
   channels: initialChannels,
-  voiceInboxEnabled: initialVoiceInboxEnabled = false,
+  voiceInboxEnabled: _initialVoiceInboxEnabled = false,
   smsInboxEnabled: initialSmsInboxEnabled = false,
   conversations: initialConversations,
   conversationsTotalCount: initialTotalCount,
@@ -78,12 +77,29 @@ function ChatsMonitorPanelContent({
   activeChannelConnected: initialActiveChannelConnected,
   activeAiEnabled: initialActiveAiEnabled,
   activeCannedResponses: initialActiveCannedResponses,
-  favoritesOnly = false,
+  favoritesOnly: _favoritesOnly = false,
 }: ChatsMonitorPanelProps = {}) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialConversationId = searchParams.get("conversation")?.trim() || null;
-  const listScope = favoritesOnly ? ("favorites" as const) : ("monitor" as const);
-  const cachedList = getCachedConversationList({ scope: listScope });
+  // Client-only channel scope so refresh / new session always starts on "All".
+  const [channelTab, setChannelTab] = useState<InboxChannelTabId>("all");
+  const selectedMessagingChannel =
+    channelTab !== "all" &&
+    channelTab !== "favorites" &&
+    channelTab !== "sms"
+      ? channelTab
+      : undefined;
+  const listScope =
+    channelTab === "favorites"
+      ? ("favorites" as const)
+      : selectedMessagingChannel
+        ? ("channel" as const)
+        : ("monitor" as const);
+  const cachedList = getCachedConversationList({
+    scope: listScope,
+    channel: selectedMessagingChannel,
+  });
 
   const [hasBusiness, setHasBusiness] = useState(initialHasBusiness ?? true);
   const [businessId, setBusinessId] = useState<string | null>(initialBusinessId);
@@ -112,9 +128,8 @@ function ChatsMonitorPanelContent({
     useDebouncedInboxSearch();
   const [activeFilter, setActiveFilter] = useState<ChatInboxFilter>("all");
   const [activeSort] = useState<ChatInboxSort>("needs_reply_first");
-  const [activeQuickView] = useState<ChatInboxQuickView>(
-    favoritesOnly ? "favorites" : "all",
-  );
+  const activeQuickView: ChatInboxQuickView =
+    channelTab === "favorites" ? "favorites" : "all";
   const [isFetching, startFetching] = useTransition();
   const { consumeSkipInitialFetch } = useSkipInitialListFetch();
   const refreshConversationsRef = useRef<() => void>(() => {});
@@ -134,6 +149,7 @@ function ChatsMonitorPanelContent({
           offset,
           limit: limitOverride ?? INBOX_PAGE_SIZE,
           search: debouncedSearch || undefined,
+          channel: selectedMessagingChannel,
           view: activeQuickView,
           filter: activeFilter,
           sort: activeSort,
@@ -173,7 +189,7 @@ function ChatsMonitorPanelContent({
 
       startFetching(run);
     },
-    [activeFilter, activeQuickView, activeSort, debouncedSearch],
+    [activeFilter, activeQuickView, activeSort, debouncedSearch, selectedMessagingChannel],
   );
 
   const refreshConversations = useCallback(() => {
@@ -186,7 +202,8 @@ function ChatsMonitorPanelContent({
   const hasActiveListFilters =
     Boolean(debouncedSearch) ||
     activeFilter !== "all" ||
-    activeQuickView !== "all";
+    activeQuickView !== "all" ||
+    Boolean(selectedMessagingChannel);
 
   const {
     selectedConversationId,
@@ -241,21 +258,25 @@ function ChatsMonitorPanelContent({
     }
 
     setCachedConversationList(
-      { scope: listScope },
+      { scope: listScope, channel: selectedMessagingChannel },
       {
         items: conversations,
         totalCount,
         hasMore,
       },
     );
-  }, [conversations, hasMore, listScope, totalCount]);
+  }, [conversations, hasMore, listScope, selectedMessagingChannel, totalCount]);
 
   const displayConversations = useMemo(() => {
+    const messagingOnly = conversations.filter(
+      (conversation) => conversation.channel !== "voice",
+    );
+
     if (hasActiveListFilters) {
-      return conversations;
+      return messagingOnly;
     }
 
-    return sortConversations(conversations, activeSort);
+    return sortConversations(messagingOnly, activeSort);
   }, [activeSort, conversations, hasActiveListFilters]);
 
   const unreadByChannel = useMemo(() => {
@@ -265,6 +286,9 @@ function ChatsMonitorPanelContent({
       ...conversations,
       ...needsAttentionConversations,
     ]) {
+      if (conversation.channel === "voice") {
+        continue;
+      }
       merged.set(conversation.id, conversation);
     }
 
@@ -285,7 +309,7 @@ function ChatsMonitorPanelContent({
 
   const activeConversationId = selectedConversationId;
   const showChatOnMobile = Boolean(activeConversationId);
-  const { detailsOpen } = useInboxLayout();
+  const { detailsOpen, setMobileDetailsOpen } = useInboxLayout();
   const channelStatsConnected = useMemo(() => {
     const channel = activeConversation?.channel ?? selectedListItem?.channel;
 
@@ -301,7 +325,7 @@ function ChatsMonitorPanelContent({
 
   const handleContactFavoriteChange = useCallback(
     (contactId: string, isFavorite: boolean) => {
-      if (favoritesOnly && !isFavorite) {
+      if (channelTab === "favorites" && !isFavorite) {
         setConversations((current) =>
           current.filter((item) => item.contactId !== contactId),
         );
@@ -335,7 +359,7 @@ function ChatsMonitorPanelContent({
         ),
       );
 
-      if (favoritesOnly && isFavorite) {
+      if (channelTab === "favorites" && isFavorite) {
         fetchConversations(0, false, true);
       }
 
@@ -343,7 +367,7 @@ function ChatsMonitorPanelContent({
     },
     [
       conversations,
-      favoritesOnly,
+      channelTab,
       fetchConversations,
       refreshConversation,
       selectConversation,
@@ -377,6 +401,17 @@ function ChatsMonitorPanelContent({
     initialTotalCount,
   ]);
 
+  const handleChannelTabChange = useCallback(
+    (tab: InboxChannelTabId) => {
+      if (tab === "sms") {
+        router.push(DASHBOARD_ROUTES.chatsSms);
+        return;
+      }
+      setChannelTab(tab);
+    },
+    [router],
+  );
+
   const inboxToolbar = hasBusiness
     ? {
         searchQuery,
@@ -385,6 +420,11 @@ function ChatsMonitorPanelContent({
         onFilterChange: setActiveFilter,
         aiChannel,
         aiEnabled: activeAiEnabled,
+        channelTab,
+        onChannelTabChange: handleChannelTabChange,
+        visibleChannelIds,
+        unreadByChannel,
+        smsInboxEnabled: initialSmsInboxEnabled,
       }
     : null;
 
@@ -410,25 +450,16 @@ function ChatsMonitorPanelContent({
     <InboxShell
       showChatOnMobile={showChatOnMobile}
       showRightColumn={detailsOpen || suggestReplyOpen}
-      channelTabs={
-        <InboxChannelTabs
-          activeChannel={favoritesOnly ? "favorites" : "all"}
-          unreadByChannel={unreadByChannel}
-          visibleChannelIds={visibleChannelIds}
-          voiceInboxEnabled={initialVoiceInboxEnabled}
-          smsInboxEnabled={initialSmsInboxEnabled}
-        />
-      }
       listColumn={
         <InboxConversationList
           conversations={displayConversations}
           activeConversationId={activeConversationId}
           channelId="whatsapp"
           linkToConversationChannel
-          linkMode={favoritesOnly ? "favorites" : "overview"}
+          linkMode={channelTab === "favorites" ? "favorites" : "overview"}
           onConversationSelect={handleConversationSelect}
           emptyVariant={
-            favoritesOnly
+            channelTab === "favorites"
               ? "favorites"
               : totalCount > 0 && conversations.length === 0
                 ? "search"
@@ -442,20 +473,6 @@ function ChatsMonitorPanelContent({
       }
       chatColumn={
         <div className="flex h-full min-h-0 flex-col">
-          {showChatOnMobile ? (
-            <div className="shrink-0 border-b px-3 py-2 lg:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={() => handleConversationSelect(null)}
-              >
-                <ArrowLeftIcon className="size-4" />
-                {CHAT_MESSAGES.pageTitle}
-              </Button>
-            </div>
-          ) : null}
-
           <ChatWindow
             conversation={activeConversation}
             isClientTyping={isClientTyping}
@@ -486,6 +503,11 @@ function ChatsMonitorPanelContent({
             className="min-h-0 min-w-0 flex-1"
             suggestReplyOpen={suggestReplyOpen}
             onSuggestReplyOpenChange={setSuggestReplyOpen}
+            onBack={
+              showChatOnMobile
+                ? () => handleConversationSelect(null)
+                : undefined
+            }
             onOptimisticMessage={appendMessage}
             onMessageSent={(message, pendingId) => {
               if (pendingId) {
@@ -516,11 +538,20 @@ function ChatsMonitorPanelContent({
           <AiSuggestReplyPanel
             conversationId={activeConversation.id}
             open
-            onOpenChange={setSuggestReplyOpen}
+            onOpenChange={(open) => {
+              setSuggestReplyOpen(open);
+              if (!open) {
+                setMobileDetailsOpen(false);
+              }
+            }}
             onUseSuggestion={setDraft}
           />
         ) : (
-          <InboxDetailsPanel conversation={activeConversation} />
+          <InboxDetailsPanel
+            conversation={activeConversation}
+            onClose={() => setMobileDetailsOpen(false)}
+            showCloseButton
+          />
         )
       }
     />

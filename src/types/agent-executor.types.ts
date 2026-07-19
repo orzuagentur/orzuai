@@ -41,10 +41,15 @@ export const executorCreateDealActionSchema = z.object({
 
 export const executorCreateOrderActionSchema = z.object({
   type: z.literal("create_order"),
-  title: z.string().trim().min(1).max(200),
+  title: z.string().trim().max(200).optional(),
   description: z.string().trim().max(2000).optional(),
   serviceType: z.string().trim().max(120).optional(),
   amount: z.number().min(0).max(999999999).optional(),
+  customerName: z.string().trim().max(200).optional(),
+  phone: z.string().trim().max(40).optional(),
+  email: z.string().trim().max(320).optional(),
+  /** Custom + extra configured order form field values keyed by field.key */
+  fields: z.record(z.string(), z.string()).optional(),
 });
 
 export const executorAddNoteActionSchema = z.object({

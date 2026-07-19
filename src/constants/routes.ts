@@ -9,6 +9,13 @@ export const LEGAL_ROUTES = {
   dataDeletion: "/data-deletion",
 } as const;
 
+export const DOCS_ROUTES = {
+  root: "/docs",
+  about: "/docs/about",
+  gettingStarted: "/docs/getting-started",
+  page: (slug: string) => `/docs/${slug}`,
+} as const;
+
 export const AUTH_ROUTES = {
   callback: "/auth/callback",
   confirm: "/auth/confirm",

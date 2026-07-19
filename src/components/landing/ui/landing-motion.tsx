@@ -71,15 +71,15 @@ export function LandingSectionHeader({
       )}
     >
       {eyebrow ? (
-        <p className="mb-3 text-xs font-semibold uppercase text-[#1e6f5c]">
+        <p className="landing-eyebrow mb-3">
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="text-3xl font-semibold leading-tight text-[#101815] sm:text-5xl">
+      <h2 className="landing-heading text-3xl font-semibold leading-tight sm:text-5xl">
         {title}
       </h2>
       {subtitle ? (
-        <p className="mt-5 text-base leading-8 text-[#52625a] sm:text-lg">
+        <p className="landing-copy mt-5 text-base leading-8 sm:text-lg">
           {subtitle}
         </p>
       ) : null}
@@ -97,11 +97,11 @@ export function LandingGlassCard({
 
   return (
     <motion.div
-      whileHover={hover && !reducedMotion ? { y: -4, scale: 1.01 } : undefined}
+      whileHover={hover && !reducedMotion ? { y: -8, scale: 1.012 } : undefined}
       transition={{ type: "spring", stiffness: 320, damping: 24 }}
       className={cn(
-        "rounded-lg border border-[#d9e3dc] bg-white p-6 shadow-[0_1px_0_rgba(24,36,30,0.04)]",
-        hover && "hover:border-[#b8cbc1] hover:bg-[#fcfdfc]",
+        "landing-panel p-6",
+        hover && "landing-panel-hover",
         className,
       )}
       {...props}

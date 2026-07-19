@@ -28,6 +28,7 @@ import {
 import { CONTACTS_MESSAGES } from "@/features/contacts/constants";
 import { deleteContactAction } from "@/features/contacts/actions/delete-contact";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
+import { getChatHeaderActionButtonClassName } from "@/features/chats/chat-theme";
 import type { ConversationDetail } from "@/types/chat.types";
 
 type InboxChatMenuProps = {
@@ -76,7 +77,7 @@ export function InboxChatMenu({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8"
+            className={getChatHeaderActionButtonClassName(conversation.channel)}
             aria-label={CHAT_MESSAGES.chatMenuLabel}
           >
             <MoreHorizontalIcon className="size-4" />

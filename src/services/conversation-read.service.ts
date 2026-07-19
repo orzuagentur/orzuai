@@ -5,7 +5,7 @@ import { hasSupabaseEnv } from "@/lib/env";
 import { countUnreadCalendarNotifications } from "@/services/business-notifications.service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { MessagingChannel } from "@/types/database.types";
-import { sumUnreadByChannel } from "@/utils/conversation-unread";
+import { sumChatsInboxUnread } from "@/utils/conversation-unread";
 import { createEmptyUnreadByChannel } from "@/utils/messaging-channel-defaults";
 
 const OPEN_STATUSES = new Set(["open", "active", "pending"]);
@@ -208,7 +208,7 @@ export async function getDashboardNavBadgeCounts(
   ]);
 
   return {
-    inboxUnread: sumUnreadByChannel(empty.unreadByChannel),
+    inboxUnread: sumChatsInboxUnread(empty.unreadByChannel),
     crmUnread: unreadContactIds.size,
     calendarAiUnread,
     overdueTasks: agenda.overdueTasks,

@@ -1489,9 +1489,52 @@ async function applyCreateOrder(
     channel?: MessagingChannel;
   },
 ): Promise<string | null> {
-  const title = action.title.trim();
+  const { getEnabledOrderFormFields, isOrderFormBuiltinKey, resolveOrderTitle } =
+    await import("@/features/orders/order-form-fields");
+  const { getOrderFormFieldsForBusiness } = await import(
+    "@/services/order-form-fields.service"
+  );
+  const { toCrmOrderSource } = await import("@/types/crm-order.types");
+  const { createCrmOrder } = await import("@/services/crm-orders.service");
 
-  if (!title || GENERIC_DEAL_TITLES.has(title.toLowerCase())) {
+  const formFields = getEnabledOrderFormFields(
+    await getOrderFormFieldsForBusiness(businessId),
+  );
+  const customFromAction = action.fields ?? {};
+
+  const valuesByKey: Record<string, string> = {
+    customerName: action.customerName?.trim() ?? "",
+    phone: action.phone?.trim() ?? "",
+    email: action.email?.trim() ?? "",
+    title: action.title?.trim() ?? "",
+    serviceType: action.serviceType?.trim() ?? "",
+    description: action.description?.trim() ?? "",
+    amount: action.amount != null ? String(action.amount) : "",
+    ...Object.fromEntries(
+      Object.entries(customFromAction).map(([key, value]) => [
+        key,
+        value.trim(),
+      ]),
+    ),
+  };
+
+  for (const field of formFields) {
+    if (!field.required) continue;
+    const value = valuesByKey[field.key] ?? "";
+    if (!value) {
+      throw new Error(`Order field "${field.label}" is required.`);
+    }
+  }
+
+  const title = resolveOrderTitle({
+    title: valuesByKey.title,
+    customerName: valuesByKey.customerName,
+    serviceType: valuesByKey.serviceType,
+    description: valuesByKey.description,
+  });
+
+  const hasAnyField = Object.values(valuesByKey).some((value) => value.trim());
+  if (!hasAnyField) {
     return null;
   }
 
@@ -1506,18 +1549,32 @@ async function applyCreateOrder(
     return null;
   }
 
-  const { toCrmOrderSource } = await import("@/types/crm-order.types");
-  const { createCrmOrder } = await import("@/services/crm-orders.service");
+  const customPayloadFields: Record<string, string> = {};
+  for (const [key, value] of Object.entries(valuesByKey)) {
+    if (isOrderFormBuiltinKey(key) || key === "source") continue;
+    if (!value.trim()) continue;
+    customPayloadFields[key] = value.trim();
+  }
+
+  const amountValue = valuesByKey.amount
+    ? Number.parseFloat(valuesByKey.amount)
+    : action.amount;
+
   const result = await createCrmOrder({
     businessId,
     contactId,
     conversationId: idempotencyContext.conversationId ?? null,
     title,
-    description: action.description?.trim() || null,
+    description: valuesByKey.description || null,
     source: toCrmOrderSource(idempotencyContext.channel),
-    amount: action.amount ?? null,
+    amount:
+      amountValue != null && Number.isFinite(amountValue) ? amountValue : null,
     payload: {
-      serviceType: action.serviceType?.trim() || null,
+      customerName: valuesByKey.customerName || null,
+      phone: valuesByKey.phone || null,
+      email: valuesByKey.email || null,
+      serviceType: valuesByKey.serviceType || null,
+      fields: customPayloadFields,
     },
   });
 

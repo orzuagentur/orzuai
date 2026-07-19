@@ -21,6 +21,7 @@ export const sendVerificationEmailSchema = z.object({
 export const sendPasswordResetEmailSchema = z.object({
   to: emailAddressSchema,
   resetUrl: urlSchema,
+  resetCode: z.string().trim().min(4).max(12).optional().nullable(),
 });
 
 export const sendLeadFollowUpEmailSchema = z.object({

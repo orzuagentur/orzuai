@@ -47,7 +47,10 @@ export function ContactProfileDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+      <SheetContent
+        showCloseButton={false}
+        className="inset-0 flex h-[100dvh] w-full max-w-none flex-col gap-0 border-0 p-0 sm:max-w-none data-[side=right]:w-full data-[side=right]:sm:max-w-none"
+      >
         <SheetHeader className="sr-only">
           <SheetTitle>{CONTACTS_MESSAGES.profileTitle}</SheetTitle>
         </SheetHeader>

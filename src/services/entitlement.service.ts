@@ -153,7 +153,7 @@ export async function assertVoiceAiAllowed(
   if (!entitlements.voiceAi) {
     return {
       allowed: false,
-      message: `Voice AI is available on Pro and Agency plans. Current plan: ${planLabel}.`,
+      message: `Calls AI is available on Pro and Agency plans. Current plan: ${planLabel}.`,
     };
   }
 
@@ -166,7 +166,7 @@ export async function assertVoiceAiAllowed(
   if (usedMinutes >= entitlements.monthlyVoiceMinutes) {
     return {
       allowed: false,
-      message: `Monthly voice AI limit reached (${entitlements.monthlyVoiceMinutes} min on ${planLabel}). Add a Voice Minutes Pack or upgrade.`,
+      message: `Monthly Calls AI limit reached (${entitlements.monthlyVoiceMinutes} min on ${planLabel}). Add a Voice Minutes Pack or upgrade.`,
     };
   }
 

@@ -1,15 +1,20 @@
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 10;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export const REGISTRATION_MESSAGES = {
-  confirmationTitle: "Check your email",
+  confirmationTitle: "Enter verification code",
   confirmationDescription:
-    "Check your email to verify your account.",
+    "We emailed a confirmation code. Enter it below to activate your account.",
   emailFailed:
     "Your account was created, but we could not send the verification email. Please contact support.",
   alreadyRegistered:
     "An account with this email already exists. Try signing in instead.",
   genericError: "Unable to create your account. Please try again.",
+  otpInvalid: "Invalid or expired verification code. Please try again.",
+  otpVerifyButton: "Verify email",
+  otpVerifying: "Verifying…",
+  otpCodeLabel: "Verification code",
+  otpCodePlaceholder: "6-digit code",
 } as const;
 
 export const LOGIN_MESSAGES = {
@@ -50,18 +55,23 @@ export const VERIFICATION_MESSAGES = {
 export const PASSWORD_RESET_MESSAGES = {
   requestTitle: "Reset your password",
   requestDescription:
-    "Enter your email address and we will send you a link to reset your password.",
-  confirmationTitle: "Check your email",
+    "Enter your email and we will send a confirmation code to reset your password.",
+  confirmationTitle: "Enter reset code",
   confirmationDescription:
-    "If an account exists for this email, you will receive a password reset link shortly.",
+    "If an account exists for this email, enter the code from your inbox.",
   resetTitle: "Choose a new password",
   resetDescription: "Enter a new password for your OrzuX account.",
   successTitle: "Password updated",
   successDescription:
     "Your password has been updated. You can now sign in with your new password.",
   invalidSession:
-    "This password reset link is invalid or has expired. Please request a new one.",
+    "This password reset code is invalid or has expired. Please request a new one.",
   genericError: "Unable to reset your password. Please try again.",
+  sendCodeButton: "Send reset code",
+  sendingCode: "Sending code…",
+  otpCodeLabel: "Confirmation code",
+  otpVerifyButton: "Continue",
+  otpVerifying: "Checking code…",
 } as const;
 
 export const ACCOUNT_DELETION_MESSAGES = {

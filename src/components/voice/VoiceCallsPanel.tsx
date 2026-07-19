@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
+  Grid3x3Icon,
   UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -84,6 +85,7 @@ function VoiceCallsPanelContent({
   const searchParams = useSearchParams();
   const activeCallId = searchParams.get("call")?.trim() || null;
   const phoneDraft = searchParams.get("phone")?.trim() || "";
+  const dialOpen = searchParams.get("dial") === "1";
 
   const [calls, setCalls] = useState(initialCalls);
   const [activeCallDetail, setActiveCallDetail] = useState<VoiceCallDetail | null>(
@@ -93,7 +95,9 @@ function VoiceCallsPanelContent({
   const [contactsOpen, setContactsOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addContactPhone, setAddContactPhone] = useState("");
-  const [workspaceView, setWorkspaceView] = useState<VoiceWorkspaceView>({ mode: "dialpad" });
+  const [workspaceView, setWorkspaceView] = useState<VoiceWorkspaceView>({
+    mode: "home",
+  });
   const [phonebookContacts, setPhonebookContacts] = useState<PhoneContactListItem[]>([]);
   const { detailsOpen } = useInboxLayout();
   const notifiedInboundCallsRef = useRef(new Set<string>());
@@ -218,19 +222,32 @@ function VoiceCallsPanelContent({
   const hasNumberSelected = Boolean(activeCallId || phoneDraft);
 
   useEffect(() => {
+    if (dialOpen && !activeCallId && !phoneDraft) {
+      setWorkspaceView({ mode: "dialpad" });
+      return;
+    }
+
     if (!activeCallId && !phoneDraft) {
       setWorkspaceView((current) => {
-        if (["history", "recordings", "transcripts", "transcript", "live"].includes(current.mode)) {
+        if (
+          ["history", "recordings", "transcripts", "transcript", "live"].includes(
+            current.mode,
+          )
+        ) {
           return current;
         }
-        return { mode: "dialpad" };
+        return { mode: "home" };
       });
       return;
     }
 
     if (phoneDraft && !activeCallId) {
       setWorkspaceView((current) => {
-        if (["history", "recordings", "transcripts", "transcript", "live"].includes(current.mode)) {
+        if (
+          ["history", "recordings", "transcripts", "transcript", "live"].includes(
+            current.mode,
+          )
+        ) {
           return current;
         }
         if (current.mode === "dialpad") {
@@ -251,7 +268,11 @@ function VoiceCallsPanelContent({
     }
 
     setWorkspaceView((current) => {
-      if (["history", "recordings", "transcripts", "transcript"].includes(current.mode)) {
+      if (
+        ["history", "recordings", "transcripts", "transcript"].includes(
+          current.mode,
+        )
+      ) {
         return current;
       }
 
@@ -265,7 +286,7 @@ function VoiceCallsPanelContent({
 
       return { mode: "home" };
     });
-  }, [activeCallId, calls, phoneDraft]);
+  }, [activeCallId, calls, dialOpen, phoneDraft]);
 
   const handlePrepareNewCall = useCallback(() => {
     setActiveCallDetail((current) => {
@@ -284,7 +305,8 @@ function VoiceCallsPanelContent({
 
   const handleOpenDialpad = useCallback(() => {
     setWorkspaceView({ mode: "dialpad" });
-  }, []);
+    router.push(`${DASHBOARD_ROUTES.voice}?dial=1`);
+  }, [router]);
 
   const handleWorkspaceViewChange = useCallback((view: VoiceWorkspaceView) => {
     setWorkspaceView(view);
@@ -304,6 +326,7 @@ function VoiceCallsPanelContent({
   );
 
   const handleBackToList = useCallback(() => {
+    setWorkspaceView({ mode: "home" });
     router.push(DASHBOARD_ROUTES.voice);
   }, [router]);
 
@@ -422,7 +445,13 @@ function VoiceCallsPanelContent({
     );
   }
 
-  const showDetailOnMobile = true;
+  const showDetailOnMobile = Boolean(activeCallId || phoneDraft || dialOpen);
+  const showSubPageBack =
+    showDetailOnMobile &&
+    (workspaceView.mode === "history" ||
+      workspaceView.mode === "recordings" ||
+      workspaceView.mode === "transcripts" ||
+      workspaceView.mode === "transcript");
 
   return (
     <>
@@ -431,24 +460,43 @@ function VoiceCallsPanelContent({
         showRightColumn={showRightPanel}
         listColumn={
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <h1 className="text-xl font-semibold">{VOICE_MESSAGES.inboxTabLabel}</h1>
-                <VoiceInboxToolbar
-                  showDialpadToggle={hasNumberSelected && workspaceView.mode === "home"}
-                  dialpadOpen={workspaceView.mode === "dialpad"}
-                  onOpenDialpad={handleOpenDialpad}
-                />
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <h1 className="text-lg font-semibold lg:text-xl">
+                  {VOICE_MESSAGES.inboxTabLabel}
+                </h1>
+                <div className="hidden lg:block">
+                  <VoiceInboxToolbar
+                    showDialpadToggle={
+                      hasNumberSelected && workspaceView.mode === "home"
+                    }
+                    dialpadOpen={workspaceView.mode === "dialpad"}
+                    onOpenDialpad={handleOpenDialpad}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="size-8 shrink-0 lg:hidden"
+                  aria-label={VOICE_MESSAGES.dialpadTitle}
+                  onClick={handleOpenDialpad}
+                >
+                  <Grid3x3Icon className="size-4" />
+                </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={() => setContactsOpen(true)}
+                  className="px-2.5 sm:px-3"
                 >
-                  <UserIcon className="mr-2 size-4" />
-                  {VOICE_MESSAGES.contactsButton}
+                  <UserIcon className="size-4 sm:mr-2" />
+                  <span className="hidden sm:inline">
+                    {VOICE_MESSAGES.contactsButton}
+                  </span>
                 </Button>
               </div>
             </div>
@@ -466,11 +514,37 @@ function VoiceCallsPanelContent({
         chatColumn={
           <div className="flex h-full min-h-0 flex-col">
             {showDetailOnMobile ? (
-              <div className="shrink-0 border-b px-3 py-2 lg:hidden">
-                <Button variant="ghost" size="sm" type="button" onClick={handleBackToList}>
+              <div className="flex shrink-0 items-center gap-1 border-b px-2 py-2 lg:hidden">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    if (showSubPageBack) {
+                      setWorkspaceView({ mode: "home" });
+                      return;
+                    }
+                    handleBackToList();
+                  }}
+                >
                   <ArrowLeftIcon className="size-4" />
-                  {VOICE_MESSAGES.inboxTabLabel}
+                  {showSubPageBack
+                    ? VOICE_MESSAGES.callPhoneLabel
+                    : VOICE_MESSAGES.inboxTabLabel}
                 </Button>
+                {workspaceView.mode === "home" ||
+                workspaceView.mode === "dialpad" ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="ml-auto size-8"
+                    aria-label={VOICE_MESSAGES.dialpadTitle}
+                    onClick={handleOpenDialpad}
+                  >
+                    <Grid3x3Icon className="size-4" />
+                  </Button>
+                ) : null}
               </div>
             ) : null}
             <VoiceWorkspacePanel

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { XIcon } from "lucide-react";
+import { ArrowLeftIcon, CalendarDaysIcon, XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -30,6 +30,7 @@ import {
   formatHeaderDate,
   formatTimeRange,
   isSameDay,
+  parseDateQueryParam,
   startOfDay,
 } from "./utils";
 
@@ -51,6 +52,8 @@ type OrzuxCalendarProps = {
   accountEmail?: string | null;
   googleConnected?: boolean;
   lastSyncedAt?: string | null;
+  /** YYYY-MM-DD from ?date= — opens that day in the calendar. */
+  initialDate?: string | null;
 };
 
 export function OrzuxCalendar({
@@ -65,14 +68,21 @@ export function OrzuxCalendar({
   accountEmail,
   googleConnected = false,
   lastSyncedAt = null,
+  initialDate = null,
 }: OrzuxCalendarProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [openTimesExpanded, setOpenTimesExpanded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-  const [visibleMonth, setVisibleMonth] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  const [mobileSurface, setMobileSurface] = useState<"bookings" | "day">(
+    "bookings",
   );
+  const [openTimesExpanded, setOpenTimesExpanded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    return parseDateQueryParam(initialDate) ?? startOfDay(new Date());
+  });
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const base = parseDateQueryParam(initialDate) ?? new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
   const [selectedEvent, setSelectedEvent] = useState<OrzuxCalendarEvent | null>(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -83,6 +93,15 @@ export function OrzuxCalendar({
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskInitialStart, setTaskInitialStart] = useState<Date | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const parsed = parseDateQueryParam(initialDate);
+    if (!parsed) {
+      return;
+    }
+    setSelectedDate(parsed);
+    setVisibleMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+  }, [initialDate]);
 
   const openTaskDialog = useCallback((open: boolean) => {
     setTaskDialogOpen(open);
@@ -176,6 +195,15 @@ export function OrzuxCalendar({
     () => slots.filter((slot) => isSameDay(new Date(slot.start), selectedDate)),
     [slots, selectedDate],
   );
+
+  const bookingEvents = useMemo(() => {
+    return events
+      .filter((event) => event.kind === "booking" || event.isBooking)
+      .slice()
+      .sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
+  }, [events]);
 
   const openBooking = useCallback((start: Date | null = null) => {
     setBookingInitialStart(start);
@@ -272,8 +300,23 @@ export function OrzuxCalendar({
 
   useCalendarChromeRegistration(chromeConfig);
 
+  const createMenu = (
+    <OrzuxCalendarCreateMenu
+      selectedDate={selectedDate}
+      variant="fab"
+      bookingPageCount={bookingPages.length}
+      onOpenBooking={() => openBooking()}
+      eventOpen={eventDialogOpen}
+      onEventOpenChange={setEventDialogOpen}
+      taskOpen={taskDialogOpen}
+      onTaskOpenChange={openTaskDialog}
+      taskInitialStart={taskInitialStart}
+      onPrepareTaskOpen={() => setTaskInitialStart(null)}
+    />
+  );
+
   return (
-    <div className="relative flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
+    <div className="relative flex dashboard-main-frame flex-col overflow-hidden bg-background">
       {syncError ? (
         <div className="shrink-0 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive md:px-6">
           {syncError}.{" "}
@@ -283,7 +326,106 @@ export function OrzuxCalendar({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+      {/* Mobile: bookings list first, day calendar behind icon */}
+      <div className="flex min-h-0 flex-1 flex-col md:hidden">
+        {mobileSurface === "bookings" ? (
+          <>
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold">Bookings</h1>
+                <p className="truncate text-xs text-muted-foreground">
+                  {bookingEvents.length} upcoming
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-9 shrink-0"
+                aria-label={GOOGLE_CALENDAR_MESSAGES.pageTitle}
+                onClick={() => setMobileSurface("day")}
+              >
+                <CalendarDaysIcon className="size-4" />
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              {bookingEvents.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  No bookings yet. Tap + to create one.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {bookingEvents.map((event) => (
+                    <li key={event.id}>
+                      <button
+                        type="button"
+                        className="w-full rounded-xl border bg-card px-3 py-3 text-left transition-colors hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setEventSheetOpen(true);
+                        }}
+                      >
+                        <p className="truncate font-medium">{event.summary}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {formatTimeRange(event.start, event.end)}
+                          {event.customerName
+                            ? ` · ${event.customerName}`
+                            : null}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="pointer-events-none absolute bottom-20 right-4 z-30 md:bottom-6">
+              <div className="pointer-events-auto">{createMenu}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileSurface("bookings")}
+              >
+                <ArrowLeftIcon className="size-4" />
+                Bookings
+              </Button>
+              <p className="ml-auto truncate text-sm capitalize text-muted-foreground">
+                {headerDateLabel}
+              </p>
+            </div>
+            <div className="relative min-h-0 flex-1 overflow-hidden p-3">
+              <OrzuxCalendarDayGrid
+                selectedDate={selectedDate}
+                events={events}
+                timeZone={timeZone}
+                onEventClick={(event) => {
+                  setSelectedEvent(event);
+                  setEventSheetOpen(true);
+                }}
+                onSlotClick={(time) => {
+                  setSlotTime(time);
+                  setSlotSheetOpen(true);
+                }}
+                onTaskStatusChange={(event, status) =>
+                  void handleTaskStatusChange(event, status)
+                }
+                updatingTaskId={updatingTaskId}
+              />
+              <div className="pointer-events-none absolute bottom-4 right-4 z-30">
+                <div className="pointer-events-auto">{createMenu}</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop */}
+      <div className="relative hidden min-h-0 flex-1 overflow-hidden md:flex">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
           <OrzuxCalendarDayGrid
             selectedDate={selectedDate}
@@ -302,20 +444,7 @@ export function OrzuxCalendar({
           />
 
           <div className="pointer-events-none absolute bottom-6 right-6 z-30">
-            <div className="pointer-events-auto">
-              <OrzuxCalendarCreateMenu
-                selectedDate={selectedDate}
-                variant="fab"
-                bookingPageCount={bookingPages.length}
-                onOpenBooking={() => openBooking()}
-                eventOpen={eventDialogOpen}
-                onEventOpenChange={setEventDialogOpen}
-                taskOpen={taskDialogOpen}
-                onTaskOpenChange={openTaskDialog}
-                taskInitialStart={taskInitialStart}
-                onPrepareTaskOpen={() => setTaskInitialStart(null)}
-              />
-            </div>
+            <div className="pointer-events-auto">{createMenu}</div>
           </div>
         </div>
 

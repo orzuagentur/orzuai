@@ -44,7 +44,7 @@ function ActivationGate() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
-            {["Behavior", "Voice AI calls", "Activate"].map((item) => (
+            {["Behavior", "Calls AI", "Activate"].map((item) => (
               <div
                 key={item}
                 className="rounded-xl border bg-muted/20 p-4 text-center"
@@ -106,14 +106,14 @@ export function AiAssistantShell({ data, children }: AiAssistantShellProps) {
 
   if (shouldShowActivation) {
     return (
-      <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
         <ActivationGate />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-hidden bg-background">
+    <div className="flex dashboard-main-frame min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-hidden bg-background">
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
         {children}
       </div>

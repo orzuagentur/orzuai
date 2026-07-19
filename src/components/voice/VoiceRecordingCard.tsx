@@ -250,7 +250,7 @@ export function VoiceRecordingCard({
           <div className="mt-3 space-y-1.5">
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-[width] duration-150"
+                className="h-full rounded-full bg-zinc-500 transition-[width] duration-150"
                 style={{ width: `${progress}%` }}
               />
             </div>

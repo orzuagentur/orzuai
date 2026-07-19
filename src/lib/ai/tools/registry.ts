@@ -77,9 +77,9 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     description:
       "Create a customer order/request (product or service fulfillment) — NEVER a calendar booking.",
     orchestratorHint:
-      "CRITICAL: Orders and bookings are mutually exclusive. Use create_order ONLY for product/service requests (delivery, quote, repair, purchase) with NO appointment slot. NEVER use create_order for appointments, reservations, visits, or scheduled times — those require create_calendar_event. NEVER use create_calendar_event for orders. Prefer create_deal for sales pipeline quotes when tracking value/stage; use create_order for the operational Orders queue.",
+      "CRITICAL: Orders and bookings are mutually exclusive. Use create_order ONLY for product/service requests (delivery, quote, repair, purchase) with NO appointment slot. NEVER use create_order for appointments, reservations, visits, or scheduled times — those require create_calendar_event. NEVER use create_calendar_event for orders. Prefer create_deal for sales pipeline quotes when tracking value/stage; use create_order for the operational Orders queue. Fill ALL configured order-form fields from the conversation (required ones must not be empty). When options are listed for a field, prefer an exact option value. Put custom field values in fields{key:value}.",
     executorHint:
-      "Capture a clear order title, optional serviceType, description, and amount. Never create a calendar event for the same request.",
+      "Fill configured order form fields from customer data. Required fields must be present. Prefer listed options when available. Use fields for custom keys. Title can be derived if missing.",
     schema: executorCreateOrderActionSchema,
   },
   {
@@ -127,9 +127,9 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     description:
       "Book instantly via OrzuX calendar with slot resolution and email confirmation — NEVER for product/service orders.",
     orchestratorHint:
-      "Use ONLY for appointments/reservations when booking is enabled and the customer gave a usable date/time. NEVER use for orders/requests (заявка/заказ) — those use create_order.",
+      "Use ONLY for appointments/reservations when booking is enabled and the customer gave a usable date/time or date range. For hotels: startDateTime=check-in, endDateTime=check-out (full stay). NEVER for product/service orders — those use create_order.",
     executorHint:
-      "Deterministic booking: code resolves conflicts and sends confirmation email. Never create an order for the same request.",
+      "Deterministic booking: code resolves conflicts, preserves multi-day ranges, and sends confirmation email. Never create an order for the same request.",
     schema: executorCreateCalendarEventActionSchema,
   },
   {

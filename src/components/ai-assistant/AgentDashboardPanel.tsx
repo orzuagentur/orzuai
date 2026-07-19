@@ -60,7 +60,7 @@ function AgentActiveIcon({ active }: { active: boolean }) {
     <div className="relative flex size-24 items-center justify-center">
       {active ? (
         <span
-          className="absolute inset-0 rounded-full border-[3px] border-emerald-500/15 border-t-emerald-500 border-r-emerald-400 animate-spin motion-reduce:animate-none"
+          className="absolute inset-0 rounded-full border-[3px] border-zinc-900/10 border-t-zinc-900 border-r-zinc-500 animate-spin motion-reduce:animate-none"
           aria-hidden
         />
       ) : null}
@@ -68,7 +68,7 @@ function AgentActiveIcon({ active }: { active: boolean }) {
         className={cn(
           "relative z-10 flex size-20 items-center justify-center rounded-full shadow-md",
           active
-            ? "bg-emerald-500 text-white shadow-emerald-500/25"
+            ? "bg-zinc-900 text-white shadow-zinc-900/20"
             : "bg-muted text-muted-foreground",
         )}
       >
@@ -292,7 +292,7 @@ function AgentTestChatCard() {
                 )}
               >
                 {message.role === "assistant" ? (
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-500 text-white">
                     <BotIcon className="size-4" />
                   </div>
                 ) : null}
@@ -373,7 +373,7 @@ export function AgentDashboardPanel({
           iconClassName="bg-violet-100 text-violet-600"
         />
         <MetricCard
-          label="Voice AI replies"
+          label="Calls AI replies"
           value={formatMetricValue(stats.voiceAiReplies)}
           hint={`${formatMetricValue(stats.voiceAiReplyMinutes)} min`}
           icon={Volume2Icon}
@@ -390,7 +390,7 @@ export function AgentDashboardPanel({
           label="Contacts served"
           value={formatMetricValue(stats.contactsServed)}
           icon={UsersIcon}
-          iconClassName="bg-emerald-100 text-emerald-600"
+          iconClassName="bg-zinc-100 text-zinc-600"
         />
       </div>
 
@@ -435,7 +435,7 @@ export function AgentDashboardPanel({
                     variant={settings.aiEnabled ? "default" : "secondary"}
                     className={cn(
                       settings.aiEnabled &&
-                        "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+                        "bg-zinc-100 text-zinc-800 hover:bg-zinc-100",
                     )}
                   >
                     {settings.aiEnabled ? "Online" : "Off"}
@@ -518,7 +518,7 @@ export function AgentDashboardPanel({
                       className={cn(
                         "shrink-0",
                         dialogue.status === "resolved" &&
-                          "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+                          "bg-zinc-100 text-zinc-800 hover:bg-zinc-100",
                         dialogue.status === "waiting" &&
                           "bg-amber-100 text-amber-900 hover:bg-amber-100",
                       )}

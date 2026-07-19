@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AUTH_ROUTES } from "@/constants/routes";
+import { PASSWORD_RESET_MESSAGES } from "@/features/auth/constants";
 import { usePasswordResetRequest } from "@/hooks/use-password-reset-request";
 import { cn } from "@/lib/utils";
 
@@ -61,10 +62,10 @@ export function ForgotPasswordForm({ className }: ForgotPasswordFormProps) {
         {isLoading ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
-            Sending reset link...
+            {PASSWORD_RESET_MESSAGES.sendingCode}
           </>
         ) : (
-          "Send reset link"
+          PASSWORD_RESET_MESSAGES.sendCodeButton
         )}
       </Button>
 

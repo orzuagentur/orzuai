@@ -23,7 +23,7 @@ export function LandingPlatformStrip({ open }: LandingPlatformStripProps) {
           animate={{ opacity: 1, y: 0 }}
           exit={reducedMotion ? undefined : { opacity: 0, y: -6 }}
           transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="border-b border-white/[0.06] bg-[#060b12]/95 backdrop-blur-xl"
+          className="border-b border-white/10 bg-[#0f1716]/95 backdrop-blur-xl"
           role="region"
           aria-label="OrzuX platform modules"
         >
@@ -41,7 +41,7 @@ function PlatformStripContent() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-white/38">
+        <p className="text-[11px] font-medium uppercase text-white/38">
           {copy.platformStrip.title}
         </p>
         <p className="text-[11px] text-white/38">
@@ -50,7 +50,7 @@ function PlatformStripContent() {
       </div>
 
       <div
-        className="flex items-stretch gap-0 overflow-x-auto rounded-xl border border-white/[0.07] bg-white/[0.02] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-stretch gap-0 overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="list"
       >
         {services.map((service, index) => (

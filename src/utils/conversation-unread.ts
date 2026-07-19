@@ -89,6 +89,15 @@ export function sumUnreadByChannel(
   );
 }
 
+/** Chats nav badge — exclude Calls (voice); those belong under Calls. */
+export function sumChatsInboxUnread(
+  unreadByChannel: Partial<Record<MessagingChannel, number>>,
+): number {
+  return (Object.entries(unreadByChannel) as [MessagingChannel, number | undefined][])
+    .filter(([channel]) => channel !== "voice")
+    .reduce((total, [, count]) => total + (count ?? 0), 0);
+}
+
 export function countUnreadClientMessages(
   messages: ChatMessageData[],
   lastReadAt: string | null,

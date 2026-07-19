@@ -84,7 +84,7 @@ export function TeamRolesPanel() {
                             className={cn(
                               "inline-flex size-7 items-center justify-center rounded-full",
                               enabled
-                                ? "bg-emerald-500/10 text-emerald-600"
+                                ? "bg-zinc-500/10 text-zinc-600"
                                 : "bg-muted text-muted-foreground",
                             )}
                           >

@@ -33,7 +33,7 @@ function statusBadgeClass(status: CrmOrderStatus): string {
     case "in_progress":
       return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200";
     case "done":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200";
+      return "border-zinc-200 bg-zinc-50 text-zinc-800 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-200";
     case "cancelled":
       return "border-muted bg-muted text-muted-foreground";
   }

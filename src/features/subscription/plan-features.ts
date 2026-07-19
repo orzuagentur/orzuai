@@ -30,11 +30,11 @@ export function buildPlanFeaturesFromEntitlements(
   if (entitlements.voiceAi) {
     features.push(
       entitlements.monthlyVoiceMinutes > 0
-        ? `Voice AI - ${entitlements.monthlyVoiceMinutes} min / month`
-        : "Voice AI agent",
+        ? `Calls AI - ${entitlements.monthlyVoiceMinutes} min / month`
+        : "Calls AI agent",
     );
   } else {
-    features.push("Voice AI - upgrade to Pro");
+    features.push("Calls AI - upgrade to Pro");
   }
 
   if (entitlements.followUpAgent) {

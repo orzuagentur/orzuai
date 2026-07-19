@@ -20,6 +20,7 @@ export const CONTACTS_MESSAGES = {
   pageDescription:
     "All contacts across WhatsApp, Instagram, Telegram, and Website Forms.",
   filtersLabel: "Filters",
+  channelsLabel: "Channels",
   segmentsLabel: "Segments",
   searchPlaceholder: "Search by name, phone, or email…",
   searchEmptyTitle: "No matches",

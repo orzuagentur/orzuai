@@ -171,5 +171,12 @@ export const ANALYTICS_CARD_LABELS = {
   conversionRate: "AI Coverage",
 } as const;
 
+export {
+  DASHBOARD_ACTIVITY_VIEWS,
+  DASHBOARD_CARD_PERIOD_OPTIONS,
+  DASHBOARD_CARD_SLOTS,
+} from "./metric-cards";
+
+
 export const DASHBOARD_COMING_SOON_MESSAGE =
   "This section is coming in a future release.";

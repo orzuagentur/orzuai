@@ -6,9 +6,6 @@ import { APP_ORIGIN } from "@/constants/app-origin";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
-const GOOGLE_ANALYTICS_ID =
-  process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID?.trim() || "G-JDJV13PM0T";
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -80,24 +77,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: [
-      {
-        url: "/platform-icon-light.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/platform-icon.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: dark)",
-      },
-    ],
+    icon: [{ url: "/platform-icon-light.png", type: "image/png" }],
     apple: [{ url: "/platform-icon-light.png", type: "image/png" }],
   },
 };
 
 export const viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#f3f4f6",
 };
 
 export default function RootLayout({
@@ -109,26 +95,30 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ colorScheme: "light" }}
       suppressHydrationWarning
     >
       <head>
         <Script id="theme-init" strategy="beforeInteractive">
-          {`(function(){try{var t=localStorage.getItem("theme");var d=window.matchMedia("(prefers-color-scheme: dark)").matches;if(t==="dark"||(!t||t==="system")&&d){document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark";}else{document.documentElement.style.colorScheme="light";}}catch(e){}})();`}
+          {`(function(){try{document.documentElement.classList.remove("dark");document.documentElement.style.colorScheme="light";localStorage.setItem("theme","light");}catch(e){}})();`}
         </Script>
-      </head>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
+        <Script id="ga-consent-default" strategy="beforeInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GOOGLE_ANALYTICS_ID}');
+            gtag('consent', 'default', {
+              ad_storage: 'denied',
+              ad_user_data: 'denied',
+              ad_personalization: 'denied',
+              analytics_storage: 'denied',
+              functionality_storage: 'granted',
+              security_storage: 'granted',
+              wait_for_update: 500
+            });
           `}
         </Script>
+      </head>
+      <body className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -755,7 +755,7 @@ export function AiAssistantEditPanel({
                 Status:{" "}
                 <span
                   className={
-                    permissions.canReply ? "text-emerald-600" : "text-destructive"
+                    permissions.canReply ? "text-zinc-600" : "text-destructive"
                   }
                 >
                   {permissions.canReply ? "Active" : "Deactivated"}
@@ -764,7 +764,7 @@ export function AiAssistantEditPanel({
               <p className="mt-2 text-sm text-muted-foreground">
                 {permissions.canReply
                   ? "Deactivating stops autonomous customer replies. CRM and calendar actions will not run until you activate the agent again."
-                  : "Complete required Behavior settings, optionally configure Voice AI for calls, then activate the agent."}
+                  : "Complete required Behavior settings, optionally configure Calls AI for calls, then activate the agent."}
               </p>
             </div>
 
@@ -793,7 +793,7 @@ export function AiAssistantEditPanel({
                     <li
                       key={item.label}
                       className={
-                        item.ok ? "text-emerald-700" : "text-amber-700"
+                        item.ok ? "text-zinc-700" : "text-amber-700"
                       }
                     >
                       {item.ok ? "✓" : "○"} {item.label}
@@ -897,7 +897,7 @@ export function AiAssistantEditPanel({
                     isActive
                       ? "border-violet-200 bg-violet-50 font-medium text-violet-900"
                       : isDone
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        ? "border-zinc-200 bg-zinc-50 text-zinc-800"
                         : "bg-background text-muted-foreground hover:bg-muted/40",
                   )}
                 >

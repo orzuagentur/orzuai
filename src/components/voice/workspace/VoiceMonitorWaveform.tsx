@@ -25,7 +25,7 @@ export function VoiceMonitorWaveform({
         <span
           key={index}
           className={cn(
-            "w-1 rounded-full bg-emerald-500/80 transition-all",
+            "w-1 rounded-full bg-zinc-500/80 transition-all",
             active ? "animate-pulse" : "h-1 bg-muted-foreground/30",
           )}
           style={

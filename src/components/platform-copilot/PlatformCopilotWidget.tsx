@@ -336,7 +336,7 @@ export function PlatformCopilotWidget() {
 
       <div
         data-platform-copilot-root
-        className="pointer-events-none fixed bottom-4 left-4 z-50 md:left-[calc(var(--sidebar-width)+1rem)]"
+        className="pointer-events-none fixed bottom-20 right-4 z-50 md:bottom-4 md:left-[calc(var(--sidebar-width)+1rem)] md:right-auto"
         style={{
           transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
         }}

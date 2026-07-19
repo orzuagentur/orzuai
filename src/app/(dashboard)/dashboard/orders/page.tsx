@@ -5,6 +5,7 @@ import { DashboardSetupPrompt } from "@/components/dashboard/DashboardSetupPromp
 import { OrdersPanel } from "@/components/orders/OrdersPanel";
 import { ORDERS_MESSAGES } from "@/features/orders/constants";
 import { getCrmOrdersPageData } from "@/services/crm-orders.service";
+import { getOwnedOrderFormFields } from "@/services/order-form-fields.service";
 
 type OrdersPageProps = {
   searchParams: Promise<{ status?: string; q?: string; order?: string }>;
@@ -24,11 +25,14 @@ async function OrdersPageContent({
   searchParams: Promise<{ status?: string; q?: string; order?: string }>;
 }) {
   const params = await searchParams;
-  const data = await getCrmOrdersPageData({
-    status: params.status,
-    q: params.q,
-    orderId: params.order,
-  });
+  const [data, formFields] = await Promise.all([
+    getCrmOrdersPageData({
+      status: params.status,
+      q: params.q,
+      orderId: params.order,
+    }),
+    getOwnedOrderFormFields(),
+  ]);
 
   if (!data.hasBusiness) {
     return (
@@ -39,5 +43,5 @@ async function OrdersPageContent({
     );
   }
 
-  return <OrdersPanel data={data} />;
+  return <OrdersPanel data={data} formFields={formFields} />;
 }

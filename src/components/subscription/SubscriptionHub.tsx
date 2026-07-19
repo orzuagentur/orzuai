@@ -83,7 +83,7 @@ function statusClassName(status: string): string {
   const normalized = status.trim().toLowerCase();
 
   if (normalized === "active" || normalized === "trialing") {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    return "border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300";
   }
 
   if (normalized === "past_due" || normalized === "unpaid") {
@@ -168,7 +168,7 @@ function AddOnRow({
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">{addOn.label}</p>
           {addOn.activeQuantity > 0 ? (
-            <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+            <Badge className="bg-zinc-500/10 text-zinc-700 dark:text-zinc-300">
               {SUBSCRIPTION_MESSAGES.addonActiveLabel} x{addOn.activeQuantity}
             </Badge>
           ) : null}

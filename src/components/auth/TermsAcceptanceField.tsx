@@ -26,7 +26,7 @@ export function TermsAcceptanceField({
           checked={checked}
           disabled={disabled}
           onChange={(event) => onChange(event.target.checked)}
-          className="mt-1 size-4 rounded border border-input"
+          className="mt-1 size-4 rounded border border-input accent-primary"
           aria-invalid={Boolean(error)}
         />
         <span className="text-muted-foreground">

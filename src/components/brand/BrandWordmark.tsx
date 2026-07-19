@@ -12,7 +12,7 @@ export function BrandWordmark({ className, size = "md" }: BrandWordmarkProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-baseline truncate font-medium tracking-[0.12em] text-inherit uppercase",
+        "inline-flex items-baseline truncate font-medium text-inherit uppercase",
         sizeClass,
         className,
       )}
@@ -21,7 +21,7 @@ export function BrandWordmark({ className, size = "md" }: BrandWordmarkProps) {
       <span
         className={cn(
           "relative -ml-0.5 inline-block font-black leading-none",
-          "bg-gradient-to-br from-emerald-500 via-cyan-500 to-sky-500 bg-clip-text text-transparent",
+          "bg-gradient-to-br from-zinc-800 via-zinc-600 to-zinc-400 bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-zinc-500",
           size === "lg"
             ? "text-[1.55em] -translate-y-[0.06em]"
             : size === "sm"

@@ -283,7 +283,7 @@ export function OrzuxCalendarEventSheet({
                 </div>
               ) : null}
               {event.isBooking ? (
-                <div className="rounded-lg border bg-emerald-500/5 px-3 py-2 text-emerald-700 dark:text-emerald-300">
+                <div className="rounded-lg border bg-zinc-500/5 px-3 py-2 text-zinc-700 dark:text-zinc-300">
                   {ORZUX_CALENDAR_MESSAGES.bookingBadge}
                 </div>
               ) : null}

@@ -13,9 +13,12 @@ export type LandingChannelId =
   | "instagram"
   | "telegram"
   | "website_forms"
+  | "website_chat"
   | "voice"
   | "email"
   | "google_calendar";
+
+export type { LandingLiveEvent } from "@/features/landing/demo/types";
 
 export type LandingIconKey =
   | "ai"
@@ -80,21 +83,6 @@ export type LandingSolutionCard = {
   outcomes: string[];
 };
 
-export type LandingLiveEvent = {
-  id: string;
-  channel: LandingChannelId;
-  label: string;
-  customer: string;
-  message: string;
-  aiReply: string;
-  intent: string;
-  deal: string;
-  nextStep: string;
-  callStatus: string;
-  calendar: string;
-  metric: string;
-};
-
 export type LandingCopy = {
   meta: {
     title: string;
@@ -112,16 +100,12 @@ export type LandingCopy = {
       services: string;
       solutions: string;
       enterprise: string;
-      developers: string;
       resources: string;
       pricing: string;
       documentation: string;
       company: string;
     };
-    mega: Record<
-      "products" | "solutions" | "developers" | "resources",
-      LandingMegaPanel
-    >;
+    mega: Record<"products" | "solutions" | "resources", LandingMegaPanel>;
   };
   hero: {
     eyebrow: string;
@@ -146,13 +130,55 @@ export type LandingCopy = {
     inbox: string;
     aiResponse: string;
     crm: string;
-    voice: string;
+    calls: string;
     calendar: string;
     actions: string;
     guardrailTitle: string;
     guardrailText: string;
     synced: string;
-    events: LandingLiveEvent[];
+    crmActions: string;
+    playCall: string;
+    pauseCall: string;
+    callListeningHint: string;
+    liveTranscript: string;
+    openCalendar: string;
+    calendarTitle: string;
+    bookingLive: string;
+    thisWeek: string;
+    calendarSync: string;
+    bookingSummary: string;
+    summaryCustomer: string;
+    summaryMeeting: string;
+    summaryTime: string;
+    summaryFollowUp: string;
+    bookingFootnote: string;
+    dialer: string;
+    dialerHint: string;
+    calendarListHint: string;
+    calendarListPreview: string;
+    addCalendarItem: string;
+    addBooking: string;
+    addEvent: string;
+    addTask: string;
+    calendarItemTitle: string;
+    calendarHour: string;
+    calendarMinute: string;
+    saveCalendarItem: string;
+    cancel: string;
+    messagePlaceholder: string;
+    sendMessage: string;
+    emailSubjectLabel: string;
+    emailBodyPlaceholder: string;
+    emailSendAction: string;
+    listenLive: string;
+    stopListen: string;
+    callListening: string;
+    mute: string;
+    unmute: string;
+    callHold: string;
+    resume: string;
+    takeOver: string;
+    endCall: string;
   };
   platform: {
     eyebrow: string;
@@ -170,6 +196,9 @@ export type LandingCopy = {
     eyebrow: string;
     title: string;
     subtitle: string;
+    honestyNote?: string;
+    checklistTitle?: string;
+    checklist?: string[];
     pillars: LandingProductCard[];
   };
   platformStrip: {
@@ -181,10 +210,15 @@ export type LandingCopy = {
     eyebrow: string;
     title: string;
     subtitle: string;
+    lead?: string;
+    outcomeTitle?: string;
+    outcomeBody?: string;
+    principles?: { title: string; description: string }[];
     nodes: {
       id: string;
       label: string;
       caption: string;
+      detail?: string;
     }[];
   };
   faq: {
@@ -270,7 +304,6 @@ const EN: LandingCopy = {
       services: "Services",
       solutions: "Solutions",
       enterprise: "Enterprise",
-      developers: "Developers",
       resources: "Resources",
       pricing: "Pricing",
       documentation: "Documentation",
@@ -286,12 +319,12 @@ const EN: LandingCopy = {
             items: [
               {
                 title: "Unified Inbox",
-                description: "WhatsApp, Instagram, Telegram, forms, email, and SMS in one queue.",
+                description: "WhatsApp, Telegram, Website Chat, and Email in one queue.",
                 href: "#platform",
                 icon: "inbox",
               },
               {
-                title: "Voice AI",
+                title: "Calls AI",
                 description: "AI answers calls, qualifies intent, and hands off with context.",
                 href: "#platform",
                 icon: "phone",
@@ -319,22 +352,11 @@ const EN: LandingCopy = {
                 href: "#platform",
                 icon: "calendar",
               },
-            ],
-          },
-          {
-            title: "Measure",
-            items: [
               {
                 title: "AI Analytics",
                 description: "Channel performance, AI usage, response quality, and ROI signals.",
                 href: "#enterprise",
                 icon: "analytics",
-              },
-              {
-                title: "Integrations",
-                description: "Official provider connections with provider-owned credentials.",
-                href: "#architecture",
-                icon: "integrations",
               },
             ],
           },
@@ -348,107 +370,113 @@ const EN: LandingCopy = {
       },
       solutions: {
         title: "Solutions",
-        description: "Purpose-built flows for teams that live close to the customer.",
+        description:
+          "Industry playbooks for teams that live in messaging, calls, and bookings.",
         columns: [
           {
-            title: "Revenue teams",
+            title: "Local & guest",
             items: [
               {
-                title: "Sales Development",
-                description: "Qualify leads, answer objections, and book meetings around the clock.",
-                href: "#solutions",
+                title: "Clinics & medical",
+                description: "Appointments, FAQs, and human-safe handoff.",
+                href: "/docs/clinics-and-medical",
+                icon: "calendar",
+              },
+              {
+                title: "Beauty & salons",
+                description: "Booking pages and chat that does not interrupt service.",
+                href: "/docs/beauty-and-salons",
                 icon: "spark",
               },
               {
-                title: "Local Services",
-                description: "Turn calls, DMs, and forms into confirmed appointments.",
-                href: "#solutions",
-                icon: "calendar",
-              },
-            ],
-          },
-          {
-            title: "Operations",
-            items: [
-              {
-                title: "Customer Support",
-                description: "Resolve common questions and route sensitive cases to humans.",
-                href: "#solutions",
+                title: "Restaurants & cafés",
+                description: "Reservations, events, and guest questions.",
+                href: "/docs/restaurants-and-cafes",
                 icon: "chat",
               },
               {
-                title: "Agencies",
-                description: "Manage multiple client workspaces with clear usage and outcomes.",
-                href: "#solutions",
+                title: "Hospitality & hotels",
+                description: "Pre-arrival messaging and shared guest history.",
+                href: "/docs/hospitality-and-hotels",
                 icon: "users",
               },
             ],
           },
-        ],
-        featured: {
-          title: "Built for real workflows",
-          description: "Not a chatbot layer. OrzuX updates the business system behind every conversation.",
-          cta: "Explore use cases",
-          href: "#solutions",
-        },
-      },
-      developers: {
-        title: "Developers",
-        description: "Connect OrzuX to the systems your business already trusts.",
-        columns: [
           {
-            title: "Build",
+            title: "Sales & field",
             items: [
               {
-                title: "API & Webhooks",
-                description: "Route events, sync conversations, and connect internal tools.",
-                href: "#architecture",
-                icon: "api",
+                title: "Real estate",
+                description: "Qualify leads and book viewings with shared CRM.",
+                href: "/docs/real-estate",
+                icon: "crm",
               },
               {
-                title: "Documentation",
-                description: "Implementation guidance for integrations and platform setup.",
-                href: "#architecture",
-                icon: "docs",
-              },
-            ],
-          },
-          {
-            title: "Control",
-            items: [
-              {
-                title: "Security Model",
-                description: "Business-scoped data, signed webhooks, and provider keys.",
-                href: "#enterprise",
-                icon: "security",
+                title: "Home services",
+                description: "Forms, calls, and estimate scheduling for field teams.",
+                href: "/docs/home-services",
+                icon: "phone",
               },
               {
-                title: "Guardrails",
-                description: "Human handoff, reply controls, and knowledge-grounded responses.",
-                href: "#enterprise",
+                title: "Auto & dealerships",
+                description: "Service booking and sales/service conversation memory.",
+                href: "/docs/auto-and-dealerships",
+                icon: "workflow",
+              },
+              {
+                title: "Professional services",
+                description: "Intake forms and consult booking without free advice leaks.",
+                href: "/docs/professional-services",
                 icon: "guardrails",
               },
             ],
           },
+          {
+            title: "Growth",
+            items: [
+              {
+                title: "Education & training",
+                description: "Enrollment FAQs and consultation booking.",
+                href: "/docs/education-and-training",
+                icon: "docs",
+              },
+              {
+                title: "Fitness & wellness",
+                description: "Trials, membership questions, and front-desk chat.",
+                href: "/docs/fitness-and-wellness",
+                icon: "analytics",
+              },
+            ],
+          },
         ],
         featured: {
-          title: "Production-ready architecture",
-          description: "Designed for teams that need AI-assisted operations without losing control.",
-          cta: "View architecture",
-          href: "#architecture",
+          title: "All business use cases",
+          description:
+            "Ten industries with honest fit notes: pains, useful features, and first setup steps.",
+          cta: "Browse use cases",
+          href: "/docs/use-cases",
         },
       },
       resources: {
         title: "Resources",
-        description: "Proof, guidance, and answers for evaluating OrzuX.",
+        description:
+          "Evaluate OrzuX with real product docs, pricing clarity, and company context — not slideware.",
         columns: [
           {
             title: "Learn",
             items: [
               {
-                title: "Platform Guide",
-                description: "How the AI communication workspace comes together.",
-                href: "#architecture",
+                title: "Documentation",
+                description:
+                  "Operator guides for inbox, AI agent, CRM, calls, calendar, and trust.",
+                href: "/docs",
+                icon: "docs",
+              },
+              {
+                title: "Getting started",
+                description:
+                  "From account creation to your first connected channel.",
+                href: "/docs/getting-started",
                 icon: "resources",
               },
               {
@@ -464,9 +492,17 @@ const EN: LandingCopy = {
             items: [
               {
                 title: "About OrzuX",
-                description: "A focused platform for customer-facing AI operations.",
-                href: "#footer",
+                description:
+                  "An AI communication workspace for messages, calls, CRM, booking, and human-controlled automation.",
+                href: "/docs/about",
                 icon: "company",
+              },
+              {
+                title: "Security & privacy",
+                description:
+                  "Auth, cookie consent, workspace scoping, and legal documents.",
+                href: "/docs/security-and-privacy",
+                icon: "security",
               },
               {
                 title: "FAQ",
@@ -478,10 +514,11 @@ const EN: LandingCopy = {
           },
         ],
         featured: {
-          title: "Evaluation checklist",
-          description: "Use the page to verify channels, AI control, CRM flow, booking, and analytics.",
-          cta: "Review FAQ",
-          href: "#faq",
+          title: "About OrzuX",
+          description:
+            "Built for teams that need one operational system behind every customer conversation — not a chatbot bolted onto a messenger.",
+          cta: "Read About OrzuX",
+          href: "/docs/about",
         },
       },
     },
@@ -514,77 +551,63 @@ const EN: LandingCopy = {
     ],
   },
   liveDemo: {
-    title: "OrzuX command center",
-    subtitle: "AI replies, creates CRM context, handles calls, books time, and syncs the team.",
+    title: "OrzuX workspace",
+    subtitle: "Real channels, live AI chat, Calls AI, bookings, and CRM actions — the same stack as inside the product.",
     status: "Live system",
     inbox: "Inbox",
-    aiResponse: "AI response",
+    aiResponse: "OrzuX AI",
     crm: "CRM",
-    voice: "Voice",
+    calls: "AI Calls",
     calendar: "Calendar",
     actions: "Actions",
     guardrailTitle: "AI guardrail",
     guardrailText:
       "Knowledge-grounded reply, channel policy checked, human handoff available.",
     synced: "Synced",
-    events: [
-      {
-        id: "booking",
-        channel: "whatsapp",
-        label: "WhatsApp lead",
-        customer: "Amina R.",
-        message: "Can I book a consultation tomorrow after 3?",
-        aiReply: "Yes. I found 3:30 and 4:15. I can reserve either slot and send the confirmation.",
-        intent: "Booking request",
-        deal: "Consultation - qualified",
-        nextStep: "Send confirmation",
-        callStatus: "No call needed",
-        calendar: "3:30 PM reserved",
-        metric: "12 sec reply",
-      },
-      {
-        id: "pricing",
-        channel: "instagram",
-        label: "Instagram DM",
-        customer: "Nova Studio",
-        message: "Do you have monthly plans for teams?",
-        aiReply: "Yes. Starter covers one channel. Pro adds voice AI and advanced analytics.",
-        intent: "Pricing question",
-        deal: "Team plan - warm",
-        nextStep: "Share Pro plan",
-        callStatus: "Follow-up queued",
-        calendar: "Demo link ready",
-        metric: "Deal created",
-      },
-      {
-        id: "voice",
-        channel: "voice",
-        label: "AI phone call",
-        customer: "+49 152 8840",
-        message: "Caller asks for availability and payment options.",
-        aiReply: "AI is speaking naturally, checking business hours, and summarizing the call for the team.",
-        intent: "Appointment + payment",
-        deal: "Inbound call - new",
-        nextStep: "SMS summary",
-        callStatus: "AI answering",
-        calendar: "Open slots checked",
-        metric: "Voice active",
-      },
-      {
-        id: "form",
-        channel: "website_forms",
-        label: "Website form",
-        customer: "Mira Clinic",
-        message: "New enterprise inquiry from the website form.",
-        aiReply: "Lead enriched, routed to the right workspace, and assigned with recommended next action.",
-        intent: "Enterprise inquiry",
-        deal: "Enterprise - priority",
-        nextStep: "Assign owner",
-        callStatus: "Manager notified",
-        calendar: "Discovery call proposed",
-        metric: "SLA protected",
-      },
-    ],
+    crmActions: "CRM actions",
+    playCall: "Play conversation",
+    pauseCall: "Pause",
+    callListeningHint: "Press play to hear customer ↔ AI — same monitor flow as Calls AI.",
+    liveTranscript: "Live call transcript",
+    openCalendar: "Open calendar booking",
+    calendarTitle: "Team calendar · bookings",
+    bookingLive: "Live bookings",
+    thisWeek: "This week",
+    calendarSync: "Google Calendar sync ready",
+    bookingSummary: "Booking summary",
+    summaryCustomer: "Customer",
+    summaryMeeting: "Meeting",
+    summaryTime: "Time",
+    summaryFollowUp: "Follow-up",
+    bookingFootnote:
+      "AI created the event, updated CRM, and queued the confirmation — same booking path as in-app.",
+    dialer: "Dialer",
+    dialerHint: "Enter a number like the in-app Calls dial pad.",
+    calendarListHint: "Bookings · tasks · events",
+    calendarListPreview: "Open the team calendar and add a live demo booking.",
+    addCalendarItem: "Add",
+    addBooking: "Booking",
+    addEvent: "Event",
+    addTask: "Task",
+    calendarItemTitle: "Title",
+    calendarHour: "Hour",
+    calendarMinute: "Minute",
+    saveCalendarItem: "Save",
+    cancel: "Cancel",
+    messagePlaceholder: "Type a message",
+    sendMessage: "Send",
+    emailSubjectLabel: "Subject",
+    emailBodyPlaceholder: "Write your email reply…",
+    emailSendAction: "Send",
+    listenLive: "Listen live",
+    stopListen: "Stop listening",
+    callListening: "Listening",
+    mute: "Mute",
+    unmute: "Unmute",
+    callHold: "Hold",
+    resume: "Resume",
+    takeOver: "Take over",
+    endCall: "End call",
   },
   platform: {
     eyebrow: "Product platform",
@@ -610,7 +633,7 @@ const EN: LandingCopy = {
       },
       {
         id: "voice",
-        title: "Voice AI",
+        title: "Calls AI",
         description: "Answer calls, summarize outcomes, trigger SMS, and escalate to a human when needed.",
         metric: "Always on",
         detail: "Phone-ready",
@@ -667,33 +690,74 @@ const EN: LandingCopy = {
   },
   enterprise: {
     eyebrow: "Enterprise readiness",
-    title: "Autonomy with supervision, context, and control.",
+    title: "Built for control — not unchecked autonomy.",
     subtitle:
-      "Enterprise AI only works when teams can understand what happened, control how agents act, and keep provider relationships clear.",
+      "Enterprise readiness here means business-scoped data, human handoff, role permissions, audit-friendly conversation history, consent-aware analytics, and clear provider boundaries. It does not mean “we replaced your entire IT stack.”",
+    honestyNote:
+      "OrzuX is production software for multi-channel operations. Channel reliability depends on your provider credentials (WhatsApp, Telegram, Twilio, email, Google). AI quality depends on your knowledge and review habits. We document what ships — and what still requires your setup.",
+    checklistTitle: "What serious teams should verify before rollout",
+    checklist: [
+      "Business-scoped access: teammates only see their workspace data",
+      "Human handoff: AI can be paused and a person can take the thread",
+      "Knowledge grounding: answers come from content you control",
+      "Channel activation: each channel is connected deliberately in Integrations",
+      "Cookie/analytics consent: measurement is opt-in, not forced",
+      "Billing clarity: plan limits and provider add-ons are visible in Subscription",
+    ],
     pillars: [
       {
         id: "guardrails",
-        title: "Human handoff",
-        description: "AI can pause, escalate, or let operators reply manually from the same customer record.",
-        metric: "Controlled",
-        detail: "Handoff built in",
+        title: "Human handoff & supervision",
+        description:
+          "Operators can reply manually, escalate sensitive cases, and keep AI from owning high-risk decisions. The same customer record stays visible during takeover.",
+        metric: "Controllable AI",
+        detail: "Handoff in the inbox",
         icon: "guardrails",
       },
       {
         id: "security",
-        title: "Business-scoped data",
-        description: "Workspaces, channels, keys, and conversations stay separated by business context.",
-        metric: "Scoped",
-        detail: "Tenant-aware",
+        title: "Business-scoped tenancy",
+        description:
+          "Conversations, credentials, CRM records, and agent settings are scoped to the business workspace — not a flat shared pool across customers.",
+        metric: "Tenant-aware",
+        detail: "Workspace isolation",
         icon: "security",
       },
       {
         id: "observability",
         title: "Operational visibility",
-        description: "Managers can monitor AI volume, quality signals, queue health, and channel outcomes.",
+        description:
+          "Teams can monitor conversation volume, AI activity, call history, and analytics views that exist in the product today — enough to run the operation, not a fictional “AI trust score.”",
         metric: "Measurable",
-        detail: "AI ops",
+        detail: "Inbox + analytics + calls",
         icon: "analytics",
+      },
+      {
+        id: "roles",
+        title: "Roles & team access",
+        description:
+          "Invite teammates with permissions so billing, integrations, and sensitive settings are not open to everyone by default.",
+        metric: "Permissioned",
+        detail: "Team workspace",
+        icon: "users",
+      },
+      {
+        id: "providers",
+        title: "Provider-honest architecture",
+        description:
+          "Messaging and voice still run on real providers. OrzuX orchestrates them — it does not invent delivery guarantees beyond what WhatsApp, Telegram, Twilio, or email can do.",
+        metric: "Transparent",
+        detail: "Marketplace connections",
+        icon: "integrations",
+      },
+      {
+        id: "privacy",
+        title: "Consent & legal surfaces",
+        description:
+          "Cookie preferences gate analytics. Privacy, Terms, and data-deletion pages are first-class. You remain responsible for customer messaging consent in your jurisdiction.",
+        metric: "Accountable",
+        detail: "Privacy + cookies",
+        icon: "enterprise",
       },
     ],
   },
@@ -706,14 +770,72 @@ const EN: LandingCopy = {
     eyebrow: "Architecture",
     title: "From channel event to business outcome.",
     subtitle:
-      "OrzuX connects incoming messages, AI reasoning, CRM updates, calendar actions, and analytics into one observable flow.",
+      "OrzuX is an operations pipeline: an inbound message or call becomes routing, optional AI reasoning, CRM context, booking actions, and measurable activity — with humans able to intervene.",
+    lead:
+      "This is not six marketing tiles. It is the path a real customer event travels inside the workspace when channels and AI are configured.",
+    outcomeTitle: "Outcome: a handled customer moment with durable business state",
+    outcomeBody:
+      "The thread is answered or handed off, the contact record stays updated, a booking or follow-up can be created, and the team can see what happened — instead of losing the interaction in a personal phone chat.",
+    principles: [
+      {
+        title: "Event in, state out",
+        description:
+          "Inbound channel events create or update conversations. Outcomes land in CRM, calendar, orders, or call history — not only in a disposable reply bubble.",
+      },
+      {
+        title: "AI is optional, not mandatory",
+        description:
+          "Humans can run the inbox without the agent. When AI is enabled per channel, it uses your knowledge and tools under handoff rules.",
+      },
+      {
+        title: "Observable by design",
+        description:
+          "Realtime inbox updates, delivery tracking, call monitor, and analytics exist so operations are inspectable — not a black box.",
+      },
+    ],
     nodes: [
-      { id: "channels", label: "Channels", caption: "DMs, calls, forms, email" },
-      { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
-      { id: "ai", label: "AI Engine", caption: "Knowledge, intent, guardrails" },
-      { id: "crm", label: "CRM", caption: "Contacts, deals, tasks" },
-      { id: "calendar", label: "Calendar", caption: "Bookings, reminders, sync" },
-      { id: "analytics", label: "Analytics", caption: "Quality, usage, ROI" },
+      {
+        id: "channels",
+        label: "Channel event",
+        caption: "WhatsApp, Telegram, Website Chat, Email, Forms, Voice, SMS",
+        detail:
+          "A customer writes, submits a form, or calls. The event enters OrzuX only for channels you connected in Integrations — empty channels stay empty by design.",
+      },
+      {
+        id: "core",
+        label: "OrzuX Core",
+        caption: "Routing, auth scope, realtime, webhooks",
+        detail:
+          "The platform authenticates the business context, stores the conversation securely, and pushes realtime updates to operators in the shared inbox.",
+      },
+      {
+        id: "ai",
+        label: "AI Engine",
+        caption: "Knowledge, tools, channel rules, guardrails",
+        detail:
+          "If enabled, the agent drafts or sends a reply using your knowledge base and registered tools. It can stop and escalate when handoff rules say a human should own the thread.",
+      },
+      {
+        id: "crm",
+        label: "CRM memory",
+        caption: "Contacts, notes, work context",
+        detail:
+          "The person behind the message stays attached to a contact record so the next reply — AI or human — does not start from zero.",
+      },
+      {
+        id: "calendar",
+        label: "Business action",
+        caption: "Booking, orders, tasks, callbacks",
+        detail:
+          "Qualified intent can become a calendar booking, an order/lead status change, a call callback, or a teammate follow-up — the operational step after the chat.",
+      },
+      {
+        id: "analytics",
+        label: "Signal & review",
+        caption: "Volume, channel mix, AI usage, call history",
+        detail:
+          "Managers review activity in Analytics, Calls, and the inbox itself. Use it to tune knowledge and staffing — not as a substitute for financial reporting.",
+      },
     ],
   },
   faq: {
@@ -782,13 +904,14 @@ const EN: LandingCopy = {
         title: "Platform",
         links: [
           { label: "Products", href: "#platform" },
-          { label: "Architecture", href: "#architecture" },
+          { label: "Documentation", href: "/docs" },
           { label: "Pricing", href: "#pricing" },
         ],
       },
       {
         title: "Company",
         links: [
+          { label: "About OrzuX", href: "/docs/about" },
           { label: "Enterprise", href: "#enterprise" },
           { label: "FAQ", href: "#faq" },
           { label: "Demo", href: "mailto:hello@orzux.com?subject=OrzuX%20demo%20request" },
@@ -809,7 +932,7 @@ const EN: LandingCopy = {
     { id: "whatsapp", label: "WhatsApp", hint: "360dialog - inbox", liveLine: "Booking for tomorrow 3pm?" },
     { id: "instagram", label: "Instagram", hint: "DM - stories", liveLine: "Team plan available?" },
     { id: "telegram", label: "Telegram", hint: "Bot API", liveLine: "Demo request received" },
-    { id: "voice", label: "Voice AI", hint: "Twilio - calls", liveLine: "Incoming +49..." },
+    { id: "voice", label: "Calls AI", hint: "Twilio - calls", liveLine: "Incoming +49..." },
     { id: "website_forms", label: "Website Forms", hint: "Leads to inbox", liveLine: "New form submission" },
     { id: "inbox", label: "Unified Inbox", hint: "All channels", liveLine: "3 channels - 1 screen" },
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },
@@ -841,7 +964,6 @@ const RU: LandingCopy = {
       products: "Продукты",
       solutions: "Решения",
       enterprise: "Enterprise",
-      developers: "Разработчикам",
       resources: "Ресурсы",
       pricing: "Тарифы",
       documentation: "Документация",
@@ -868,77 +990,64 @@ const RU: LandingCopy = {
   },
   liveDemo: {
     ...EN.liveDemo,
-    title: "Командный центр OrzuX",
-    subtitle: "AI отвечает, создает CRM-контекст, ведет звонки, бронирует время и синхронизирует команду.",
+    title: "Рабочее пространство OrzuX",
+    subtitle:
+      "Реальные каналы, живой AI-чат, Calls AI, бронирования и CRM — тот же стек, что внутри продукта.",
     status: "Живая система",
     inbox: "Inbox",
-    aiResponse: "AI-ответ",
+    aiResponse: "OrzuX AI",
     crm: "CRM",
-    voice: "Голос",
+    calls: "AI Calls",
     calendar: "Календарь",
     actions: "Действия",
     guardrailTitle: "AI-контроль",
     guardrailText:
       "Ответ проверен по базе знаний, политика канала соблюдена, handoff доступен.",
     synced: "Синхронизировано",
-    events: [
-      {
-        id: "booking",
-        channel: "whatsapp",
-        label: "Лид из WhatsApp",
-        customer: "Амина Р.",
-        message: "Можно записаться завтра после 15:00?",
-        aiReply: "Да. Есть 15:30 и 16:15. Я могу забронировать слот и отправить подтверждение.",
-        intent: "Запрос на бронь",
-        deal: "Консультация - qualified",
-        nextStep: "Отправить подтверждение",
-        callStatus: "Звонок не нужен",
-        calendar: "15:30 зарезервировано",
-        metric: "Ответ за 12 сек",
-      },
-      {
-        id: "pricing",
-        channel: "instagram",
-        label: "Instagram DM",
-        customer: "Nova Studio",
-        message: "Есть месячные тарифы для команды?",
-        aiReply: "Да. Starter покрывает один канал. Pro добавляет Voice AI и расширенную аналитику.",
-        intent: "Вопрос о цене",
-        deal: "Team plan - warm",
-        nextStep: "Показать Pro",
-        callStatus: "Follow-up в очереди",
-        calendar: "Ссылка на демо готова",
-        metric: "Сделка создана",
-      },
-      {
-        id: "voice",
-        channel: "voice",
-        label: "AI-звонок",
-        customer: "+49 152 8840",
-        message: "Клиент спрашивает доступное время и варианты оплаты.",
-        aiReply: "AI говорит естественно, проверяет часы работы и готовит краткое резюме для команды.",
-        intent: "Запись и оплата",
-        deal: "Входящий звонок - new",
-        nextStep: "SMS-резюме",
-        callStatus: "AI отвечает",
-        calendar: "Слоты проверены",
-        metric: "Голос активен",
-      },
-      {
-        id: "form",
-        channel: "website_forms",
-        label: "Форма на сайте",
-        customer: "Mira Clinic",
-        message: "Новая enterprise-заявка с сайта.",
-        aiReply: "Лид обогащен, направлен в нужное пространство и назначен с рекомендуемым действием.",
-        intent: "Enterprise-запрос",
-        deal: "Enterprise - priority",
-        nextStep: "Назначить владельца",
-        callStatus: "Менеджер уведомлен",
-        calendar: "Предложен discovery call",
-        metric: "SLA защищен",
-      },
-    ],
+    crmActions: "CRM-действия",
+    playCall: "Слушать разговор",
+    pauseCall: "Пауза",
+    callListeningHint: "Play — диалог клиент ↔ AI, как в мониторе Calls AI.",
+    liveTranscript: "Живой транскрипт",
+    openCalendar: "Открыть календарь",
+    calendarTitle: "Календарь команды · брони",
+    bookingLive: "Живые бронирования",
+    thisWeek: "Эта неделя",
+    calendarSync: "Синхронизация Google Calendar",
+    bookingSummary: "Сводка брони",
+    summaryCustomer: "Клиент",
+    summaryMeeting: "Встреча",
+    summaryTime: "Время",
+    summaryFollowUp: "Follow-up",
+    bookingFootnote:
+      "AI создал событие, обновил CRM и поставил подтверждение в очередь — как в приложении.",
+    dialer: "Номеронабиратель",
+    dialerHint: "Наберите номер как в dial pad Calls.",
+    calendarListHint: "Брони · задачи · события",
+    calendarListPreview: "Откройте календарь и добавьте демо-бронирование.",
+    addCalendarItem: "Добавить",
+    addBooking: "Бронь",
+    addEvent: "Событие",
+    addTask: "Задача",
+    calendarItemTitle: "Название",
+    calendarHour: "Час",
+    calendarMinute: "Минута",
+    saveCalendarItem: "Сохранить",
+    cancel: "Отмена",
+    messagePlaceholder: "Введите сообщение",
+    sendMessage: "Отправить",
+    emailSubjectLabel: "Тема",
+    emailBodyPlaceholder: "Напишите ответ…",
+    emailSendAction: "Отправить",
+    listenLive: "Слушать",
+    stopListen: "Стоп",
+    callListening: "Прослушивание",
+    mute: "Mute",
+    unmute: "Unmute",
+    callHold: "Hold",
+    resume: "Продолжить",
+    takeOver: "Перехватить",
+    endCall: "Завершить",
   },
   platform: {
     eyebrow: "Продуктовая платформа",
@@ -948,7 +1057,7 @@ const RU: LandingCopy = {
     cards: [
       { ...EN.platform.cards[0]!, title: "Единый Inbox", description: "Все каналы попадают в одно приоритетное пространство с назначениями, заметками и handoff.", metric: "Все каналы", detail: "Одна очередь" },
       { ...EN.platform.cards[1]!, title: "OrzuX Assistant", description: "AI отвечает на основе знаний бизнеса, помнит контекст клиента и уважает настройки каналов.", metric: "Grounded AI", detail: "Знает контекст" },
-      { ...EN.platform.cards[2]!, title: "Voice AI", description: "Отвечает на звонки, резюмирует исход, запускает SMS и передает оператору при необходимости.", metric: "Всегда на связи", detail: "Готов к звонкам" },
+      { ...EN.platform.cards[2]!, title: "Calls AI", description: "Отвечает на звонки, резюмирует исход, запускает SMS и передает оператору при необходимости.", metric: "Всегда на связи", detail: "Готов к звонкам" },
       { ...EN.platform.cards[3]!, title: "CRM и сделки", description: "Превращает ответы в контакты, сделки, задачи и следующие действия.", metric: "Автообновление", detail: "Без копирования" },
       { ...EN.platform.cards[4]!, title: "Календарь и бронирования", description: "Создает страницы записи, проверяет доступность, отправляет напоминания и синхронизирует Google Calendar.", metric: "Синхронизировано", detail: "Booking engine" },
       { ...EN.platform.cards[5]!, title: "AI-аналитика", description: "Показывает объем, usage, качество, каналы, скорость ответа и revenue-сигналы.", metric: "Наблюдаемо", detail: "AI ops" },
@@ -978,14 +1087,21 @@ const RU: LandingCopy = {
     ],
   },
   enterprise: {
-    eyebrow: "Enterprise-ready",
-    title: "Автономность с наблюдением, контекстом и контролем.",
+    ...EN.enterprise,
+    eyebrow: "Enterprise readiness",
+    title: "Контроль важнее бесконтрольной автономии.",
     subtitle:
-      "Enterprise AI работает только тогда, когда команда понимает действия агента, контролирует поведение и сохраняет прозрачность провайдеров.",
-    pillars: [
-      { ...EN.enterprise.pillars[0]!, title: "Human handoff", description: "AI может остановиться, передать диалог или дать оператору ответить из той же карточки клиента.", metric: "Под контролем", detail: "Handoff встроен" },
-      { ...EN.enterprise.pillars[1]!, title: "Данные в рамках бизнеса", description: "Рабочие пространства, каналы, ключи и диалоги разделены по бизнес-контексту.", metric: "Scoped", detail: "Tenant-aware" },
-      { ...EN.enterprise.pillars[2]!, title: "Операционная видимость", description: "Менеджеры видят объем AI, качество, состояние очереди и результаты по каналам.", metric: "Измеримо", detail: "AI ops" },
+      "Enterprise readiness здесь означает данные в рамках бизнеса, human handoff, роли, историю диалогов, consent-aware analytics и честные границы провайдеров — а не «мы заменили весь ваш IT-стек».",
+    honestyNote:
+      "OrzuX — production-платформа для мульти-канальных операций. Надёжность каналов зависит от ваших credentials. Качество AI — от базы знаний и review. Мы описываем то, что реально есть — и то, что требует вашей настройки.",
+    checklistTitle: "Что проверить перед серьёзным запуском",
+    checklist: [
+      "Доступ в рамках бизнеса: команда видит только свой workspace",
+      "Human handoff: AI можно остановить, диалог забирает человек",
+      "Knowledge grounding: ответы опираются на ваш контент",
+      "Активация каналов: каждый канал подключается осознанно",
+      "Согласие на cookies/analytics: измерение opt-in",
+      "Биллинг: лимиты плана и add-on провайдеров видны в Subscription",
     ],
   },
   platformStrip: {
@@ -994,18 +1110,16 @@ const RU: LandingCopy = {
     liveLabel: "Live",
   },
   architecture: {
+    ...EN.architecture,
     eyebrow: "Архитектура",
-    title: "От события в канале до бизнес-результата.",
+    title: "От события канала к бизнес-результату.",
     subtitle:
-      "OrzuX связывает входящие сообщения, AI-логику, CRM, календарь и аналитику в один наблюдаемый поток.",
-    nodes: [
-      { id: "channels", label: "Каналы", caption: "DM, звонки, формы, email" },
-      { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
-      { id: "ai", label: "AI Engine", caption: "Знания, intent, guardrails" },
-      { id: "crm", label: "CRM", caption: "Контакты, сделки, задачи" },
-      { id: "calendar", label: "Календарь", caption: "Брони, напоминания, sync" },
-      { id: "analytics", label: "Аналитика", caption: "Качество, usage, ROI" },
-    ],
+      "OrzuX — operational pipeline: входящее сообщение или звонок проходит routing, опциональный AI, CRM-контекст, действия бронирования и измеримую активность — с возможностью вмешательства человека.",
+    lead:
+      "Это не шесть маркетинговых плиток. Это путь реального customer event внутри workspace, когда каналы и AI настроены.",
+    outcomeTitle: "Результат: обработанный момент клиента с сохранённым бизнес-состоянием",
+    outcomeBody:
+      "Диалог отвечен или передан человеку, контакт обновлён, можно создать booking/follow-up, команда видит что произошло — вместо потери переписки в личном чате телефона.",
   },
   faq: {
     title: "Что команды спрашивают перед переходом",
@@ -1099,7 +1213,7 @@ const RU: LandingCopy = {
     { id: "whatsapp", label: "WhatsApp", hint: "360dialog - inbox", liveLine: "Запись на завтра 15:00?" },
     { id: "instagram", label: "Instagram", hint: "DM - stories", liveLine: "Есть тариф для команды?" },
     { id: "telegram", label: "Telegram", hint: "Bot API", liveLine: "Запрос демо получен" },
-    { id: "voice", label: "Voice AI", hint: "Twilio - calls", liveLine: "Входящий +49..." },
+    { id: "voice", label: "Calls AI", hint: "Twilio - calls", liveLine: "Входящий +49..." },
     { id: "website_forms", label: "Website Forms", hint: "Leads to inbox", liveLine: "Новая заявка" },
     { id: "inbox", label: "Unified Inbox", hint: "Все каналы", liveLine: "3 канала - 1 экран" },
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },
@@ -1131,7 +1245,6 @@ const UZ: LandingCopy = {
       products: "Mahsulotlar",
       solutions: "Yechimlar",
       enterprise: "Enterprise",
-      developers: "Dasturchilar",
       resources: "Resurslar",
       pricing: "Narxlar",
       documentation: "Hujjatlar",
@@ -1158,77 +1271,64 @@ const UZ: LandingCopy = {
   },
   liveDemo: {
     ...EN.liveDemo,
-    title: "OrzuX command center",
-    subtitle: "AI javob beradi, CRM kontekst yaratadi, qo'ng'iroqni boshqaradi, vaqt bron qiladi va jamoani sinxronlaydi.",
+    title: "OrzuX workspace",
+    subtitle:
+      "Haqiqiy kanallar, jonli AI chat, Calls AI, bronlar va CRM — mahsulot ichidagi stack.",
     status: "Jonli tizim",
     inbox: "Inbox",
-    aiResponse: "AI javob",
+    aiResponse: "OrzuX AI",
     crm: "CRM",
-    voice: "Ovoz",
+    calls: "AI Calls",
     calendar: "Taqvim",
     actions: "Harakatlar",
     guardrailTitle: "AI guardrail",
     guardrailText:
       "Javob knowledge asosida, kanal siyosati tekshirildi, human handoff mavjud.",
     synced: "Sinxron",
-    events: [
-      {
-        id: "booking",
-        channel: "whatsapp",
-        label: "WhatsApp lead",
-        customer: "Amina R.",
-        message: "Ertaga 15:00 dan keyin konsultatsiya bormi?",
-        aiReply: "Ha. 15:30 va 16:15 bo'sh. Slotni bron qilib tasdiq yuborishim mumkin.",
-        intent: "Booking so'rovi",
-        deal: "Consultation - qualified",
-        nextStep: "Tasdiq yuborish",
-        callStatus: "Qo'ng'iroq kerak emas",
-        calendar: "15:30 bron qilindi",
-        metric: "12 sec reply",
-      },
-      {
-        id: "pricing",
-        channel: "instagram",
-        label: "Instagram DM",
-        customer: "Nova Studio",
-        message: "Jamoa uchun oylik tariflar bormi?",
-        aiReply: "Ha. Starter bitta kanalni qamraydi. Pro Voice AI va keng analitikani qo'shadi.",
-        intent: "Pricing savoli",
-        deal: "Team plan - warm",
-        nextStep: "Pro tarifini ulashish",
-        callStatus: "Follow-up navbatda",
-        calendar: "Demo link tayyor",
-        metric: "Deal yaratildi",
-      },
-      {
-        id: "voice",
-        channel: "voice",
-        label: "AI qo'ng'iroq",
-        customer: "+49 152 8840",
-        message: "Mijoz bo'sh vaqt va to'lov variantlarini so'rayapti.",
-        aiReply: "AI tabiiy gaplashmoqda, ish vaqtini tekshirmoqda va jamoa uchun xulosa tayyorlamoqda.",
-        intent: "Uchrashuv + to'lov",
-        deal: "Inbound call - new",
-        nextStep: "SMS xulosa",
-        callStatus: "AI javob beradi",
-        calendar: "Slotlar tekshirildi",
-        metric: "Voice active",
-      },
-      {
-        id: "form",
-        channel: "website_forms",
-        label: "Website form",
-        customer: "Mira Clinic",
-        message: "Saytdan yangi enterprise so'rov.",
-        aiReply: "Lead boyitildi, kerakli workspacega yo'naltirildi va tavsiya qilingan keyingi qadam bilan biriktirildi.",
-        intent: "Enterprise so'rov",
-        deal: "Enterprise - priority",
-        nextStep: "Owner biriktirish",
-        callStatus: "Menejer xabardor",
-        calendar: "Discovery call taklif qilindi",
-        metric: "SLA himoyada",
-      },
-    ],
+    crmActions: "CRM harakatlar",
+    playCall: "Suhbatni tinglash",
+    pauseCall: "Pauza",
+    callListeningHint: "Play — mijoz ↔ AI suhbat, Calls AI monitoridagi kabi.",
+    liveTranscript: "Jonli transkript",
+    openCalendar: "Taqvimni ochish",
+    calendarTitle: "Jamoa taqvimi · bronlar",
+    bookingLive: "Jonli bronlar",
+    thisWeek: "Shu hafta",
+    calendarSync: "Google Calendar sync",
+    bookingSummary: "Bron xulosasi",
+    summaryCustomer: "Mijoz",
+    summaryMeeting: "Uchrashuv",
+    summaryTime: "Vaqt",
+    summaryFollowUp: "Follow-up",
+    bookingFootnote:
+      "AI event yaratdi, CRM yangiladi va tasdiqni navbatga qo'ydi — ilovadagi yo'l.",
+    dialer: "Dialer",
+    dialerHint: "Calls dial pad kabi raqam kiriting.",
+    calendarListHint: "Bron · task · event",
+    calendarListPreview: "Jamoa taqvimini oching va demo bron qo'shing.",
+    addCalendarItem: "Qo'shish",
+    addBooking: "Bron",
+    addEvent: "Event",
+    addTask: "Task",
+    calendarItemTitle: "Sarlavha",
+    calendarHour: "Soat",
+    calendarMinute: "Daqiqa",
+    saveCalendarItem: "Saqlash",
+    cancel: "Bekor",
+    messagePlaceholder: "Xabar yozing",
+    sendMessage: "Yuborish",
+    emailSubjectLabel: "Mavzu",
+    emailBodyPlaceholder: "Email javob yozing…",
+    emailSendAction: "Yuborish",
+    listenLive: "Tinglash",
+    stopListen: "To‘xtatish",
+    callListening: "Tinglanmoqda",
+    mute: "Mute",
+    unmute: "Unmute",
+    callHold: "Hold",
+    resume: "Davom ettirish",
+    takeOver: "O‘zlashtirish",
+    endCall: "Yakunlash",
   },
   platform: {
     eyebrow: "Mahsulot platformasi",
@@ -1238,7 +1338,7 @@ const UZ: LandingCopy = {
     cards: [
       { ...EN.platform.cards[0]!, title: "Unified Inbox", description: "Barcha kanallar bitta ustuvor ish maydoniga kiradi: assignment, notes va handoff bilan.", metric: "Barcha kanallar", detail: "Bitta queue" },
       { ...EN.platform.cards[1]!, title: "OrzuX Assistant", description: "AI biznes bilimlari asosida javob beradi, mijoz kontekstini eslaydi va kanal nazoratiga rioya qiladi.", metric: "Grounded AI", detail: "Kontekstli" },
-      { ...EN.platform.cards[2]!, title: "Voice AI", description: "Qo'ng'iroqlarga javob beradi, xulosalaydi, SMS yuboradi va kerak bo'lsa insonga o'tkazadi.", metric: "Doim faol", detail: "Phone-ready" },
+      { ...EN.platform.cards[2]!, title: "Calls AI", description: "Qo'ng'iroqlarga javob beradi, xulosalaydi, SMS yuboradi va kerak bo'lsa insonga o'tkazadi.", metric: "Doim faol", detail: "Phone-ready" },
       { ...EN.platform.cards[3]!, title: "CRM va bitimlar", description: "Javoblarni kontakt, pipeline, task va keyingi harakatlarga aylantiradi.", metric: "Auto-update", detail: "Copy-paste yo'q" },
       { ...EN.platform.cards[4]!, title: "Taqvim va booking", description: "Booking sahifalari, availability, eslatmalar va Google Calendar sync.", metric: "Synced", detail: "Booking engine" },
       { ...EN.platform.cards[5]!, title: "AI analitika", description: "Hajm, usage, sifat, kanallar, javob tezligi va revenue signallarini ko'rsatadi.", metric: "Observable", detail: "AI ops" },
@@ -1268,15 +1368,13 @@ const UZ: LandingCopy = {
     ],
   },
   enterprise: {
-    eyebrow: "Enterprise-ready",
-    title: "Nazorat, kontekst va supervision bilan avtonomiya.",
+    ...EN.enterprise,
+    eyebrow: "Enterprise readiness",
+    title: "Nazorat — cheksiz avtonomiyadan muhimroq.",
     subtitle:
-      "Enterprise AI agent nima qilganini ko'rish, xatti-harakatini boshqarish va providerlarni aniq saqlash mumkin bo'lganda ishlaydi.",
-    pillars: [
-      { ...EN.enterprise.pillars[0]!, title: "Human handoff", description: "AI to'xtashi, eskalatsiya qilishi yoki operatorga bir xil customer recorddan javob berishga ruxsat berishi mumkin.", metric: "Controlled", detail: "Handoff built in" },
-      { ...EN.enterprise.pillars[1]!, title: "Business-scoped data", description: "Workspace, kanal, kalit va suhbat biznes kontekst bo'yicha ajratiladi.", metric: "Scoped", detail: "Tenant-aware" },
-      { ...EN.enterprise.pillars[2]!, title: "Operational visibility", description: "Menejerlar AI hajmi, sifat signallari, queue health va kanal natijalarini kuzatadi.", metric: "Measurable", detail: "AI ops" },
-    ],
+      "Bu yerda enterprise readiness biznes doirasidagi ma'lumot, human handoff, rollar, suhbat tarixi, consent-aware analytics va provider chegaralarini anglatadi.",
+    honestyNote:
+      "OrzuX — multi-channel operatsiyalar uchun production platforma. Kanal ishonchliligi credentiallaringizga bog'liq. AI sifati bilim bazasi va review odatlariga bog'liq.",
   },
   platformStrip: {
     title: "OrzuX Platformasi",
@@ -1284,18 +1382,11 @@ const UZ: LandingCopy = {
     liveLabel: "Live",
   },
   architecture: {
+    ...EN.architecture,
     eyebrow: "Arxitektura",
-    title: "Kanal eventidan biznes natijagacha.",
+    title: "Kanal hodisasidan biznes natijasigacha.",
     subtitle:
-      "OrzuX kiruvchi xabarlar, AI reasoning, CRM, taqvim va analitikani bitta kuzatiladigan oqimga ulaydi.",
-    nodes: [
-      { id: "channels", label: "Kanallar", caption: "DM, call, form, email" },
-      { id: "core", label: "OrzuX Core", caption: "Routing, realtime, webhooks" },
-      { id: "ai", label: "AI Engine", caption: "Knowledge, intent, guardrails" },
-      { id: "crm", label: "CRM", caption: "Kontaktlar, deal, task" },
-      { id: "calendar", label: "Taqvim", caption: "Booking, reminder, sync" },
-      { id: "analytics", label: "Analitika", caption: "Sifat, usage, ROI" },
-    ],
+      "OrzuX — operational pipeline: kiruvchi xabar yoki qo'ng'iroq routing, ixtiyoriy AI, CRM kontekst, booking harakatlari va o'lchanadigan faoliyatga aylanadi.",
   },
   faq: {
     title: "Jamoalar o'tishdan oldin so'raydigan savollar",
@@ -1389,7 +1480,7 @@ const UZ: LandingCopy = {
     { id: "whatsapp", label: "WhatsApp", hint: "360dialog - inbox", liveLine: "Ertaga 15:00 ga booking?" },
     { id: "instagram", label: "Instagram", hint: "DM - stories", liveLine: "Team tarif bormi?" },
     { id: "telegram", label: "Telegram", hint: "Bot API", liveLine: "Demo so'rovi keldi" },
-    { id: "voice", label: "Voice AI", hint: "Twilio - calls", liveLine: "Kiruvchi +49..." },
+    { id: "voice", label: "Calls AI", hint: "Twilio - calls", liveLine: "Kiruvchi +49..." },
     { id: "website_forms", label: "Website Forms", hint: "Leads to inbox", liveLine: "Yangi ariza" },
     { id: "inbox", label: "Unified Inbox", hint: "Barcha kanallar", liveLine: "3 kanal - 1 ekran" },
     { id: "orzu-ai", label: "OrzuX Assistant", hint: "Agents - knowledge", liveLine: "Intent: pricing" },

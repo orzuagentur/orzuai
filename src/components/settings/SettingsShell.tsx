@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BookOpenIcon, ExternalLinkIcon } from "lucide-react";
 
-import { DASHBOARD_ROUTES } from "@/constants/routes";
+import { Button } from "@/components/ui/button";
+import { DASHBOARD_ROUTES, DOCS_ROUTES } from "@/constants/routes";
 import { SETTINGS_MESSAGES } from "@/features/settings/constants";
 import { getNavSegmentActiveClassName } from "@/features/navigation/channel-rail-ui";
 import { cn } from "@/lib/utils";
@@ -40,7 +42,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col overflow-hidden bg-background">
+    <div className="flex dashboard-main-frame min-h-0 flex-col overflow-hidden bg-background">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -49,26 +51,49 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
               {SETTINGS_MESSAGES.pageDescription}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto">
-            {SETTINGS_TABS.map((tab) => {
-              const isActive =
-                pathname === tab.href ||
-                (tab.id === "profile" && pathname.startsWith(`${DASHBOARD_ROUTES.profile}`)) ||
-                (tab.id === "account" && pathname.startsWith(`${DASHBOARD_ROUTES.account}`));
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 self-start"
+              asChild
+            >
+              <Link
+                href={DOCS_ROUTES.root}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BookOpenIcon className="size-4" aria-hidden="true" />
+                {SETTINGS_MESSAGES.openDocumentation}
+                <ExternalLinkIcon
+                  className="size-3.5 opacity-60"
+                  aria-hidden="true"
+                />
+              </Link>
+            </Button>
+            <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto">
+              {SETTINGS_TABS.map((tab) => {
+                const isActive =
+                  pathname === tab.href ||
+                  (tab.id === "profile" &&
+                    pathname.startsWith(`${DASHBOARD_ROUTES.profile}`)) ||
+                  (tab.id === "account" &&
+                    pathname.startsWith(`${DASHBOARD_ROUTES.account}`));
 
-              return (
-                <Link
-                  key={tab.id}
-                  href={tab.href}
-                  className={cn(
-                    "shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors",
-                    getNavSegmentActiveClassName(isActive),
-                  )}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
+                return (
+                  <Link
+                    key={tab.id}
+                    href={tab.href}
+                    className={cn(
+                      "shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors",
+                      getNavSegmentActiveClassName(isActive),
+                    )}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

@@ -254,12 +254,55 @@ export function parseIsoDateTime(value: string): Date | null {
   return parsed;
 }
 
+/**
+ * Parse AI/booking datetimes in a business IANA timezone.
+ * - `YYYY-MM-DD` → local midnight in `timeZone` (avoids UTC date-only +1 day bugs)
+ * - `YYYY-MM-DDTHH:mm[:ss]` without offset → wall clock in `timeZone`
+ * - values with `Z` or ±offset → absolute instant
+ */
+export function parseBookingDateTime(
+  value: string,
+  timeZone: string,
+): Date | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const year = Number.parseInt(dateOnly[1] ?? "0", 10);
+    const month = Number.parseInt(dateOnly[2] ?? "0", 10);
+    const day = Number.parseInt(dateOnly[3] ?? "0", 10);
+    return findUtcForLocalDateTime(year, month, day, 0, 0, timeZone);
+  }
+
+  const hasExplicitOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  if (hasExplicitOffset) {
+    return parseIsoDateTime(trimmed);
+  }
+
+  const localMatch = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/,
+  );
+  if (localMatch) {
+    const year = Number.parseInt(localMatch[1] ?? "0", 10);
+    const month = Number.parseInt(localMatch[2] ?? "0", 10);
+    const day = Number.parseInt(localMatch[3] ?? "0", 10);
+    const hour = Number.parseInt(localMatch[4] ?? "0", 10);
+    const minute = Number.parseInt(localMatch[5] ?? "0", 10);
+    return findUtcForLocalDateTime(year, month, day, hour, minute, timeZone);
+  }
+
+  return parseIsoDateTime(trimmed);
+}
+
 export function formatSlotForDisplay(
   slot: TimeInterval,
   timeZone: string,
   locale = "en-US",
 ): string {
-  const formatter = new Intl.DateTimeFormat(locale, {
+  const startFormatter = new Intl.DateTimeFormat(locale, {
     timeZone,
     weekday: "short",
     month: "short",
@@ -268,7 +311,18 @@ export function formatSlotForDisplay(
     minute: "2-digit",
   });
 
-  return formatter.format(slot.start);
+  const spanMs = slot.end.getTime() - slot.start.getTime();
+  if (spanMs >= 12 * 60 * 60 * 1000) {
+    const dayFormatter = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    return `${dayFormatter.format(slot.start)} → ${dayFormatter.format(slot.end)}`;
+  }
+
+  return startFormatter.format(slot.start);
 }
 
 function findUtcForLocalDateTime(
