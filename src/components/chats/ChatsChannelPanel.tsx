@@ -39,9 +39,6 @@ import type {
 } from "@/types/chat.types";
 import type { CannedResponseItem } from "@/types/canned-response.types";
 import type { MessagingChannel } from "@/types/database.types";
-import {
-  countUnreadByChannel,
-} from "@/utils/conversation-unread";
 
 type ChatsChannelPanelProps = {
   channelId: ChatChannelId;
@@ -262,11 +259,6 @@ function ChatsChannelPanelContent({
     initialHasBusiness,
     initialBusinessId,
   ]);
-
-  const _unreadByChannel = useMemo(
-    () => countUnreadByChannel(conversations),
-    [conversations],
-  );
 
   const handleContactFavoriteChange = useCallback(
     (contactId: string, isFavorite: boolean) => {
