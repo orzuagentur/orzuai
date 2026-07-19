@@ -1,6 +1,6 @@
 import type { DocsArticle } from "@/features/docs/types";
 
-function useCaseArticle(input: {
+function buildUseCaseArticle(input: {
   slug: string;
   title: string;
   summary: string;
@@ -106,7 +106,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   },
 
-  "clinics-and-medical": useCaseArticle({
+  "clinics-and-medical": buildUseCaseArticle({
     slug: "clinics-and-medical",
     title: "Clinics & medical practices",
     summary:
@@ -138,7 +138,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "real-estate": useCaseArticle({
+  "real-estate": buildUseCaseArticle({
     slug: "real-estate",
     title: "Real estate agencies",
     summary:
@@ -170,7 +170,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "hospitality-and-hotels": useCaseArticle({
+  "hospitality-and-hotels": buildUseCaseArticle({
     slug: "hospitality-and-hotels",
     title: "Hospitality & hotels",
     summary:
@@ -201,7 +201,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "beauty-and-salons": useCaseArticle({
+  "beauty-and-salons": buildUseCaseArticle({
     slug: "beauty-and-salons",
     title: "Beauty salons & studios",
     summary:
@@ -232,7 +232,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "home-services": useCaseArticle({
+  "home-services": buildUseCaseArticle({
     slug: "home-services",
     title: "Home services",
     summary:
@@ -263,7 +263,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "education-and-training": useCaseArticle({
+  "education-and-training": buildUseCaseArticle({
     slug: "education-and-training",
     title: "Education & training centers",
     summary:
@@ -294,7 +294,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "auto-and-dealerships": useCaseArticle({
+  "auto-and-dealerships": buildUseCaseArticle({
     slug: "auto-and-dealerships",
     title: "Auto services & dealerships",
     summary:
@@ -325,7 +325,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "restaurants-and-cafes": useCaseArticle({
+  "restaurants-and-cafes": buildUseCaseArticle({
     slug: "restaurants-and-cafes",
     title: "Restaurants & cafés",
     summary:
@@ -356,7 +356,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "professional-services": useCaseArticle({
+  "professional-services": buildUseCaseArticle({
     slug: "professional-services",
     title: "Professional services",
     summary:
@@ -388,7 +388,7 @@ export const USE_CASE_ARTICLES: Record<string, DocsArticle> = {
     ],
   }),
 
-  "fitness-and-wellness": useCaseArticle({
+  "fitness-and-wellness": buildUseCaseArticle({
     slug: "fitness-and-wellness",
     title: "Fitness & wellness",
     summary:
