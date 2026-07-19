@@ -787,7 +787,7 @@ function WorkspaceLiveView({
     return () => {
       stopOutboundRingback();
     };
-  }, [call.aiHandled, call.humanHandled, isRinging]);
+  }, [call, isRinging]);
 
   const prevRingingRef = useRef(isRinging);
   useEffect(() => {
@@ -802,7 +802,7 @@ function WorkspaceLiveView({
     ) {
       playCallDisconnectedTone();
     }
-  }, [call.aiHandled, call.humanHandled, isConnected, isRinging]);
+  }, [call, isConnected, isRinging]);
 
   const handleBack = () => {
     if (isLiveSession) {

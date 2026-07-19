@@ -297,7 +297,7 @@ export function ChatWindow({
     return () => {
       scrollContainer.removeEventListener("scroll", handleScroll);
     };
-  }, [conversation?.id, onConversationViewed]);
+  }, [conversation, onConversationViewed]);
 
   useEffect(() => {
     if (!conversation) {

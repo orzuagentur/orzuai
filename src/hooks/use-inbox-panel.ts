@@ -240,7 +240,7 @@ export function useInboxPanel({
       }
     });
   }, [
-    activeConversationDetail?.id,
+    activeConversationDetail,
     clearConversationUnread,
     navBadges,
     selectedConversationId,
