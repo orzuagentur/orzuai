@@ -20,6 +20,7 @@ from orzuvideo.services.media_pick import (
     merge_optional_training,
 )
 from orzuvideo.services.pexels import download_stock_clips
+from orzuvideo.services.emoji_backgrounds import generate_emoji_background_clips
 from orzuvideo.services.scriptgen import generate_creativity_script, generate_script
 from orzuvideo.services.storage import (
     delete_object,
@@ -30,6 +31,7 @@ from orzuvideo.services.storage import (
     storage_meta,
     upload_preview,
 )
+from orzuvideo.services.visual_assets import prepare_visual_overlays
 from orzuvideo.services.youtube import upload_short
 
 
@@ -743,6 +745,9 @@ def _process_job(job: dict) -> None:
         return
 
     is_creativity = _is_creativity_job(job, meta0)
+    video_type = str(meta0.get("video_type") or "standard").strip().lower()
+    if video_type not in ("standard", "emoji"):
+        video_type = "standard"
 
     # Default publish=True only for real YouTube jobs; Creativity never publishes
     if is_creativity:
@@ -804,6 +809,7 @@ def _process_job(job: dict) -> None:
                 "pipeline": "creativity",
                 "publish": False,
                 "aspect_ratio": aspect,
+                "video_type": video_type,
                 "output_size": [out_w, out_h],
                 "youtube_channel_id": None,
                 "used_ai_training": bool(db.get_training(sb, user_id)),
@@ -957,6 +963,7 @@ def _process_job(job: dict) -> None:
                     if training.get("duration_auto")
                     else int(training.get("duration_seconds") or 30)
                 ),
+                video_type=video_type,
                 user_id=user_id,
                 job_id=job_id,
             )
@@ -991,6 +998,8 @@ def _process_job(job: dict) -> None:
                 "pexels_queries": script_data["pexels_queries"],
                 "language": script_data.get("language"),
                 "music_mood": script_data.get("music_mood"),
+                "video_type": script_data.get("video_type") or video_type,
+                "asset_overlays": script_data.get("asset_overlays") or [],
             },
         }
         if script_data.get("duration_seconds") is not None:
@@ -1062,13 +1071,20 @@ def _process_job(job: dict) -> None:
         )
 
         # 3) Media
+        is_emoji_video = (
+            is_creativity
+            and str(script_data.get("video_type") or video_type).strip().lower() == "emoji"
+        )
         if is_creativity:
             montage = {
-                "clip_count": 5,
+                "clip_count": 7 if is_emoji_video else 5,
                 "avoid_reuse_days": 45,
                 "music_volume_hook": 0.88,
                 "music_volume_body": 0.58,
                 "voice_volume": 1.05,
+                "transitions_enabled": True,
+                "motions_enabled": True,
+                "punch_first_clip": True,
             }
         else:
             montage = db.get_montage_settings(sb, user_id)
@@ -1078,6 +1094,7 @@ def _process_job(job: dict) -> None:
             dur_for_clips = int(
                 (training or {}).get("duration_seconds")
                 or meta0.get("duration_seconds")
+                or script_data.get("duration_seconds")
                 or 45
             )
         except (TypeError, ValueError):
@@ -1087,46 +1104,67 @@ def _process_job(job: dict) -> None:
             if is_creativity
             else _clip_count_for_duration(base_clips, dur_for_clips)
         )
+        if is_emoji_video:
+            # More color plates for longer emoji montages
+            clip_count = max(clip_count, min(12, 4 + max(0, dur_for_clips // 25)))
+
         used_pexels = exclude_used_media(sb, user_id, "pexels", avoid_days=avoid_days)
         print(f"[MEDIA] pexels exclude={len(used_pexels)} library music history tracked per user")
 
         db.update_job(sb, job_id, status="fetching_media")
-        queries = [
-            q
-            for q in (script_data.get("pexels_queries") or [])
-            if isinstance(q, str) and q.strip()
-        ]
-        fallback_q = str(training.get("pexels_query") or "").strip()
-        niche_q = str(training.get("niche") or "").strip()
-        if not queries:
-            queries = [fallback_q] if fallback_q else []
-        if niche_q and niche_q.lower() not in {q.lower() for q in queries}:
-            queries = [niche_q, *queries]
-        if not queries:
-            queries = ["cinematic b-roll"]
-        # Shuffle so we don't always pull the same first query's clips
-        random.shuffle(queries)
-        clips, pexels_ids = download_stock_clips(
-            queries,
-            work / "clips",
-            count=clip_count,
-            exclude_ids=used_pexels,
-            orientation=(
-                "landscape"
-                if aspect == "16:9"
-                else "square"
-                if aspect == "1:1"
-                else "portrait"
-            ),
-        )
-        for pid in pexels_ids:
-            db.record_media_usage(
-                sb,
-                user_id=user_id,
-                provider="pexels",
-                asset_id=pid,
-                job_id=job_id,
+        pexels_ids: list[str] = []
+        if is_emoji_video:
+            bg_colors = script_data.get("background_colors") or []
+            voice_dur = ffprobe_duration(voice_path)
+            plate_dur = max(3.0, min(6.5, voice_dur / max(3, clip_count) + 0.8))
+            clips = generate_emoji_background_clips(
+                bg_colors if isinstance(bg_colors, list) else [],
+                work / "clips",
+                count=clip_count,
+                size=(out_w, out_h),
+                duration_each=plate_dur,
             )
+            print(
+                f"[EMOJI] solid/gradient plates={len(clips)} "
+                f"colors={bg_colors!r} (no Pexels video)"
+            )
+        else:
+            queries = [
+                q
+                for q in (script_data.get("pexels_queries") or [])
+                if isinstance(q, str) and q.strip()
+            ]
+            fallback_q = str(training.get("pexels_query") or "").strip()
+            niche_q = str(training.get("niche") or "").strip()
+            if not queries:
+                queries = [fallback_q] if fallback_q else []
+            if niche_q and niche_q.lower() not in {q.lower() for q in queries}:
+                queries = [niche_q, *queries]
+            if not queries:
+                queries = ["cinematic b-roll"]
+            # Shuffle so we don't always pull the same first query's clips
+            random.shuffle(queries)
+            clips, pexels_ids = download_stock_clips(
+                queries,
+                work / "clips",
+                count=clip_count,
+                exclude_ids=used_pexels,
+                orientation=(
+                    "landscape"
+                    if aspect == "16:9"
+                    else "square"
+                    if aspect == "1:1"
+                    else "portrait"
+                ),
+            )
+            for pid in pexels_ids:
+                db.record_media_usage(
+                    sb,
+                    user_id=user_id,
+                    provider="pexels",
+                    asset_id=pid,
+                    job_id=job_id,
+                )
 
         music_prefs = training.get("music_prefs") or {}
         if isinstance(music_prefs, str):
@@ -1173,12 +1211,31 @@ def _process_job(job: dict) -> None:
             )
         music_path = library_track.path
         print(f"Background music ready: {music_path} ({music_path.stat().st_size} bytes)")
+        visual_overlays = []
+        resolved_visual_overlays = []
+        if is_emoji_video:
+            visual_overlays = prepare_visual_overlays(
+                sb,
+                user_id=user_id,
+                job_id=job_id,
+                overlays=script_data.get("asset_overlays") or [],
+                work_dir=work / "overlays",
+                video_duration=ffprobe_duration(voice_path),
+            )
+            resolved_visual_overlays = [
+                {k: (str(v) if k == "path" else v) for k, v in ov.items()}
+                for ov in visual_overlays
+            ]
         description = script_data["description"]
         meta = {
             **meta0,
             "hook": script_data["hook"],
-            "pexels_queries": script_data["pexels_queries"],
+            "pexels_queries": script_data.get("pexels_queries") or [],
             "pexels_ids": pexels_ids,
+            "background_colors": script_data.get("background_colors") or [],
+            "video_type": script_data.get("video_type") or video_type,
+            "asset_overlays": script_data.get("asset_overlays") or [],
+            "resolved_asset_overlays": resolved_visual_overlays,
             "music": {
                 "id": library_track.id,
                 "name": library_track.name,
@@ -1190,6 +1247,7 @@ def _process_job(job: dict) -> None:
             "publish": publish,
             "user_brief": user_brief,
             "clip_count": len(clips),
+            "emoji_solid_backgrounds": is_emoji_video,
         }
         if credit:
             description = f"{description}\n\n{credit}"
@@ -1245,6 +1303,7 @@ def _process_job(job: dict) -> None:
             allowed_motions=allowed_motions,
             transitions_enabled=transitions_on,
             allowed_transitions=allowed_transitions,
+            visual_overlays=visual_overlays,
         )
         db.update_job(sb, job_id, video_path=str(out_video), voice_path=str(voice_path))
 

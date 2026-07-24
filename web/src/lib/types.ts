@@ -92,6 +92,7 @@ export type VideoJob = {
     duration_seconds?: number | null;
     duration_auto?: boolean;
     aspect_ratio?: string;
+    video_type?: string;
     [key: string]: unknown;
   } | null;
 };

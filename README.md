@@ -51,6 +51,7 @@ Supabase keeps **auth + Postgres only**. The worker does **not** mark status `re
 | OpenAI (`gpt-4o-mini`) | Shorts script |
 | ElevenLabs | Voice + caption timings |
 | Pexels | Background video (portrait) |
+| Unsplash | Creators → Photos (Access Key; server proxy) |
 | Jamendo | Background instrumental music (`client_id`) |
 
 ## 3. Web (Vercel)

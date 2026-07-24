@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSearchQuery } from "@/lib/search-lang";
 
 export type MediaKind = "video" | "photo" | "music" | "all";
 
@@ -8,6 +9,9 @@ type MediaCard = {
   kind: MediaKind;
   title: string;
   author: string;
+  authorUrl?: string | null;
+  provider?: "pexels" | "library" | "unsplash";
+  providerLabel?: string;
   thumb: string | null;
   previewUrl: string | null;
   downloadUrl: string | null;
@@ -50,7 +54,7 @@ function lightVideoFile(files: { link?: string; width?: number; height?: number 
 
 const PAGE_SIZE = 40;
 
-/** Hide upstream CDN / catalog URLs from the client — serve via our download proxy only. */
+/** Proxy CDN bytes; keep Pexels page URLs for attribution (guideline). */
 function sanitizeClientMedia(items: MediaCard[]): MediaCard[] {
   return items.map((it) => {
     const type =
@@ -69,7 +73,13 @@ function sanitizeClientMedia(items: MediaCard[]): MediaCard[] {
     };
     return {
       ...it,
-      pageUrl: null,
+      provider: it.provider || (it.kind === "music" ? "library" : "pexels"),
+      providerLabel:
+        it.providerLabel ||
+        (it.kind === "music" ? "OrzuAi" : "Pexels"),
+      // Keep catalog page for attribution links (not a secret CDN URL)
+      pageUrl: it.pageUrl || null,
+      authorUrl: it.authorUrl || null,
       thumb: wrap(it.thumb, true, `stock-${it.id}-thumb.${ext === "mp3" ? "jpg" : ext === "mp4" ? "jpg" : ext}`),
       previewUrl: wrap(
         it.previewUrl,
@@ -111,7 +121,7 @@ async function searchPexelsVideos(
       duration?: number;
       image?: string;
       url?: string;
-      user?: { name?: string };
+      user?: { name?: string; url?: string };
       video_files?: { link?: string; width?: number; height?: number }[];
       video_pictures?: { picture?: string }[];
     }) => {
@@ -121,7 +131,10 @@ async function searchPexelsVideos(
         id: String(v.id),
         kind: "video" as const,
         title: `Video #${v.id}`,
-        author: v.user?.name || "Stock",
+        author: v.user?.name || "Pexels",
+        authorUrl: v.user?.url || null,
+        provider: "pexels" as const,
+        providerLabel: "Pexels",
         thumb:
           v.image ||
           v.video_pictures?.[0]?.picture ||
@@ -131,7 +144,7 @@ async function searchPexelsVideos(
         durationSec: v.duration ?? null,
         width: v.width ?? null,
         height: v.height ?? null,
-        pageUrl: null,
+        pageUrl: v.url || null,
         downloadAllowed: Boolean(downloadUrl),
       };
     },
@@ -169,6 +182,7 @@ async function searchPexelsPhotos(
       alt?: string;
       url?: string;
       photographer?: string;
+      photographer_url?: string;
       src?: {
         medium?: string;
         large?: string;
@@ -179,14 +193,17 @@ async function searchPexelsPhotos(
       id: String(p.id),
       kind: "photo" as const,
       title: p.alt || `Photo #${p.id}`,
-      author: p.photographer || "Stock",
+      author: p.photographer || "Pexels",
+      authorUrl: p.photographer_url || null,
+      provider: "pexels" as const,
+      providerLabel: "Pexels",
       thumb: p.src?.medium || p.src?.large || null,
       previewUrl: p.src?.large2x || p.src?.large || p.src?.original || null,
       downloadUrl: p.src?.original || p.src?.large2x || null,
       durationSec: null,
       width: p.width ?? null,
       height: p.height ?? null,
-      pageUrl: null,
+      pageUrl: p.url || null,
       downloadAllowed: Boolean(p.src?.original || p.src?.large2x),
     }),
   );
@@ -278,10 +295,20 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const kind = (url.searchParams.get("type") || "all") as MediaKind;
-  const q = url.searchParams.get("q") || "";
+  const qRaw = url.searchParams.get("q") || "";
   const page = Math.max(1, Number(url.searchParams.get("page") || 1));
   const orientation = url.searchParams.get("orientation") || "all";
   const genreId = (url.searchParams.get("genre_id") || "").trim();
+
+  let q = qRaw.trim();
+  if (q && (kind === "video" || kind === "photo" || kind === "all")) {
+    try {
+      const n = await normalizeSearchQuery(q);
+      q = n.en || q;
+    } catch {
+      /* keep original */
+    }
+  }
 
   try {
     if (kind === "all") {

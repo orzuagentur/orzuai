@@ -1,0 +1,224 @@
+{
+  "fetchedAt": "2026-07-24T20:06:21.902Z",
+  "source": "https://api.iconify.design/collections?pretty=true",
+  "policy": {
+    "safeSpdx": [
+      "MIT",
+      "ISC",
+      "Apache-2.0",
+      "CC0-1.0"
+    ],
+    "unsafeSpdx": [
+      "GPL-2.0",
+      "GPL-2.0-only",
+      "GPL-2.0-or-later",
+      "GPL-3.0",
+      "GPL-3.0-only",
+      "GPL-3.0-or-later",
+      "AGPL-3.0",
+      "AGPL-3.0-only",
+      "AGPL-3.0-or-later",
+      "LGPL-2.1",
+      "LGPL-3.0",
+      "SSPL-1.0",
+      "BUSL-1.1",
+      "UNLICENSED",
+      "LicenseRef-Proprietary"
+    ],
+    "productAllowlist": [
+      "lucide",
+      "lucide-lab",
+      "heroicons",
+      "heroicons-outline",
+      "heroicons-solid",
+      "tabler",
+      "ph",
+      "mdi"
+    ],
+    "notes": [
+      "Only product allowlist sets are exposed in Creators → Icons.",
+      "Apache-2.0 (MDI) requires keeping license notice when redistributing icon packs.",
+      "Do not bulk-mirror icon SVGs into our Storage unless license notice is retained.",
+      "Icons are loaded on demand from Iconify API (SVG URL) — attribution via UI/footer is recommended.",
+      "OFL / CC-BY / GPL icon sets are excluded from the product filter."
+    ]
+  },
+  "counts": {
+    "totalOnIconify": 231,
+    "productSafe": 8,
+    "permissiveButNotCurated": 131,
+    "blocked": 92,
+    "allowlistMissingOrUnsafe": 0
+  },
+  "productSafe": [
+    {
+      "prefix": "heroicons",
+      "name": "HeroIcons",
+      "total": 1288,
+      "category": "UI Other / Mixed Grid",
+      "license": "MIT",
+      "licenseTitle": "MIT",
+      "licenseUrl": "https://github.com/tailwindlabs/heroicons/blob/master/LICENSE",
+      "homepage": "https://github.com/tailwindlabs/heroicons",
+      "samples": [
+        "camera",
+        "building-library",
+        "receipt-refund",
+        "bookmark",
+        "cloud",
+        "folder"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/heroicons/camera.svg"
+    },
+    {
+      "prefix": "heroicons-outline",
+      "name": "HeroIcons v1 Outline",
+      "total": 230,
+      "category": "Archive / Unmaintained",
+      "license": "MIT",
+      "licenseTitle": "MIT",
+      "licenseUrl": "https://github.com/tailwindlabs/heroicons/blob/master/LICENSE",
+      "homepage": "https://github.com/tailwindlabs/heroicons",
+      "samples": [
+        "color-swatch",
+        "library",
+        "receipt-refund",
+        "bookmark",
+        "cloud",
+        "folder"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/heroicons-outline/color-swatch.svg"
+    },
+    {
+      "prefix": "heroicons-solid",
+      "name": "HeroIcons v1 Solid",
+      "total": 230,
+      "category": "Archive / Unmaintained",
+      "license": "MIT",
+      "licenseTitle": "MIT",
+      "licenseUrl": "https://github.com/tailwindlabs/heroicons/blob/master/LICENSE",
+      "homepage": "https://github.com/tailwindlabs/heroicons",
+      "samples": [
+        "color-swatch",
+        "library",
+        "receipt-refund",
+        "bookmark",
+        "cloud",
+        "folder"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/heroicons-solid/color-swatch.svg"
+    },
+    {
+      "prefix": "lucide",
+      "name": "Lucide",
+      "total": 1754,
+      "category": "UI 24px",
+      "license": "ISC",
+      "licenseTitle": "ISC",
+      "licenseUrl": "https://github.com/lucide-icons/lucide/blob/main/LICENSE",
+      "homepage": "https://github.com/lucide-icons/lucide",
+      "samples": [
+        "circle-check",
+        "award",
+        "house",
+        "check",
+        "mountain",
+        "chevron-up"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/lucide/circle-check.svg"
+    },
+    {
+      "prefix": "lucide-lab",
+      "name": "Lucide Lab",
+      "total": 373,
+      "category": "UI 24px",
+      "license": "ISC",
+      "licenseTitle": "ISC",
+      "licenseUrl": "https://github.com/lucide-icons/lucide-lab/blob/main/LICENSE",
+      "homepage": "https://github.com/lucide-icons/lucide-lab",
+      "samples": [
+        "venn",
+        "card-credit",
+        "pac-man",
+        "cent",
+        "candlestick-big-lit",
+        "gearbox"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/lucide-lab/venn.svg"
+    },
+    {
+      "prefix": "mdi",
+      "name": "Material Design Icons",
+      "total": 7447,
+      "category": "Material",
+      "license": "Apache-2.0",
+      "licenseTitle": "Apache 2.0",
+      "licenseUrl": "https://github.com/Templarian/MaterialDesign/blob/master/LICENSE",
+      "homepage": "https://github.com/Templarian/MaterialDesign",
+      "samples": [
+        "account-check",
+        "bell-alert-outline",
+        "calendar-edit",
+        "skip-previous",
+        "home-variant",
+        "lock-open-outline"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/mdi/account-check.svg"
+    },
+    {
+      "prefix": "ph",
+      "name": "Phosphor",
+      "total": 9072,
+      "category": "UI Other / Mixed Grid",
+      "license": "MIT",
+      "licenseTitle": "MIT",
+      "licenseUrl": "https://github.com/phosphor-icons/core/blob/main/LICENSE",
+      "homepage": "https://github.com/phosphor-icons/core",
+      "samples": [
+        "folder-open-duotone",
+        "check-square-offset-thin",
+        "pencil-line-fill",
+        "check-thin",
+        "browser-duotone",
+        "thermometer-simple-fill"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/ph/folder-open-duotone.svg"
+    },
+    {
+      "prefix": "tabler",
+      "name": "Tabler Icons",
+      "total": 6166,
+      "category": "UI 24px",
+      "license": "MIT",
+      "licenseTitle": "MIT",
+      "licenseUrl": "https://github.com/tabler/tabler-icons/blob/master/LICENSE",
+      "homepage": "https://github.com/tabler/tabler-icons",
+      "samples": [
+        "alien",
+        "device-desktop",
+        "photo",
+        "chevron-right",
+        "check",
+        "square-root"
+      ],
+      "status": "safe",
+      "reasons": [],
+      "svgExample": "https://api.iconify.design/tabler/alien.svg"
+    }
+  ],
+  "allowlistMissingOrUnsafe": []
+}

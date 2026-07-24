@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -18,12 +19,67 @@ import {
   type PolyPackage,
   type PolyPreviewSide,
 } from "@/lib/polyhaven";
+import type { UnsplashPhotoCard } from "@/lib/unsplash";
+import {
+  CreatorsMediaMasonry,
+  mapPexelsMediaToStock,
+  mapUnsplashToStock,
+  PexelsCategoryCard,
+  type CreatorsStockItem,
+} from "@/components/CreatorsMediaMasonry";
 
-const TYPE_OPTIONS: { id: Exclude<PolyHavenType, "all">; label: string }[] = [
+type StudioKind =
+  | "models"
+  | "hdris"
+  | "textures"
+  | "photos"
+  | "videos"
+  | "emojis"
+  | "icons";
+
+const TYPE_OPTIONS: { id: StudioKind; label: string }[] = [
   { id: "models", label: "3D models" },
   { id: "hdris", label: "HDRIs" },
   { id: "textures", label: "Textures" },
+  { id: "photos", label: "Photos" },
+  { id: "videos", label: "Videos" },
+  { id: "emojis", label: "Emojis" },
+  { id: "icons", label: "Icons" },
 ];
+
+const PEXELS_PHOTOS_ID = "pexels";
+
+type OpenMojiItem = {
+  hex: string;
+  filename: string;
+  public_url: string;
+  byte_size: number;
+  name?: string | null;
+  tags?: string | null;
+  group_name?: string | null;
+  subgroup?: string | null;
+};
+
+type IconifySetCard = {
+  prefix: string;
+  label: string;
+  family: string;
+  license: string;
+  licenseUrl: string;
+  homepage: string;
+  notes: string | null;
+  total: number | null;
+  thumbUrl: string | null;
+};
+
+type IconifyIconItem = {
+  id: string;
+  prefix: string;
+  name: string;
+  label: string;
+  svgUrl: string;
+  license: string;
+};
 
 type CategoryOpt = {
   id: string;
@@ -35,8 +91,14 @@ type CategoryOpt = {
 
 type ViewMode = "categories" | "gallery";
 
-function typeLabel(t: PolyHavenType) {
+function typeLabel(t: StudioKind) {
   return TYPE_OPTIONS.find((o) => o.id === t)?.label || t;
+}
+
+function isPolyKind(
+  t: StudioKind,
+): t is Exclude<PolyHavenType, "all"> {
+  return t === "models" || t === "hdris" || t === "textures";
 }
 
 async function downloadPackageZip(pack: PolyPackage, assetId: string) {
@@ -64,7 +126,7 @@ async function downloadPackageZip(pack: PolyPackage, assetId: string) {
 }
 
 export function CreatorsStudio() {
-  const [kind, setKind] = useState<Exclude<PolyHavenType, "all">>("models");
+  const [kind, setKind] = useState<StudioKind>("models");
   const [view, setView] = useState<ViewMode>("categories");
   const [category, setCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryOpt[]>([]);
@@ -73,6 +135,19 @@ export function CreatorsStudio() {
   const [submitted, setSubmitted] = useState("");
   const [typeOpen, setTypeOpen] = useState(false);
   const [items, setItems] = useState<PolyHavenAssetMeta[]>([]);
+  const [emojis, setEmojis] = useState<OpenMojiItem[]>([]);
+  const [emojiViewer, setEmojiViewer] = useState<OpenMojiItem | null>(null);
+  const [emojiGroups, setEmojiGroups] = useState<CategoryOpt[]>([]);
+  const [emojiGroup, setEmojiGroup] = useState<string | null>(null);
+  const [iconSets, setIconSets] = useState<IconifySetCard[]>([]);
+  const [iconPrefix, setIconPrefix] = useState<string | null>(null);
+  const [icons, setIcons] = useState<IconifyIconItem[]>([]);
+  const [iconViewer, setIconViewer] = useState<IconifyIconItem | null>(null);
+  const [photos, setPhotos] = useState<UnsplashPhotoCard[]>([]);
+  const [photoViewer, setPhotoViewer] = useState<UnsplashPhotoCard | null>(
+    null,
+  );
+  const [stockItems, setStockItems] = useState<CreatorsStockItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -80,17 +155,44 @@ export function CreatorsStudio() {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverCat, setHoverCat] = useState<string | null>(null);
   const [favKeys, setFavKeys] = useState<Set<string>>(() => new Set());
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [toolbarH, setToolbarH] = useState(64);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const typeRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const pageRef = useRef(1);
   const requestIdRef = useRef(0);
+  const catsPageRef = useRef(1);
+  const catsHasMoreRef = useRef(true);
+  const catsLoadingRef = useRef(false);
+  const [catsLoadingMore, setCatsLoadingMore] = useState(false);
 
+  const isEmoji = kind === "emojis";
+  const isIcons = kind === "icons";
+  const isPhotos = kind === "photos";
+  const isVideos = kind === "videos";
+  const isPexelsPhotos = isPhotos && category === PEXELS_PHOTOS_ID;
   const searching = Boolean(submitted);
-  const showCategories = view === "categories" && !searching;
-  const showGallery = view === "gallery" || searching;
+  const isStockGallery =
+    isVideos || (isPhotos && (Boolean(category) || searching));
+  const showCategories =
+    (isEmoji && !emojiGroup && !searching) ||
+    (isIcons && !iconPrefix && !searching) ||
+    (isPhotos && !category && !searching) ||
+    (isPolyKind(kind) && view === "categories" && !searching);
+  const showGallery =
+    (isEmoji && (Boolean(emojiGroup) || searching)) ||
+    (isIcons && (Boolean(iconPrefix) || searching)) ||
+    isStockGallery ||
+    (isPolyKind(kind) && (view === "gallery" || searching));
+  const showResultsList =
+    (isEmoji && showGallery) ||
+    (isIcons && showGallery) ||
+    isStockGallery ||
+    (isPolyKind(kind) && showGallery);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -101,6 +203,44 @@ export function CreatorsStudio() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  // Live search: update results as you type; empty field restores the list
+  useEffect(() => {
+    const q = query.trim();
+    const delay = q === "" ? 0 : 280;
+    const t = window.setTimeout(() => {
+      setSubmitted(q);
+      setErr(null);
+      if (q) {
+        setView("gallery");
+      } else if ((isPolyKind(kind) || kind === "photos") && !category) {
+        setView("categories");
+      } else if (kind === "videos") {
+        setView("gallery");
+      }
+    }, delay);
+    return () => window.clearTimeout(t);
+  }, [query, kind, category]);
+
+  useEffect(() => {
+    function onScroll() {
+      setShowScrollTop(window.scrollY > 480);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Keep search bar height in sync so content isn't covered (fixed toolbar)
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setToolbarH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showGallery, kind]);
 
   useEffect(() => {
     void (async () => {
@@ -117,8 +257,11 @@ export function CreatorsStudio() {
     })();
   }, []);
 
-  // Load all categories for current type
+  // Load all categories for current Poly Haven type
   useEffect(() => {
+    if (!isPolyKind(kind)) {
+      return;
+    }
     let cancelled = false;
     setCatsLoading(true);
     void (async () => {
@@ -140,10 +283,262 @@ export function CreatorsStudio() {
     };
   }, [kind]);
 
-  // Gallery fetch (category or search)
+  // Unsplash topics → Photos categories (page 1; more on scroll)
   useEffect(() => {
+    if (!isPhotos) return;
+    let cancelled = false;
+    setCatsLoading(true);
+    catsPageRef.current = 1;
+    catsHasMoreRef.current = true;
+    void (async () => {
+      const res = await fetch("/api/unsplash/topics?page=1&perPage=24");
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      if (!res.ok) {
+        setErr(data.error || "Failed to load Unsplash topics");
+        setCategories([]);
+        catsHasMoreRef.current = false;
+      } else {
+        setCategories(
+          ((data.items || []) as Array<{
+            slug: string;
+            label: string;
+            count: number;
+            thumbUrl: string | null;
+          }>).map((t) => ({
+            id: t.slug,
+            label: t.label,
+            count: t.count,
+            thumbUrl: t.thumbUrl,
+          })),
+        );
+        catsHasMoreRef.current = Boolean(data.hasMore);
+        catsPageRef.current = 1;
+      }
+      setCatsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPhotos]);
+
+  // Photos (Unsplash + Pexels) and Videos (Pexels) — media masonry
+  useEffect(() => {
+    if (!isPhotos && !isVideos) return;
+    if (isPhotos && !category && !submitted) return;
+
+    let cancelled = false;
+    const reqId = ++requestIdRef.current;
+    pageRef.current = 1;
+    hasMoreRef.current = true;
+    loadingRef.current = true;
+    setLoading(true);
+    setErr(null);
+    setPhotos([]);
+    setStockItems([]);
+
+    void (async () => {
+      try {
+        const stock: CreatorsStockItem[] = [];
+        let hasMore = false;
+
+        const wantPexels =
+          isVideos || isPexelsPhotos || (isPhotos && Boolean(submitted));
+        if (wantPexels) {
+          const params = new URLSearchParams({
+            type: isVideos ? "video" : "photo",
+            page: "1",
+            q: submitted || (isVideos ? "cinematic" : "nature"),
+          });
+          const res = await fetch(`/api/media/search?${params}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "Pexels failed");
+          for (const row of data.items || []) {
+            const mapped = mapPexelsMediaToStock(row);
+            if (mapped) stock.push(mapped);
+          }
+          hasMore = Boolean(data.hasMore);
+        }
+
+        const wantUnsplash =
+          isPhotos && !isPexelsPhotos && (Boolean(submitted) || Boolean(category));
+        if (wantUnsplash) {
+          const params = new URLSearchParams({
+            page: "1",
+            perPage: "30",
+          });
+          if (submitted) params.set("q", submitted);
+          else if (category) params.set("topic", category);
+          const res = await fetch(`/api/unsplash/photos?${params}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok && !wantPexels) {
+            throw new Error(data.error || "Unsplash failed");
+          }
+          if (res.ok) {
+            const batch = (data.items || []) as UnsplashPhotoCard[];
+            setPhotos(batch);
+            for (const p of batch) stock.push(mapUnsplashToStock(p));
+            hasMore = hasMore || Boolean(data.hasMore);
+          }
+        }
+
+        if (cancelled || reqId !== requestIdRef.current) return;
+        const seen = new Set<string>();
+        setStockItems(
+          stock.filter((s) => {
+            if (seen.has(s.key)) return false;
+            seen.add(s.key);
+            return true;
+          }),
+        );
+        hasMoreRef.current = hasMore;
+        pageRef.current = 1;
+      } catch (e) {
+        if (cancelled || reqId !== requestIdRef.current) return;
+        setErr(e instanceof Error ? e.message : "Failed to load media");
+        setStockItems([]);
+        hasMoreRef.current = false;
+      } finally {
+        if (!cancelled && reqId === requestIdRef.current) {
+          loadingRef.current = false;
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPhotos, isVideos, isPexelsPhotos, category, submitted]);
+
+  // OpenMoji categories (group_name)
+  useEffect(() => {
+    if (!isEmoji) return;
+    let cancelled = false;
+    setCatsLoading(true);
+    void (async () => {
+      const res = await fetch("/api/openmoji/categories");
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      if (!res.ok) {
+        setErr(data.error || "Failed to load emoji categories");
+        setEmojiGroups([]);
+      } else {
+        setEmojiGroups((data.items || []) as CategoryOpt[]);
+      }
+      setCatsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEmoji]);
+
+  // Safe Iconify sets (Lucide / Heroicons / Tabler / Phosphor / MDI)
+  useEffect(() => {
+    if (!isIcons) return;
+    let cancelled = false;
+    setCatsLoading(true);
+    void (async () => {
+      const res = await fetch("/api/iconify/collections");
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      if (!res.ok) {
+        setErr(data.error || "Failed to load icon sets");
+        setIconSets([]);
+      } else {
+        setIconSets((data.items || []) as IconifySetCard[]);
+      }
+      setCatsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isIcons]);
+
+  // Iconify icon gallery (set browse or live search across safe sets)
+  useEffect(() => {
+    if (!isIcons) return;
+    if (!iconPrefix && !submitted) return;
+    let cancelled = false;
+    const reqId = ++requestIdRef.current;
+    pageRef.current = 1;
+    hasMoreRef.current = true;
+    loadingRef.current = true;
+    setLoading(true);
+    setErr(null);
+    setIcons([]);
+    void (async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "96",
+      });
+      if (iconPrefix) params.set("prefix", iconPrefix);
+      if (submitted) params.set("q", submitted);
+      const res = await fetch(`/api/iconify/icons?${params}`);
+      const data = await res.json().catch(() => ({}));
+      if (cancelled || reqId !== requestIdRef.current) return;
+      if (!res.ok) {
+        setErr(data.error || "Failed to load icons");
+        setIcons([]);
+        hasMoreRef.current = false;
+      } else {
+        setIcons((data.items || []) as IconifyIconItem[]);
+        hasMoreRef.current = Boolean(data.hasMore);
+        pageRef.current = 1;
+      }
+      loadingRef.current = false;
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isIcons, iconPrefix, submitted]);
+
+  // OpenMoji gallery (category and/or live search)
+  useEffect(() => {
+    if (!isEmoji) return;
+    if (!emojiGroup && !submitted) return;
+    let cancelled = false;
+    const reqId = ++requestIdRef.current;
+    pageRef.current = 1;
+    hasMoreRef.current = true;
+    loadingRef.current = true;
+    setLoading(true);
+    setErr(null);
+    setEmojis([]);
+    void (async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "96",
+      });
+      if (submitted) params.set("q", submitted);
+      if (emojiGroup) params.set("group", emojiGroup);
+      const res = await fetch(`/api/openmoji?${params}`);
+      const data = await res.json().catch(() => ({}));
+      if (cancelled || reqId !== requestIdRef.current) return;
+      if (!res.ok) {
+        setErr(data.error || "Failed to load emojis");
+        setEmojis([]);
+        hasMoreRef.current = false;
+      } else {
+        setEmojis((data.items || []) as OpenMojiItem[]);
+        hasMoreRef.current = Boolean(data.hasMore);
+        pageRef.current = 1;
+      }
+      loadingRef.current = false;
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEmoji, emojiGroup, submitted]);
+
+  // Gallery fetch (category or search) — Poly Haven only
+  useEffect(() => {
+    if (isEmoji) return;
     if (!showGallery) return;
     if (!searching && !category) return;
+    if (!isPolyKind(kind)) return;
 
     let cancelled = false;
     const reqId = ++requestIdRef.current;
@@ -192,6 +587,49 @@ export function CreatorsStudio() {
   }, [showGallery, searching, category, kind, submitted]);
 
   const loadMore = useCallback(async () => {
+    // Photos: load more topic categories while browsing the catalog
+    if (isPhotos && showCategories) {
+      if (catsLoadingRef.current || !catsHasMoreRef.current) return;
+      catsLoadingRef.current = true;
+      setCatsLoadingMore(true);
+      const nextPage = catsPageRef.current + 1;
+      try {
+        const res = await fetch(
+          `/api/unsplash/topics?page=${nextPage}&perPage=24`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load more topics");
+        const batch = (
+          (data.items || []) as Array<{
+            slug: string;
+            label: string;
+            count: number;
+            thumbUrl: string | null;
+          }>
+        ).map((t) => ({
+          id: t.slug,
+          label: t.label,
+          count: t.count,
+          thumbUrl: t.thumbUrl,
+        }));
+        catsHasMoreRef.current = Boolean(data.hasMore);
+        catsPageRef.current = nextPage;
+        if (batch.length) {
+          setCategories((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...batch.filter((b) => !seen.has(b.id))];
+          });
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Failed to load more topics");
+        catsHasMoreRef.current = false;
+      } finally {
+        catsLoadingRef.current = false;
+        setCatsLoadingMore(false);
+      }
+      return;
+    }
+
     if (!showGallery) return;
     if (loadingRef.current || !hasMoreRef.current) return;
     loadingRef.current = true;
@@ -199,27 +637,119 @@ export function CreatorsStudio() {
     const reqId = requestIdRef.current;
     const nextPage = pageRef.current + 1;
     try {
-      const params = new URLSearchParams({
-        type: kind,
-        page: String(nextPage),
-        pageSize: "48",
-        q: submitted,
-      });
-      if (!searching && category) params.set("category", category);
-      const res = await fetch(`/api/polyhaven/assets?${params}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      if (reqId !== requestIdRef.current) return;
-      if (!res.ok) throw new Error(data.error || "Failed to load more");
-      const batch: PolyHavenAssetMeta[] = data.items || [];
-      hasMoreRef.current = Boolean(data.hasMore);
-      pageRef.current = nextPage;
-      if (batch.length) {
-        setItems((prev) => {
-          const seen = new Set(prev.map((p) => p.id));
-          return [...prev, ...batch.filter((b) => !seen.has(b.id))];
+      if (isEmoji) {
+        const params = new URLSearchParams({
+          page: String(nextPage),
+          limit: "96",
         });
+        if (submitted) params.set("q", submitted);
+        if (emojiGroup) params.set("group", emojiGroup);
+        const res = await fetch(`/api/openmoji?${params}`);
+        const data = await res.json();
+        if (reqId !== requestIdRef.current) return;
+        if (!res.ok) throw new Error(data.error || "Failed to load more");
+        const batch: OpenMojiItem[] = data.items || [];
+        hasMoreRef.current = Boolean(data.hasMore);
+        pageRef.current = nextPage;
+        if (batch.length) {
+          setEmojis((prev) => {
+            const seen = new Set(prev.map((p) => p.hex));
+            return [...prev, ...batch.filter((b) => !seen.has(b.hex))];
+          });
+        }
+      } else if (isIcons && (iconPrefix || submitted)) {
+        const params = new URLSearchParams({
+          page: String(nextPage),
+          limit: "96",
+        });
+        if (iconPrefix) params.set("prefix", iconPrefix);
+        if (submitted) params.set("q", submitted);
+        const res = await fetch(`/api/iconify/icons?${params}`);
+        const data = await res.json();
+        if (reqId !== requestIdRef.current) return;
+        if (!res.ok) throw new Error(data.error || "Failed to load more");
+        const batch: IconifyIconItem[] = data.items || [];
+        hasMoreRef.current = Boolean(data.hasMore);
+        pageRef.current = nextPage;
+        if (batch.length) {
+          setIcons((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...batch.filter((b) => !seen.has(b.id))];
+          });
+        }
+      } else if (isVideos || (isPhotos && (category || submitted))) {
+        const batch: CreatorsStockItem[] = [];
+        let hasMore = false;
+
+        const wantPexels =
+          isVideos || isPexelsPhotos || (isPhotos && Boolean(submitted));
+        if (wantPexels) {
+          const params = new URLSearchParams({
+            type: isVideos ? "video" : "photo",
+            page: String(nextPage),
+            q: submitted || (isVideos ? "cinematic" : "nature"),
+          });
+          const res = await fetch(`/api/media/search?${params}`);
+          const data = await res.json();
+          if (reqId !== requestIdRef.current) return;
+          if (!res.ok) throw new Error(data.error || "Failed to load more");
+          for (const row of data.items || []) {
+            const mapped = mapPexelsMediaToStock(row);
+            if (mapped) batch.push(mapped);
+          }
+          hasMore = Boolean(data.hasMore);
+        }
+
+        const wantUnsplash =
+          isPhotos && !isPexelsPhotos && (Boolean(submitted) || Boolean(category));
+        if (wantUnsplash) {
+          const params = new URLSearchParams({
+            page: String(nextPage),
+            perPage: "30",
+          });
+          if (submitted) params.set("q", submitted);
+          else if (category) params.set("topic", category);
+          const res = await fetch(`/api/unsplash/photos?${params}`);
+          const data = await res.json();
+          if (reqId !== requestIdRef.current) return;
+          if (res.ok) {
+            const unsplashBatch = (data.items || []) as UnsplashPhotoCard[];
+            for (const p of unsplashBatch) batch.push(mapUnsplashToStock(p));
+            hasMore = hasMore || Boolean(data.hasMore);
+          }
+        }
+
+        hasMoreRef.current = hasMore;
+        pageRef.current = nextPage;
+        if (batch.length) {
+          setStockItems((prev) => {
+            const seen = new Set(prev.map((p) => p.key));
+            return [...prev, ...batch.filter((b) => !seen.has(b.key))];
+          });
+        }
+      } else if (isPolyKind(kind)) {
+        const params = new URLSearchParams({
+          type: kind,
+          page: String(nextPage),
+          pageSize: "48",
+          q: submitted,
+        });
+        if (!searching && category) params.set("category", category);
+        const res = await fetch(`/api/polyhaven/assets?${params}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (reqId !== requestIdRef.current) return;
+        if (!res.ok) throw new Error(data.error || "Failed to load more");
+        const batch: PolyHavenAssetMeta[] = data.items || [];
+        hasMoreRef.current = Boolean(data.hasMore);
+        pageRef.current = nextPage;
+        if (batch.length) {
+          setItems((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...batch.filter((b) => !seen.has(b.id))];
+          });
+        }
       }
     } catch (e) {
       if (reqId !== requestIdRef.current) return;
@@ -230,11 +760,27 @@ export function CreatorsStudio() {
         setLoadingMore(false);
       }
     }
-  }, [showGallery, kind, category, submitted, searching]);
+  }, [
+    showGallery,
+    showCategories,
+    kind,
+    category,
+    submitted,
+    searching,
+    isEmoji,
+    isIcons,
+    isPhotos,
+    isVideos,
+    isPexelsPhotos,
+    iconPrefix,
+    emojiGroup,
+  ]);
 
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !showGallery) return;
+    const watch =
+      showGallery || (isPhotos && showCategories);
+    if (!el || !watch) return;
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) void loadMore();
@@ -243,18 +789,42 @@ export function CreatorsStudio() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [loadMore, showGallery, items.length]);
+  }, [
+    loadMore,
+    showGallery,
+    showCategories,
+    isPhotos,
+    items.length,
+    emojis.length,
+    icons.length,
+    photos.length,
+    stockItems.length,
+    categories.length,
+  ]);
 
-  function selectKind(next: Exclude<PolyHavenType, "all">) {
+  function selectKind(next: StudioKind) {
     setTypeOpen(false);
     if (next === kind) return;
     setKind(next);
     setCategory(null);
+    setIconPrefix(null);
+    setEmojiGroup(null);
     setView("categories");
     setSubmitted("");
     setQuery("");
     setItems([]);
+    setEmojis([]);
+    setIcons([]);
+    setPhotos([]);
+    setStockItems([]);
+    setIconSets([]);
+    setEmojiGroups([]);
     setViewer(null);
+    setEmojiViewer(null);
+    setIconViewer(null);
+    setPhotoViewer(null);
+    setErr(null);
+    if (next === "videos") setView("gallery");
   }
 
   function openCategory(cat: CategoryOpt) {
@@ -264,7 +834,55 @@ export function CreatorsStudio() {
     setQuery("");
   }
 
+  function openEmojiGroup(cat: CategoryOpt) {
+    setEmojiGroup(cat.id);
+    setView("gallery");
+    setSubmitted("");
+    setQuery("");
+    setErr(null);
+  }
+
+  function openIconSet(set: IconifySetCard) {
+    setIconPrefix(set.prefix);
+    setView("gallery");
+    setSubmitted("");
+    setQuery("");
+    setErr(null);
+  }
+
   function backToCategories() {
+    if (isEmoji) {
+      setEmojiGroup(null);
+      setEmojis([]);
+      setSubmitted("");
+      setQuery("");
+      setEmojiViewer(null);
+      return;
+    }
+    if (isIcons) {
+      setIconPrefix(null);
+      setIcons([]);
+      setSubmitted("");
+      setQuery("");
+      setIconViewer(null);
+      return;
+    }
+    if (isPhotos) {
+      setCategory(null);
+      setPhotos([]);
+      setStockItems([]);
+      setSubmitted("");
+      setQuery("");
+      setPhotoViewer(null);
+      setView("categories");
+      return;
+    }
+    if (isVideos) {
+      setStockItems([]);
+      setSubmitted("");
+      setQuery("");
+      return;
+    }
     setView("categories");
     setCategory(null);
     setSubmitted("");
@@ -277,14 +895,26 @@ export function CreatorsStudio() {
     e.preventDefault();
     const q = query.trim();
     setSubmitted(q);
+    setErr(null);
     if (q) {
       setView("gallery");
-      setCategory(null);
-    } else {
+      return;
+    }
+    if (isEmoji && !emojiGroup) return;
+    if (isIcons && !iconPrefix) return;
+    if (isPhotos && !category) {
       setView("categories");
-      setCategory(null);
+      setPhotos([]);
+      return;
+    }
+    if (isPolyKind(kind) && !category) {
+      setView("categories");
       setItems([]);
     }
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function toggleFavorite(asset: PolyHavenAssetMeta) {
@@ -321,25 +951,88 @@ export function CreatorsStudio() {
 
   const activeCategoryLabel =
     categories.find((c) => c.id === category)?.label || category;
+  const activeEmojiLabel =
+    emojiGroups.find((c) => c.id === emojiGroup)?.label || emojiGroup;
+  const activeIconLabel =
+    iconSets.find((s) => s.prefix === iconPrefix)?.label || iconPrefix;
 
   return (
     <div className="space-y-4">
-      {/* Sticky toolbar — search */}
-      <form
-        onSubmit={onSearch}
-        className="sticky top-14 z-40 -mx-3 flex flex-wrap items-center gap-2 bg-[color:var(--bg)]/95 px-3 py-2.5 backdrop-blur-md sm:top-[5.75rem] sm:-mx-4 sm:px-4 sm:py-3 md:top-[6.25rem] md:-mx-6 md:px-6"
+      {/* Fixed search + back — never scrolls away (sticky fails on some mobile browsers) */}
+      <div
+        ref={toolbarRef}
+        className="fixed inset-x-0 z-[70] border-b border-[color:var(--line)] bg-[color:var(--bg)] px-3 pb-2.5 pt-2.5 sm:px-4 sm:pb-3 sm:pt-3 md:px-6"
+        style={{ top: "var(--app-header-height, 3.5rem)" }}
       >
-        <div className="relative min-w-0 flex-1">
-          <div className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2" ref={typeRef}>
+        <form onSubmit={onSearch} className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/dashboard/creators"
+            className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--fg)]"
+          >
+            ← Hub
+          </Link>
+          <div className="relative min-w-0 flex-1">
+            <div className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2" ref={typeRef}>
+              <button
+                type="button"
+                title="Filter type"
+                onClick={() => setTypeOpen((v) => !v)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M4 5h16" />
+                  <path d="M7 12h10" />
+                  <path d="M10 19h4" />
+                </svg>
+              </button>
+              {typeOpen && (
+                <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-1 shadow-2xl">
+                  {TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => selectKind(opt.id)}
+                      className="block w-full px-3 py-2 text-left text-sm transition hover:bg-white/5"
+                      style={{
+                        color: kind === opt.id ? "var(--accent)" : "var(--fg)",
+                        background:
+                          kind === opt.id
+                            ? "rgba(232,165,75,0.1)"
+                            : "transparent",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${typeLabel(kind).toLowerCase()}…`}
+              className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-2.5 pl-11 pr-11 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
+            />
             <button
-              type="button"
-              title="Filter type"
-              onClick={() => setTypeOpen((v) => !v)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
+              type="submit"
+              title="Search"
+              className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
             >
               <svg
-                width="15"
-                height="15"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -348,73 +1041,25 @@ export function CreatorsStudio() {
                 strokeLinejoin="round"
                 aria-hidden
               >
-                <path d="M4 5h16" />
-                <path d="M7 12h10" />
-                <path d="M10 19h4" />
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
               </svg>
             </button>
-            {typeOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-1 shadow-2xl">
-                {TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => selectKind(opt.id)}
-                    className="block w-full px-3 py-2 text-left text-sm transition hover:bg-white/5"
-                    style={{
-                      color: kind === opt.id ? "var(--accent)" : "var(--fg)",
-                      background:
-                        kind === opt.id
-                          ? "rgba(232,165,75,0.1)"
-                          : "transparent",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
+        </form>
 
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${typeLabel(kind).toLowerCase()}…`}
-            className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-2.5 pl-11 pr-11 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
-          />
+        {showGallery && !(isVideos && !searching) && (
           <button
-            type="submit"
-            title="Search"
-            className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
+            type="button"
+            onClick={backToCategories}
+            className="mt-2 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+            ← Categories
           </button>
-        </div>
-      </form>
-
-      {showGallery && (
-        <button
-          type="button"
-          onClick={backToCategories}
-          className="text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
-        >
-          ← Categories
-        </button>
-      )}
+        )}
+      </div>
+      {/* Spacer matching fixed toolbar so content starts below it */}
+      <div style={{ height: toolbarH }} aria-hidden className="shrink-0" />
 
       {err && (
         <p className="rounded-xl border border-[color:var(--danger)]/40 bg-[color:var(--danger)]/10 px-3 py-2 text-sm text-[color:var(--danger)]">
@@ -426,6 +1071,146 @@ export function CreatorsStudio() {
         <section>
           {catsLoading ? (
             <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+          ) : isIcons ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4">
+              {iconSets.map((set) => {
+                const on = hoverCat === set.prefix;
+                return (
+                  <button
+                    key={set.prefix}
+                    type="button"
+                    onClick={() => openIconSet(set)}
+                    onMouseEnter={() => setHoverCat(set.prefix)}
+                    onMouseLeave={() => setHoverCat(null)}
+                    className="flex flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/40 text-left outline-none transition hover:border-[color:rgba(232,165,75,0.45)]"
+                    style={{
+                      background: on ? "rgba(232,165,75,0.08)" : undefined,
+                    }}
+                  >
+                    <span className="flex aspect-[4/3] items-center justify-center bg-white/[0.03] p-6">
+                      {set.thumbUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={set.thumbUrl}
+                          alt=""
+                          className="h-14 w-14 object-contain opacity-90"
+                        />
+                      ) : (
+                        <span className="text-2xl text-[color:var(--muted)]">
+                          ◇
+                        </span>
+                      )}
+                    </span>
+                    <span className="border-t border-[color:var(--line)] px-3 py-2.5">
+                      <span className="block font-[family-name:var(--font-syne)] text-sm font-semibold">
+                        {set.label}
+                      </span>
+                      {set.total != null ? (
+                        <span className="mt-0.5 block text-[11px] text-[color:var(--muted)]">
+                          {set.total.toLocaleString()} icons
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : isEmoji ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
+              {emojiGroups.map((cat) => {
+                const on = hoverCat === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => openEmojiGroup(cat)}
+                    onMouseEnter={() => setHoverCat(cat.id)}
+                    onMouseLeave={() => setHoverCat(null)}
+                    className="relative aspect-square overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/40 outline-none"
+                  >
+                    {cat.thumbUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cat.thumbUrl}
+                        alt=""
+                        className="h-full w-full object-contain p-6 transition duration-300"
+                        style={{
+                          transform: on ? "scale(1.06)" : "scale(1)",
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-white/5" />
+                    )}
+                    {on && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 text-left">
+                        <p className="font-[family-name:var(--font-syne)] text-sm font-semibold text-white">
+                          {cat.label}
+                        </p>
+                        <p className="text-[11px] text-white/75">
+                          {cat.count} emoji{cat.count === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : isPhotos ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
+              <PexelsCategoryCard
+                onClick={() =>
+                  openCategory({
+                    id: PEXELS_PHOTOS_ID,
+                    label: "Pexels",
+                    count: 0,
+                    thumbUrl: null,
+                  })
+                }
+                hover={hoverCat === PEXELS_PHOTOS_ID}
+                onHover={(on) => setHoverCat(on ? PEXELS_PHOTOS_ID : null)}
+              />
+              {categories.map((cat) => {
+                const on = hoverCat === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => openCategory(cat)}
+                    onMouseEnter={() => setHoverCat(cat.id)}
+                    onMouseLeave={() => setHoverCat(null)}
+                    className="relative aspect-square overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/40 outline-none"
+                  >
+                    {cat.thumbUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cat.thumbUrl}
+                        alt=""
+                        className="h-full w-full object-cover transition duration-300"
+                        style={{
+                          transform: on ? "scale(1.04)" : "scale(1)",
+                          filter: on ? "brightness(1.05)" : undefined,
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-white/5" />
+                    )}
+                    <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white">
+                      Unsplash
+                    </span>
+                    {on && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 text-left">
+                        <p className="font-[family-name:var(--font-syne)] text-sm font-semibold text-white">
+                          {cat.label}
+                        </p>
+                        <p className="text-[11px] text-white/75">
+                          {cat.count.toLocaleString()} photos · Unsplash
+                        </p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
               {categories.map((cat) => {
@@ -468,10 +1253,157 @@ export function CreatorsStudio() {
               })}
             </div>
           )}
+          {isPhotos && (
+            <>
+              <div ref={sentinelRef} className="h-10" />
+              {catsLoadingMore && (
+                <p className="pb-2 text-center text-xs text-[color:var(--muted)]">
+                  Loading more…
+                </p>
+              )}
+            </>
+          )}
         </section>
       )}
 
-      {showGallery && (
+      {isEmoji && showGallery && (
+        <section>
+          <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
+            {searching
+              ? `Search · ${submitted}`
+              : activeEmojiLabel || "Emojis"}
+          </h1>
+          {loading && !emojis.length ? (
+            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+          ) : !emojis.length ? (
+            <p className="text-sm text-[color:var(--muted)]">No emojis found.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:gap-3">
+              {emojis.map((emo) => {
+                const hover = hoverId === emo.hex;
+                return (
+                  <button
+                    key={emo.hex}
+                    type="button"
+                    title={emo.name || emo.hex}
+                    onClick={() => setEmojiViewer(emo)}
+                    onMouseEnter={() => setHoverId(emo.hex)}
+                    onMouseLeave={() => setHoverId(null)}
+                    className="relative flex aspect-square flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/50 outline-none transition hover:border-[color:rgba(232,165,75,0.45)]"
+                    style={{
+                      background: hover
+                        ? "rgba(232,165,75,0.1)"
+                        : undefined,
+                    }}
+                  >
+                    <span className="flex min-h-0 flex-1 items-center justify-center p-1.5 sm:p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={emo.public_url}
+                        alt={emo.name || emo.hex}
+                        loading="lazy"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </span>
+                    <span className="truncate border-t border-[color:var(--line)] px-1 py-1 text-center text-[8px] leading-tight text-[color:var(--muted)] sm:text-[10px]">
+                      {emo.name || emo.hex}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div ref={sentinelRef} className="h-10" />
+          {loadingMore && (
+            <p className="pb-2 text-center text-xs text-[color:var(--muted)]">
+              Loading more…
+            </p>
+          )}
+        </section>
+      )}
+
+      {isIcons && showGallery && (
+        <section>
+          <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
+            {searching
+              ? activeIconLabel
+                ? `${activeIconLabel} · ${submitted}`
+                : `Search · ${submitted}`
+              : activeIconLabel || "Icons"}
+          </h1>
+          {loading && !icons.length ? (
+            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+          ) : !icons.length ? (
+            <p className="text-sm text-[color:var(--muted)]">No icons found.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:gap-3">
+              {icons.map((ico) => {
+                const hover = hoverId === ico.id;
+                return (
+                  <button
+                    key={ico.id}
+                    type="button"
+                    title={ico.label}
+                    onClick={() => setIconViewer(ico)}
+                    onMouseEnter={() => setHoverId(ico.id)}
+                    onMouseLeave={() => setHoverId(null)}
+                    className="relative flex aspect-square flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/50 outline-none transition hover:border-[color:rgba(232,165,75,0.45)]"
+                    style={{
+                      background: hover ? "rgba(232,165,75,0.1)" : undefined,
+                    }}
+                  >
+                    <span className="flex min-h-0 flex-1 items-center justify-center p-1 sm:p-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={ico.svgUrl}
+                        alt={ico.label}
+                        loading="lazy"
+                        className="h-[72%] w-[72%] object-contain"
+                      />
+                    </span>
+                    <span className="truncate border-t border-[color:var(--line)] px-1 py-1 text-center text-[8px] leading-tight text-[color:var(--muted)] sm:text-[10px]">
+                      {ico.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div ref={sentinelRef} className="h-10" />
+          {loadingMore && (
+            <p className="pb-2 text-center text-xs text-[color:var(--muted)]">
+              Loading more…
+            </p>
+          )}
+        </section>
+      )}
+
+      {(isPhotos || isVideos) && showGallery && (
+        <section>
+          <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
+            {searching
+              ? `Search · ${submitted}`
+              : isVideos
+                ? "Videos"
+                : isPexelsPhotos
+                  ? "Pexels"
+                  : activeCategoryLabel || "Photos"}
+          </h1>
+          <CreatorsMediaMasonry
+            items={stockItems}
+            loading={loading}
+            loadingMore={loadingMore}
+            emptyText={
+              isVideos ? "No videos found." : "No photos found."
+            }
+            resetKey={`${kind}:${category || ""}:${submitted}`}
+            sentinelRef={sentinelRef}
+            onError={setErr}
+          />
+        </section>
+      )}
+
+      {showGallery && !isEmoji && !isIcons && !isPhotos && !isVideos && (
         <section>
           <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
             {searching
@@ -576,7 +1508,347 @@ export function CreatorsStudio() {
           onError={(msg) => setErr(msg)}
         />
       )}
+
+      {emojiViewer && (
+        <EmojiViewer
+          item={emojiViewer}
+          onClose={() => setEmojiViewer(null)}
+        />
+      )}
+
+      {iconViewer && (
+        <IconViewer item={iconViewer} onClose={() => setIconViewer(null)} />
+      )}
+
+      {photoViewer && (
+        <UnsplashPhotoViewer
+          photo={photoViewer}
+          onClose={() => setPhotoViewer(null)}
+          onError={(msg) => setErr(msg)}
+        />
+      )}
+
+      {showResultsList && showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          title="Back to top"
+          aria-label="Back to top"
+          className="fixed bottom-24 right-4 z-[80] flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] text-[color:var(--fg)] shadow-lg transition hover:border-[color:rgba(232,165,75,0.55)] hover:text-[color:var(--accent)] md:bottom-8 md:right-8"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M12 19V5" />
+            <path d="m5 12 7-7 7 7" />
+          </svg>
+        </button>
+      )}
     </div>
+  );
+}
+
+function EmojiViewer({
+  item,
+  onClose,
+}: {
+  item: OpenMojiItem;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal
+      aria-label={item.hex}
+    >
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate font-[family-name:var(--font-syne)] text-sm font-semibold">
+              {item.name || item.hex}
+            </p>
+            <p className="truncate text-xs text-[color:var(--muted)]">
+              {item.hex}
+              {item.group_name ? ` · ${item.group_name}` : ""} · OpenMoji
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex items-center justify-center bg-white/5 p-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.public_url}
+            alt={item.name || item.hex}
+            className="h-40 w-40 object-contain sm:h-48 sm:w-48"
+          />
+        </div>
+        <div className="flex flex-col gap-2 p-4 sm:flex-row">
+          <a
+            href={item.public_url}
+            download={item.filename}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary flex-1 text-center text-sm"
+          >
+            Download SVG
+          </a>
+          <button
+            type="button"
+            className="btn btn-ghost flex-1 text-sm"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(item.public_url);
+              } catch {
+                /* ignore */
+              }
+            }}
+          >
+            Copy link
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function IconViewer({
+  item,
+  onClose,
+}: {
+  item: IconifyIconItem;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const filename = `${item.prefix}-${item.name}.svg`;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal
+      aria-label={item.id}
+    >
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate font-[family-name:var(--font-syne)] text-sm font-semibold">
+              {item.label}
+            </p>
+            <p className="truncate text-xs text-[color:var(--muted)]">
+              {item.id}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex items-center justify-center bg-white/5 p-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.svgUrl}
+            alt={item.label}
+            className="h-40 w-40 object-contain sm:h-48 sm:w-48"
+          />
+        </div>
+        <div className="flex flex-col gap-2 p-4 sm:flex-row">
+          <a
+            href={item.svgUrl}
+            download={filename}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary flex-1 text-center text-sm"
+          >
+            Download SVG
+          </a>
+          <button
+            type="button"
+            className="btn btn-ghost flex-1 text-sm"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(item.svgUrl);
+              } catch {
+                /* ignore */
+              }
+            }}
+          >
+            Copy link
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function UnsplashPhotoViewer({
+  photo,
+  onClose,
+  onError,
+}: {
+  photo: UnsplashPhotoCard;
+  onClose: () => void;
+  onError: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function trackAndOpen() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/unsplash/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ downloadLocation: photo.downloadLocation }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Download tracking failed");
+      }
+      // Open hotlinked full URL (guideline) — not the download_location response
+      window.open(photo.urls.full, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal
+      aria-label={photo.alt}
+    >
+      <div
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-[color:var(--line)] px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate font-[family-name:var(--font-syne)] text-sm font-semibold">
+              {photo.photographer.name}
+            </p>
+            <p className="truncate text-xs text-[color:var(--muted)]">
+              @{photo.photographer.username}
+              {photo.width && photo.height
+                ? ` · ${photo.width}×${photo.height}`
+                : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="relative flex max-h-[55vh] items-center justify-center bg-black/40">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo.urls.regular}
+            alt={photo.alt}
+            className="max-h-[55vh] w-full object-contain"
+          />
+        </div>
+        {(photo.description || photo.alt) && (
+          <p className="border-b border-[color:var(--line)] px-4 py-2 text-xs text-[color:var(--muted)]">
+            {photo.description || photo.alt}
+          </p>
+        )}
+        <p className="px-4 pt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
+          Photo by{" "}
+          <a
+            href={photo.photographer.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[color:var(--accent)] underline-offset-2 hover:underline"
+          >
+            {photo.photographer.name}
+          </a>{" "}
+          on{" "}
+          <a
+            href={`https://unsplash.com/?utm_source=orzuai&utm_medium=referral`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[color:var(--accent)] underline-offset-2 hover:underline"
+          >
+            Unsplash
+          </a>
+        </p>
+        <div className="flex flex-col gap-2 p-4 sm:flex-row">
+          <button
+            type="button"
+            className="btn btn-primary flex-1 text-sm"
+            disabled={busy}
+            onClick={() => void trackAndOpen()}
+          >
+            {busy ? "Opening…" : "Download"}
+          </button>
+          <a
+            href={photo.unsplashUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost flex-1 text-center text-sm"
+          >
+            View on Unsplash
+          </a>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

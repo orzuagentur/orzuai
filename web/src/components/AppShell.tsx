@@ -621,13 +621,34 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [headerH, setHeaderH] = useState(56);
+  const headerRef = useRef<HTMLElement | null>(null);
   const isLibrary = pathname.startsWith("/dashboard/favorites");
   const isClipping = pathname.startsWith("/dashboard/clipping");
   const isCreativity = pathname.startsWith("/dashboard/content");
-  const isEditor = pathname.startsWith("/dashboard/editor");
+  const isEditor =
+    pathname.startsWith("/dashboard/editor") ||
+    pathname.startsWith("/dashboard/creators/presentation");
   const pageTitle =
     ALL_NAV.find((item) => isNavActive(pathname, item))?.label || "OrzuAi";
   const ctx = { menuOpen, setMenuOpen };
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      setHeaderH(h);
+      document.documentElement.style.setProperty("--app-header-height", `${h}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--app-header-height");
+    };
+  }, [pathname, isLibrary, isClipping, isCreativity]);
 
   if (isEditor) {
     return (
@@ -647,7 +668,10 @@ export function AppShell({
             <NoYoutubeChannelModal />
           </Suspense>
 
-          <header className="sticky top-0 z-50 bg-[color:var(--bg)]/95 backdrop-blur-md">
+          <header
+            ref={headerRef}
+            className="fixed inset-x-0 top-0 z-[80] border-b border-[color:var(--line)] bg-[color:var(--bg)]"
+          >
             <div className="relative flex h-14 items-center justify-between gap-3 px-3 sm:h-[5.75rem] sm:px-4 md:h-[6.25rem] md:px-6">
               <BrandLogo
                 href="/dashboard"
@@ -751,7 +775,10 @@ export function AppShell({
             )}
           </header>
 
-          <main className="min-w-0 flex-1 px-3 py-3 pb-[calc(5.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-5 lg:pb-5">
+          <main
+            className="min-w-0 flex-1 px-3 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-4 sm:pt-4 lg:px-6 lg:pb-5 lg:pt-5"
+            style={{ paddingTop: `calc(${headerH}px + 0.75rem)` }}
+          >
             {children}
           </main>
 

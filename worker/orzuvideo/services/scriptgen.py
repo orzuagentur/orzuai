@@ -148,7 +148,8 @@ Rules:
   NEVER copy or lightly edit the user prompt as the title.
 - "script" is the full spoken narration. Punchy, cinematic, no fluff — match the user's requested vibe.
 - First 3 seconds must hook attention. Put that opener in "hook" (4–12 words) and start the script with it.
-- Choose B-roll search queries in English for stock footage (pexels_queries), matching the visuals described.
+- For STANDARD videos: choose B-roll search queries in English for stock footage (pexels_queries).
+- For EMOJI videos: do NOT use stock footage. Fill background_colors with solid hex colors and a rich asset_overlays plan.
 - Suggest a subtitle style hint in "subtitle_style" from:
   classic, karaoke_gold, neon_pink, impact, yellow_pop, soft_shadow, lower_third, minimal.
 - Suggest a look filter in "visual_effect" from:
@@ -156,6 +157,7 @@ Rules:
 - Do NOT invent motivational-coach / gym / discipline themes unless the prompt asks for them.
 - Return STRICT JSON only, no markdown.
 {duration_rule}
+{video_type_rule}
 JSON schema:
 {{
   "language": "ru",
@@ -165,11 +167,24 @@ JSON schema:
   "description": "one short summary sentence",
   "tags": ["tag1", "tag2"],
   "pexels_queries": ["query1", "query2", "query3", "query4", "query5"],
+  "background_colors": ["0F172A", "312E81", "0F766E"],
   "subtitle_emphasis": ["WORD1", "WORD2"],
   "subtitle_style": "classic",
   "visual_effect": "cinematic",
   "music_mood": "short english mood phrase",
-  "duration_seconds": 30
+  "duration_seconds": 30,
+  "asset_overlays": [
+    {{
+      "kind": "emoji",
+      "query": "rocket",
+      "label": "rocket",
+      "start_pct": 0.08,
+      "duration": 2.2,
+      "position": "top_right",
+      "size_pct": 0.18,
+      "color": "#FFFFFF"
+    }}
+  ]
 }}
 """
 
@@ -211,6 +226,105 @@ def _filled(value: Any) -> str | None:
     return text or None
 
 
+_OVERLAY_POSITIONS = {
+    "top_left",
+    "top_center",
+    "top_right",
+    "center_left",
+    "center",
+    "center_right",
+    "bottom_left",
+    "bottom_right",
+}
+
+
+def _as_float(value: Any, fallback: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _sanitize_hex_list(raw: Any, *, limit: int = 8) -> list[str]:
+    items = raw if isinstance(raw, list) else []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        text = str(item or "").strip().lstrip("#").upper()
+        if len(text) == 3 and all(c in "0123456789ABCDEF" for c in text):
+            text = "".join(ch * 2 for ch in text)
+        if len(text) != 6 or any(c not in "0123456789ABCDEF" for c in text):
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _sanitize_overlay_color(raw: Any) -> str | None:
+    text = str(raw or "").strip().lstrip("#").upper()
+    if len(text) == 3 and all(c in "0123456789ABCDEF" for c in text):
+        text = "".join(ch * 2 for ch in text)
+    if len(text) == 6 and all(c in "0123456789ABCDEF" for c in text):
+        return f"#{text}"
+    return None
+
+
+def _sanitize_asset_overlays(raw: Any, *, enabled: bool) -> list[dict[str, Any]]:
+    """Keep AI overlay plans bounded so icons don't cover captions or dominate."""
+    if not enabled:
+        return []
+    items = raw if isinstance(raw, list) else []
+    out: list[dict[str, Any]] = []
+    fallback_positions = [
+        "top_right",
+        "center_left",
+        "top_left",
+        "center_right",
+        "top_center",
+        "bottom_right",
+        "center",
+        "bottom_left",
+        "center_left",
+        "top_right",
+        "center_right",
+        "top_left",
+    ]
+    for idx, item in enumerate(items[:14]):
+        if not isinstance(item, dict):
+            continue
+        query = _filled(item.get("query") or item.get("name") or item.get("label"))
+        if not query:
+            continue
+        kind = str(item.get("kind") or "emoji").strip().lower()
+        if kind not in ("emoji", "icon"):
+            kind = "emoji"
+        start = max(0.02, min(0.9, _as_float(item.get("start_pct"), 0.06 + idx * 0.07)))
+        duration = max(1.4, min(5.0, _as_float(item.get("duration"), 2.6)))
+        # Hero moments can be larger; still leave room for captions.
+        size = max(0.10, min(0.30, _as_float(item.get("size_pct"), 0.16)))
+        position = str(item.get("position") or "").strip().lower()
+        if position not in _OVERLAY_POSITIONS or position == "lower_center":
+            position = fallback_positions[idx % len(fallback_positions)]
+        color = _sanitize_overlay_color(item.get("color"))
+        entry: dict[str, Any] = {
+            "kind": kind,
+            "query": query[:80],
+            "label": (_filled(item.get("label")) or query)[:80],
+            "start_pct": round(start, 3),
+            "duration": round(duration, 2),
+            "position": position,
+            "size_pct": round(size, 3),
+        }
+        if color:
+            entry["color"] = color
+        out.append(entry)
+    return out[:12]
+
+
 def _training_lines(training: dict[str, Any]) -> str:
     """Build prompt lines only from non-empty training fields."""
     mapping = [
@@ -242,6 +356,7 @@ def generate_creativity_script(
     user_prompt: str,
     duration_auto: bool = True,
     duration_seconds: int | None = None,
+    video_type: str | None = None,
     user_id: str | None = None,
     job_id: str | None = None,
 ) -> dict[str, Any]:
@@ -270,7 +385,34 @@ def generate_creativity_script(
         )
         target_note = f"Target length: {dur} seconds (~{words} words)."
 
-    system = CREATIVITY_SYSTEM.format(duration_rule=duration_rule)
+    normalized_video_type = (video_type or "standard").strip().lower()
+    emoji_video = normalized_video_type in {"emoji", "emoji_video", "emojis"}
+    if emoji_video:
+        video_type_rule = """
+- VIDEO TYPE: Emoji video (NO stock / Pexels video footage).
+- Set "pexels_queries" to [].
+- Fill "background_colors" with 5-8 solid HEX colors (no #) that match the mood —
+  preferably monochrome / dark cinematic tones (navy, charcoal, deep teal, wine, forest).
+  Backgrounds must be abstract color fields only — NEVER people, faces, products, rooms, or busy scenes.
+- Create a PROFESSIONAL montage plan in "asset_overlays": 6-12 emoji/icon moments that follow the narration beats.
+- Prefer "kind":"emoji" (OpenMoji) for concrete objects/emotions (rocket, money bag, heart, light bulb, fire, chart, trophy).
+- Use "kind":"icon" for clean abstract symbols (check, shield, trend, lock) and set "color" to a contrasting HEX like "#F8FAFC" or "#FBBF24".
+- Every overlay query MUST be short English search keywords for the emoji/icon library.
+- Timing: start_pct 0.02–0.90, duration 1.4–5.0s. Stagger so 1–2 overlays are visible at a time, not a pile-up.
+- Position from: top_left, top_center, top_right, center_left, center, center_right, bottom_left, bottom_right.
+  Alternate left/right. Avoid lower_center / bottom_center (captions live there). Avoid stacking two overlays in the same corner.
+- size_pct 0.12–0.28 (hero beat up to 0.30). Place larger icons on key story beats only.
+- Overlays must support the spoken story — one clear visual idea per moment, not random decoration.
+"""
+    else:
+        video_type_rule = (
+            '- VIDEO TYPE: Standard video. Set "asset_overlays" to [] and "background_colors" to [].'
+        )
+
+    system = CREATIVITY_SYSTEM.format(
+        duration_rule=duration_rule,
+        video_type_rule=video_type_rule.strip(),
+    )
     user_msg = f"""USER PROMPT (ONLY source of truth — ignore any YouTube/channel training):
 \"\"\"{prompt}\"\"\"
 
@@ -280,9 +422,11 @@ Hard requirements:
 1) Detect language from THIS prompt only and write script+hook+title in that language.
 2) Topic/theme must follow THIS prompt only — do not reuse generic motivational niches.
 3) Title = original short name, never the raw prompt.
-4) pexels_queries = English stock-search phrases matching the prompt visuals.
+4) If video_type is emoji: pexels_queries=[], fill background_colors (solid mood hex) + rich asset_overlays.
+   If standard: pexels_queries = English stock-search phrases matching the prompt visuals; background_colors=[].
 5) Respect safety: no illegal / sexual-minors / real crime-howto content.
 6) Fill subtitle_style + visual_effect to match the mood of the prompt.
+7) video_type = {normalized_video_type}.
 """
 
     response = client.chat.completions.create(
@@ -320,22 +464,71 @@ Hard requirements:
         title = (data.get("hook") or "New video")[:60]
 
     language = (data.get("language") or "en").strip().lower()[:8] or "en"
+    bg_colors = _sanitize_hex_list(data.get("background_colors"), limit=8) if emoji_video else []
+    if emoji_video and len(bg_colors) < 4:
+        bg_colors = _sanitize_hex_list(
+            ["0F172A", "1E293B", "312E81", "0F766E", "7C2D12", "164E63"],
+            limit=8,
+        )
     result: dict[str, Any] = {
         "hook": data.get("hook") or script.split(".")[0],
         "script": script,
         "title": title[:90],
         "description": data.get("description") or script[:180],
         "tags": data.get("tags") or ["shorts"],
-        "pexels_queries": data.get("pexels_queries")
-        or ["cinematic b-roll"],
+        "pexels_queries": []
+        if emoji_video
+        else (data.get("pexels_queries") or ["cinematic b-roll"]),
+        "background_colors": bg_colors,
         "subtitle_emphasis": data.get("subtitle_emphasis") or [],
         "subtitle_style": data.get("subtitle_style") or "classic",
         "visual_effect": data.get("visual_effect") or "cinematic",
         "language": language,
         "music_mood": data.get("music_mood"),
+        "video_type": "emoji" if emoji_video else "standard",
+        "asset_overlays": _sanitize_asset_overlays(
+            data.get("asset_overlays"),
+            enabled=emoji_video,
+        ),
     }
 
-    # Honor the UI duration pick exactly (e.g. 5 minutes → ~300s spoken script)
+    if emoji_video and not result["asset_overlays"]:
+        fallback_terms = [
+            "sparkles",
+            "light bulb",
+            "rocket",
+            "fire",
+            "star",
+            "trophy",
+            "chart increasing",
+            "red heart",
+        ]
+        fallback_positions = [
+            "top_right",
+            "center_left",
+            "top_left",
+            "center_right",
+            "top_center",
+            "bottom_right",
+            "center",
+            "bottom_left",
+        ]
+        result["asset_overlays"] = _sanitize_asset_overlays(
+            [
+                {
+                    "kind": "emoji",
+                    "query": term,
+                    "label": term,
+                    "start_pct": 0.06 + i * 0.11,
+                    "duration": 2.6,
+                    "position": fallback_positions[i],
+                    "size_pct": 0.16 if i % 3 else 0.22,
+                }
+                for i, term in enumerate(fallback_terms)
+            ],
+            enabled=True,
+        )
+
     if not duration_auto and duration_seconds:
         target = max(creat_min, min(creat_max, int(duration_seconds)))
         result["duration_seconds"] = target

@@ -1,5 +1,5 @@
-import { CreatorsStudio } from "@/components/CreatorsStudio";
+import { CreatorsHub } from "@/components/CreatorsHub";
 
 export default function CreatorsPage() {
-  return <CreatorsStudio />;
+  return <CreatorsHub />;
 }

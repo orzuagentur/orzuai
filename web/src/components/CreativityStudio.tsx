@@ -38,8 +38,14 @@ const DURATIONS = [
   { id: "300", label: "5 min" },
 ] as const;
 
+const VIDEO_TYPES = [
+  { id: "standard", label: "Standard", hint: "Stock montage" },
+  { id: "emoji", label: "Emoji", hint: "Solid bg + emoji/icons" },
+] as const;
+
 type Aspect = (typeof ASPECTS)[number]["id"];
 type DurationId = (typeof DURATIONS)[number]["id"];
+type VideoType = (typeof VIDEO_TYPES)[number]["id"];
 
 function isCreativityJob(job: VideoJob) {
   const src = String(job.metadata?.source || "").toLowerCase();
@@ -69,6 +75,12 @@ function durationLabel(job: VideoJob): string {
   if (job.duration_seconds) return `${job.duration_seconds}s`;
   if (job.metadata?.duration_seconds) return `${job.metadata.duration_seconds}s`;
   return "Auto";
+}
+
+function videoTypeLabel(job: VideoJob): string {
+  return String(job.metadata?.video_type || "").toLowerCase() === "emoji"
+    ? "Emoji video"
+    : "AI video";
 }
 
 async function downloadVideo(jobId: string, filename: string) {
@@ -161,7 +173,10 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState<Aspect>("9:16");
   const [durationId, setDurationId] = useState<DurationId>("auto");
-  const [openChip, setOpenChip] = useState<"format" | "duration" | null>(null);
+  const [videoType, setVideoType] = useState<VideoType>("standard");
+  const [openChip, setOpenChip] = useState<
+    "format" | "duration" | "type" | null
+  >(null);
   const [creating, setCreating] = useState(false);
   const { show: toast, notice } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -211,6 +226,8 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   const durationChipLabel =
     DURATIONS.find((d) => d.id === durationId)?.label || "Auto";
   const aspectChipLabel = ASPECTS.find((a) => a.id === aspect)?.label || "9:16";
+  const videoTypeChipLabel =
+    VIDEO_TYPES.find((t) => t.id === videoType)?.label || "Standard";
 
   async function createVideo() {
     const text = prompt.trim();
@@ -233,6 +250,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
         duration_auto,
         duration_seconds: duration_auto ? null : Number(durationId),
         aspect_ratio: aspect,
+        video_type: videoType,
       }),
     });
     const data = await res.json();
@@ -349,6 +367,36 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           AI picks
                         </span>
                       )}
+                    </button>
+                  );
+                })}
+              </PromptChip>
+
+              <PromptChip
+                label="Type"
+                value={videoTypeChipLabel}
+                open={openChip === "type"}
+                onOpenChange={(open) => setOpenChip(open ? "type" : null)}
+              >
+                {VIDEO_TYPES.map((t) => {
+                  const on = videoType === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="option"
+                      aria-selected={on}
+                      className="flex w-full items-center justify-between gap-4 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white/5"
+                      style={{ color: on ? "var(--accent)" : "var(--fg)" }}
+                      onClick={() => {
+                        setVideoType(t.id);
+                        setOpenChip(null);
+                      }}
+                    >
+                      <span className="font-semibold">{t.label}</span>
+                      <span className="text-xs text-[color:var(--muted)]">
+                        {t.hint}
+                      </span>
                     </button>
                   );
                 })}
@@ -507,6 +555,8 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                         <span>{aspectOf(job)}</span>
                         <span>·</span>
                         <span>{durationLabel(job)}</span>
+                        <span>·</span>
+                        <span>{videoTypeLabel(job)}</span>
                       </div>
                     </div>
                   </article>

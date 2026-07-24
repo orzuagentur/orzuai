@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 
 const ASPECTS = new Set(["9:16", "16:9", "1:1"]);
+const CREATIVITY_VIDEO_TYPES = new Set(["standard", "emoji"]);
 /** Shorts / clipping */
 const SHORT_DURATIONS = new Set([15, 30, 45, 60]);
 /** Creativity — personal longer videos */
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     duration_seconds?: number | null | "auto";
     duration_auto?: boolean;
     aspect_ratio?: string;
+    video_type?: string;
     source?: string;
     pipeline?: string;
     mode?: "ai_auto" | "ai_prompt" | string;
@@ -73,6 +75,13 @@ export async function POST(request: Request) {
 
   const aspect = String(body.aspect_ratio || "9:16").trim();
   const aspect_ratio = ASPECTS.has(aspect) ? aspect : "9:16";
+  const requestedVideoType = String(body.video_type || "standard")
+    .trim()
+    .toLowerCase();
+  const video_type =
+    isCreativity && CREATIVITY_VIDEO_TYPES.has(requestedVideoType)
+      ? requestedVideoType
+      : "standard";
 
   if (isCreativity || isYoutubePrompt) {
     if (!brief) {
@@ -147,6 +156,7 @@ export async function POST(request: Request) {
     duration_auto: durationAuto,
     duration_seconds: durationAuto ? null : duration_seconds,
     aspect_ratio,
+    video_type,
     used_ai_training: !isCreativity,
   };
   if (!isCreativity) {
@@ -178,6 +188,7 @@ export async function POST(request: Request) {
     duration_auto: durationAuto,
     duration_seconds,
     aspect_ratio,
+    video_type,
     source: resolvedSource,
   });
 }

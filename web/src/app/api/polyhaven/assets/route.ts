@@ -6,11 +6,13 @@ import {
   type PolyHavenAssetMeta,
   type PolyHavenType,
 } from "@/lib/polyhaven";
+import { normalizeSearchQuery } from "@/lib/search-lang";
 
 export const runtime = "nodejs";
 
 /**
  * List Poly Haven assets (CC0). Paginated + searchable server-side.
+ * Multilingual q is normalized to English keywords.
  * Query: type=all|models|hdris|textures, category=, q=, page=, pageSize=
  */
 export async function GET(request: Request) {
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
       ? typeRaw
       : "all";
   const category = (url.searchParams.get("category") || "").trim().toLowerCase();
-  const q = (url.searchParams.get("q") || "").trim().toLowerCase();
+  const qRaw = (url.searchParams.get("q") || "").trim();
   const page = Math.max(1, Number(url.searchParams.get("page") || 1));
   const pageSize = Math.min(
     80,
@@ -48,7 +50,15 @@ export async function GET(request: Request) {
         a.categories.some((c) => c.toLowerCase() === category),
       );
     }
-    if (q) {
+    if (qRaw) {
+      const normalized = await normalizeSearchQuery(qRaw);
+      const needles = Array.from(
+        new Set(
+          [normalized.en, normalized.original]
+            .map((t) => t.toLowerCase().trim())
+            .filter(Boolean),
+        ),
+      );
       items = items.filter((a) => {
         const blob = [
           a.id,
@@ -60,7 +70,7 @@ export async function GET(request: Request) {
         ]
           .join(" ")
           .toLowerCase();
-        return blob.includes(q);
+        return needles.some((n) => blob.includes(n));
       });
     }
 
