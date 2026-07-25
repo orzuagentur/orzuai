@@ -154,7 +154,7 @@ export async function resolveOpenMoji(
       const pattern = `%${term.replace(/[%_]/g, "")}%`;
       for (const column of ["name", "tags", "filename"] as const) {
         const { data } = await sb
-          .table("openmoji")
+          .from("openmoji")
           .select("hex,public_url,name,filename")
           .ilike(column, pattern)
           .limit(6);
