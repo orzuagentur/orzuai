@@ -21,12 +21,22 @@ import {
 import { useToast } from "@/components/ToastNotice";
 import { clippingSourcePath, MEDIA_BUCKET } from "@/lib/storage";
 import { VoicePicker } from "@/components/VoicePicker";
-import { SUBTITLE_STYLES } from "@/lib/editor-catalog";
+import { SUBTITLE_STYLES, EFFECTS, TRANSITIONS, LOOK_PACKS, MOTIONS } from "@/lib/editor-catalog";
 import {
   SubtitleStyleCard,
   type SubtitleStyleId,
 } from "@/components/SubtitleStylePicker";
+import {
+  VIDEO_STYLE_LOOK,
+  VIDEO_STYLE_PRESETS,
+  MONTAGE_PACE_PRESETS,
+} from "@/lib/training-presets";
 import { useFeatureLocked } from "@/lib/product-locks-client";
+
+const MONTAGE_STYLE_OPTIONS = [
+  { value: "", label: "Auto" },
+  ...VIDEO_STYLE_PRESETS,
+] as const;
 
 const ASPECTS = [
   { id: "9:16", label: "9:16", hint: "Shorts / Reels" },
@@ -173,6 +183,20 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   const [subtitleStyle, setSubtitleStyle] =
     useState<SubtitleStyleId>("classic");
   const [subsOpen, setSubsOpen] = useState(false);
+  const [videoStyle, setVideoStyle] = useState("");
+  const [visualEffect, setVisualEffect] = useState("");
+  const [preferredTransition, setPreferredTransition] = useState("");
+  const [preferredMotion, setPreferredMotion] = useState("");
+  const [montagePace, setMontagePace] = useState("");
+  const [viralityMode, setViralityMode] = useState(false);
+  const [styleFlashCuts, setStyleFlashCuts] = useState(false);
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [gradeOpen, setGradeOpen] = useState(false);
+  const [transitionOpen, setTransitionOpen] = useState(false);
+  const [paceOpen, setPaceOpen] = useState(false);
+  const [motionOpen, setMotionOpen] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false);
+  const [viralityOpen, setViralityOpen] = useState(false);
   const [musicTrackId, setMusicTrackId] = useState("");
   const [musicOpen, setMusicOpen] = useState(false);
   const [musicTracks, setMusicTracks] = useState<
@@ -421,6 +445,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
           music_track_id: addMusic ? musicTrackId || null : null,
           add_subtitles: addSubtitles,
           subtitle_style: addSubtitles ? subtitleStyle : null,
+          video_style: videoStyle || null,
+          visual_effect: visualEffect || null,
+          preferred_transition: preferredTransition || null,
+          preferred_motion: preferredMotion || null,
+          montage_pace: montagePace || null,
+          virality_mode: viralityMode,
+          flash_cuts: viralityMode || styleFlashCuts,
           instructions: instructions.trim() || null,
         }),
       });
@@ -581,6 +612,437 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                 />
               </div>
 
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                  Style / Montage
+                </p>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2">
+                  {(
+                    [
+                      {
+                        key: "style",
+                        label: "Style",
+                        open: styleOpen,
+                        set: setStyleOpen,
+                        value: videoStyle
+                          ? MONTAGE_STYLE_OPTIONS.find((s) => s.value === videoStyle)
+                              ?.label || "Style"
+                          : "Auto",
+                      },
+                      {
+                        key: "look",
+                        label: "Look",
+                        open: lookOpen,
+                        set: setLookOpen,
+                        value: "Packs",
+                      },
+                      {
+                        key: "grade",
+                        label: "Grade",
+                        open: gradeOpen,
+                        set: setGradeOpen,
+                        value: visualEffect
+                          ? EFFECTS.find((e) => e.id === visualEffect)?.label ||
+                            visualEffect
+                          : "Auto",
+                      },
+                      {
+                        key: "transition",
+                        label: "Transition",
+                        open: transitionOpen,
+                        set: setTransitionOpen,
+                        value: preferredTransition
+                          ? TRANSITIONS.find((t) => t.id === preferredTransition)
+                              ?.label || preferredTransition
+                          : "Auto",
+                      },
+                      {
+                        key: "pace",
+                        label: "Pace",
+                        open: paceOpen,
+                        set: setPaceOpen,
+                        value: viralityMode
+                          ? "Viral"
+                          : montagePace
+                            ? MONTAGE_PACE_PRESETS.find((p) => p.value === montagePace)
+                                ?.label || montagePace
+                            : "Auto",
+                      },
+                      {
+                        key: "motion",
+                        label: "Motion",
+                        open: motionOpen,
+                        set: setMotionOpen,
+                        value: preferredMotion
+                          ? MOTIONS.find((m) => m.id === preferredMotion)?.label ||
+                            preferredMotion
+                          : "Auto",
+                      },
+                      {
+                        key: "virality",
+                        label: "Virality",
+                        open: viralityOpen,
+                        set: setViralityOpen,
+                        value: viralityMode ? "On" : "Off",
+                      },
+                    ] as const
+                  ).map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      disabled={creating}
+                      onClick={() => {
+                        const next = !chip.open;
+                        setStyleOpen(false);
+                        setLookOpen(false);
+                        setGradeOpen(false);
+                        setTransitionOpen(false);
+                        setPaceOpen(false);
+                        setMotionOpen(false);
+                        setViralityOpen(false);
+                        setVoiceOpen(false);
+                        setMusicOpen(false);
+                        setSubsOpen(false);
+                        chip.set(next);
+                      }}
+                      className="flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center text-[11px] font-semibold transition sm:px-2 sm:text-xs"
+                      style={{
+                        borderColor: chip.open
+                          ? "rgba(232,165,75,0.55)"
+                          : "var(--line)",
+                        background: chip.open
+                          ? "rgba(232,165,75,0.12)"
+                          : "transparent",
+                        color: chip.open ? "var(--accent)" : "var(--fg)",
+                      }}
+                    >
+                      <span className="truncate">{chip.label}</span>
+                      <span
+                        className="max-w-full truncate text-[10px] font-medium"
+                        style={{ opacity: 0.75 }}
+                      >
+                        {chip.value}
+                      </span>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                        style={{
+                          opacity: 0.7,
+                          transform: chip.open ? "rotate(180deg)" : undefined,
+                          transition: "transform 0.15s ease",
+                        }}
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+
+                {styleOpen && (
+                  <div className="max-h-[280px] space-y-1.5 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    {MONTAGE_STYLE_OPTIONS.map((s) => {
+                      const on = videoStyle === s.value;
+                      return (
+                        <button
+                          key={s.value || "auto"}
+                          type="button"
+                          disabled={creating}
+                          className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition sm:text-sm"
+                          style={{
+                            background: on
+                              ? "rgba(232,165,75,0.12)"
+                              : "transparent",
+                            border: `1px solid ${
+                              on ? "rgba(232,165,75,0.45)" : "transparent"
+                            }`,
+                          }}
+                          onClick={() => {
+                            setVideoStyle(s.value);
+                            const pack = s.value
+                              ? VIDEO_STYLE_LOOK[s.value]
+                              : null;
+                            if (pack) {
+                              setVisualEffect(pack.visual_effect);
+                              setPreferredTransition(pack.preferred_transition);
+                              setMontagePace(pack.montage_pace);
+                              setStyleFlashCuts(Boolean(pack.flash_cuts));
+                            } else {
+                              setVisualEffect("");
+                              setPreferredTransition("");
+                              setMontagePace("");
+                              setStyleFlashCuts(false);
+                            }
+                          }}
+                        >
+                          <span>{s.label}</span>
+                          {on && (
+                            <span className="text-[10px] text-[color:var(--accent)]">
+                              Selected
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {lookOpen && (
+                  <div className="max-h-[280px] space-y-1.5 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    {LOOK_PACKS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={creating}
+                        className="flex w-full flex-col items-start gap-0.5 rounded-lg px-2.5 py-2 text-left transition"
+                        style={{ border: "1px solid var(--line)" }}
+                        onClick={() => {
+                          setVisualEffect(p.effect);
+                          setPreferredTransition(p.transition);
+                          setPreferredMotion(
+                            p.motion === "none" ? "" : p.motion,
+                          );
+                          if (
+                            p.id === "viral" ||
+                            p.id === "boom" ||
+                            p.id === "hype" ||
+                            p.id === "techno"
+                          ) {
+                            setMontagePace("viral");
+                            setStyleFlashCuts(true);
+                          } else if (p.id === "cinema" || p.id === "luxury") {
+                            setMontagePace("cinematic");
+                            setStyleFlashCuts(false);
+                          } else {
+                            setMontagePace("medium");
+                            setStyleFlashCuts(false);
+                          }
+                        }}
+                      >
+                        <span className="text-xs font-semibold sm:text-sm">
+                          {p.label}
+                        </span>
+                        <span className="text-[10px] text-[color:var(--muted)]">
+                          {p.effect} · {p.transition} · {p.motion}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {gradeOpen && (
+                  <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    <button
+                      type="button"
+                      disabled={creating}
+                      className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                      style={{
+                        background: !visualEffect
+                          ? "rgba(232,165,75,0.12)"
+                          : "transparent",
+                      }}
+                      onClick={() => setVisualEffect("")}
+                    >
+                      Auto
+                    </button>
+                    {EFFECTS.filter((e) => e.id !== "none").map((e) => {
+                      const on = visualEffect === e.id;
+                      return (
+                        <button
+                          key={e.id}
+                          type="button"
+                          disabled={creating}
+                          className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                          style={{
+                            background: on
+                              ? "rgba(232,165,75,0.12)"
+                              : "transparent",
+                          }}
+                          onClick={() => setVisualEffect(e.id)}
+                        >
+                          {e.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {transitionOpen && (
+                  <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    <button
+                      type="button"
+                      disabled={creating}
+                      className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                      style={{
+                        background: !preferredTransition
+                          ? "rgba(232,165,75,0.12)"
+                          : "transparent",
+                      }}
+                      onClick={() => setPreferredTransition("")}
+                    >
+                      Auto
+                    </button>
+                    {TRANSITIONS.map((t) => {
+                      const on = preferredTransition === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          disabled={creating}
+                          className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                          style={{
+                            background: on
+                              ? "rgba(232,165,75,0.12)"
+                              : "transparent",
+                          }}
+                          onClick={() => setPreferredTransition(t.id)}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {paceOpen && (
+                  <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    <button
+                      type="button"
+                      disabled={creating || viralityMode}
+                      className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                      style={{
+                        background:
+                          !montagePace && !viralityMode
+                            ? "rgba(232,165,75,0.12)"
+                            : "transparent",
+                      }}
+                      onClick={() => setMontagePace("")}
+                    >
+                      Auto
+                    </button>
+                    {MONTAGE_PACE_PRESETS.map((p) => {
+                      const on =
+                        (viralityMode ? "viral" : montagePace) === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          disabled={creating || viralityMode}
+                          className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                          style={{
+                            background: on
+                              ? "rgba(232,165,75,0.12)"
+                              : "transparent",
+                          }}
+                          onClick={() => setMontagePace(p.value)}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {motionOpen && (
+                  <div className="max-h-[280px] space-y-1 overflow-y-auto rounded-xl border border-[color:var(--line)] p-2">
+                    <button
+                      type="button"
+                      disabled={creating}
+                      className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                      style={{
+                        background: !preferredMotion
+                          ? "rgba(232,165,75,0.12)"
+                          : "transparent",
+                      }}
+                      onClick={() => setPreferredMotion("")}
+                    >
+                      Auto
+                    </button>
+                    {MOTIONS.filter((m) => m.id !== "none").map((m) => {
+                      const on = preferredMotion === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          disabled={creating}
+                          className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
+                          style={{
+                            background: on
+                              ? "rgba(232,165,75,0.12)"
+                              : "transparent",
+                          }}
+                          onClick={() => setPreferredMotion(m.id)}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {viralityOpen && (
+                  <div
+                    className="rounded-xl border px-3 py-3 sm:px-4"
+                    style={{
+                      borderColor: viralityMode
+                        ? "rgba(232,165,75,0.55)"
+                        : "var(--line)",
+                      background: viralityMode
+                        ? "rgba(232,165,75,0.1)"
+                        : "rgba(255,255,255,0.02)",
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">Virality mode</p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-[color:var(--muted)]">
+                          Opt-in boom-boom edit: hook in the first second, ~1s
+                          punch cuts, flash transitions. Off by default — you
+                          must enable it.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={viralityMode}
+                        disabled={creating}
+                        onClick={() => {
+                          const next = !viralityMode;
+                          setViralityMode(next);
+                          if (next) {
+                            setMontagePace("viral");
+                            if (!visualEffect) setVisualEffect("punch_pop");
+                            if (!preferredTransition)
+                              setPreferredTransition("zoomin");
+                            if (!preferredMotion)
+                              setPreferredMotion("slam_zoom");
+                          }
+                        }}
+                        className="relative h-7 w-12 shrink-0 rounded-full transition"
+                        style={{
+                          background: viralityMode
+                            ? "rgba(232,165,75,0.85)"
+                            : "rgba(255,255,255,0.12)",
+                        }}
+                      >
+                        <span
+                          className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition"
+                          style={{
+                            left: viralityMode ? "1.4rem" : "0.2rem",
+                          }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Mobile: Voice / Music / Subtitles picker chips in one row;
                   open list renders below so chip size never changes */}
               {(useVoice || addMusic || addSubtitles) && (
@@ -596,6 +1058,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           if (next) {
                             setMusicOpen(false);
                             setSubsOpen(false);
+                            setStyleOpen(false);
+                            setLookOpen(false);
+                            setGradeOpen(false);
+                            setTransitionOpen(false);
+                            setPaceOpen(false);
+                            setMotionOpen(false);
+                            setViralityOpen(false);
                           }
                         }}
                         className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center text-[11px] font-semibold transition"
@@ -640,6 +1109,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           if (next) {
                             setVoiceOpen(false);
                             setSubsOpen(false);
+                            setStyleOpen(false);
+                            setLookOpen(false);
+                            setGradeOpen(false);
+                            setTransitionOpen(false);
+                            setPaceOpen(false);
+                            setMotionOpen(false);
+                            setViralityOpen(false);
                           }
                         }}
                         className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center text-[11px] font-semibold transition"
@@ -684,6 +1160,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           if (next) {
                             setVoiceOpen(false);
                             setMusicOpen(false);
+                            setStyleOpen(false);
+                            setLookOpen(false);
+                            setGradeOpen(false);
+                            setTransitionOpen(false);
+                            setPaceOpen(false);
+                            setMotionOpen(false);
+                            setViralityOpen(false);
                           }
                         }}
                         className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center text-[11px] font-semibold transition"

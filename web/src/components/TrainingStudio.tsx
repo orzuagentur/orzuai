@@ -32,6 +32,7 @@ import {
   REPLY_STYLE_PRESETS,
   TRANSITION_PRESETS,
   VIDEO_FORMAT_PRESETS,
+  VIDEO_STYLE_LOOK,
   VIDEO_STYLE_PRESETS,
   VISUAL_EFFECT_PRESETS,
   ensurePreset,
@@ -211,6 +212,19 @@ export function TrainingStudio({
       toast("Each publish time must be different.", "error");
       setBusy(false);
       return false;
+    }
+    const sortedMins = [...schedulePayload.times]
+      .map((t) => {
+        const [h, m] = String(t).split(":");
+        return Number(h) * 60 + Number(m || 0);
+      })
+      .sort((a, b) => a - b);
+    for (let i = 1; i < sortedMins.length; i++) {
+      if (sortedMins[i] - sortedMins[i - 1] < 15) {
+        toast("Keep at least 15 minutes between publish times.", "error");
+        setBusy(false);
+        return false;
+      }
     }
 
     const musicPrefs: MusicPrefs = {
@@ -482,7 +496,25 @@ export function TrainingStudio({
                 label="Edit style"
                 value={form.video_style || ""}
                 presets={ensurePreset(VIDEO_STYLE_PRESETS, form.video_style || "")}
-                onChange={(v) => setTraining("video_style", v)}
+                onChange={(v) => {
+                  const pack = VIDEO_STYLE_LOOK[v];
+                  setForm((prev) => {
+                    const updated = {
+                      ...prev,
+                      video_style: v,
+                      ...(pack
+                        ? {
+                            visual_effect: pack.visual_effect,
+                            preferred_transition: pack.preferred_transition,
+                            montage_pace: pack.montage_pace,
+                            flash_cuts: pack.flash_cuts,
+                          }
+                        : {}),
+                    };
+                    markDirty(updated, schedule);
+                    return updated;
+                  });
+                }}
                 optional
                 compact
               />

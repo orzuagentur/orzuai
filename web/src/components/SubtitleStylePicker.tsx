@@ -18,7 +18,7 @@ const PREVIEW_WORDS = PREVIEW_SENTENCE.split(/\s+/);
 const PREVIEW_CHUNK = 3;
 
 /** One square stock photo per style (Unsplash — free to display) */
-export const SUBTITLE_PREVIEW_BG: Record<SubtitleStyleId, string> = {
+export const SUBTITLE_PREVIEW_BG: Partial<Record<SubtitleStyleId, string>> = {
   classic:
     "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=480&h=480&q=80",
   karaoke_gold:
@@ -76,6 +76,14 @@ export const SUBTITLE_PREVIEW_BG: Record<SubtitleStyleId, string> = {
   bold_white:
     "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=480&h=480&q=80",
 };
+
+const DEFAULT_SUBTITLE_BG =
+  SUBTITLE_PREVIEW_BG.classic ||
+  "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=480&h=480&q=80";
+
+export function subtitlePreviewBg(id: SubtitleStyleId): string {
+  return SUBTITLE_PREVIEW_BG[id] || DEFAULT_SUBTITLE_BG;
+}
 
 /** Map legacy training ids → current catalog */
 export function normalizeSubtitleStyle(
@@ -356,7 +364,7 @@ export function SubtitleStyleCard({
   }, []);
 
   const css = liveSubtitleStyle(style.id);
-  const bg = SUBTITLE_PREVIEW_BG[style.id];
+  const bg = subtitlePreviewBg(style.id);
   const chunkStart = Math.floor(cursor / PREVIEW_CHUNK) * PREVIEW_CHUNK;
   const chunk = PREVIEW_WORDS.slice(chunkStart, chunkStart + PREVIEW_CHUNK);
   const activeInChunk = cursor - chunkStart;
@@ -447,7 +455,7 @@ export function SubtitleStylePicker({
   const current = normalizeSubtitleStyle(value);
   const label =
     SUBTITLE_STYLES.find((s) => s.id === current)?.label || "Classic";
-  const headerBg = SUBTITLE_PREVIEW_BG[current];
+  const headerBg = subtitlePreviewBg(current);
 
   return (
     <div

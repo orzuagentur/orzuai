@@ -4,9 +4,9 @@ import { SiteChrome } from "@/components/SiteChrome";
 import { BrandLogoWide } from "@/components/BrandLogo";
 
 export const metadata: Metadata = {
-  title: "About OrzuAi — AI YouTube Shorts Studio",
+  title: "About OrzuAi — AI Creator Studio",
   description:
-    "OrzuAi is an AI creator studio for YouTube Shorts: scripts, voice, captions, stock montage, AI clipping, music, and YouTube publishing from www.orzuai.com.",
+    "OrzuAi is an AI creator studio for video, YouTube Shorts, clipping, presentations, and media — scripts, voice, captions, and publishing at www.orzuai.com.",
   keywords: [
     "OrzuAi",
     "AI YouTube Shorts",
@@ -35,11 +35,11 @@ export default function AboutPage() {
         <header className="space-y-3">
           <BrandLogoWide width={180} />
           <h1 className="text-2xl font-semibold">
-            AI studio for YouTube Shorts and short-form video
+            AI creator studio for video, Shorts, and more
           </h1>
           <p className="text-[color:var(--muted)]">
-            OrzuAi helps creators generate scripts, voiceovers, captions, and
-            edited Shorts — then optionally publish to YouTube on a schedule.
+            OrzuAi helps creators generate scripts, voiceovers, captions, clips,
+            presentations, and YouTube Shorts — then publish when you are ready.
           </p>
         </header>
 
@@ -48,12 +48,80 @@ export default function AboutPage() {
             What you can do
           </h2>
           <ul className="list-disc space-y-2 pl-5 text-sm text-[color:var(--muted)]">
-            <li>Train your AI once for channel niche, tone, and language</li>
-            <li>Generate and publish YouTube Shorts with AI scripts and voice</li>
-            <li>Create personal videos from a free-form prompt (AI Video)</li>
-            <li>Build AI clips and montages with transitions and captions</li>
-            <li>Use a music library and creator 3D / HDRI assets</li>
-            <li>Connect Google / YouTube OAuth to publish from your channel</li>
+            <li>
+              <Link href="/features/ai-youtube-shorts" className="text-[color:var(--accent)] hover:underline">
+                Train your AI
+              </Link>{" "}
+              once for channel niche, tone, and language
+            </li>
+            <li>
+              Generate and publish{" "}
+              <Link href="/features/ai-youtube-shorts" className="text-[color:var(--accent)] hover:underline">
+                YouTube Shorts
+              </Link>{" "}
+              with AI scripts and voice
+            </li>
+            <li>
+              Create personal videos from a prompt (
+              <Link href="/features/ai-video" className="text-[color:var(--accent)] hover:underline">
+                AI Video
+              </Link>
+              )
+            </li>
+            <li>
+              Build{" "}
+              <Link href="/features/ai-clipping" className="text-[color:var(--accent)] hover:underline">
+                AI clips
+              </Link>{" "}
+              and montages with transitions and captions
+            </li>
+            <li>
+              Make an{" "}
+              <Link href="/features/ai-presentation" className="text-[color:var(--accent)] hover:underline">
+                AI Presentation
+              </Link>
+              , edit with{" "}
+              <Link href="/features/video-editor" className="text-[color:var(--accent)] hover:underline">
+                video
+              </Link>{" "}
+              and{" "}
+              <Link href="/features/photo-editor" className="text-[color:var(--accent)] hover:underline">
+                photo
+              </Link>{" "}
+              editors
+            </li>
+            <li>
+              Browse{" "}
+              <Link href="/features/3d-models" className="text-[color:var(--accent)] hover:underline">
+                3D models
+              </Link>
+              ,{" "}
+              <Link href="/features/hdris" className="text-[color:var(--accent)] hover:underline">
+                HDRIs
+              </Link>
+              ,{" "}
+              <Link href="/features/textures" className="text-[color:var(--accent)] hover:underline">
+                textures
+              </Link>
+              ,{" "}
+              <Link href="/features/emojis" className="text-[color:var(--accent)] hover:underline">
+                emojis
+              </Link>
+              ,{" "}
+              <Link href="/features/icons" className="text-[color:var(--accent)] hover:underline">
+                icons
+              </Link>
+              , and{" "}
+              <Link href="/features/photo-search" className="text-[color:var(--accent)] hover:underline">
+                media search
+              </Link>
+            </li>
+            <li>
+              Connect Google / YouTube OAuth for{" "}
+              <Link href="/features/youtube-autopilot" className="text-[color:var(--accent)] hover:underline">
+                channel autopilot
+              </Link>
+            </li>
           </ul>
         </section>
 

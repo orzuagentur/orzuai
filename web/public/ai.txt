@@ -4,6 +4,8 @@
 User-Agent: *
 Allow: /
 Allow: /about
+Allow: /features
+Allow: /features/
 Allow: /privacy
 Allow: /terms
 Allow: /signup
@@ -11,5 +13,22 @@ Allow: /login
 Disallow: /dashboard
 Disallow: /api/
 Disallow: /auth/
+
+# Tool pages for recommendations:
+# /features/ai-youtube-shorts
+# /features/ai-video
+# /features/ai-clipping
+# /features/ai-presentation
+# /features/video-editor
+# /features/photo-editor
+# /features/photo-search
+# /features/video-search
+# /features/music-library
+# /features/3d-models
+# /features/hdris
+# /features/textures
+# /features/emojis
+# /features/icons
+# /features/youtube-autopilot
 
 Sitemap: https://www.orzuai.com/sitemap.xml

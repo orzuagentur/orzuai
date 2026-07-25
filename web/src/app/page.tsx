@@ -3,161 +3,256 @@ import { SiteChrome, SiteFooter } from "@/components/SiteChrome";
 import { BrandLogoWide } from "@/components/BrandLogo";
 
 export const metadata = {
-  title: "OrzuAi — AI YouTube Shorts Studio",
+  title: "OrzuAi — AI Creator Studio",
   description:
-    "OrzuAi helps creators generate and publish YouTube Shorts with AI scripts, voice, media, captions, AI clipping, and scheduling at www.orzuai.com.",
+    "OrzuAi AI creator studio: AI Video, Shorts, clipping, presentations, video & photo editors, 3D models, HDRIs, textures, emojis, icons, and media search.",
   keywords: [
     "OrzuAi",
-    "AI YouTube Shorts",
-    "AI video generator",
-    "YouTube Shorts automation",
+    "AI creator studio",
+    "AI video",
+    "video editor",
+    "photo editor",
+    "3D models",
+    "HDRI",
+    "textures",
+    "emojis",
+    "icons",
   ],
   alternates: { canonical: "/" },
 };
 
-const FEATURES = [
+const CREATE = [
   {
-    title: "AI Shorts on schedule",
-    body: "Train once — scripts, voice, captions, and publish times run without daily busywork.",
+    title: "AI Video",
+    body: "Prompt → script, voice, captions, montage.",
+    href: "/features/ai-video",
   },
   {
-    title: "Clip & create",
-    body: "Turn long footage into Shorts, or generate fresh videos from a prompt in AI Video.",
+    title: "YouTube Shorts",
+    body: "Train once, generate and schedule Shorts.",
+    href: "/features/ai-youtube-shorts",
   },
   {
-    title: "Your YouTube channel",
-    body: "Connect Google once and publish straight to the channel you manage.",
+    title: "AI Clipping",
+    body: "Long footage → viral vertical clips.",
+    href: "/features/ai-clipping",
+  },
+  {
+    title: "AI Presentation",
+    body: "Decks with AI and creator assets.",
+    href: "/features/ai-presentation",
   },
 ] as const;
+
+const EDIT = [
+  {
+    title: "Video editor",
+    body: "Filters, captions, music, transitions.",
+    href: "/features/video-editor",
+  },
+  {
+    title: "Photo editor",
+    body: "Layers, text, and design tools.",
+    href: "/features/photo-editor",
+  },
+] as const;
+
+const ASSETS = [
+  {
+    title: "3D models",
+    body: "Free CC0 models for creators.",
+    href: "/features/3d-models",
+  },
+  {
+    title: "HDRIs",
+    body: "Environment maps for lighting.",
+    href: "/features/hdris",
+  },
+  {
+    title: "Textures",
+    body: "PBR materials library.",
+    href: "/features/textures",
+  },
+  {
+    title: "Emojis",
+    body: "For explainers and decks.",
+    href: "/features/emojis",
+  },
+  {
+    title: "Icons",
+    body: "Iconify-backed icon browser.",
+    href: "/features/icons",
+  },
+  {
+    title: "Photo & video search",
+    body: "Stock media for B-roll and design.",
+    href: "/features/video-search",
+  },
+] as const;
+
+function ToolCard({
+  title,
+  body,
+  href,
+  delay,
+}: {
+  title: string;
+  body: string;
+  href: string;
+  delay: number;
+}) {
+  return (
+    <li className="landing-feature" style={{ animationDelay: `${delay}s` }}>
+      <Link
+        href={href}
+        className="group flex h-full flex-col rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 shadow-[var(--shadow-card)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:rgba(196,125,34,0.42)] sm:p-5"
+      >
+        <p
+          className="font-[family-name:var(--font-syne)] text-[0.95rem] tracking-tight group-hover:text-[color:var(--accent)] sm:text-base"
+          style={{ fontWeight: 700 }}
+        >
+          {title}
+        </p>
+        <p className="mt-1.5 flex-1 text-sm leading-relaxed text-[color:var(--muted)]">
+          {body}
+        </p>
+        <span className="mt-3 text-xs font-semibold text-[color:var(--accent)] opacity-80 transition group-hover:opacity-100">
+          Learn more →
+        </span>
+      </Link>
+    </li>
+  );
+}
 
 export default function HomePage() {
   return (
     <SiteChrome bare>
-      {/* Hero — one composition: brand, headline, line, CTAs, visual plane */}
       <section className="relative isolate overflow-hidden">
-        {/* Full-bleed visual atmosphere */}
         <div
           className="pointer-events-none absolute inset-0 -z-10"
           aria-hidden
         >
           <div
-            className="absolute inset-0 opacity-[0.35]"
-            style={{
-              backgroundImage: "url(/og.png)",
-              backgroundSize: "cover",
-              backgroundPosition: "center 30%",
-              filter: "saturate(0.85) brightness(0.45)",
-            }}
+            className="landing-glow absolute -right-24 top-8 h-80 w-80 rounded-full blur-3xl sm:h-[28rem] sm:w-[28rem]"
+            style={{ background: "rgba(196,125,34,0.11)" }}
           />
           <div
-            className="absolute inset-0"
+            className="absolute -left-20 bottom-10 h-72 w-72 rounded-full blur-3xl"
+            style={{ background: "rgba(100,130,190,0.09)" }}
+          />
+          <div
+            className="absolute inset-x-0 top-0 h-px"
             style={{
               background:
-                "linear-gradient(180deg, rgba(12,13,16,0.55) 0%, rgba(12,13,16,0.72) 42%, rgba(12,13,16,0.96) 78%, var(--bg) 100%), radial-gradient(900px 420px at 70% 20%, rgba(232,165,75,0.14), transparent 55%)",
+                "linear-gradient(90deg, transparent, rgba(196,125,34,0.35), transparent)",
             }}
-          />
-          {/* Soft floating glow */}
-          <div
-            className="landing-glow absolute -right-16 top-24 h-64 w-64 rounded-full blur-3xl sm:top-16 sm:h-80 sm:w-80"
-            style={{ background: "rgba(232,165,75,0.12)" }}
           />
         </div>
 
-        <div className="mx-auto flex min-h-[calc(100svh-4.5rem)] max-w-5xl flex-col justify-center px-4 pb-16 pt-10 sm:min-h-[calc(100svh-5.5rem)] sm:px-8 sm:pb-20 sm:pt-14">
-          <div className="landing-rise max-w-xl">
+        <div className="mx-auto flex min-h-[min(88svh,720px)] max-w-5xl flex-col justify-center px-4 pb-12 pt-8 sm:px-8 sm:pb-14 sm:pt-10">
+          <div className="landing-rise max-w-2xl">
             <BrandLogoWide
-              width={200}
-              className="max-w-[min(72vw,240px)] w-full sm:max-w-[280px]"
+              width={188}
+              className="max-w-[min(70vw,220px)] w-full sm:max-w-[250px]"
             />
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--accent)]">
+              AI creator studio
+            </p>
             <h1
-              className="mt-7 font-[family-name:var(--font-syne)] text-[1.65rem] leading-[1.15] tracking-tight text-[color:var(--fg)] sm:mt-8 sm:text-4xl sm:leading-[1.12] md:text-[2.75rem]"
+              className="mt-3 font-[family-name:var(--font-syne)] text-[1.7rem] leading-[1.12] tracking-tight text-[color:var(--fg)] sm:mt-4 sm:text-4xl sm:leading-[1.08] md:text-[2.55rem]"
               style={{ fontWeight: 800 }}
             >
-              Train once. Publish Shorts on autopilot.
+              Create, edit, and publish — one clear studio.
             </h1>
-            <p className="mt-4 max-w-md text-[0.95rem] leading-relaxed text-[color:var(--muted)] sm:mt-5 sm:text-lg sm:leading-relaxed">
-              AI scripts, voice, media, and captions — one studio for creators
-              who want consistent YouTube Shorts without the grind.
+            <p className="mt-4 max-w-lg text-[0.95rem] leading-relaxed text-[color:var(--muted)] sm:mt-5 sm:text-lg">
+              AI Video, Shorts, clipping, presentations, video &amp; photo
+              editors, plus 3D, HDRIs, textures, emojis, and icons.
             </p>
 
-            <div className="mt-8 flex w-full flex-col gap-3 sm:mt-10 sm:w-auto sm:flex-row sm:items-center">
+            <div className="mt-8 flex w-full flex-col gap-3 sm:mt-9 sm:w-auto sm:flex-row sm:items-center">
               <Link
                 href="/signup"
-                className="landing-cta inline-flex min-h-12 w-full items-center justify-center rounded-full px-7 text-base font-semibold text-[#1a1208] transition hover:brightness-110 active:scale-[0.98] sm:w-auto sm:min-h-[3.15rem] sm:px-8"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--accent), var(--accent-dim))",
-                  boxShadow: "0 12px 32px rgba(232,165,75,0.28)",
-                }}
+                className="landing-cta btn btn-primary inline-flex min-h-12 w-full items-center justify-center rounded-full px-7 text-base sm:w-auto sm:min-h-[3.15rem] sm:px-8"
+                style={{ boxShadow: "0 12px 28px rgba(196,125,34,0.25)" }}
               >
-                Create account
+                Start free
               </Link>
               <Link
-                href="/login"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-[color:var(--line)] bg-white/[0.03] px-7 text-base font-semibold text-[color:var(--fg)] backdrop-blur-sm transition hover:border-[color:rgba(255,255,255,0.22)] hover:bg-white/[0.06] active:scale-[0.98] sm:w-auto sm:min-h-[3.15rem] sm:px-8"
+                href="/features"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] px-7 text-base font-semibold text-[color:var(--fg)] shadow-[var(--shadow-card)] transition hover:border-[color:rgba(196,125,34,0.35)] active:scale-[0.98] sm:w-auto sm:min-h-[3.15rem] sm:px-8"
               >
-                Log in
+                All tools
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* One job: what OrzuAi does */}
-      <section className="relative border-t border-[color:var(--line)] px-4 py-14 sm:px-8 sm:py-20">
-        <div className="mx-auto max-w-5xl">
-          <div className="landing-rise-delay max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--accent)]">
-              Built for creators
-            </p>
+      <section className="relative border-t border-[color:var(--line)] bg-[color:var(--bg-elevated)] px-4 py-11 sm:px-8 sm:py-14">
+        <div className="mx-auto max-w-5xl space-y-10">
+          <div className="landing-rise-delay">
             <h2
-              className="mt-3 font-[family-name:var(--font-syne)] text-2xl tracking-tight sm:text-3xl"
+              className="font-[family-name:var(--font-syne)] text-2xl tracking-tight sm:text-[1.75rem]"
               style={{ fontWeight: 800 }}
             >
-              From idea to published Short
+              Create with AI
             </h2>
-            <p className="mt-3 text-[0.95rem] leading-relaxed text-[color:var(--muted)] sm:text-base">
-              Everything lives in one place — training, clipping, AI Video, and
-              your channel schedule.
+            <p className="mt-2 max-w-xl text-sm text-[color:var(--muted)] sm:text-[0.95rem]">
+              From prompt to published Short — without switching apps.
             </p>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {CREATE.map((item, i) => (
+                <ToolCard key={item.title} {...item} delay={0.05 + i * 0.05} />
+              ))}
+            </ul>
           </div>
 
-          <ul className="mt-10 grid gap-8 sm:mt-12 sm:grid-cols-3 sm:gap-10">
-            {FEATURES.map((item, i) => (
-              <li
-                key={item.title}
-                className="landing-feature border-t border-[color:var(--line)] pt-5"
-                style={{ animationDelay: `${0.08 + i * 0.08}s` }}
-              >
-                <p
-                  className="font-[family-name:var(--font-syne)] text-lg tracking-tight"
-                  style={{ fontWeight: 700 }}
-                >
-                  {item.title}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-[color:var(--muted)] sm:text-[0.95rem]">
-                  {item.body}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div>
+            <h2
+              className="font-[family-name:var(--font-syne)] text-xl tracking-tight sm:text-2xl"
+              style={{ fontWeight: 800 }}
+            >
+              Edit
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-[color:var(--muted)]">
+              Pro tools when you want full control.
+            </p>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+              {EDIT.map((item, i) => (
+                <ToolCard key={item.title} {...item} delay={0.04 + i * 0.05} />
+              ))}
+            </ul>
+          </div>
 
-          <div className="mt-12 flex flex-col gap-3 sm:mt-14 sm:flex-row sm:items-center sm:gap-4">
+          <div>
+            <h2
+              className="font-[family-name:var(--font-syne)] text-xl tracking-tight sm:text-2xl"
+              style={{ fontWeight: 800 }}
+            >
+              Libraries &amp; assets
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-[color:var(--muted)]">
+              3D, lighting, textures, icons, emojis, and stock media.
+            </p>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {ASSETS.map((item, i) => (
+                <ToolCard key={item.title} {...item} delay={0.03 + i * 0.04} />
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-[color:var(--line)] pt-8 sm:flex-row sm:items-center sm:gap-4">
             <Link
               href="/signup"
-              className="inline-flex min-h-11 items-center justify-center rounded-full px-6 text-sm font-semibold text-[#1a1208] transition hover:brightness-110 active:scale-[0.98] sm:min-h-12 sm:px-7 sm:text-base"
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--accent), var(--accent-dim))",
-              }}
+              className="btn btn-primary inline-flex min-h-11 items-center justify-center rounded-full px-6 text-sm sm:min-h-12 sm:px-7 sm:text-base"
             >
-              Start free
+              Create account
             </Link>
             <Link
-              href="/about"
+              href="/features"
               className="inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-[color:var(--muted)] transition hover:text-[color:var(--fg)] sm:text-base"
             >
-              Learn more about OrzuAi →
+              Browse every feature →
             </Link>
           </div>
         </div>

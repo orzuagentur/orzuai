@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { seoFeatureSlugs } from "@/lib/seo-features";
 
 const SITE = (
   process.env.NEXT_PUBLIC_APP_URL || "https://www.orzuai.com"
@@ -12,11 +13,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"];
   }[] = [
     { path: "/", priority: 1, changeFrequency: "weekly" },
+    { path: "/features", priority: 0.95, changeFrequency: "weekly" },
     { path: "/about", priority: 0.9, changeFrequency: "monthly" },
     { path: "/signup", priority: 0.85, changeFrequency: "monthly" },
     { path: "/login", priority: 0.55, changeFrequency: "monthly" },
     { path: "/privacy", priority: 0.4, changeFrequency: "yearly" },
     { path: "/terms", priority: 0.4, changeFrequency: "yearly" },
+    ...seoFeatureSlugs().map((slug) => ({
+      path: `/features/${slug}`,
+      priority: 0.92,
+      changeFrequency: "weekly" as const,
+    })),
   ];
 
   return pages.map((p) => ({

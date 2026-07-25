@@ -1,15 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0c0d10;
-  --bg-elevated: #14161c;
-  --fg: #f2efe8;
-  --muted: #9a958c;
-  --line: rgba(242, 239, 232, 0.12);
-  --accent: #e8a54b;
-  --accent-dim: #b8792a;
-  --success: #5ecf8a;
-  --danger: #e86a5a;
+  /* Modern light studio — shared by landing + app */
+  --bg: #f5f6f8;
+  --bg-elevated: #ffffff;
+  --fg: #12141a;
+  --muted: #5e6672;
+  --line: rgba(18, 20, 26, 0.1);
+  --accent: #c47d22;
+  --accent-dim: #a36618;
+  --success: #1a9d55;
+  --danger: #d9483b;
+  --overlay-soft: rgba(18, 20, 26, 0.035);
+  --overlay-med: rgba(18, 20, 26, 0.06);
+  --overlay-strong: rgba(18, 20, 26, 0.09);
+  --shadow-card: 0 1px 2px rgba(18, 20, 26, 0.04),
+    0 12px 32px rgba(18, 20, 26, 0.06);
+  --btn-on-accent: #ffffff;
   --mobile-nav-space: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 
@@ -40,13 +47,22 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(232, 165, 75, 0.14), transparent 55%),
-    radial-gradient(900px 500px at 90% 0%, rgba(90, 120, 160, 0.12), transparent 50%),
+    radial-gradient(
+      1000px 520px at 8% -8%,
+      rgba(196, 125, 34, 0.08),
+      transparent 55%
+    ),
+    radial-gradient(
+      800px 420px at 92% 0%,
+      rgba(90, 120, 180, 0.06),
+      transparent 50%
+    ),
     var(--bg);
   color: var(--fg);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   text-size-adjust: 100%;
+  color-scheme: light;
 }
 
 a {
@@ -64,29 +80,31 @@ button {
 .field {
   width: 100%;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
   color: var(--fg);
   border-radius: 10px;
   padding: 0.85rem 1rem;
   outline: none;
   font-size: 0.95rem;
   line-height: 1.45;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 2px rgba(18, 20, 26, 0.03);
 }
 
 .field:focus {
-  border-color: rgba(232, 165, 75, 0.55);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(196, 125, 34, 0.55);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 3px rgba(196, 125, 34, 0.12);
 }
 
 select.field {
   cursor: pointer;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 select.field option {
-  background-color: #161616;
-  color: #f3f3f3;
+  background-color: #ffffff;
+  color: #12141a;
 }
 
 .btn {
@@ -131,20 +149,20 @@ select.field option {
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-  color: #1a1208;
+  color: var(--btn-on-accent);
 }
 
 .btn-ghost {
-  background: transparent;
+  background: var(--bg-elevated);
   border: 1px solid var(--line);
   color: var(--fg);
 }
 
 .panel {
-  background: rgba(20, 22, 28, 0.85);
+  background: var(--bg-elevated);
   border: 1px solid var(--line);
   border-radius: 18px;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
 }
 
 @keyframes rise {
@@ -212,7 +230,7 @@ select.field option {
 }
 
 .landing-cta:hover {
-  box-shadow: 0 14px 36px rgba(232,165,75,0.36);
+  box-shadow: 0 14px 36px rgba(196, 125, 34, 0.28);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -222,6 +240,38 @@ select.field option {
   .landing-feature {
     animation: none !important;
   }
+}
+
+/* Remap dark-era translucent white overlays → light surfaces */
+.bg-white\/\[0\.02\],
+.bg-white\/\[0\.03\],
+.bg-white\/\[0\.04\],
+.bg-white\/\[0\.05\],
+.bg-white\/\[0\.06\],
+.bg-white\/\[0\.08\],
+.bg-white\/5,
+.bg-white\/10,
+.bg-white\/\[0\.12\] {
+  background-color: var(--overlay-soft) !important;
+}
+
+.hover\:bg-white\/5:hover,
+.hover\:bg-white\/\[0\.03\]:hover,
+.hover\:bg-white\/\[0\.04\]:hover,
+.hover\:bg-white\/\[0\.06\]:hover,
+.hover\:bg-white\/\[0\.08\]:hover,
+.hover\:bg-white\/10:hover {
+  background-color: var(--overlay-med) !important;
+}
+
+.border-white\/10,
+.border-white\/\[0\.08\],
+.border-white\/\[0\.12\] {
+  border-color: var(--line) !important;
+}
+
+.shadow-2xl {
+  box-shadow: var(--shadow-card) !important;
 }
 
 /* Presentation studio animations */
@@ -347,7 +397,7 @@ select.field option {
 }
 .pres-studio .btn-primary {
   background: var(--accent);
-  color: #111;
+  color: var(--btn-on-accent);
 }
 .pres-studio .btn-primary:disabled {
   opacity: 0.5;
@@ -358,7 +408,7 @@ select.field option {
   color: var(--fg);
 }
 .pres-studio .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-soft);
 }
 
 @media print {

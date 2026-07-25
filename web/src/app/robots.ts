@@ -1,8 +1,14 @@
 import type { MetadataRoute } from "next";
+import { seoFeatureSlugs } from "@/lib/seo-features";
 
 const SITE = (
   process.env.NEXT_PUBLIC_APP_URL || "https://www.orzuai.com"
 ).replace(/\/$/, "");
+
+const FEATURE_PATHS = [
+  "/features",
+  ...seoFeatureSlugs().map((s) => `/features/${s}`),
+];
 
 /** Public pages only — dashboard / API stay private. */
 const PUBLIC_ALLOW = [
@@ -12,6 +18,7 @@ const PUBLIC_ALLOW = [
   "/privacy",
   "/terms",
   "/about",
+  ...FEATURE_PATHS,
 ];
 
 const PRIVATE_DISALLOW = [
@@ -23,6 +30,8 @@ const PRIVATE_DISALLOW = [
   "/auth/forgot-password",
 ];
 
+const AI_ALLOW = ["/", "/about", "/features", ...FEATURE_PATHS, "/privacy", "/terms", "/signup"];
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
@@ -31,7 +40,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: PUBLIC_ALLOW,
         disallow: PRIVATE_DISALLOW,
       },
-      // Google
       {
         userAgent: "Googlebot",
         allow: PUBLIC_ALLOW,
@@ -39,10 +47,9 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "Googlebot-Image",
-        allow: ["/", "/og.png", "/logo.png", "/logo-mark.png", "/icons/"],
+        allow: ["/", "/og.png", "/logo.png", "/logo-mark.png", "/icons/", "/features"],
         disallow: ["/dashboard", "/api/"],
       },
-      // Bing / Yahoo / DuckDuckGo (Bing index)
       {
         userAgent: "Bingbot",
         allow: PUBLIC_ALLOW,
@@ -53,7 +60,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: PUBLIC_ALLOW,
         disallow: PRIVATE_DISALLOW,
       },
-      // Yandex
       {
         userAgent: "Yandex",
         allow: PUBLIC_ALLOW,
@@ -64,7 +70,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: PUBLIC_ALLOW,
         disallow: PRIVATE_DISALLOW,
       },
-      // Europe / others
       {
         userAgent: "Applebot",
         allow: PUBLIC_ALLOW,
@@ -85,34 +90,39 @@ export default function robots(): MetadataRoute.Robots {
         allow: PUBLIC_ALLOW,
         disallow: PRIVATE_DISALLOW,
       },
-      // AI crawlers — public marketing pages only
+      // AI crawlers — marketing + feature pages so ChatGPT / Claude can recommend tools
       {
         userAgent: "GPTBot",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
         disallow: ["/dashboard", "/api/", "/auth/"],
       },
       {
         userAgent: "ChatGPT-User",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
         disallow: ["/dashboard", "/api/", "/auth/"],
       },
       {
         userAgent: "Google-Extended",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
       },
       {
         userAgent: "anthropic-ai",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
         disallow: ["/dashboard", "/api/", "/auth/"],
       },
       {
         userAgent: "ClaudeBot",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
         disallow: ["/dashboard", "/api/", "/auth/"],
       },
       {
         userAgent: "PerplexityBot",
-        allow: ["/", "/about", "/privacy", "/terms"],
+        allow: AI_ALLOW,
+        disallow: ["/dashboard", "/api/", "/auth/"],
+      },
+      {
+        userAgent: "CCBot",
+        allow: AI_ALLOW,
         disallow: ["/dashboard", "/api/", "/auth/"],
       },
     ],

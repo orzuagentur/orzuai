@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { getSource, type SourceEntry } from "@/lib/sources";
+import {
+  getSource,
+  opsHealthLabel,
+  type OpsHealth,
+  type SourceEntry,
+} from "@/lib/sources";
 
 function StatusPill({ status }: { status: SourceEntry["status"] }) {
   const label =
@@ -22,6 +27,29 @@ function StatusPill({ status }: { status: SourceEntry["status"] }) {
       }}
     >
       {label}
+    </span>
+  );
+}
+
+function OpsPill({ health }: { health: OpsHealth }) {
+  const color =
+    health === "ok"
+      ? "var(--success)"
+      : health === "watch"
+        ? "var(--accent)"
+        : health === "setup"
+          ? "var(--muted)"
+          : "#f87171";
+  return (
+    <span
+      className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+      style={{
+        color,
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid var(--line)",
+      }}
+    >
+      {opsHealthLabel(health)}
     </span>
   );
 }
@@ -66,9 +94,27 @@ export function SourceDetail({ id }: { id: string }) {
             </h1>
             <p className="mt-2 text-[color:var(--muted)]">{source.tagline}</p>
           </div>
-          <StatusPill status={source.status} />
+          <div className="flex flex-wrap gap-1.5">
+            <StatusPill status={source.status} />
+            <OpsPill health={source.opsHealth} />
+          </div>
         </div>
       </div>
+
+      <section className="space-y-2 rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4">
+        <h2 className="font-[family-name:var(--font-syne)] text-sm font-bold uppercase tracking-wide text-[color:var(--muted)]">
+          Ops status
+        </h2>
+        <p className="text-[15px] font-semibold text-[color:var(--fg)]">
+          {source.opsStatusLabel}
+        </p>
+        <p className="text-sm leading-relaxed text-[color:var(--muted)]">
+          {source.opsAction}
+        </p>
+        <p className="text-xs text-[color:var(--muted)]">
+          Plan / quota: {source.planHint}
+        </p>
+      </section>
 
       <section className="space-y-2">
         <h2 className="font-[family-name:var(--font-syne)] text-sm font-bold uppercase tracking-wide text-[color:var(--muted)]">

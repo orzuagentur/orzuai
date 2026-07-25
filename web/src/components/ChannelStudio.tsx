@@ -21,7 +21,7 @@ import {
 } from "@/lib/job-status";
 import { useToast } from "@/components/ToastNotice";
 
-type PubStep = "closed" | "root" | "ai" | "device" | "prompt";
+type PubStep = "closed" | "root" | "ai" | "device" | "prompt" | "drafts";
 
 function isYoutubeQueueJob(job: VideoJob) {
   const src = String(job.metadata?.source || "");
@@ -33,6 +33,7 @@ function isYoutubeQueueJob(job: VideoJob) {
 export function ChannelStudio({
   profile,
   videos,
+  drafts: draftsInitial = [],
   initialQueue = [],
   isTrained = false,
   aiContentEnabled = false,
@@ -41,6 +42,7 @@ export function ChannelStudio({
 }: {
   profile: Profile | null;
   videos: VideoJob[];
+  drafts?: VideoJob[];
   initialQueue?: VideoJob[];
   isTrained?: boolean;
   aiContentEnabled?: boolean;
@@ -59,7 +61,11 @@ export function ChannelStudio({
   const [prompt, setPrompt] = useState("");
   const [deviceTitle, setDeviceTitle] = useState("");
   const [queue, setQueue] = useState<VideoJob[]>(initialQueue);
+  const [drafts, setDrafts] = useState<VideoJob[]>(draftsInitial);
   const [aiOn, setAiOn] = useState(aiContentEnabled);
+  /** Keep polling these job ids even if a refresh briefly returns empty. */
+  const watchingRef = useRef<Set<string>>(new Set());
+  const [watchTick, setWatchTick] = useState(0);
   const [unauthorized, setUnauthorized] = useState(youtubeUnauthorized);
   const [channelStats, setChannelStats] = useState(() => ({
     subscribers: profile?.youtube_subscriber_count ?? 0,
@@ -81,8 +87,28 @@ export function ChannelStudio({
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   useEffect(() => {
-    setQueue(initialQueue);
+    // Merge server queue with any jobs we are still watching (avoid wipe after router.refresh)
+    setQueue((prev) => {
+      const byId = new Map<string, VideoJob>();
+      for (const j of initialQueue) byId.set(j.id, j);
+      for (const j of prev) {
+        if (watchingRef.current.has(j.id) && QUEUE_STATUSES.has(j.status)) {
+          const newer = byId.get(j.id);
+          byId.set(j.id, newer || j);
+        }
+      }
+      return Array.from(byId.values())
+        .filter(isYoutubeQueueJob)
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+    });
   }, [initialQueue]);
+
+  useEffect(() => {
+    setDrafts(draftsInitial);
+  }, [draftsInitial]);
 
   useEffect(() => {
     setUnauthorized(youtubeUnauthorized);
@@ -157,17 +183,71 @@ export function ChannelStudio({
     if (profile?.youtube_channel_id) {
       q = q.eq("youtube_channel_id", profile.youtube_channel_id);
     }
-    const { data } = await q;
-    if (data) setQueue((data as VideoJob[]).filter(isYoutubeQueueJob));
+    const { data, error } = await q;
+    if (error || !data) return;
+
+    const next = (data as VideoJob[]).filter(isYoutubeQueueJob);
+    const nextIds = new Set(next.map((j) => j.id));
+
+    // Drop watchers that finished (left QUEUE_STATUSES)
+    for (const id of [...watchingRef.current]) {
+      if (!nextIds.has(id)) watchingRef.current.delete(id);
+    }
+
+    setQueue((prev) => {
+      const byId = new Map<string, VideoJob>();
+      for (const j of next) byId.set(j.id, j);
+      // Keep optimistic stubs until they appear in the query
+      for (const j of prev) {
+        if (watchingRef.current.has(j.id) && !byId.has(j.id)) {
+          byId.set(j.id, j);
+        }
+      }
+      return Array.from(byId.values()).sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    });
+    setWatchTick((n) => n + 1);
   }, [profile?.youtube_channel_id]);
 
+  function trackJob(job: Partial<VideoJob> & { id: string }) {
+    watchingRef.current.add(job.id);
+    const stub: VideoJob = {
+      id: job.id,
+      status: job.status || "queued",
+      title: job.title ?? null,
+      script_text: job.script_text ?? null,
+      youtube_url: null,
+      youtube_video_id: null,
+      error_message: null,
+      scheduled_for: job.scheduled_for || new Date().toISOString(),
+      created_at: job.created_at || new Date().toISOString(),
+      completed_at: null,
+      thumbnail_url: null,
+      preview_url: null,
+      metadata: {
+        pipeline: "youtube",
+        source: "youtube_ai",
+        publish: true,
+        ...(job.metadata || {}),
+      },
+    };
+    setQueue((prev) => {
+      if (prev.some((j) => j.id === stub.id)) return prev;
+      return [stub, ...prev];
+    });
+    setWatchTick((n) => n + 1);
+  }
+
   useEffect(() => {
-    if (activeJobs.length === 0) return;
+    const watching = watchingRef.current.size > 0 || activeJobs.length > 0;
+    if (!watching) return;
     const t = window.setInterval(() => {
       void refreshQueue();
     }, 2500);
     return () => window.clearInterval(t);
-  }, [activeJobs.length, refreshQueue]);
+  }, [activeJobs.length, watchTick, refreshQueue]);
 
   async function toggleAiContent() {
     if (!aiOn && !isTrained) {
@@ -331,6 +411,22 @@ export function ChannelStudio({
     router.refresh();
   }
 
+  async function publishDraft(jobId: string) {
+    setBusy(jobId);
+    const res = await fetch(`/api/jobs/${jobId}/publish`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) {
+      toast(data.error || "Publish failed", "error");
+      return;
+    }
+    setDrafts((prev) => prev.filter((d) => d.id !== jobId));
+    toast("Draft queued for YouTube");
+    setStep("closed");
+    trackJob({ id: jobId, status: "queued", metadata: { source: "draft_publish" } });
+    void refreshQueue();
+  }
+
   async function startAiAuto() {
     if (!isTrained) {
       toast("Save AI Training for this channel first.", "error");
@@ -354,9 +450,15 @@ export function ChannelStudio({
       return;
     }
     setStep("closed");
+    if (data.job_id) {
+      trackJob({
+        id: String(data.job_id),
+        status: "queued",
+        metadata: { source: "youtube_ai", pipeline: "youtube", publish: true },
+      });
+    }
     toast("AI is creating a video and will publish it to YouTube.", "info");
     await refreshQueue();
-    router.refresh();
   }
 
   async function startAiPrompt() {
@@ -389,9 +491,19 @@ export function ChannelStudio({
     }
     setPrompt("");
     setStep("closed");
+    if (data.job_id) {
+      trackJob({
+        id: String(data.job_id),
+        status: "queued",
+        metadata: {
+          source: "youtube_prompt",
+          pipeline: "youtube",
+          publish: true,
+        },
+      });
+    }
     toast("AI is creating a video from your prompt and will publish it to YouTube.", "info");
     await refreshQueue();
-    router.refresh();
   }
 
   async function startDeviceUpload(file: File) {
@@ -408,9 +520,15 @@ export function ChannelStudio({
     }
     setDeviceTitle("");
     setStep("closed");
+    if (data.job_id) {
+      trackJob({
+        id: String(data.job_id),
+        status: "queued",
+        metadata: { source: "device_upload", pipeline: "youtube", publish: true },
+      });
+    }
     toast("Video uploaded - publishing to YouTube.", "info");
     await refreshQueue();
-    router.refresh();
   }
 
   if (!profile?.youtube_connected) {
@@ -623,12 +741,12 @@ export function ChannelStudio({
                   aria-expanded={step === "root"}
                   onClick={() => {
                     setAnalyticsOpen(false);
-                    setStep((s) => (s === "closed" ? "root" : "closed"));
+                    setStep((s) => (s === "closed" || s === "drafts" ? "root" : "closed"));
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
                   style={{
                     boxShadow:
-                      step !== "closed"
+                      step === "root" || step === "ai" || step === "device" || step === "prompt"
                         ? "0 0 0 2px rgba(232,165,75,0.55)"
                         : undefined,
                   }}
@@ -682,6 +800,54 @@ export function ChannelStudio({
                   </div>
                 )}
               </div>
+
+              <button
+                type="button"
+                title={
+                  drafts.length
+                    ? `Drafts (${drafts.length})`
+                    : "Drafts — unpublished videos"
+                }
+                aria-label="Drafts"
+                aria-expanded={step === "drafts"}
+                onClick={() => {
+                  setAnalyticsOpen(false);
+                  setStep((s) => (s === "drafts" ? "closed" : "drafts"));
+                }}
+                className="relative flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
+                style={{
+                  boxShadow:
+                    step === "drafts"
+                      ? "0 0 0 2px rgba(232,165,75,0.55)"
+                      : undefined,
+                }}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M8 13h8" />
+                  <path d="M8 17h6" />
+                </svg>
+                {drafts.length > 0 && (
+                  <span
+                    className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-black"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    {drafts.length > 9 ? "9+" : drafts.length}
+                  </span>
+                )}
+              </button>
+
               <button
                 type="button"
                 title="Refresh"
@@ -840,8 +1006,47 @@ export function ChannelStudio({
         />
       </section>
 
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold">
+            Drafts
+            {drafts.length > 0 ? (
+              <span className="ml-2 text-sm font-normal text-[color:var(--muted)]">
+                ({drafts.length})
+              </span>
+            ) : null}
+          </h3>
+          <p className="text-[11px] text-[color:var(--muted)]">
+            Ready videos not published to YouTube
+          </p>
+        </div>
+        <YouTubeVideoCards
+          jobs={drafts}
+          onPublish={(id) => void publishDraft(id)}
+          busyId={busy}
+          emptyLabel="No drafts yet — create with AI publish off, Creativity, or Content."
+        />
+      </section>
+
+      {step === "drafts" && (
+        <PubModal
+          title="Drafts"
+          subtitle="Unpublished videos ready to send to YouTube"
+          onClose={() => setStep("closed")}
+        >
+          <div className="max-h-[60vh] overflow-y-auto">
+            <YouTubeVideoCards
+              jobs={drafts}
+              onPublish={(id) => void publishDraft(id)}
+              busyId={busy}
+              emptyLabel="No drafts yet."
+            />
+          </div>
+        </PubModal>
+      )}
+
       {activeJobs.length > 0 && (
-        <div className="pointer-events-none fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-40 flex w-[min(100%-1.5rem,300px)] flex-col gap-2 sm:right-4 lg:bottom-6 lg:right-6">
+        <div className="pointer-events-none fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-3 z-[80] flex w-[min(100%-1.5rem,300px)] flex-col gap-2 sm:right-4 lg:bottom-6 lg:right-6">
           {activeJobs.map((job) => {
             const pct = jobProgressPercent(job.status);
             return (

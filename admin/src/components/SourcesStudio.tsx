@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { SOURCES, type SourceEntry } from "@/lib/sources";
+import {
+  SOURCES,
+  opsHealthLabel,
+  type OpsHealth,
+  type SourceEntry,
+} from "@/lib/sources";
 
 function StatusPill({ status }: { status: SourceEntry["status"] }) {
   const label =
@@ -26,6 +31,29 @@ function StatusPill({ status }: { status: SourceEntry["status"] }) {
   );
 }
 
+function OpsPill({ health }: { health: OpsHealth }) {
+  const color =
+    health === "ok"
+      ? "var(--success)"
+      : health === "watch"
+        ? "var(--accent)"
+        : health === "setup"
+          ? "var(--muted)"
+          : "#f87171";
+  return (
+    <span
+      className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+      style={{
+        color,
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid var(--line)",
+      }}
+    >
+      {opsHealthLabel(health)}
+    </span>
+  );
+}
+
 export function SourcesStudio() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -34,8 +62,8 @@ export function SourcesStudio() {
           Sources
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-[color:var(--muted)]">
-          Every external service and internal source OrzuAi uses — open a card
-          for full purpose, where it runs, and which env keys it needs.
+          Every external service OrzuAi uses — status, whether you need a higher
+          limit or paid plan, and which env keys it needs.
         </p>
       </header>
 
@@ -50,15 +78,27 @@ export function SourcesStudio() {
               <span className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--muted)]">
                 {s.categoryLabel}
               </span>
-              <StatusPill status={s.status} />
+              <div className="flex flex-wrap justify-end gap-1">
+                <StatusPill status={s.status} />
+                <OpsPill health={s.opsHealth} />
+              </div>
             </div>
             <h2 className="mt-3 font-[family-name:var(--font-syne)] text-lg font-bold tracking-tight group-hover:text-[color:var(--accent)]">
               {s.name}
             </h2>
-            <p className="mt-1.5 flex-1 text-sm leading-relaxed text-[color:var(--muted)]">
+            <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--muted)]">
               {s.tagline}
             </p>
-            <p className="mt-3 text-xs text-[color:var(--muted)]">
+            <p className="mt-3 text-xs font-medium text-[color:var(--fg)]">
+              {s.opsStatusLabel}
+            </p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[color:var(--muted)]">
+              {s.opsAction}
+            </p>
+            <p className="mt-3 text-[11px] text-[color:var(--muted)]">
+              {s.planHint}
+            </p>
+            <p className="mt-2 text-xs text-[color:var(--muted)]">
               {s.usedIn.join(" · ")}
             </p>
           </Link>

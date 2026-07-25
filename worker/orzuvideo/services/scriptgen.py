@@ -150,17 +150,10 @@ Rules:
 - First 3 seconds must hook attention. Put that opener in "hook" (4–12 words) and start the script with it.
 - For STANDARD videos: choose B-roll search queries in English for stock footage (pexels_queries).
 - For EMOJI videos: do NOT use stock footage. Fill background_colors with solid hex colors and a rich asset_overlays plan.
-- Suggest a subtitle style hint in "subtitle_style" from:
-  classic, karaoke_gold, neon_pink, impact, yellow_pop, soft_shadow, lower_third, minimal,
-  cyan_glow, fire_orange, lime_pulse, comic_pop, glass_frost, serif_clean, stack_outline, typewriter, hook_banner,
-  viral_white, duotone_sub.
-- Suggest a look filter in "visual_effect" from:
-  cinematic, vivid, teal_orange, warm, cool, drama, neon, vintage, punch, glow, clarity,
-  soft, noir, pastel, sunset, arctic, ember, matrix, high_key, low_key,
-  kodak, fuji, bleach_bypass, golden_hour, steel_blue, blockbuster, moody_teal, pop_art.
-- Suggest preferred_transition from xfade names that match the prompt energy
-  (e.g. slam edits → wipeleft/slideright/zoomin; calm → dissolve/fade/smoothleft; bold → circleopen/radial).
-- Suggest montage_pace from: viral, fast, medium, cinematic — match prompt energy.
+- Suggest a subtitle style hint in "subtitle_style", a look filter in "visual_effect",
+  preferred_transition, and montage_pace from the AVAILABLE TOOLS block below.
+  Prefer ids that match the prompt mood. Never invent ids outside that list.
+{tools_block}
 - Set flash_cuts true for high-energy / hype / sales prompts; false for calm / luxury / storytelling.
 - Do NOT invent motivational-coach / gym / discipline themes unless the prompt asks for them.
 - Match EVERY creative choice (tone, colors, subtitle look, motion energy) to the user's prompt theme.
@@ -451,6 +444,16 @@ Build a dense visual storyboard now. Visuals > voice.
         return []
 
 
+def _montage_tools_block() -> str:
+    try:
+        from orzuvideo.pipeline.fx_library import catalog_prompt_block
+
+        return catalog_prompt_block()
+    except Exception as exc:
+        print(f"[scriptgen] catalog tools skipped: {exc}")
+        return ""
+
+
 def _training_lines(training: dict[str, Any]) -> str:
     """Build prompt lines only from non-empty training fields."""
     mapping = [
@@ -529,6 +532,7 @@ def generate_creativity_script(
     system = CREATIVITY_SYSTEM.format(
         duration_rule=duration_rule,
         video_type_rule=video_type_rule.strip(),
+        tools_block=_montage_tools_block(),
     )
     user_msg = f"""USER PROMPT (ONLY source of truth — ignore any YouTube/channel training):
 \"\"\"{prompt}\"\"\"

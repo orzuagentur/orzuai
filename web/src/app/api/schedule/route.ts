@@ -123,6 +123,25 @@ export async function POST(request: Request) {
     );
   }
 
+  // Cron runs every 15 minutes — slots closer than 15m can block each other
+  const sortedMins = [...normalizedTimes]
+    .map((t) => {
+      const [h, m] = t.split(":");
+      return Number(h) * 60 + Number(m || 0);
+    })
+    .sort((a, b) => a - b);
+  for (let i = 1; i < sortedMins.length; i++) {
+    if (sortedMins[i] - sortedMins[i - 1] < 15) {
+      return NextResponse.json(
+        {
+          error:
+            "Keep at least 15 minutes between publish times so the schedule can fire each slot.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const payload = {
     user_id: user.id,
     youtube_channel_id: active.channel_id,

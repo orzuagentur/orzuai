@@ -12,6 +12,14 @@ export type SourceCategory =
   | "domains"
   | "legacy";
 
+/** Health of the integration for ops (limits / billing). */
+export type OpsHealth =
+  | "ok"
+  | "watch"
+  | "raise_limit"
+  | "need_paid"
+  | "setup";
+
 export type SourceEntry = {
   id: string;
   name: string;
@@ -24,6 +32,14 @@ export type SourceEntry = {
   details: string[];
   envKeys: string[];
   status: "active" | "legacy" | "infra";
+  /** Card badge: is the free/paid plan enough? */
+  opsHealth: OpsHealth;
+  /** Short status line on the card */
+  opsStatusLabel: string;
+  /** What to do next (raise limit, upgrade, verify domain, etc.) */
+  opsAction: string;
+  /** Typical plan / quota note */
+  planHint: string;
 };
 
 export const SOURCES: SourceEntry[] = [
@@ -51,6 +67,11 @@ export const SOURCES: SourceEntry[] = [
       "SUPABASE_URL (worker)",
     ],
     status: "active",
+    opsHealth: "watch",
+    opsStatusLabel: "Watch DB size & egress",
+    opsAction:
+      "If approaching Free/Pro storage or egress caps, upgrade Supabase plan or raise project limits in the dashboard.",
+    planHint: "Pro recommended in production; Free is OK for early staging.",
   },
   {
     id: "cloudflare-r2",
@@ -79,6 +100,11 @@ export const SOURCES: SourceEntry[] = [
       "R2_REGION",
     ],
     status: "active",
+    opsHealth: "ok",
+    opsStatusLabel: "Storage OK",
+    opsAction:
+      "Monitor Class A/B ops and stored GB in Cloudflare. Raise R2 budget if monthly video volume grows.",
+    planHint: "Pay-as-you-go R2; no egress fees to Cloudflare network.",
   },
   {
     id: "pexels",
@@ -97,17 +123,90 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["PEXELS_API_KEY"],
     status: "active",
+    opsHealth: "raise_limit",
+    opsStatusLabel: "May need higher API limit",
+    opsAction:
+      "If search returns 429 / rate errors, request a higher Pexels API limit or add a second key. Production traffic often outgrows the default free quota.",
+    planHint: "Free API key with rate limits — request increase for production.",
+  },
+  {
+    id: "unsplash",
+    name: "Unsplash",
+    tagline: "High-quality stock photos",
+    category: "media",
+    categoryLabel: "Stock media",
+    website: "https://unsplash.com/developers",
+    usedIn: ["Web photo library", "Presentations / creators"],
+    purpose:
+      "Photo search for creator libraries and presentation visuals when Unsplash is configured.",
+    details: [
+      "Requires UNSPLASH_ACCESS_KEY on the web project.",
+      "Used alongside Pexels/Pixabay for photo coverage.",
+      "Demo/demo rates are limited — production needs a registered app.",
+    ],
+    envKeys: ["UNSPLASH_ACCESS_KEY"],
+    status: "active",
+    opsHealth: "raise_limit",
+    opsStatusLabel: "Demo limit — upgrade app",
+    opsAction:
+      "Register a production Unsplash app and request higher rate limits if photo search is heavy. Demo keys are too low for multi-user traffic.",
+    planHint: "Free developer app; production approval / higher quota as needed.",
+  },
+  {
+    id: "pixabay",
+    name: "Pixabay",
+    tagline: "Stock photos & clips backup source",
+    category: "media",
+    categoryLabel: "Stock media",
+    website: "https://pixabay.com/api/docs/",
+    usedIn: ["Web media search"],
+    purpose:
+      "Additional stock photo/video search to broaden results beyond Pexels/Unsplash.",
+    details: [
+      "PIXABAY_API_KEY on web (and admin if Media search uses it).",
+      "Fallback / parallel provider for library search.",
+    ],
+    envKeys: ["PIXABAY_API_KEY"],
+    status: "active",
+    opsHealth: "watch",
+    opsStatusLabel: "Watch hourly quota",
+    opsAction:
+      "If Pixabay rate limits hit, space out requests or request a higher quota from Pixabay support.",
+    planHint: "Free API with hourly request caps.",
+  },
+  {
+    id: "iconify",
+    name: "Iconify",
+    tagline: "Icon sets for creator libraries",
+    category: "assets",
+    categoryLabel: "Assets",
+    website: "https://iconify.design",
+    usedIn: ["Web icons library", "Presentations"],
+    purpose:
+      "Public Iconify API powers the icons browser for presentations and creator assets (no paid key required).",
+    details: [
+      "Calls api.iconify.design from the web app.",
+      "No secret env key — public CDN/API.",
+      "Cache aggressively if traffic grows.",
+    ],
+    envKeys: [],
+    status: "active",
+    opsHealth: "ok",
+    opsStatusLabel: "Public API OK",
+    opsAction:
+      "Usually no billing. If Iconify rate-limits, add caching or self-host icon JSON packs.",
+    planHint: "Free public API — no subscription.",
   },
   {
     id: "openai",
     name: "OpenAI",
-    tagline: "Scripts, hooks, and comment replies",
+    tagline: "Scripts, hooks, clipping picks, comments",
     category: "ai",
     categoryLabel: "AI",
     website: "https://platform.openai.com",
-    usedIn: ["Worker", "Web (YouTube comments API)"],
+    usedIn: ["Worker", "Web (YouTube comments API)", "Whisper transcription"],
     purpose:
-      "LLM for video scripts, hooks, music mood hints, and AI replies to YouTube comments.",
+      "LLM for video scripts, hooks, music mood hints, clip window picking, and AI replies to YouTube comments. Whisper for transcription on clipping.",
     details: [
       "Default model: gpt-4o-mini (OPENAI_MODEL).",
       "Worker scriptgen builds Creativity / daily video copy.",
@@ -116,6 +215,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["OPENAI_API_KEY", "OPENAI_MODEL"],
     status: "active",
+    opsHealth: "need_paid",
+    opsStatusLabel: "Paid usage — set spend cap",
+    opsAction:
+      "Ensure billing is active with a monthly spend limit. Raise TPM/RPM org limits if jobs queue on 429. Prefer gpt-4o-mini for cost control.",
+    planHint: "Pay-as-you-go; set Organization usage limits in OpenAI dashboard.",
   },
   {
     id: "elevenlabs",
@@ -134,6 +238,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID"],
     status: "active",
+    opsHealth: "raise_limit",
+    opsStatusLabel: "Characters — upgrade if low",
+    opsAction:
+      "If voice jobs fail on quota, upgrade ElevenLabs plan or buy more characters. Starter plans run out quickly with daily Shorts.",
+    planHint: "Starter → Creator/Pro as channel volume grows.",
   },
   {
     id: "youtube",
@@ -156,6 +265,11 @@ export const SOURCES: SourceEntry[] = [
       "YOUTUBE_REDIRECT_URI",
     ],
     status: "active",
+    opsHealth: "watch",
+    opsStatusLabel: "Watch quota units",
+    opsAction:
+      "Monitor Google Cloud YouTube Data API quota. Request quota increase if uploads/comments hit daily unit limits.",
+    planHint: "Google Cloud project free tier quota; request increase for scale.",
   },
   {
     id: "vercel",
@@ -175,6 +289,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["CRON_SECRET", "NEXT_PUBLIC_APP_URL", "VERCEL"],
     status: "infra",
+    opsHealth: "watch",
+    opsStatusLabel: "Watch function usage",
+    opsAction:
+      "If cron or API hits Hobby limits, move web to Pro. Keep admin on a separate Vercel project.",
+    planHint: "Hobby for early; Pro for production cron + bandwidth.",
   },
   {
     id: "railway",
@@ -198,6 +317,11 @@ export const SOURCES: SourceEntry[] = [
       "TEMP_DIR",
     ],
     status: "infra",
+    opsHealth: "need_paid",
+    opsStatusLabel: "Paid usage for CPU/disk",
+    opsAction:
+      "Scale worker RAM/CPU and disk if FFmpeg jobs OOM or fill temp. Add a second worker replica if queue grows.",
+    planHint: "Usage-based Railway plan — budget for continuous worker + disk.",
   },
   {
     id: "ffmpeg",
@@ -216,6 +340,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: [],
     status: "infra",
+    opsHealth: "ok",
+    opsStatusLabel: "Local binary OK",
+    opsAction:
+      "No SaaS limit. Ensure worker image includes a recent FFmpeg build with libx264 + filters.",
+    planHint: "Open-source — no subscription.",
   },
   {
     id: "poly-haven",
@@ -234,6 +363,10 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: [],
     status: "active",
+    opsHealth: "ok",
+    opsStatusLabel: "Public API OK",
+    opsAction: "No billing. Cache CDN responses if users browse heavily.",
+    planHint: "Free CC0 assets — no subscription.",
   },
   {
     id: "platform-music",
@@ -253,6 +386,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["(same as Cloudflare R2 + Supabase)"],
     status: "active",
+    opsHealth: "ok",
+    opsStatusLabel: "Internal catalog OK",
+    opsAction:
+      "Keep uploading cleared tracks in Admin → Music. Storage cost follows R2.",
+    planHint: "Internal — no third-party music SaaS fee.",
   },
   {
     id: "resend",
@@ -272,6 +410,11 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: ["RESEND_API_KEY", "RESEND_FROM_EMAIL"],
     status: "active",
+    opsHealth: "watch",
+    opsStatusLabel: "Verify domain + volume",
+    opsAction:
+      "Verify orzuai.com DNS in Resend. Upgrade plan if monthly email volume exceeds Free tier.",
+    planHint: "Free tier for early; paid as auth email volume grows.",
   },
   {
     id: "namecheap",
@@ -291,9 +434,31 @@ export const SOURCES: SourceEntry[] = [
     ],
     envKeys: [],
     status: "infra",
+    opsHealth: "ok",
+    opsStatusLabel: "Renew domain yearly",
+    opsAction:
+      "Keep auto-renew on. Ensure SPF/DKIM/DMARC still point at Resend after DNS edits.",
+    planHint: "Annual domain + optional Private Email.",
   },
 ];
 
 export function getSource(id: string): SourceEntry | undefined {
   return SOURCES.find((s) => s.id === id);
+}
+
+export function opsHealthLabel(h: OpsHealth): string {
+  switch (h) {
+    case "ok":
+      return "OK";
+    case "watch":
+      return "Watch";
+    case "raise_limit":
+      return "Raise limit";
+    case "need_paid":
+      return "Paid / upgrade";
+    case "setup":
+      return "Needs setup";
+    default:
+      return h;
+  }
 }

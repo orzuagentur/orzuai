@@ -76,6 +76,23 @@ export async function POST(request: Request) {
   const subtitle_style = SUBTITLE_STYLE_IDS.has(subtitleStyleRaw)
     ? subtitleStyleRaw
     : "classic";
+  const videoStyle = String(body.video_style || body.montage_style || "")
+    .trim()
+    .slice(0, 64);
+  const visualEffect = String(body.visual_effect || "").trim().slice(0, 64);
+  const preferredTransition = String(body.preferred_transition || "")
+    .trim()
+    .slice(0, 64);
+  const preferredMotion = String(body.preferred_motion || "")
+    .trim()
+    .slice(0, 64);
+  const montagePaceRaw = String(body.montage_pace || "").trim().toLowerCase();
+  const montage_pace = ["viral", "fast", "medium", "cinematic"].includes(
+    montagePaceRaw,
+  )
+    ? montagePaceRaw
+    : "";
+  const virality_mode = body.virality_mode === true || body.virality === true;
   // Effects + transitions are always on (AI)
   const addEffects = true;
   const addTransitions = true;
@@ -216,6 +233,13 @@ export async function POST(request: Request) {
     add_music: addMusic,
     add_effects: addEffects,
     add_transitions: addTransitions,
+    video_style: videoStyle || null,
+    visual_effect: visualEffect || null,
+    preferred_transition: preferredTransition || null,
+    preferred_motion: preferredMotion || null,
+    montage_pace: montage_pace || null,
+    virality_mode,
+    flash_cuts: virality_mode || body.flash_cuts === true,
     use_voice: useVoice,
     voice_id: voiceId,
     music_track_id: musicTrackId,

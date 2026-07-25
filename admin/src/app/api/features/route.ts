@@ -22,6 +22,19 @@ export async function GET() {
     .maybeSingle();
 
   if (error) {
+    // Table not migrated yet — treat as unlocked instead of 500
+    const missing =
+      /schema cache|does not exist|Could not find the table/i.test(
+        error.message || "",
+      );
+    if (missing) {
+      return NextResponse.json({
+        locks: {} as ProductLocksMap,
+        updatedAt: null,
+        features: PRODUCT_LOCK_FEATURES,
+        pendingMigration: "029_product_locks",
+      });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -69,6 +82,20 @@ export async function PUT(request: Request) {
     .single();
 
   if (error) {
+    const missing =
+      /schema cache|does not exist|Could not find the table/i.test(
+        error.message || "",
+      );
+    if (missing) {
+      return NextResponse.json(
+        {
+          error:
+            "Run migration 029_product_locks.sql in the OrzuVideo Supabase SQL editor, then retry.",
+          pendingMigration: "029_product_locks",
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

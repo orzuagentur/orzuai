@@ -186,6 +186,45 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
     music_track_id = str(meta0.get("music_track_id") or "").strip() or None
     music_group = str(meta0.get("music_group") or "").strip() or None
     instructions = (meta0.get("user_brief") or meta0.get("instructions") or "").strip() or None
+    virality_mode = bool(meta0.get("virality_mode") or meta0.get("virality"))
+
+    from orzuvideo.pipeline.fx_library import (
+        FLASH_TRANSITION_POOL,
+        resolve_training_montage,
+    )
+
+    look = resolve_training_montage(
+        {
+            "video_style": str(meta0.get("video_style") or meta0.get("montage_style") or "").strip(),
+            "visual_effect": str(meta0.get("visual_effect") or "").strip() or None,
+            "preferred_transition": str(meta0.get("preferred_transition") or "").strip() or None,
+            "montage_pace": str(meta0.get("montage_pace") or "").strip() or None,
+            "flash_cuts": True if virality_mode else meta0.get("flash_cuts"),
+            "subtitle_style": subtitle_style,
+        },
+        meta0=meta0,
+    )
+    if virality_mode:
+        look["montage_pace"] = "viral"
+        look["flash_cuts"] = True
+        if not look.get("visual_effect") or look.get("visual_effect") in ("cinematic", "none"):
+            look["visual_effect"] = "punch_pop"
+        if not look.get("preferred_transition"):
+            look["preferred_transition"] = FLASH_TRANSITION_POOL[0]
+    visual_effect = str(look.get("visual_effect") or "cinematic")
+    preferred_transition = (
+        str(look["preferred_transition"]).strip()
+        if look.get("preferred_transition")
+        else None
+    )
+    flash_cuts = bool(look.get("flash_cuts")) or virality_mode
+    preferred_motions = look.get("preferred_motions")
+    motion_ids: list[str] | None = None
+    preferred_motion = str(meta0.get("preferred_motion") or "").strip()
+    if preferred_motion:
+        motion_ids = [preferred_motion]
+    elif isinstance(preferred_motions, list) and preferred_motions:
+        motion_ids = [str(m) for m in preferred_motions if m]
 
     raw_sources = meta0.get("sources")
     sources: list[dict] = []
@@ -209,7 +248,8 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
     print(
         f"[CLIPPING] job={job_id} sources={len(sources)} aspect={aspect} "
         f"target={target_dur}s voice={use_voice} subs={add_subtitles}/{subtitle_style} "
-        f"music={add_music} track={music_track_id} group={music_group}"
+        f"music={add_music} style={meta0.get('video_style') or 'auto'} "
+        f"effect={visual_effect} virality={virality_mode} flash={flash_cuts}"
     )
 
     db.update_job(
@@ -273,6 +313,7 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
             instructions=instructions,
             user_id=user_id,
             job_id=job_id,
+            virality_mode=virality_mode,
         )
         clip_len = max(1.0, end - start)
         titles.append(title)
@@ -282,9 +323,25 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
         clip_pipe.cut_segment(local, start, clip_len, cut)
         framed = work / f"framed_{i}.mp4"
         clip_pipe.reframe_clip(
-            cut, framed, width=out_w, height=out_h, effects=add_effects
+            cut,
+            framed,
+            width=out_w,
+            height=out_h,
+            effects=add_effects,
+            effect_id=visual_effect,
+            punch_open=virality_mode or i == 0,
+            motion_ids=motion_ids,
+            flash_in=virality_mode and i == 0,
         )
-        framed_clips.append(framed)
+        if virality_mode:
+            beats = clip_pipe.split_viral_beats(
+                framed,
+                work / f"beats_{i}",
+                beat_sec=1.05,
+            )
+            framed_clips.extend(beats)
+        else:
+            framed_clips.append(framed)
 
     if not framed_clips:
         raise RuntimeError("No usable source clips (videos too short?)")
@@ -300,6 +357,9 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
             combined,
             work_dir=work / "concat",
             use_transitions=add_transitions,
+            preferred_transition=preferred_transition,
+            flash_cuts=flash_cuts,
+            overlap=0.24 if virality_mode else None,
         )
 
     # Strict output length — never longer than the chosen duration
@@ -470,6 +530,12 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
         "add_music": bool(music_path),
         "add_effects": True,
         "add_transitions": True,
+        "virality_mode": virality_mode,
+        "video_style": str(meta0.get("video_style") or "") or None,
+        "visual_effect": visual_effect,
+        "preferred_transition": preferred_transition,
+        "montage_pace": look.get("montage_pace"),
+        "flash_cuts": flash_cuts,
         "use_voice": use_voice,
         "voice_id": voice_id if use_voice else None,
         "music_track_id": music_track_id,
@@ -1357,6 +1423,16 @@ def _process_job(job: dict) -> None:
             allowed_motions = None
         else:
             allowed_motions = [str(m) for m in allowed_motions if m]
+
+        # Edit style motion pack intersects with montage pool when present
+        style_motions = look.get("preferred_motions")
+        if isinstance(style_motions, list) and style_motions:
+            style_ids = [str(m) for m in style_motions if m]
+            if allowed_motions:
+                inter = [m for m in allowed_motions if m in style_ids]
+                allowed_motions = inter or style_ids
+            else:
+                allowed_motions = style_ids
 
         punch_first = bool(montage.get("punch_first_clip", True))
         transitions_on = bool(montage.get("transitions_enabled", True))

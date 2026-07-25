@@ -151,7 +151,7 @@ export function CreatorsHub() {
           <Link
             key={card.href}
             href={card.href}
-            className="group relative overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 transition duration-300 hover:border-[rgba(232,165,75,0.45)] hover:bg-[rgba(255,255,255,0.03)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] sm:p-8"
+            className="group relative overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-6 shadow-[var(--shadow-card)] transition duration-300 hover:-translate-y-0.5 hover:border-[rgba(196,125,34,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] sm:p-8"
           >
             <div
               className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-30 blur-3xl transition group-hover:opacity-50"
@@ -161,7 +161,7 @@ export function CreatorsHub() {
             <div className="relative flex flex-col gap-5">
               <div className="flex items-start justify-between gap-3">
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--line)] bg-[rgba(0,0,0,0.25)] text-[var(--fg)] transition group-hover:scale-105"
+                  className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--bg)] text-[var(--fg)] shadow-sm transition group-hover:scale-105"
                   style={{ color: card.accent }}
                 >
                   {card.icon}

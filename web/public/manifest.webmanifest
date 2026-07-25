@@ -1,13 +1,13 @@
 {
   "name": "OrzuAi",
   "short_name": "OrzuAi",
-  "description": "AI YouTube Shorts studio — create, edit, and publish.",
+  "description": "AI creator studio — video, Shorts, clipping, presentations.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0c0c0c",
-  "theme_color": "#0c0c0c",
+  "background_color": "#f5f6f8",
+  "theme_color": "#f5f6f8",
   "lang": "en",
   "categories": ["productivity", "photo", "video"],
   "icons": [

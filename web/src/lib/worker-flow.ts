@@ -41,7 +41,7 @@ export const FLOW_NODES: FlowNodeDef[] = [
     col: 0,
     row: 0,
     title: "Schedule & Vercel Cron",
-    how: "Every hour Vercel calls /api/cron/daily. If your Schedule time matches (timezone, days, slots), it inserts queued jobs into Supabase. This does not render video — it only creates work for the worker.",
+    how: "Every 15 minutes Vercel calls /api/cron/daily. Due schedule slots (reached today, within 3h catch-up) insert queued jobs with scheduled_for at the real slot time. This does not render video — it only creates work for the worker.",
     connects: [
       "Requires Schedule enabled in the dashboard",
       "Requires YouTube connected + AI trained",

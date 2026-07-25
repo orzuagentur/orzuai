@@ -44,7 +44,7 @@ def pick_transition(
         pool = list(dict.fromkeys([*flashy, *pool]))
     pool = [t for t in pool if t != exclude] or pool
     pref = (preferred or "").strip()
-    if pref and pref in pool and pref != exclude and random.random() < 0.55:
+    if pref and pref in pool and pref != exclude and random.random() < 0.92:
         return pref
     if flash_cuts and random.random() < 0.45:
         flashy = [t for t in pool if t in ("fadewhite", "fadeblack", "radial", "zoomin", "hblur")]

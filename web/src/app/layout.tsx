@@ -20,21 +20,30 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL || "https://www.orzuai.com",
   ),
   title: {
-    default: "OrzuAi — AI YouTube Shorts Studio",
+    default: "OrzuAi — AI Creator Studio",
     template: "%s · OrzuAi",
   },
   description:
-    "OrzuAi is an AI creator studio: generate YouTube Shorts with scripts, voice, captions, stock montage, AI clipping, music, and optional YouTube publishing.",
+    "OrzuAi is an AI creator studio for video, YouTube Shorts, clipping, presentations, media search, and YouTube publishing.",
   applicationName: "OrzuAi",
   keywords: [
     "OrzuAi",
     "AI YouTube Shorts",
     "AI video generator",
+    "AI video",
+    "AI clipping",
+    "AI presentation",
     "YouTube Shorts automation",
-    "AI clipping tool",
     "auto publish Shorts",
+    "photo search",
+    "video search",
+    "ИИ видео",
+    "ИИ YouTube Shorts",
+    "ИИ клиппинг",
+    "ИИ презентация",
+    "поиск фото",
+    "поиск видео",
     "creator AI studio",
-    "short form video AI",
   ],
   authors: [{ name: "OrzuAi", url: "https://www.orzuai.com" }],
   creator: "OrzuAi",
@@ -63,9 +72,9 @@ export const metadata: Metadata = {
     shortcut: ["/favicon.ico"],
   },
   openGraph: {
-    title: "OrzuAi — AI YouTube Shorts Studio",
+    title: "OrzuAi — AI Creator Studio",
     description:
-      "Train once. OrzuAi creates and publishes YouTube Shorts with AI scripts, voice, media, and scheduling.",
+      "Create AI video, Shorts, clips, and presentations — one studio for modern creators.",
     url: "https://www.orzuai.com",
     siteName: "OrzuAi",
     locale: "en_US",
@@ -115,7 +124,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0c0c0c",
+  themeColor: "#f5f6f8",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

@@ -36,9 +36,20 @@ export async function ChannelStudioPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
+  let draftsQuery = supabase
+    .from("video_jobs")
+    .select(
+      "id,status,title,script_text,youtube_url,youtube_video_id,error_message,scheduled_for,created_at,completed_at,thumbnail_url,preview_url,view_count,like_count,comment_count,duration_seconds,metadata",
+    )
+    .eq("user_id", user!.id)
+    .eq("status", "ready")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
   if (active?.channel_id) {
     publishedQuery = publishedQuery.eq("youtube_channel_id", active.channel_id);
     queueQuery = queueQuery.eq("youtube_channel_id", active.channel_id);
+    draftsQuery = draftsQuery.eq("youtube_channel_id", active.channel_id);
   }
 
   const trainingQuery = active?.channel_id
@@ -71,12 +82,14 @@ export async function ChannelStudioPage() {
     { data: profile },
     { data: videos },
     { data: queue },
+    { data: drafts },
     { data: training },
     { data: schedule },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     publishedQuery,
     queueQuery,
+    draftsQuery,
     trainingQuery,
     scheduleQuery,
   ]);
@@ -140,6 +153,7 @@ export async function ChannelStudioPage() {
     <ChannelStudio
       profile={safe}
       videos={videoList}
+      drafts={(drafts as VideoJob[]) || []}
       initialQueue={(queue as VideoJob[]) || []}
       isTrained={Boolean(training?.is_trained)}
       aiContentEnabled={Boolean(

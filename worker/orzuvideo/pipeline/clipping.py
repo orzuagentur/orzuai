@@ -114,6 +114,7 @@ def pick_clip_window(
     instructions: str | None,
     user_id: str,
     job_id: str,
+    virality_mode: bool = False,
 ) -> tuple[float, float, str]:
     """
     Choose [start, end] for a viral short.
@@ -125,21 +126,33 @@ def pick_clip_window(
 
     fallback_start = max(0.0, min(source_duration * 0.12, source_duration - target))
     fallback_end = min(source_duration, fallback_start + target)
+    if virality_mode:
+        # Prefer an earlier hook window for boom-boom openings
+        fallback_start = max(0.0, min(source_duration * 0.04, source_duration - target))
+        fallback_end = min(source_duration, fallback_start + target)
 
     if not (transcript or "").strip() and not (instructions or "").strip():
         return fallback_start, fallback_end, "AI Clip"
 
     client = OpenAI(api_key=settings.openai_api_key)
+    viral_rules = (
+        "VIRALITY MODE ON: start on the strongest hook in the FIRST second. "
+        "Prefer shock, surprise, emotion peak, or a line that stops the scroll. "
+        "Title must be punchy and clickable.\n"
+        if virality_mode
+        else "Prefer a strong hook near the start of the chosen window.\n"
+    )
     prompt = (
         "You pick the best viral short clip from a longer video.\n"
         f"Source duration seconds: {source_duration:.1f}\n"
         f"Target clip length seconds: {target:.0f}\n"
-        f"Optional editor notes: {(instructions or 'none').strip()[:500]}\n\n"
+        f"Optional editor notes: {(instructions or 'none').strip()[:500]}\n"
+        f"{viral_rules}\n"
         "Transcript (may be partial):\n"
         f"{(transcript or '(no speech detected)')[:6000]}\n\n"
         "Return ONLY compact JSON:\n"
         '{"start": <seconds>, "title": "<short catchy title max 70 chars>"}\n'
-        "Rules: start >= 0, start + target <= source duration, prefer a strong hook."
+        "Rules: start >= 0, start + target <= source duration."
     )
     try:
         response = client.chat.completions.create(
@@ -147,11 +160,16 @@ def pick_clip_window(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a viral short-form video editor. Reply with JSON only.",
+                    "content": (
+                        "You are a viral short-form video editor focused on "
+                        "hook-first retention. Reply with JSON only."
+                        if virality_mode
+                        else "You are a viral short-form video editor. Reply with JSON only."
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.4,
+            temperature=0.55 if virality_mode else 0.4,
             response_format={"type": "json_object"},
         )
         usage = response.usage
@@ -166,7 +184,7 @@ def pick_clip_window(
                 cost_usd=estimate_openai_cost(
                     usage.prompt_tokens or 0, usage.completion_tokens or 0
                 ),
-                meta={"model": settings.openai_model},
+                meta={"model": settings.openai_model, "virality": virality_mode},
             )
         raw = (response.choices[0].message.content or "").strip()
         data = json.loads(raw)
@@ -244,10 +262,15 @@ def reframe_clip(
     width: int,
     height: int,
     effects: bool,
+    effect_id: str | None = None,
+    punch_open: bool = False,
+    motion_ids: list[str] | None = None,
+    flash_in: bool = False,
 ) -> Path:
-    """Center-crop / pad to target aspect with optional grade + locked CFR timebase."""
+    """Center-crop / pad to target aspect with optional grade + motion + locked CFR."""
     from orzuvideo.config import settings
-    from orzuvideo.pipeline.fx_library import EFFECT_FILTERS
+    from orzuvideo.pipeline.fx_library import EFFECT_FILTERS, effect_chain, motion_by_id
+    from orzuvideo.pipeline.montage import pick_motion
     import random
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -260,18 +283,52 @@ def reframe_clip(
     if effects:
         try:
             dur = ffprobe_duration(source)
-            fade_out = max(0.2, dur - 0.4)
-            grades = [
-                v
-                for k, v in EFFECT_FILTERS.items()
-                if k not in ("none",) and v
-            ]
-            grade = random.choice(grades) if grades else "eq=contrast=1.08:saturation=1.12"
+            fade_out = max(0.15, dur - 0.28)
+            chosen = (effect_id or "").strip()
+            if chosen and chosen != "none" and chosen in EFFECT_FILTERS and EFFECT_FILTERS[chosen]:
+                grade = EFFECT_FILTERS[chosen]
+            else:
+                chain = effect_chain(chosen) if chosen else ""
+                if chain:
+                    grade = chain
+                else:
+                    grades = [
+                        v
+                        for k, v in EFFECT_FILTERS.items()
+                        if k not in ("none",) and v
+                    ]
+                    grade = (
+                        random.choice(grades)
+                        if grades
+                        else "eq=contrast=1.08:saturation=1.12"
+                    )
+            motion = None
+            if punch_open:
+                motion = motion_by_id("punch_in") or pick_motion(punch=True)
+            elif motion_ids:
+                allowed = [m for m in motion_ids if motion_by_id(m)]
+                if allowed:
+                    motion = motion_by_id(random.choice(allowed))
+                else:
+                    motion = pick_motion(allowed_ids=None)
+            zoom = ""
+            if motion:
+                zoom = (
+                    f"zoompan=z='{motion['zoom']}':d=1:"
+                    f"x='{motion['x']}':y='{motion['y']}':"
+                    f"s={width}x{height}:fps={fps},"
+                )
+            fade_in = "0.08" if (punch_open or flash_in) else "0.18"
+            flash_part = (
+                "fade=t=in:st=0:d=0.09:color=white," if flash_in else ""
+            )
             vf = (
                 f"{base},"
+                f"{zoom}"
                 f"{grade},"
-                "fade=t=in:st=0:d=0.2,"
-                f"fade=t=out:st={fade_out:.3f}:d=0.35,"
+                f"{flash_part}"
+                f"fade=t=in:st=0:d={fade_in},"
+                f"fade=t=out:st={fade_out:.3f}:d=0.28,"
                 f"{tb}"
             )
         except Exception:
@@ -462,12 +519,40 @@ def has_meaningful_speech(transcript: str, words: list[WordTiming]) -> bool:
     return len(words) >= 12
 
 
+def split_viral_beats(
+    source: Path,
+    work_dir: Path,
+    *,
+    beat_sec: float = 1.05,
+    max_beats: int = 48,
+) -> list[Path]:
+    """Chop a clip into ~1s boom-boom segments for virality mode."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    dur = ffprobe_duration(source)
+    beat = max(0.75, min(1.35, float(beat_sec)))
+    if dur < beat * 2.2:
+        return [source]
+    n = min(max_beats, max(2, int(dur / beat)))
+    chunk = dur / n
+    out: list[Path] = []
+    for i in range(n):
+        start = i * chunk
+        length = chunk if i < n - 1 else max(0.5, dur - start)
+        path = work_dir / f"beat_{i:02d}.mp4"
+        cut_segment(source, start, length, path)
+        out.append(path)
+    return out
+
+
 def concat_av_clips(
     clips: list[Path],
     out: Path,
     *,
     work_dir: Path,
     use_transitions: bool = True,
+    preferred_transition: str | None = None,
+    flash_cuts: bool = False,
+    overlap: float | None = None,
 ) -> Path:
     """Join AV clips with optional xfade / acrossfade, else hard concat."""
     from orzuvideo.pipeline.montage import concat_with_pro_transitions, pick_transition
@@ -517,7 +602,8 @@ def concat_av_clips(
     fps = settings.fps
     w, h = settings.output_width, settings.output_height
     durations = [ffprobe_duration(c) for c in clips]
-    overlap = 0.45
+    ov = float(overlap) if overlap is not None else (0.28 if flash_cuts else 0.45)
+    ov = max(0.18, min(0.55, ov))
     inputs: list[str] = []
     for c in clips:
         inputs.extend(["-i", str(c)])
@@ -535,15 +621,19 @@ def concat_av_clips(
 
     v_filters: list[str] = []
     a_filters: list[str] = []
-    offset = max(0.05, durations[0] - overlap)
+    offset = max(0.05, durations[0] - ov)
     prev_v = "[pv0]"
     prev_a = "[pa0]"
     last_tr: str | None = None
 
     for i in range(1, len(clips)):
-        tr = pick_transition(exclude=last_tr)
+        tr = pick_transition(
+            exclude=last_tr,
+            preferred=preferred_transition,
+            flash_cuts=flash_cuts,
+        )
         last_tr = tr
-        dur = min(overlap, 0.6)
+        dur = min(ov, 0.55)
         raw_v = f"[vx{i}]"
         a_out = f"[a{i}]" if i < len(clips) - 1 else "[aout]"
         v_filters.append(
@@ -597,7 +687,7 @@ def concat_av_clips(
     except Exception as exc:
         print(f"[CLIPPING] AV xfade failed ({exc}); video-only concat")
         vid_only = work_dir / "vout_only.mp4"
-        concat_with_pro_transitions(clips, vid_only, overlap=overlap)
+        concat_with_pro_transitions(clips, vid_only, overlap=ov)
         audio = work_dir / "a0.aac"
         extract_clip_audio(clips[0], audio)
         mux_video_audio(vid_only, audio, out)

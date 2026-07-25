@@ -349,7 +349,8 @@ def build_short(
     voice_dur = ffprobe_duration(voice_path)
     frame = size or (settings.output_width, settings.output_height)
     pace = pace_profile(montage_pace)
-    flash_on = bool(flash_cuts) or float(pace.get("flash_bias") or 0) >= 0.5
+    # Training flash_cuts is authoritative (pace flash_bias only densifies when on)
+    flash_on = bool(flash_cuts)
 
     n = max(1, len(clips))
     overlap = float(pace.get("overlap") or 0.55) if n > 1 else 0.0
