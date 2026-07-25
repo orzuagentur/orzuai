@@ -176,6 +176,12 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
     use_voice = bool(meta0.get("use_voice", True))
     add_subtitles = bool(meta0.get("add_subtitles", True))
     subtitle_style = str(meta0.get("subtitle_style") or "classic").strip() or "classic"
+    try:
+        from orzuvideo.pipeline.fx_library import normalize_subtitle_style
+
+        subtitle_style = normalize_subtitle_style(subtitle_style)
+    except Exception:
+        pass
     voice_id = str(meta0.get("voice_id") or settings.elevenlabs_voice_id or "").strip()
     music_track_id = str(meta0.get("music_track_id") or "").strip() or None
     music_group = str(meta0.get("music_group") or "").strip() or None
@@ -560,6 +566,12 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
     caption_text = str(meta0.get("caption_text") or "").strip()
     text_style = str(meta0.get("text_style") or "bold_center").strip()
     subtitle_style = str(meta0.get("subtitle_style") or "classic").strip()
+    try:
+        from orzuvideo.pipeline.fx_library import normalize_subtitle_style
+
+        subtitle_style = normalize_subtitle_style(subtitle_style)
+    except Exception:
+        pass
     preferred_transition = str(meta0.get("preferred_transition") or "fade").strip()
     music_mode = str(meta0.get("music_mode") or "none").strip()
     music_track_id = str(meta0.get("music_track_id") or "").strip() or None
@@ -568,10 +580,37 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
     except (TypeError, ValueError):
         music_volume = 0.45
     keep_original = bool(meta0.get("keep_original_audio", True))
+    try:
+        playback_speed = float(meta0.get("playback_speed") or 1.0)
+    except (TypeError, ValueError):
+        playback_speed = 1.0
+    flip_h = bool(meta0.get("flip_h", False))
+    flip_v = bool(meta0.get("flip_v", False))
+    try:
+        zoom = float(meta0.get("zoom") or 1.0)
+    except (TypeError, ValueError):
+        zoom = 1.0
+    try:
+        brightness = float(meta0.get("brightness") or 0.0)
+    except (TypeError, ValueError):
+        brightness = 0.0
+    try:
+        contrast = float(meta0.get("contrast") or 1.0)
+    except (TypeError, ValueError):
+        contrast = 1.0
+    try:
+        saturation = float(meta0.get("saturation") or 1.0)
+    except (TypeError, ValueError):
+        saturation = 1.0
+    try:
+        voice_volume = float(meta0.get("voice_volume") or 1.05)
+    except (TypeError, ValueError):
+        voice_volume = 1.05
 
     print(
         f"[REEDIT] job={job_id} effect={effect} motion={motion} "
-        f"transition={preferred_transition} music={music_mode} keep_audio={keep_original}"
+        f"transition={preferred_transition} music={music_mode} keep_audio={keep_original} "
+        f"speed={playback_speed} flip={flip_h}/{flip_v} zoom={zoom}"
     )
 
     db.update_job(sb, job_id, status="editing", metadata={**meta0})
@@ -579,14 +618,23 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
     trimmed = work / "trimmed.mp4"
     reedit_pipe.trim_clip(source, trimmed, start=trim_start, end=trim_end_f)
 
+    sped = work / "speed.mp4"
+    reedit_pipe.apply_speed(trimmed, sped, speed=playback_speed)
+
     looked = work / "look.mp4"
     reedit_pipe.apply_look(
-        trimmed,
+        sped,
         looked,
         effect=effect,
         motion=motion,
         intro_fade=intro_fade,
         outro_fade=outro_fade,
+        flip_h=flip_h,
+        flip_v=flip_v,
+        zoom=zoom,
+        brightness=brightness,
+        contrast=contrast,
+        saturation=saturation,
     )
 
     if overlay_text:
@@ -647,7 +695,7 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
             voice_duration=clip_len,
             music_volume_hook=max(0.2, min(1.0, music_volume + 0.1)),
             music_volume_body=max(0.15, min(1.0, music_volume)),
-            voice_volume=1.05 if keep_original else 0.05,
+            voice_volume=max(0.05, min(1.4, voice_volume)) if keep_original else 0.05,
         )
     else:
         mixed_a = voice_a
@@ -1113,6 +1161,7 @@ def _process_job(job: dict) -> None:
 
         db.update_job(sb, job_id, status="fetching_media")
         pexels_ids: list[str] = []
+        source_clips: list[dict] = []
         if is_emoji_video:
             bg_colors = script_data.get("background_colors") or []
             voice_dur = ffprobe_duration(voice_path)
@@ -1124,6 +1173,20 @@ def _process_job(job: dict) -> None:
                 size=(out_w, out_h),
                 duration_each=plate_dur,
             )
+            for i, color in enumerate(
+                (bg_colors if isinstance(bg_colors, list) else [])[:clip_count]
+            ):
+                source_clips.append(
+                    {
+                        "id": f"bg-{i}",
+                        "provider": "emoji_bg",
+                        "kind": "background",
+                        "thumb": None,
+                        "color": str(color),
+                        "label": f"BG {i + 1}",
+                        "query": str(color),
+                    }
+                )
             print(
                 f"[EMOJI] solid/gradient plates={len(clips)} "
                 f"colors={bg_colors!r} (no Pexels video)"
@@ -1144,7 +1207,7 @@ def _process_job(job: dict) -> None:
                 queries = ["cinematic b-roll"]
             # Shuffle so we don't always pull the same first query's clips
             random.shuffle(queries)
-            clips, pexels_ids = download_stock_clips(
+            clips, pexels_ids, clip_meta = download_stock_clips(
                 queries,
                 work / "clips",
                 count=clip_count,
@@ -1157,6 +1220,7 @@ def _process_job(job: dict) -> None:
                     else "portrait"
                 ),
             )
+            source_clips = clip_meta
             for pid in pexels_ids:
                 db.record_media_usage(
                     sb,
@@ -1226,16 +1290,41 @@ def _process_job(job: dict) -> None:
                 {k: (str(v) if k == "path" else v) for k, v in ov.items()}
                 for ov in visual_overlays
             ]
+            for i, ov in enumerate(resolved_visual_overlays):
+                source_clips.append(
+                    {
+                        "id": f"overlay-{i}-{ov.get('asset_id') or ov.get('query') or i}",
+                        "provider": ov.get("provider") or "overlay",
+                        "kind": ov.get("kind") or "emoji",
+                        "thumb": ov.get("source_url"),
+                        "label": ov.get("label") or ov.get("query") or f"Overlay {i + 1}",
+                        "query": ov.get("query"),
+                    }
+                )
         description = script_data["description"]
+        # AI Training wins for all montage look settings (subtitle, grade, pace, FX)
+        from orzuvideo.pipeline.fx_library import resolve_training_montage
+
+        look = resolve_training_montage(
+            training, script_data=script_data, meta0=meta0
+        )
+        subtitle_style = str(look["subtitle_style"] or "classic")
         meta = {
             **meta0,
             "hook": script_data["hook"],
             "pexels_queries": script_data.get("pexels_queries") or [],
             "pexels_ids": pexels_ids,
+            "source_clips": source_clips,
             "background_colors": script_data.get("background_colors") or [],
             "video_type": script_data.get("video_type") or video_type,
             "asset_overlays": script_data.get("asset_overlays") or [],
             "resolved_asset_overlays": resolved_visual_overlays,
+            "subtitle_style": look["subtitle_style"],
+            "visual_effect": look["visual_effect"],
+            "preferred_transition": look["preferred_transition"],
+            "montage_pace": look["montage_pace"],
+            "flash_cuts": look["flash_cuts"],
+            "video_style": str(training.get("video_style") or "").strip() or None,
             "music": {
                 "id": library_track.id,
                 "name": library_track.name,
@@ -1256,11 +1345,6 @@ def _process_job(job: dict) -> None:
         # 4) Edit
         db.update_job(sb, job_id, status="editing")
         out_video = work / "short_final.mp4"
-        # Prefer AI Training subtitle style; fall back to script / job metadata
-        train_sub = str(training.get("subtitle_style") or "").strip()
-        script_sub = str(script_data.get("subtitle_style") or "").strip()
-        meta_sub = str(meta0.get("subtitle_style") or "").strip()
-        subtitle_style = train_sub or script_sub or meta_sub or "classic"
 
         allowed_transitions = montage.get("enabled_transitions")
         if not isinstance(allowed_transitions, list):
@@ -1292,17 +1376,19 @@ def _process_job(job: dict) -> None:
             voice_volume=voice_vol,
             size=(out_w, out_h),
             subtitle_style=subtitle_style,
-            visual_effect=str(
-                script_data.get("visual_effect")
-                or meta0.get("visual_effect")
-                or meta0.get("effect")
-                or "cinematic"
-            ),
+            visual_effect=str(look["visual_effect"] or "cinematic"),
             punch_first_clip=punch_first,
             motions_enabled=motions_on,
             allowed_motions=allowed_motions,
             transitions_enabled=transitions_on,
             allowed_transitions=allowed_transitions,
+            preferred_transition=(
+                str(look["preferred_transition"]).strip()
+                if look.get("preferred_transition")
+                else None
+            ),
+            montage_pace=str(look["montage_pace"] or "medium"),
+            flash_cuts=bool(look["flash_cuts"]),
             visual_overlays=visual_overlays,
         )
         db.update_job(sb, job_id, video_path=str(out_video), voice_path=str(voice_path))

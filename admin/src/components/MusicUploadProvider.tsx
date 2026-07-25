@@ -122,6 +122,7 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
         let skipped = 0;
         let uploadIndex = 0;
         const uploadTotal = unique.length || 1;
+        let lastError: string | undefined;
 
         for (const { file, hash } of unique) {
           uploadIndex += 1;
@@ -152,6 +153,7 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
           } catch (e) {
             console.error(e);
             failed += 1;
+            lastError = e instanceof Error ? e.message : "Upload failed";
           }
           patchJob(id, {
             processed: uploadIndex,
@@ -160,17 +162,19 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
             skipped,
             folderDuplicates,
             failed,
+            error: lastError,
           });
         }
 
         patchJob(id, {
-          status: "done",
+          status: failed > 0 && uploaded === 0 ? "error" : "done",
           processed: n,
           pct: 100,
           uploaded,
           skipped,
           folderDuplicates,
           failed,
+          error: lastError,
         });
       } catch (e) {
         patchJob(id, {

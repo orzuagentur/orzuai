@@ -2,13 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 import { useToast } from "@/components/ToastNotice";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoJob } from "@/lib/types";
+import {
+  deletePresentationLibraryItem,
+  fetchPresentationLibrary,
+  setActivePresentationId,
+  type PresentationLibraryItem,
+} from "@/lib/presentation/library";
 
-type LibTab = "clips" | "videos" | "favorites";
+type LibTab = "clips" | "videos" | "favorites" | "presentations";
 
 type FavoriteItem = {
   id: string;
@@ -112,6 +118,44 @@ function FavHeart({
         <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
       </svg>
     </button>
+  );
+}
+
+/** Card media surface — div, not button (FavHeart / CardMenu nest inside). */
+function MediaCardHit({
+  className,
+  onClick,
+  disabled,
+  children,
+  label,
+}: {
+  className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  label?: string;
+}) {
+  return (
+    <div
+      role={onClick && !disabled ? "button" : undefined}
+      tabIndex={onClick && !disabled ? 0 : undefined}
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      className={className}
+      onClick={() => {
+        if (disabled || !onClick) return;
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (disabled || !onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -222,17 +266,28 @@ function LibraryMediaModal({
 }
 
 function parseTab(raw: string | null): LibTab {
-  if (raw === "videos" || raw === "favorites" || raw === "clips") return raw;
+  if (
+    raw === "videos" ||
+    raw === "favorites" ||
+    raw === "clips" ||
+    raw === "presentations"
+  ) {
+    return raw;
+  }
   return "clips";
 }
 
 export function LibraryStudio() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tab = parseTab(searchParams.get("tab"));
   const { show: toast, notice } = useToast();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [favs, setFavs] = useState<FavoriteItem[]>([]);
   const [favKeys, setFavKeys] = useState<Set<string>>(() => new Set());
+  const [presentations, setPresentations] = useState<PresentationLibraryItem[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [openMedia, setOpenMedia] = useState<OpenMedia | null>(null);
@@ -283,10 +338,42 @@ export function LibraryStudio() {
   }, [loadJobs, loadFavs]);
 
   useEffect(() => {
+    if (tab !== "presentations") return;
+    let cancelled = false;
+    void (async () => {
+      const items = await fetchPresentationLibrary();
+      if (!cancelled) setPresentations(items);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
+
+  useEffect(() => {
     return () => {
       audio?.pause();
     };
   }, [audio]);
+
+  function openPresentation(item: PresentationLibraryItem) {
+    setActivePresentationId(item.id);
+    const from = "from=vault";
+    if (item.source === "ai") {
+      router.push(
+        `/dashboard/creators/presentation?id=${encodeURIComponent(item.id)}&${from}`,
+      );
+      return;
+    }
+    router.push(
+      `/dashboard/creators/presentation?id=${encodeURIComponent(item.id)}&${from}`,
+    );
+  }
+
+  async function removePresentation(id: string) {
+    await deletePresentationLibraryItem(id);
+    setPresentations(await fetchPresentationLibrary());
+    toast("Presentation removed", "ok");
+  }
 
   const clips = useMemo(
     () => jobs.filter((j) => isClippingJob(j)),
@@ -447,7 +534,9 @@ export function LibraryStudio() {
       ? "My clips"
       : tab === "videos"
         ? "My videos"
-        : "Favorites";
+        : tab === "presentations"
+          ? "My presentations"
+          : "Favorites";
 
   return (
     <div className="flex w-full flex-col gap-4 pb-16">
@@ -461,6 +550,70 @@ export function LibraryStudio() {
 
       {loading ? (
         <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+      ) : tab === "presentations" ? (
+        presentations.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center">
+            <p className="text-sm text-[color:var(--muted)]">
+              No presentations yet. Create one in Classic or AI Presentation.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Link
+                href="/dashboard/creators/presentation"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-black"
+                style={{ background: "#E8A54B" }}
+              >
+                Classic presentation
+              </Link>
+              <Link
+                href="/dashboard/creators/ai-presentation"
+                className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--fg)]"
+              >
+                AI Presentation
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <ul className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 md:grid-cols-3">
+            {presentations.map((item) => (
+              <li
+                key={item.id}
+                className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-black/25"
+              >
+                <MediaCardHit
+                  className="relative aspect-[16/10] w-full cursor-pointer bg-gradient-to-br from-[rgba(232,165,75,0.2)] to-black/40 text-left"
+                  onClick={() => openPresentation(item)}
+                  label={item.title || "Open presentation"}
+                >
+                  <div className="absolute inset-0 flex flex-col justify-end p-3">
+                    <p className="line-clamp-2 text-sm font-semibold text-white">
+                      {item.title || "Untitled"}
+                    </p>
+                    <p className="mt-1 text-[11px] text-white/70">
+                      {item.source === "ai" ? "AI" : "Classic"} ·{" "}
+                      {item.format.toUpperCase()} ·{" "}
+                      {item.slideCount || item.doc.slides.length} slides
+                    </p>
+                  </div>
+                  <CardMenuSlot>
+                    <CardMenu
+                      items={[
+                        {
+                          label: "Open",
+                          onClick: () => openPresentation(item),
+                        },
+                        {
+                          label: "Delete",
+                          danger: true,
+                          onClick: () => void removePresentation(item.id),
+                        },
+                      ]}
+                    />
+                  </CardMenuSlot>
+                </MediaCardHit>
+              </li>
+            ))}
+          </ul>
+        )
       ) : tab === "favorites" ? (
         favs.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
@@ -477,11 +630,11 @@ export function LibraryStudio() {
                   key={`${item.kind}:${item.asset_id}`}
                   className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-black/25"
                 >
-                  <button
-                    type="button"
-                    className="relative aspect-square w-full bg-black/40 text-left"
+                  <MediaCardHit
+                    className="relative aspect-square w-full cursor-pointer bg-black/40 text-left disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => openFavorite(item)}
                     disabled={!canOpen && !item.preview_url}
+                    label={item.title || "Open favorite"}
                   >
                     {item.thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -539,7 +692,7 @@ export function LibraryStudio() {
                       {dur ? ` · ${dur}` : ""}
                       {playing ? " · playing" : ""}
                     </span>
-                  </button>
+                  </MediaCardHit>
                   <div className="min-w-0 space-y-0.5 px-2.5 py-2">
                     <p className="truncate text-xs font-semibold">
                       {item.title || "Untitled"}
@@ -575,10 +728,10 @@ export function LibraryStudio() {
                 key={job.id}
                 className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[color:var(--line)] bg-black/25"
               >
-                <button
-                  type="button"
-                  className="relative aspect-[9/16] w-full bg-black/40 text-left"
+                <MediaCardHit
+                  className="relative aspect-[9/16] w-full cursor-pointer bg-black/40 text-left"
                   onClick={() => openJob(job, studioHref)}
+                  label={job.title || "Open video"}
                 >
                   {job.thumbnail_url || canWatch ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -635,7 +788,7 @@ export function LibraryStudio() {
                       </span>
                     </span>
                   )}
-                </button>
+                </MediaCardHit>
                 <div className="min-w-0 space-y-0.5 px-2.5 py-2">
                   <p className="truncate text-xs font-semibold">
                     {job.title || "Untitled"}

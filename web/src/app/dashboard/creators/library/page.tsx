@@ -1,5 +1,15 @@
-import { CreatorsStudio } from "@/components/CreatorsStudio";
+import { redirect } from "next/navigation";
+import { isStudioKind } from "@/lib/studio-kind";
 
-export default function CreatorsLibraryPage() {
-  return <CreatorsStudio />;
+/** Legacy entry → dedicated /library/[kind] pages. */
+export default async function CreatorsLibraryIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ kind?: string }>;
+}) {
+  const sp = await searchParams;
+  const kind = String(sp.kind || "photos").toLowerCase();
+  redirect(
+    `/dashboard/creators/library/${isStudioKind(kind) ? kind : "photos"}`,
+  );
 }

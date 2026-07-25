@@ -39,6 +39,42 @@ export const SUBTITLE_PREVIEW_BG: Record<SubtitleStyleId, string> = {
     "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=480&h=480&q=80",
   hook_banner:
     "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=480&h=480&q=80",
+  cyan_glow:
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=480&h=480&q=80",
+  fire_orange:
+    "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=480&h=480&q=80",
+  lime_pulse:
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=480&h=480&q=80",
+  comic_pop:
+    "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&w=480&h=480&q=80",
+  glass_frost:
+    "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=480&h=480&q=80",
+  serif_clean:
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=480&h=480&q=80",
+  stack_outline:
+    "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=480&h=480&q=80",
+  typewriter:
+    "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=480&h=480&q=80",
+  viral_white:
+    "https://images.unsplash.com/photo-1516280440612-907644e9deba?auto=format&fit=crop&w=480&h=480&q=80",
+  duotone_sub:
+    "https://images.unsplash.com/photo-1550684848-89b6e8f564f8?auto=format&fit=crop&w=480&h=480&q=80",
+  neon_cyan:
+    "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=480&h=480&q=80",
+  soft_white:
+    "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=480&h=480&q=80",
+  mint_clean:
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=480&h=480&q=80",
+  purple_wave:
+    "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=480&h=480&q=80",
+  newspaper:
+    "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=480&h=480&q=80",
+  street_graffiti:
+    "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=480&h=480&q=80",
+  elegant_gold:
+    "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=480&h=480&q=80",
+  bold_white:
+    "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=480&h=480&q=80",
 };
 
 /** Map legacy training ids → current catalog */
@@ -126,6 +162,135 @@ export function liveSubtitleStyle(style: SubtitleStyleId): CSSProperties {
         color: "var(--accent)",
         fontSize: "0.72rem",
         textShadow: "0 2px 6px #000",
+      };
+    case "cyan_glow":
+      return {
+        ...base,
+        color: "#66E0FF",
+        textShadow: "0 0 12px #00AAFF, 0 2px 4px #000",
+      };
+    case "fire_orange":
+      return {
+        ...base,
+        color: "#FFA500",
+        textShadow: "0 0 10px #FF4500, 0 2px 4px #000",
+      };
+    case "lime_pulse":
+      return {
+        ...base,
+        color: "#99FF00",
+        textShadow: "0 2px 6px #000",
+      };
+    case "comic_pop":
+      return {
+        ...base,
+        color: "#fff",
+        textShadow: "3px 3px 0 #FF0000, -1px -1px 0 #000",
+      };
+    case "glass_frost":
+      return {
+        ...base,
+        color: "#fff",
+        background: "rgba(26,26,46,0.65)",
+        borderRadius: 8,
+        padding: "4px 10px",
+        display: "inline-block",
+      };
+    case "serif_clean":
+      return {
+        ...base,
+        color: "#f8f8f8",
+        fontWeight: 500,
+        fontFamily: "Georgia, serif",
+        textShadow: "0 1px 4px #000",
+      };
+    case "stack_outline":
+      return {
+        ...base,
+        color: "transparent",
+        WebkitTextStroke: "1.5px #fff",
+        textShadow: "none",
+      };
+    case "typewriter":
+      return {
+        ...base,
+        color: "#e8e8e8",
+        fontWeight: 500,
+        fontFamily: "Courier New, monospace",
+        letterSpacing: "0.04em",
+      };
+    case "viral_white":
+      return {
+        ...base,
+        color: "#fff",
+        fontSize: "0.78rem",
+        textShadow: "2px 2px 0 #000, -2px -2px 0 #000, 0 0 0 3px #000",
+      };
+    case "duotone_sub":
+      return {
+        ...base,
+        color: "#FFCC66",
+        textShadow: "0 0 8px #AA4400, 0 2px 4px #000",
+      };
+    case "neon_cyan":
+      return {
+        ...base,
+        color: "#60E0FF",
+        textShadow: "0 0 12px #FF0080, 0 2px 4px #000",
+      };
+    case "soft_white":
+      return {
+        ...base,
+        color: "#fff",
+        fontWeight: 500,
+        background: "rgba(0,0,0,0.45)",
+        borderRadius: 6,
+        padding: "4px 8px",
+        display: "inline-block",
+      };
+    case "mint_clean":
+      return {
+        ...base,
+        color: "#C8FFD0",
+        textShadow: "0 2px 4px #204030",
+      };
+    case "purple_wave":
+      return {
+        ...base,
+        color: "#FFB0E0",
+        textShadow: "0 0 10px #600080, 0 2px 4px #000",
+      };
+    case "newspaper":
+      return {
+        ...base,
+        color: "#f5f5f5",
+        fontWeight: 500,
+        fontFamily: "Georgia, serif",
+        background: "rgba(0,0,0,0.55)",
+        padding: "4px 8px",
+        display: "inline-block",
+      };
+    case "street_graffiti":
+      return {
+        ...base,
+        color: "#80FF00",
+        fontSize: "0.78rem",
+        textShadow: "3px 3px 0 #000",
+      };
+    case "elegant_gold":
+      return {
+        ...base,
+        color: "#FFD400",
+        fontWeight: 500,
+        fontFamily: "Georgia, serif",
+        textShadow: "0 2px 6px #201000",
+      };
+    case "bold_white":
+      return {
+        ...base,
+        color: "#fff",
+        fontSize: "0.78rem",
+        textShadow: "2px 2px 0 #000, -1px -1px 0 #000",
       };
     default:
       return {

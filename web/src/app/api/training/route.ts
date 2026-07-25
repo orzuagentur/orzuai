@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 import { trainingRequiredComplete } from "@/lib/training-required";
-import { SUBTITLE_STYLE_IDS } from "@/lib/editor-catalog";
+import { EFFECT_IDS, SUBTITLE_STYLE_IDS, TRANSITION_IDS } from "@/lib/editor-catalog";
 import type { AiTraining } from "@/lib/types";
 
 function normalizeSubtitleStyle(raw: string): string {
@@ -10,6 +10,23 @@ function normalizeSubtitleStyle(raw: string): string {
   if (SUBTITLE_STYLE_IDS.has(v)) return v;
   if (v === "karaoke_bold" || v === "karaoke") return "karaoke_gold";
   return "classic";
+}
+
+function normalizeVisualEffect(raw: string): string {
+  const v = String(raw || "").trim() || "cinematic";
+  return EFFECT_IDS.has(v) ? v : "cinematic";
+}
+
+function normalizeTransition(raw: string): string {
+  const v = String(raw || "").trim();
+  if (!v) return "";
+  return TRANSITION_IDS.has(v) ? v : "";
+}
+
+function normalizeMontagePace(raw: string): string {
+  const v = String(raw || "").trim().toLowerCase() || "medium";
+  if (["viral", "fast", "medium", "cinematic"].includes(v)) return v;
+  return "medium";
 }
 
 function normalizeVideoFormat(raw: string): string {
@@ -66,6 +83,10 @@ export async function POST(request: Request) {
         : undefined,
     voice_id: String(body.voice_id || "").trim(),
     subtitle_style: normalizeSubtitleStyle(String(body.subtitle_style || "classic")),
+    visual_effect: normalizeVisualEffect(String(body.visual_effect || "cinematic")),
+    preferred_transition: normalizeTransition(String(body.preferred_transition || "")),
+    montage_pace: normalizeMontagePace(String(body.montage_pace || "medium")),
+    flash_cuts: Boolean(body.flash_cuts),
     duration_seconds: clampTrainingDuration(
       Number(body.duration_seconds) || 45,
       String(body.video_format || "shorts"),
@@ -125,6 +146,18 @@ export async function POST(request: Request) {
         : {},
     voice_id: formLike.voice_id,
     subtitle_style: normalizeSubtitleStyle(formLike.subtitle_style || "classic"),
+    visual_effect: normalizeVisualEffect(
+      String(body.visual_effect || formLike.visual_effect || "cinematic"),
+    ),
+    preferred_transition: normalizeTransition(
+      String(body.preferred_transition ?? formLike.preferred_transition ?? ""),
+    ),
+    montage_pace: normalizeMontagePace(
+      String(body.montage_pace || formLike.montage_pace || "medium"),
+    ),
+    flash_cuts: Boolean(
+      body.flash_cuts ?? formLike.flash_cuts ?? false,
+    ),
     duration_seconds: clampTrainingDuration(
       formLike.duration_seconds,
       formLike.video_format,
@@ -139,6 +172,20 @@ export async function POST(request: Request) {
     is_trained: true,
   };
 
+  const montageLook = {
+    visual_effect: payload.visual_effect,
+    preferred_transition: payload.preferred_transition,
+    montage_pace: payload.montage_pace,
+    flash_cuts: payload.flash_cuts,
+  };
+  // Always mirror into music_prefs so worker works even before DB migration
+  const prefsObj =
+    payload.music_prefs && typeof payload.music_prefs === "object"
+      ? { ...(payload.music_prefs as Record<string, unknown>) }
+      : {};
+  prefsObj.montage_look = montageLook;
+  payload.music_prefs = prefsObj;
+
   const { data: existing } = await supabase
     .from("ai_training")
     .select("id")
@@ -146,14 +193,23 @@ export async function POST(request: Request) {
     .eq("youtube_channel_id", active.channel_id)
     .maybeSingle();
 
-  let error;
-  if (existing?.id) {
-    ({ error } = await supabase
-      .from("ai_training")
-      .update(payload)
-      .eq("id", existing.id));
-  } else {
-    ({ error } = await supabase.from("ai_training").insert(payload));
+  async function writePayload(body: Record<string, unknown>) {
+    if (existing?.id) {
+      return supabase.from("ai_training").update(body).eq("id", existing.id);
+    }
+    return supabase.from("ai_training").insert(body);
+  }
+
+  let { error } = await writePayload(payload);
+  if (error && /visual_effect|preferred_transition|montage_pace|flash_cuts/i.test(error.message)) {
+    const {
+      visual_effect: _ve,
+      preferred_transition: _pt,
+      montage_pace: _mp,
+      flash_cuts: _fc,
+      ...legacy
+    } = payload;
+    ({ error } = await writePayload(legacy));
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

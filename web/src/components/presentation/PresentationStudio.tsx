@@ -29,6 +29,11 @@ import {
   savePresentationDraft,
   type TextStyleId,
 } from "@/lib/presentation/factory";
+import {
+  fetchPresentationLibraryItem,
+  flushPresentationCloudSync,
+  savePresentationDocToLibrary,
+} from "@/lib/presentation/library";
 import { PRESENTATION_THEMES, getTheme } from "@/lib/presentation/themes";
 import type {
   ElementAnimation,
@@ -44,6 +49,7 @@ import { ObjectSettingsCard } from "./ObjectSettingsCard";
 import { PresentationElementView } from "./PresentationElementView";
 import { SlideResourcesPanel } from "./SlideResourcesPanel";
 import { SlideThumb } from "./SlideThumb";
+import { useSearchParams } from "next/navigation";
 
 type MediaProvider = "unsplash" | "pexels" | "upload";
 type DragMode = "move" | "resize" | null;
@@ -84,12 +90,18 @@ const SHAPES: { id: ShapeKind; label: string }[] = [
 ];
 
 const TEXT_STYLES: { id: TextStyleId; label: string; hint: string }[] = [
-  { id: "title", label: "Title", hint: "Hero headline" },
-  { id: "subtitle", label: "Subtitle", hint: "Secondary line" },
+  { id: "hero", label: "Hero", hint: "56px impact" },
+  { id: "display", label: "Display", hint: "48px big" },
+  { id: "title", label: "Title", hint: "40px headline" },
+  { id: "subtitle", label: "Subtitle", hint: "Secondary" },
+  { id: "kicker", label: "Kicker", hint: "Small caps" },
+  { id: "stat", label: "Stat", hint: "Big number" },
+  { id: "emphasis", label: "Emphasis", hint: "Key line" },
   { id: "body", label: "Body", hint: "Paragraph" },
   { id: "bullet", label: "Bullets", hint: "List points" },
   { id: "quote", label: "Quote", hint: "Pull quote" },
   { id: "caption", label: "Caption", hint: "Small note" },
+  { id: "label", label: "Label", hint: "Tiny tag" },
 ];
 
 const FONT_OPTIONS = [
@@ -129,6 +141,12 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export function PresentationStudio() {
+  const searchParams = useSearchParams();
+  const fromVault = searchParams.get("from") === "vault";
+  const backHref = fromVault
+    ? "/dashboard/favorites?tab=presentations"
+    : "/dashboard/creators";
+  const backLabel = fromVault ? "← My presentations" : "← Creators";
   const [doc, setDoc] = useState<PresentationDoc>(() => createNewPresentation());
   const [hydrated, setHydrated] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -183,16 +201,46 @@ export function PresentationStudio() {
   }, [exportOpen]);
 
   useEffect(() => {
-    const draft = loadPresentationDraft();
-    if (draft) setDoc(draft);
-    setHydrated(true);
+    let cancelled = false;
+    void (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (id) {
+        const item = await fetchPresentationLibraryItem(id);
+        if (cancelled) return;
+        if (item?.doc?.slides?.length) {
+          setDoc(item.doc);
+          setHydrated(true);
+          if (params.get("export") === "pdf") {
+            window.setTimeout(() => printPresentationPdf(), 500);
+          }
+          return;
+        }
+      }
+      const draft = loadPresentationDraft();
+      if (cancelled) return;
+      if (draft) setDoc(draft);
+      setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    const t = window.setTimeout(() => savePresentationDraft(doc), 400);
+    const t = window.setTimeout(() => {
+      savePresentationDraft(doc);
+      savePresentationDocToLibrary(doc);
+    }, 400);
     return () => window.clearTimeout(t);
   }, [doc, hydrated]);
+
+  useEffect(() => {
+    return () => {
+      void flushPresentationCloudSync();
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -542,11 +590,19 @@ export function PresentationStudio() {
       <div className="pres-studio flex h-[100dvh] flex-col overflow-hidden bg-[#0a0b0e]">
         <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--line)] bg-[var(--bg-elevated)] px-3 py-2">
           <Link
-            href="/dashboard/creators"
+            href={backHref}
             className="rounded-md px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
           >
-            ← Creators
+            {backLabel}
           </Link>
+          {!fromVault && (
+            <Link
+              href="/dashboard/favorites?tab=presentations"
+              className="rounded-md px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
+            >
+              My presentations
+            </Link>
+          )}
           <input
             className="field !w-auto min-w-[10rem] flex-1 !py-1.5 !text-sm sm:max-w-xs"
             value={doc.title}

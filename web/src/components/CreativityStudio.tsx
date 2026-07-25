@@ -19,6 +19,7 @@ import {
   statusColor,
 } from "@/lib/job-status";
 import { useToast } from "@/components/ToastNotice";
+import { useFeatureLocked } from "@/lib/product-locks-client";
 
 const ASPECTS = [
   { id: "9:16", label: "9:16", hint: "Vertical" },
@@ -40,7 +41,7 @@ const DURATIONS = [
 
 const VIDEO_TYPES = [
   { id: "standard", label: "Standard", hint: "Stock montage" },
-  { id: "emoji", label: "Emoji", hint: "Solid bg + emoji/icons" },
+  { id: "emoji", label: "Emoji", hint: "Big emoji storyboard" },
 ] as const;
 
 type Aspect = (typeof ASPECTS)[number]["id"];
@@ -180,6 +181,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   const [creating, setCreating] = useState(false);
   const { show: toast, notice } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const editorLocked = useFeatureLocked("video_editor");
 
   const activeJobs = useMemo(
     () => jobs.filter((j) => QUEUE_STATUSES.has(j.status)),
@@ -489,7 +491,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                         </div>
                       )}
 
-                      {canWatch && !failed && !busy && (
+                      {canWatch && !failed && !busy && !editorLocked && (
                         <a
                           href={`/dashboard/editor/${job.id}`}
                           className="absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
@@ -518,10 +520,14 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           items={[
                             ...(canWatch && !failed && !busy
                               ? [
-                                  {
-                                    label: "Edit",
-                                    href: `/dashboard/editor/${job.id}`,
-                                  },
+                                  ...(!editorLocked
+                                    ? [
+                                        {
+                                          label: "Edit",
+                                          href: `/dashboard/editor/${job.id}`,
+                                        },
+                                      ]
+                                    : []),
                                   {
                                     label: "Download",
                                     onClick: () =>

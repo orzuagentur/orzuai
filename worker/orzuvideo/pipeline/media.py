@@ -215,19 +215,36 @@ def write_ass_subtitles(
     play_res: tuple[int, int] | None = None,
     style_id: str = "classic",
 ) -> Path:
-    """Professional karaoke ASS + optional hook; CapCut-like subtitle styles."""
-    from orzuvideo.pipeline.fx_library import SUBTITLE_STYLES
+    """Professional karaoke ASS + optional hook; CapCut-like subtitle styles.
 
+    Hook and emphasis derive from the *selected* style so Training choices
+    are respected end-to-end (no forced karaoke_gold / hook_banner).
+    """
+    from orzuvideo.pipeline.fx_library import (
+        SUBTITLE_STYLES,
+        normalize_subtitle_style,
+    )
+
+    style_id = normalize_subtitle_style(style_id)
     emphasis_set = {e.upper().strip(".,!") for e in (emphasis or [])}
     play_w, play_h = play_res or (1080, 1920)
     margin_v = max(80, int(play_h * 0.27))
     hook_margin_v = max(120, int(play_h * 0.4))
     st = SUBTITLE_STYLES.get(style_id) or SUBTITLE_STYLES["classic"]
-    gold = SUBTITLE_STYLES.get("karaoke_gold") or st
-    hook = SUBTITLE_STYLES.get("hook_banner") or st
+    # Emphasis / hook: same family as selected style, slightly larger & punchier
+    emp = dict(st)
+    emp["size"] = str(min(110, int(st.get("size") or 72) + 8))
+    emp["outline_w"] = str(max(int(st.get("outline_w") or 4), 4))
+    emp["bold"] = "-1"
+    hook = dict(st)
+    hook["size"] = str(min(120, int(st.get("size") or 72) + 14))
+    hook["outline_w"] = str(max(int(st.get("outline_w") or 4) + 2, 6))
+    hook["bold"] = "-1"
     border_style = st.get("border_style", "1")
     back = st.get("back", "&H80000000")
     align = st.get("align", "2")
+    # ASS primary for emphasis punch — keep style colour, bump scale in tags
+    emp_primary = emp["primary"]
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -239,7 +256,7 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,{st['font']},{st['size']},{st['primary']},&H000000FF,{st['outline']},{back},{st['bold']},0,0,0,100,100,0,0,{border_style},{st['outline_w']},{st['shadow']},{align},60,60,{margin_v},1
-Style: Emphasis,{gold['font']},{gold['size']},{gold['primary']},&H000000FF,{gold['outline']},&H80000000,{gold['bold']},0,0,0,100,100,0,0,1,{gold['outline_w']},0,2,60,60,{margin_v},1
+Style: Emphasis,{emp['font']},{emp['size']},{emp_primary},&H000000FF,{emp['outline']},&H80000000,{emp['bold']},0,0,0,100,100,0,0,1,{emp['outline_w']},0,2,60,60,{margin_v},1
 Style: Hook,{hook['font']},{hook['size']},{hook['primary']},&H000000FF,{hook['outline']},&HA0000000,{hook['bold']},0,0,0,100,100,0,0,1,{hook['outline_w']},0,2,50,50,{hook_margin_v},1
 
 [Events]
@@ -275,7 +292,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         parts: list[str] = []
         for w in chunk:
             clean = w.word.strip(".,!?;:")
-            style_tag = r"{\c&H00E5FF&\fscx110\fscy110}" if clean.upper() in emphasis_set else ""
+            # Emphasis uses scale punch in the *same* primary colour as the style
+            style_tag = (
+                r"{\fscx118\fscy118\bord5}" if clean.upper() in emphasis_set else ""
+            )
             reset = r"{\r}" if style_tag else ""
             parts.append(
                 rf"{{\t({int(w.start*1000)},{int(w.end*1000)},\fscx120\fscy120)}}"

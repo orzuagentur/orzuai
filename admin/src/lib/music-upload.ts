@@ -12,6 +12,23 @@ export function isAudioFile(file: File): boolean {
   return AUDIO_RE.test(file.name);
 }
 
+/** Map browser/extension MIME to a stable type R2 + worker accept. */
+export function resolveAudioContentType(file: File): string {
+  const raw = (file.type || "").trim().toLowerCase();
+  if (raw.startsWith("audio/") || raw === "application/octet-stream") {
+    return raw || "audio/mpeg";
+  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".mp3")) return "audio/mpeg";
+  if (name.endsWith(".wav")) return "audio/wav";
+  if (name.endsWith(".m4a")) return "audio/mp4";
+  if (name.endsWith(".aac")) return "audio/aac";
+  if (name.endsWith(".flac")) return "audio/flac";
+  if (name.endsWith(".ogg")) return "audio/ogg";
+  if (name.endsWith(".opus")) return "audio/opus";
+  return "audio/mpeg";
+}
+
 function titleFromFilename(name: string): string {
   return (
     name
@@ -183,7 +200,7 @@ export async function uploadTrackToLibrary(opts: {
   const safeName = opts.file.name.replace(/[^\w.\-]+/g, "_").slice(0, 80);
   // Flat key under genre — no nested user folder names in R2
   const key = `${opts.userId}/music/${opts.genreId}/${crypto.randomUUID()}-${safeName}`;
-  const contentType = opts.file.type || "audio/mpeg";
+  const contentType = resolveAudioContentType(opts.file);
 
   const presignRes = await fetch("/api/storage/presign", {
     method: "POST",

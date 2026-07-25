@@ -1,6 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { VideoEditorStudio } from "@/components/VideoEditorStudio";
+import { UnderDevelopmentCard } from "@/components/UnderDevelopmentCard";
+import { getProductLocks } from "@/lib/product-locks-server";
+import { isFeatureLocked } from "@/lib/product-locks";
 import type { VideoJob } from "@/lib/types";
 
 export default async function EditorPage({
@@ -9,6 +12,17 @@ export default async function EditorPage({
   params: Promise<{ jobId: string }>;
 }) {
   const { jobId } = await params;
+  const locks = await getProductLocks();
+  if (isFeatureLocked(locks, "video_editor")) {
+    return (
+      <UnderDevelopmentCard
+        title="Video editor"
+        backHref="/dashboard"
+        backLabel="Back to Home"
+      />
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

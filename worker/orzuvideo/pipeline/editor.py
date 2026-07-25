@@ -151,28 +151,93 @@ def burn_subtitles_and_mux(
 
 
 def _overlay_xy(position: str) -> tuple[str, str]:
-    pos = (position or "top_right").strip().lower()
-    top_y = "main_h*0.08"
-    center_y = "main_h*0.42-overlay_h/2"
-    lower_y = "main_h*0.58-overlay_h/2"
-    left_x = "main_w*0.07"
+    """Place glyphs in the upper/mid frame so captions stay readable at bottom."""
+    pos = (position or "center").strip().lower()
+    top_y = "main_h*0.10"
+    mid_y = "main_h*0.34-overlay_h/2"
+    lower_y = "main_h*0.52-overlay_h/2"
+    left_x = "main_w*0.05"
     center_x = "(main_w-overlay_w)/2"
-    right_x = "main_w-overlay_w-main_w*0.07"
+    right_x = "main_w-overlay_w-main_w*0.05"
     if pos == "top_left":
         return left_x, top_y
     if pos == "top_center":
         return center_x, top_y
+    if pos == "top_right":
+        return right_x, top_y
     if pos == "center_left":
-        return left_x, center_y
+        return left_x, mid_y
     if pos == "center":
-        return center_x, center_y
+        return center_x, mid_y
     if pos == "center_right":
-        return right_x, center_y
+        return right_x, mid_y
     if pos == "bottom_left":
         return left_x, lower_y
     if pos == "bottom_right":
         return right_x, lower_y
-    return right_x, top_y
+    return center_x, mid_y
+
+
+def _overlay_anim_xy(
+    position: str,
+    start: float,
+    animation: str | None,
+) -> tuple[str, str]:
+    """Slide / drop overlays in from off-screen based on position or explicit anim."""
+    x_rest, y_rest = _overlay_xy(position)
+    pos = (position or "center").strip().lower()
+    anim = (animation or "auto").strip().lower()
+    d = 0.38
+    end_t = start + d
+
+    def _from_side(side: str) -> tuple[str, str]:
+        # progress 0→1 over [start, end_t]
+        p = f"((t-{start:.3f})/{d:.3f})"
+        if side == "left":
+            return (
+                f"if(lt(t\\,{end_t:.3f}),-overlay_w+({x_rest}+overlay_w)*{p},{x_rest})",
+                y_rest,
+            )
+        if side == "right":
+            return (
+                f"if(lt(t\\,{end_t:.3f}),main_w+({x_rest}-main_w)*{p},{x_rest})",
+                y_rest,
+            )
+        if side == "top":
+            return (
+                x_rest,
+                f"if(lt(t\\,{end_t:.3f}),-overlay_h+({y_rest}+overlay_h)*{p},{y_rest})",
+            )
+        if side == "bottom":
+            return (
+                x_rest,
+                f"if(lt(t\\,{end_t:.3f}),main_h+({y_rest}-main_h)*{p},{y_rest})",
+            )
+        # pop: slight overshoot from center (scale via opacity only — keep rest)
+        return x_rest, y_rest
+
+    if anim in ("slide_left", "from_left", "left"):
+        return _from_side("left")
+    if anim in ("slide_right", "from_right", "right"):
+        return _from_side("right")
+    if anim in ("slide_up", "from_top", "top", "drop"):
+        return _from_side("top")
+    if anim in ("slide_down", "from_bottom", "bottom", "rise"):
+        return _from_side("bottom")
+    if anim in ("pop", "fade", "none"):
+        return x_rest, y_rest
+
+    # auto: infer from resting position
+    if "left" in pos:
+        return _from_side("left")
+    if "right" in pos:
+        return _from_side("right")
+    if "top" in pos:
+        return _from_side("top")
+    if "bottom" in pos:
+        return _from_side("bottom")
+    # center — alternate feel via subtle rise
+    return _from_side("top")
 
 
 def apply_visual_overlays(
@@ -187,7 +252,7 @@ def apply_visual_overlays(
         ov
         for ov in overlays
         if isinstance(ov.get("path"), Path) and ov["path"].exists()
-    ][:12]
+    ][:20]
     if not usable:
         return video
 
@@ -200,22 +265,28 @@ def apply_visual_overlays(
     prev = "[base0]"
     for idx, ov in enumerate(usable):
         start = max(0.0, float(ov.get("start") or 0.0))
-        end = min(duration, start + max(0.5, float(ov.get("duration") or 2.4)))
-        if end <= start + 0.2:
+        end = min(duration, start + max(0.8, float(ov.get("duration") or 3.0)))
+        if end <= start + 0.25:
             continue
-        fade_out = max(start + 0.25, end - 0.22)
-        size_pct = max(0.10, min(0.32, float(ov.get("size_pct") or 0.16)))
-        width_px = max(96, min(int(w * size_pct), int(min(w, h) * 0.38)))
-        x, y = _overlay_xy(str(ov.get("position") or "top_right"))
-        # Subtle scale pop on enter (professional kinetic feel on solid plates).
+        fade_out = max(start + 0.3, end - 0.28)
+        role = str(ov.get("role") or "").strip().lower()
+        default_pct = 0.36 if role == "hero" else 0.24
+        size_pct = max(0.18, min(0.48, float(ov.get("size_pct") or default_pct)))
+        # Big, readable glyphs — hero can own ~half frame width on mobile.
+        width_px = max(140, min(int(w * size_pct), int(min(w, h) * 0.52)))
+        x, y = _overlay_anim_xy(
+            str(ov.get("position") or "center"),
+            start,
+            str(ov.get("animation") or "auto"),
+        )
         filters.append(
             f"[{idx + 1}:v]setpts=PTS-STARTPTS,"
             f"scale={width_px}:-1:flags=lanczos,format=rgba,"
             f"fade=t=in:st={start:.3f}:d=0.22:alpha=1,"
-            f"fade=t=out:st={fade_out:.3f}:d=0.22:alpha=1[ov{idx}]"
+            f"fade=t=out:st={fade_out:.3f}:d=0.28:alpha=1[ov{idx}]"
         )
         filters.append(
-            f"{prev}[ov{idx}]overlay=x={x}:y={y}:"
+            f"{prev}[ov{idx}]overlay=x='{x}':y='{y}':"
             f"enable='between(t,{start:.3f},{end:.3f})'[base{idx + 1}]"
         )
         prev = f"[base{idx + 1}]"
@@ -267,24 +338,38 @@ def build_short(
     transitions_enabled: bool = True,
     allowed_transitions: list[str] | None = None,
     visual_overlays: list[dict[str, Any]] | None = None,
+    preferred_transition: str | None = None,
+    montage_pace: str | None = None,
+    flash_cuts: bool = False,
 ) -> Path:
     """Pro Shorts assembly: punch open, motion library, cinematic transitions."""
+    from orzuvideo.pipeline.fx_library import pace_profile
+
     work_dir.mkdir(parents=True, exist_ok=True)
     voice_dur = ffprobe_duration(voice_path)
     frame = size or (settings.output_width, settings.output_height)
+    pace = pace_profile(montage_pace)
+    flash_on = bool(flash_cuts) or float(pace.get("flash_bias") or 0) >= 0.5
 
     n = max(1, len(clips))
-    overlap = 0.55 if n > 1 else 0.0
-    hook_dur = min(3.0, max(2.4, voice_dur * 0.12))
+    overlap = float(pace.get("overlap") or 0.55) if n > 1 else 0.0
+    hook_ratio = float(pace.get("hook_ratio") or 0.12)
+    hook_min = float(pace.get("hook_min") or 2.4)
+    hook_max = float(pace.get("hook_max") or 3.0)
+    hook_dur = min(hook_max, max(hook_min, voice_dur * hook_ratio))
     rest_budget = max(0.5, voice_dur - hook_dur + overlap * max(0, n - 1))
     rest_n = max(1, n - 1)
-    per_rest = rest_budget / rest_n
+    # Slightly uneven body cuts feel more editorial
+    weights = [1.0 + 0.18 * ((i % 3) - 1) for i in range(rest_n)]
+    wsum = sum(weights) or 1.0
+    body_durs = [rest_budget * (w / wsum) for w in weights]
+    body_speed = float(pace.get("speed_body") or 1.0)
 
     used_motions: set[str] = set()
     normalized: list[Path] = []
     for i, clip in enumerate(clips):
         dst = work_dir / f"norm_{i}.mp4"
-        dur = hook_dur if i == 0 else per_rest
+        dur = hook_dur if i == 0 else body_durs[min(i - 1, len(body_durs) - 1)]
         punch = bool(punch_first_clip and i == 0)
         if motions_enabled:
             motion = pick_motion(punch=punch, allowed_ids=allowed_motions)
@@ -298,7 +383,12 @@ def build_short(
             # Motions off: hold a gentle body motion (no punch)
             body = [m for m in MOTION_PRESETS if m["id"] != "punch_in"]
             motion = body[0] if body else pick_motion(punch=False)
-        print(f"Clip {i} motion: {motion['id']} ({dur:.2f}s)")
+        do_flash = flash_on and i > 0 and (i % 2 == 1)
+        clip_speed = 1.0 if punch else body_speed
+        print(
+            f"Clip {i} motion: {motion['id']} ({dur:.2f}s) "
+            f"flash={do_flash} speed={clip_speed:.2f}"
+        )
         normalize_clip_pro(
             clip,
             dst,
@@ -307,6 +397,8 @@ def build_short(
             motion=motion,
             size=frame,
             effect=visual_effect if visual_effect and visual_effect != "none" else None,
+            flash_in=do_flash,
+            speed=clip_speed,
         )
         normalized.append(dst)
 
@@ -318,6 +410,8 @@ def build_short(
         size=frame,
         allowed_transitions=allowed_transitions,
         transitions_enabled=transitions_enabled,
+        preferred_transition=preferred_transition,
+        flash_cuts=flash_on,
     )
 
     tl_dur = ffprobe_duration(timeline)

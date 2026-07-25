@@ -23,7 +23,15 @@ type NavItem = {
   href: string;
   label: string;
   exact?: boolean;
-  icon: "home" | "youtube" | "creators" | "clipping" | "creativity" | "library" | "account";
+  icon:
+    | "home"
+    | "youtube"
+    | "creators"
+    | "clipping"
+    | "creativity"
+    | "presentation"
+    | "library"
+    | "account";
 };
 
 /** Primary tabs — bottom bar + desktop center */
@@ -44,9 +52,14 @@ const PRIMARY_NAV: NavItem[] = [
     label: "AI Video",
     icon: "creativity",
   },
+  {
+    href: "/dashboard/creators/ai-presentation",
+    label: "AI Present",
+    icon: "presentation",
+  },
 ];
 
-/** Items moved into the top hamburger menu */
+/** Items moved into the top hamburger menu — flat fallback for title lookup */
 const MENU_NAV: NavItem[] = [
   {
     href: "/dashboard/channel",
@@ -60,8 +73,146 @@ const MENU_NAV: NavItem[] = [
   },
   {
     href: "/dashboard/favorites",
-    label: "Library",
+    label: "My vault",
     icon: "library",
+  },
+];
+
+type MenuItemIcon =
+  | "ai-video"
+  | "ai-clip"
+  | "ai-present"
+  | "photo-edit"
+  | "video-edit"
+  | "present"
+  | "videos"
+  | "photos"
+  | "models"
+  | "hdris"
+  | "textures"
+  | "emojis"
+  | "icons"
+  | "vault"
+  | "creators";
+
+type MenuGroup = {
+  id: string;
+  label: string;
+  items: { href: string; label: string; icon: MenuItemIcon }[];
+};
+
+const MENU_GROUPS: MenuGroup[] = [
+  {
+    id: "ai",
+    label: "AI",
+    items: [
+      { href: "/dashboard/content", label: "AI Video", icon: "ai-video" },
+      { href: "/dashboard/clipping", label: "AI Clipping", icon: "ai-clip" },
+      {
+        href: "/dashboard/creators/ai-presentation",
+        label: "AI Presentation",
+        icon: "ai-present",
+      },
+    ],
+  },
+  {
+    id: "editors",
+    label: "Editors",
+    items: [
+      {
+        href: "/dashboard/creators/photo-editor",
+        label: "Photo editor",
+        icon: "photo-edit",
+      },
+      {
+        href: "/dashboard/creators/content",
+        label: "Video editor",
+        icon: "video-edit",
+      },
+      {
+        href: "/dashboard/creators/presentation",
+        label: "Presentations",
+        icon: "present",
+      },
+    ],
+  },
+  {
+    id: "libraries",
+    label: "Libraries",
+    items: [
+      {
+        href: "/dashboard/creators/library/videos",
+        label: "Videos",
+        icon: "videos",
+      },
+      {
+        href: "/dashboard/creators/library/photos",
+        label: "Photos",
+        icon: "photos",
+      },
+      {
+        href: "/dashboard/creators/library/models",
+        label: "3D models",
+        icon: "models",
+      },
+      {
+        href: "/dashboard/creators/library/hdris",
+        label: "HDRIs",
+        icon: "hdris",
+      },
+      {
+        href: "/dashboard/creators/library/textures",
+        label: "Textures",
+        icon: "textures",
+      },
+      {
+        href: "/dashboard/creators/library/emojis",
+        label: "Emojis",
+        icon: "emojis",
+      },
+      {
+        href: "/dashboard/creators/library/icons",
+        label: "Icons",
+        icon: "icons",
+      },
+    ],
+  },
+  {
+    id: "vault",
+    label: "My vault",
+    items: [
+      {
+        href: "/dashboard/favorites?tab=clips",
+        label: "My clips",
+        icon: "ai-clip",
+      },
+      {
+        href: "/dashboard/favorites?tab=videos",
+        label: "My videos",
+        icon: "ai-video",
+      },
+      {
+        href: "/dashboard/favorites?tab=presentations",
+        label: "My presentations",
+        icon: "present",
+      },
+      {
+        href: "/dashboard/favorites?tab=favorites",
+        label: "Favorites",
+        icon: "vault",
+      },
+    ],
+  },
+  {
+    id: "more",
+    label: "More",
+    items: [
+      {
+        href: "/dashboard/creators",
+        label: "For creators",
+        icon: "creators",
+      },
+    ],
   },
 ];
 
@@ -70,6 +221,7 @@ const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...MENU_NAV];
 const LIBRARY_TABS = [
   { id: "clips", label: "My clips", short: "Clips" },
   { id: "videos", label: "My videos", short: "Videos" },
+  { id: "presentations", label: "My presentations", short: "Decks" },
   { id: "favorites", label: "Favorites", short: "Favs" },
 ] as const;
 
@@ -81,6 +233,11 @@ const CLIPPING_TABS = [
 const CREATIVITY_TABS = [
   { id: "create", label: "Create", short: "Create" },
   { id: "library", label: "My creations", short: "Mine" },
+] as const;
+
+const AI_PRESENTATION_TABS = [
+  { id: "create", label: "Create", short: "Create" },
+  { id: "library", label: "My presentations", short: "Mine" },
 ] as const;
 
 function NavIcon({
@@ -161,6 +318,14 @@ function NavIcon({
           />
         </svg>
       );
+    case "presentation":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M8 20h8M12 17v3" />
+          <path d="M7 8h5M7 11h8" />
+        </svg>
+      );
     case "library":
       return (
         <svg {...common}>
@@ -208,8 +373,160 @@ function MenuIcon({ open }: { open?: boolean }) {
   );
 }
 
+/** Official YouTube play-mark (red badge). */
+function YouTubeMenuMark({ size = 18 }: { size?: number }) {
+  const h = Math.round(size * 0.72);
+  return (
+    <svg width={size} height={h} viewBox="0 0 28 20" aria-hidden>
+      <path
+        fill="#fff"
+        d="M27.43 3.13A3.52 3.52 0 0 0 24.95.64C22.74 0 14 0 14 0S5.26 0 3.05.64A3.52 3.52 0 0 0 .57 3.13 36.8 36.8 0 0 0 0 10a36.8 36.8 0 0 0 .57 6.87 3.52 3.52 0 0 0 2.48 2.49C5.26 20 14 20 14 20s8.74 0 10.95-.64a3.52 3.52 0 0 0 2.48-2.49A36.8 36.8 0 0 0 28 10a36.8 36.8 0 0 0-.57-6.87Z"
+      />
+      <path fill="#FF0000" d="M11.2 14.29V5.71L18.4 10l-7.2 4.29Z" />
+    </svg>
+  );
+}
+
+function MenuEntryIcon({ name }: { name: MenuItemIcon }) {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none" as const,
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
+
+  switch (name) {
+    case "ai-video":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="3" />
+          <path d="M10 9.2v5.6L15.2 12 10 9.2Z" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "ai-clip":
+      return (
+        <svg {...common}>
+          <circle cx="6.5" cy="7" r="2.4" />
+          <circle cx="6.5" cy="17" r="2.4" />
+          <path d="M8.7 8.4 20 3.5M8.7 15.6 20 20.5M14.2 12h6.3" />
+        </svg>
+      );
+    case "ai-present":
+      return (
+        <svg {...common}>
+          <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+          <rect x="7" y="7" width="10" height="10" rx="2.5" />
+        </svg>
+      );
+    case "photo-edit":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="9" cy="10" r="2" />
+          <path d="M3 16.5 8 12l3.5 3.5L15 12l6 5" />
+        </svg>
+      );
+    case "video-edit":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="14" height="14" rx="2" />
+          <path d="M17 9h4v10a2 2 0 0 1-2 2h-8" />
+          <path d="M8 10.5 12 13l-4 2.5v-5Z" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "present":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M8 20h8M12 17v3M7 8h5M7 11h8" />
+        </svg>
+      );
+    case "videos":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M10 9.5v5l5-2.5-5-2.5Z" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "photos":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="8.5" cy="9.5" r="1.8" />
+          <path d="M3 16.5 8 12l3 3 4-4.5 6 6" />
+        </svg>
+      );
+    case "models":
+      return (
+        <svg {...common}>
+          <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z" />
+          <path d="M12 12v9M12 12 4 7.5M12 12l8-4.5" />
+        </svg>
+      );
+    case "hdris":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 4v16M4 12h16" opacity={0.45} />
+          <path d="M6.2 6.2 17.8 17.8M17.8 6.2 6.2 17.8" opacity={0.35} />
+        </svg>
+      );
+    case "textures":
+      return (
+        <svg {...common}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M4 10h16M4 16h16M10 4v16M16 4v16" opacity={0.55} />
+        </svg>
+      );
+    case "emojis":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M9 10h.01M15 10h.01M8.5 14.5c1.2 1.4 2.7 2 3.5 2s2.3-.6 3.5-2" />
+        </svg>
+      );
+    case "icons":
+      return (
+        <svg {...common}>
+          <path d="M12 3 14.5 9.5 21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" />
+        </svg>
+      );
+    case "vault":
+      return (
+        <svg {...common}>
+          <path d="M5 4.5h10.5A1.5 1.5 0 0 1 17 6v13.2l-5.5-2.6L6 19.2V6A1.5 1.5 0 0 1 7.5 4.5" />
+          <path d="M17 7.2h1.5A1.5 1.5 0 0 1 20 8.7v10.5" />
+        </svg>
+      );
+    case "creators":
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="8" r="3.2" />
+          <circle cx="16.5" cy="9.5" r="2.4" />
+          <path d="M3.5 19c.8-3.2 2.9-5 5.5-5s4.7 1.8 5.5 5" />
+          <path d="M14 19c.4-1.8 1.6-3 3.2-3 1.4 0 2.5.8 3.1 2.2" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 function isNavActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href;
+  // Keep "For creators" from stealing active state from AI Presentation.
+  if (item.href === "/dashboard/creators") {
+    if (pathname.startsWith("/dashboard/creators/ai-presentation")) return false;
+    return (
+      pathname === "/dashboard/creators" ||
+      pathname.startsWith("/dashboard/creators/")
+    );
+  }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
@@ -222,7 +539,7 @@ function MobileBottomNav() {
       aria-label="Main"
     >
       <div
-        className="pointer-events-auto relative flex w-full max-w-[22rem] items-stretch justify-between gap-1 overflow-hidden rounded-full border px-1.5 py-1.5 backdrop-blur-2xl"
+        className="pointer-events-auto relative flex w-full max-w-[28rem] items-stretch justify-between gap-0.5 overflow-hidden rounded-full border px-1 py-1.5 backdrop-blur-2xl"
         style={{
           borderColor: "rgba(255,255,255,0.18)",
           background:
@@ -301,12 +618,17 @@ function LibraryHeaderTabs() {
   const router = useRouter();
   const raw = searchParams.get("tab");
   const tab =
-    raw === "videos" || raw === "favorites" || raw === "clips" ? raw : "clips";
+    raw === "videos" ||
+    raw === "favorites" ||
+    raw === "clips" ||
+    raw === "presentations"
+      ? raw
+      : "clips";
 
   return (
     <nav
-      className="mx-auto flex w-full max-w-3xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label="Library sections"
+      className="mx-auto flex w-full max-w-4xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
+      aria-label="My vault"
     >
       {LIBRARY_TABS.map((item) => (
         <SectionTabButton
@@ -380,6 +702,37 @@ function CreativityHeaderTabs() {
             router.replace(`/dashboard/content?${next.toString()}`, {
               scroll: false,
             });
+          }}
+        />
+      ))}
+    </nav>
+  );
+}
+
+function AiPresentationHeaderTabs() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const raw = searchParams.get("tab");
+  const tab = raw === "library" || raw === "create" ? raw : "create";
+
+  return (
+    <nav
+      className="mx-auto flex w-full max-w-2xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
+      aria-label="AI Presentation sections"
+    >
+      {AI_PRESENTATION_TABS.map((item) => (
+        <SectionTabButton
+          key={item.id}
+          on={tab === item.id}
+          label={item.label}
+          short={item.short}
+          onClick={() => {
+            const next = new URLSearchParams(searchParams.toString());
+            next.set("tab", item.id);
+            router.replace(
+              `/dashboard/creators/ai-presentation?${next.toString()}`,
+              { scroll: false },
+            );
           }}
         />
       ))}
@@ -486,9 +839,20 @@ export function YouTubeChannelsButton({
 
 function AppMenu({ email }: { email?: string | null }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>("ai");
+  const [isMobile, setIsMobile] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -509,6 +873,10 @@ function AppMenu({ email }: { email?: string | null }) {
     };
   }, [open]);
 
+  const youtubeActive =
+    pathname === "/dashboard/channel" ||
+    pathname.startsWith("/dashboard/channel/");
+
   return (
     <div className="relative" ref={rootRef}>
       <button
@@ -527,32 +895,96 @@ function AppMenu({ email }: { email?: string | null }) {
 
       {open && (
         <div
-          className="absolute right-0 top-full z-[80] mt-2 w-[min(100vw-2rem,280px)] overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
+          className="absolute right-0 top-full z-[80] mt-2 max-h-[min(80vh,560px)] w-[min(100vw-2rem,320px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
           role="dialog"
           aria-label="Main menu"
         >
           <div className="p-2">
-            {MENU_NAV.map((item) => {
-              const active = isNavActive(pathname, item);
+            <Link
+              href="/dashboard/channel"
+              onClick={() => setOpen(false)}
+              aria-current={youtubeActive ? "page" : undefined}
+              className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:brightness-110"
+              style={{
+                background: "#FF0000",
+                boxShadow: youtubeActive
+                  ? "0 0 0 2px rgba(255,255,255,0.35)"
+                  : "0 8px 20px rgba(255,0,0,0.28)",
+              }}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/15">
+                <YouTubeMenuMark size={20} />
+              </span>
+              <span className="flex-1">YouTube</span>
+            </Link>
+
+            {MENU_GROUPS.map((group) => {
+              const expanded = !isMobile || openGroup === group.id;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-white/5"
-                  style={{
-                    color: active ? "var(--accent)" : "var(--fg)",
-                    background: active
-                      ? "rgba(232,165,75,0.1)"
-                      : "transparent",
-                  }}
-                  onClick={() => setOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--muted)]">
-                    <NavIcon name={item.icon} active={active} size={18} />
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
+                <div key={group.id} className="mb-1">
+                  {isMobile ? (
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)] transition hover:bg-white/5"
+                      onClick={() =>
+                        setOpenGroup((v) => (v === group.id ? null : group.id))
+                      }
+                      aria-expanded={expanded}
+                    >
+                      <span className="flex-1">{group.label}</span>
+                      <TinyChevron open={expanded} />
+                    </button>
+                  ) : (
+                    <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+                      {group.label}
+                    </p>
+                  )}
+                  {expanded && (
+                    <div className="mb-1 space-y-0.5 pl-0.5">
+                      {group.items.map((item) => {
+                        const pathOnly = item.href.split("?")[0];
+                        const tabParam = new URL(
+                          item.href,
+                          "https://orzu.local",
+                        ).searchParams.get("tab");
+                        const currentVaultTab =
+                          searchParams.get("tab") || "clips";
+                        const active = tabParam
+                          ? pathname.startsWith(pathOnly) &&
+                            currentVaultTab === tabParam
+                          : pathname === pathOnly ||
+                            pathname.startsWith(`${pathOnly}/`);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition hover:bg-white/5"
+                            style={{
+                              color: active ? "var(--accent)" : "var(--fg)",
+                              background: active
+                                ? "rgba(232,165,75,0.1)"
+                                : "transparent",
+                            }}
+                            onClick={() => setOpen(false)}
+                            aria-current={active ? "page" : undefined}
+                          >
+                            <span
+                              className="flex h-5 w-5 shrink-0 items-center justify-center"
+                              style={{
+                                color: active
+                                  ? "var(--accent)"
+                                  : "var(--muted)",
+                              }}
+                            >
+                              <MenuEntryIcon name={item.icon} />
+                            </span>
+                            <span>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -626,11 +1058,36 @@ export function AppShell({
   const isLibrary = pathname.startsWith("/dashboard/favorites");
   const isClipping = pathname.startsWith("/dashboard/clipping");
   const isCreativity = pathname.startsWith("/dashboard/content");
+  const isAiPresentation = pathname.startsWith(
+    "/dashboard/creators/ai-presentation",
+  );
   const isEditor =
     pathname.startsWith("/dashboard/editor") ||
-    pathname.startsWith("/dashboard/creators/presentation");
+    pathname.startsWith("/dashboard/creators/presentation") ||
+    pathname.startsWith("/dashboard/creators/photo-editor");
+  const assetsLibraryKind = pathname.match(
+    /^\/dashboard\/creators\/library\/([^/]+)/,
+  )?.[1];
+  const assetsLibraryTitle =
+    assetsLibraryKind === "photos"
+      ? "Photos"
+      : assetsLibraryKind === "videos"
+        ? "Videos"
+        : assetsLibraryKind === "models"
+          ? "3D models"
+          : assetsLibraryKind === "hdris"
+            ? "HDRIs"
+            : assetsLibraryKind === "textures"
+              ? "Textures"
+              : assetsLibraryKind === "emojis"
+                ? "Emojis"
+                : assetsLibraryKind === "icons"
+                  ? "Icons"
+                  : null;
   const pageTitle =
-    ALL_NAV.find((item) => isNavActive(pathname, item))?.label || "OrzuAi";
+    ALL_NAV.find((item) => isNavActive(pathname, item))?.label ||
+    assetsLibraryTitle ||
+    (isAiPresentation ? "AI Presentation" : "OrzuAi");
   const ctx = { menuOpen, setMenuOpen };
 
   useEffect(() => {
@@ -648,7 +1105,7 @@ export function AppShell({
       ro.disconnect();
       document.documentElement.style.removeProperty("--app-header-height");
     };
-  }, [pathname, isLibrary, isClipping, isCreativity]);
+  }, [pathname, isLibrary, isClipping, isCreativity, isAiPresentation]);
 
   if (isEditor) {
     return (
@@ -685,7 +1142,7 @@ export function AppShell({
 
               {/* Desktop / tablet top nav */}
               <nav className="pointer-events-none absolute inset-0 hidden items-center justify-center pt-3 lg:flex lg:pt-4">
-                <div className="pointer-events-auto flex max-w-[min(100%,40rem)] items-center gap-1 overflow-x-auto px-2 md:gap-2">
+                <div className="pointer-events-auto flex max-w-[min(100%,48rem)] items-center gap-1 overflow-x-auto px-2 md:gap-2">
                   {PRIMARY_NAV.map((item) => {
                     const active = isNavActive(pathname, item);
                     return (
@@ -718,14 +1175,16 @@ export function AppShell({
               </p>
 
               <div className="relative z-10 shrink-0">
-                <AppMenu email={email} />
+                <Suspense fallback={null}>
+                  <AppMenu email={email} />
+                </Suspense>
               </div>
             </div>
 
-            {(isLibrary || isClipping || isCreativity) && (
+            {(isLibrary || isClipping || isCreativity || isAiPresentation) && (
               <div
                 className={`flex flex-col items-center px-3 pb-2.5 sm:px-4 sm:pb-3 md:px-6 ${
-                  isClipping || isCreativity || isLibrary
+                  isClipping || isCreativity || isLibrary || isAiPresentation
                     ? "w-full"
                     : "gap-3"
                 }`}
@@ -740,7 +1199,7 @@ export function AppShell({
                 )}
                 <div
                   className={`flex w-full items-center ${
-                    isClipping || isCreativity || isLibrary
+                    isClipping || isCreativity || isLibrary || isAiPresentation
                       ? "justify-center"
                       : "gap-3"
                   }`}
@@ -760,6 +1219,14 @@ export function AppShell({
                     }
                   >
                     <ClippingHeaderTabs />
+                  </Suspense>
+                ) : isAiPresentation ? (
+                  <Suspense
+                    fallback={
+                      <div className="h-10 w-full max-w-2xl rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] sm:rounded-xl" />
+                    }
+                  >
+                    <AiPresentationHeaderTabs />
                   </Suspense>
                 ) : (
                   <Suspense

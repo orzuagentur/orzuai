@@ -63,14 +63,15 @@ def download_stock_clips(
     *,
     exclude_ids: set[str] | set[int] | None = None,
     orientation: str = "portrait",
-) -> tuple[list[Path], list[str]]:
+) -> tuple[list[Path], list[str], list[dict]]:
     """
     Download unique Pexels clips, skipping IDs already used on prior videos.
-    Returns (paths, used_asset_ids).
+    Returns (paths, used_asset_ids, clip_meta with thumbs).
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
     clips: list[Path] = []
     used_ids: list[str] = []
+    clip_meta: list[dict] = []
     seen_ids: set[str] = {str(x) for x in (exclude_ids or set())}
 
     shuffled = list(queries)
@@ -122,6 +123,21 @@ def download_stock_clips(
                     path.write_bytes(r.content)
                 clips.append(path)
                 used_ids.append(vid)
+                thumb = video.get("image")
+                if not thumb:
+                    pics = video.get("video_pictures") or []
+                    if pics:
+                        thumb = pics[0].get("picture")
+                clip_meta.append(
+                    {
+                        "id": vid,
+                        "provider": "pexels",
+                        "kind": "video",
+                        "thumb": thumb,
+                        "query": query,
+                        "label": (video.get("user") or {}).get("name") or f"Clip {vid}",
+                    }
+                )
                 print(f"Pexels clip {vid} for query={query!r} page={page}")
                 if len(clips) >= count:
                     break
@@ -141,4 +157,4 @@ def download_stock_clips(
 
     if not clips:
         raise RuntimeError(f"No fresh Pexels clips for queries: {queries}")
-    return clips, used_ids
+    return clips, used_ids, clip_meta

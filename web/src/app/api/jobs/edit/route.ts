@@ -116,6 +116,45 @@ export async function POST(request: Request) {
   }
   const keep_original_audio = body.keep_original_audio !== false;
 
+  let playback_speed = 1;
+  try {
+    playback_speed = Math.max(0.25, Math.min(4, Number(body.playback_speed ?? 1)));
+  } catch {
+    playback_speed = 1;
+  }
+  const flip_h = body.flip_h === true;
+  const flip_v = body.flip_v === true;
+  let zoom = 1;
+  try {
+    zoom = Math.max(1, Math.min(2, Number(body.zoom ?? 1)));
+  } catch {
+    zoom = 1;
+  }
+  let brightness = 0;
+  let contrast = 1;
+  let saturation = 1;
+  let voice_volume = 1.05;
+  try {
+    brightness = Math.max(-0.4, Math.min(0.4, Number(body.brightness ?? 0)));
+  } catch {
+    brightness = 0;
+  }
+  try {
+    contrast = Math.max(0.5, Math.min(1.8, Number(body.contrast ?? 1)));
+  } catch {
+    contrast = 1;
+  }
+  try {
+    saturation = Math.max(0, Math.min(2, Number(body.saturation ?? 1)));
+  } catch {
+    saturation = 1;
+  }
+  try {
+    voice_volume = Math.max(0.05, Math.min(1.4, Number(body.voice_volume ?? 1.05)));
+  } catch {
+    voice_volume = 1.05;
+  }
+
   let trim_start = 0;
   let trim_end: number | null = null;
   try {
@@ -158,8 +197,22 @@ export async function POST(request: Request) {
     music_track_id,
     music_volume,
     keep_original_audio,
+    playback_speed,
+    flip_h,
+    flip_v,
+    zoom,
+    brightness,
+    contrast,
+    saturation,
+    voice_volume,
     trim_start,
     trim_end,
+    excluded_source_ids: Array.isArray(body.excluded_source_ids)
+      ? (body.excluded_source_ids as unknown[])
+          .map((x) => String(x))
+          .filter(Boolean)
+          .slice(0, 40)
+      : [],
     source_storage_path: parent.storage_path,
     source_storage_bucket: parent.storage_bucket || "short-previews",
     source_preview_url: parent.preview_url,

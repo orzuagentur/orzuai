@@ -13,7 +13,13 @@ type ActionCard = {
   href: string;
   title: string;
   body: string;
-  icon: "youtube" | "creators" | "clip" | "create" | "library";
+  icon:
+    | "youtube"
+    | "creators"
+    | "clip"
+    | "create"
+    | "library"
+    | "presentation";
 };
 
 function YouTubeMark() {
@@ -76,8 +82,14 @@ function CardIcon({ name }: { name: ActionCard["icon"] }) {
       )}
       {name === "library" && (
         <svg {...common}>
-          <path d="M5 4.5h10.5A1.5 1.5 0 0 1 17 6v13.2l-5.5-2.6L6 19.2V6A1.5 1.5 0 0 1 7.5 4.5" />
-          <path d="M17 7.2h1.5A1.5 1.5 0 0 1 20 8.7v10.5" />
+          <path d="M4 7h16v12H4z" />
+          <path d="M8 7V5h8v2M8 11h8M8 15h5" />
+        </svg>
+      )}
+      {name === "presentation" && (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="12" rx="2" />
+          <path d="M8 20h8M12 16v4" />
         </svg>
       )}
     </span>
@@ -122,7 +134,7 @@ export function HomeQuickActions(props: HomeQuickActionsProps) {
       key: "creators",
       href: "/dashboard/creators",
       title: "For creators",
-      body: "Browse CC0 3D, HDRIs, and maps for your next edit.",
+      body: "Content studio, photo tools, AI & classic presentations.",
       icon: "creators",
     },
     {
@@ -140,10 +152,17 @@ export function HomeQuickActions(props: HomeQuickActionsProps) {
       icon: "create",
     },
     {
+      key: "presentation",
+      href: "/dashboard/creators/presentation",
+      title: "Classic presentation",
+      body: "Slides, themes, charts, photos — export PDF / Word.",
+      icon: "presentation",
+    },
+    {
       key: "library",
       href: "/dashboard/favorites",
-      title: "Library",
-      body: "Watch and download your clips, videos, and favorites.",
+      title: "My vault",
+      body: "Your clips, videos, and favorites — watch and download.",
       icon: "library",
     },
   ];

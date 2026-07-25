@@ -60,9 +60,10 @@ export function MusicUploadDock() {
 
             {(job.status === "done" || job.status === "error") && (
               <div className="space-y-0.5 px-3.5 pb-3 pt-1 text-xs text-[color:var(--muted)]">
-                {job.status === "error" && job.error ? (
+                {job.error ? (
                   <p className="text-[color:var(--danger)]">{job.error}</p>
-                ) : (
+                ) : null}
+                {(job.status !== "error" || job.uploaded > 0) && (
                   <>
                     <p>
                       Uploaded:{" "}

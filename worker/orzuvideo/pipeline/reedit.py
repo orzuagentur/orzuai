@@ -70,6 +70,83 @@ def trim_clip(
     return out
 
 
+def _atempo_chain(speed: float) -> str:
+    """Build atempo chain (each filter must stay within 0.5–2.0)."""
+    spd = max(0.25, min(4.0, float(speed)))
+    parts: list[str] = []
+    # Factor so that audio duration matches video setpts=PTS/spd
+    remaining = spd
+    while remaining > 2.0 + 1e-6:
+        parts.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5 - 1e-6:
+        parts.append("atempo=0.5")
+        remaining /= 0.5
+    parts.append(f"atempo={remaining:.4f}")
+    return ",".join(parts)
+
+
+def apply_speed(source: Path, out: Path, *, speed: float) -> Path:
+    """Change playback speed for video (+ audio when present)."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    spd = max(0.25, min(4.0, float(speed or 1.0)))
+    if abs(spd - 1.0) < 0.02:
+        import shutil
+
+        shutil.copy(source, out)
+        return out
+
+    fps = settings.fps
+    has_a = has_audio_stream(source)
+    if has_a:
+        fc = (
+            f"[0:v]setpts=PTS/{spd:.4f},fps={fps},format=yuv420p[v];"
+            f"[0:a]{_atempo_chain(spd)}[a]"
+        )
+        args = [
+            "-i",
+            str(source),
+            "-filter_complex",
+            fc,
+            "-map",
+            "[v]",
+            "-map",
+            "[a]",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "18",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            str(out),
+        ]
+    else:
+        args = [
+            "-i",
+            str(source),
+            "-vf",
+            f"setpts=PTS/{spd:.4f},fps={fps},format=yuv420p",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "18",
+            "-movflags",
+            "+faststart",
+            str(out),
+        ]
+    run_ffmpeg(args)
+    return out
+
+
 def apply_look(
     source: Path,
     out: Path,
@@ -78,14 +155,26 @@ def apply_look(
     motion: str,
     intro_fade: str,
     outro_fade: str,
+    flip_h: bool = False,
+    flip_v: bool = False,
+    zoom: float = 1.0,
+    brightness: float = 0.0,
+    contrast: float = 1.0,
+    saturation: float = 1.0,
 ) -> Path:
-    """Apply grade / optional Ken Burns / bookend fades in one encode."""
+    """Apply grade / optional Ken Burns / bookend fades / transform / manual EQ."""
     out.parent.mkdir(parents=True, exist_ok=True)
     dur = ffprobe_duration(source)
     fps = settings.fps
     w, h = settings.output_width, settings.output_height
     parts: list[str] = []
 
+    if flip_h:
+        parts.append("hflip")
+    if flip_v:
+        parts.append("vflip")
+
+    z = max(1.0, min(2.0, float(zoom or 1.0)))
     motion_p = motion_by_id(motion) if motion and motion != "none" else None
     if motion_p:
         parts.append(
@@ -97,14 +186,25 @@ def apply_look(
         )
         if motion_p.get("eq"):
             parts.append(motion_p["eq"])
-        # Layer selected grade on top of motion grade when both set
         ef = effect_chain(effect)
         if ef and effect not in ("none", ""):
             parts.append(ef)
     else:
+        if z > 1.01:
+            parts.append(
+                f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+                f"crop=iw/{z:.3f}:ih/{z:.3f},scale={w}:{h}"
+            )
         ef = effect_chain(effect)
         if ef:
             parts.append(ef)
+
+    # Manual color grade (additive on top of look presets)
+    b = max(-0.4, min(0.4, float(brightness or 0.0)))
+    c = max(0.5, min(1.8, float(contrast or 1.0)))
+    s = max(0.0, min(2.0, float(saturation or 1.0)))
+    if abs(b) > 0.01 or abs(c - 1.0) > 0.01 or abs(s - 1.0) > 0.01:
+        parts.append(f"eq=brightness={b:.3f}:contrast={c:.3f}:saturation={s:.3f}")
 
     fade_in = 0.35 if intro_fade and intro_fade != "none" else 0.0
     fade_out = 0.45 if outro_fade and outro_fade != "none" else 0.0

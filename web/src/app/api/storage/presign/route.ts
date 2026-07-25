@@ -21,10 +21,24 @@ const ALLOWED_TYPES = new Set([
   "audio/mp3",
   "audio/wav",
   "audio/x-wav",
+  "audio/wave",
   "audio/mp4",
+  "audio/x-m4a",
   "audio/aac",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/ogg",
+  "audio/opus",
+  "audio/webm",
   "application/octet-stream",
 ]);
+
+function isAllowedContentType(contentType: string): boolean {
+  if (ALLOWED_TYPES.has(contentType)) return true;
+  if (contentType.startsWith("video/")) return true;
+  if (contentType.startsWith("audio/")) return true;
+  return false;
+}
 
 /**
  * Presigned PUT for direct browser → Cloudflare R2 uploads.
@@ -68,7 +82,7 @@ export async function POST(request: Request) {
   if (key.includes("..") || key.length > 512) {
     return NextResponse.json({ error: "Invalid key" }, { status: 400 });
   }
-  if (!ALLOWED_TYPES.has(contentType) && !contentType.startsWith("video/")) {
+  if (!isAllowedContentType(contentType)) {
     return NextResponse.json(
       { error: `Unsupported content type: ${contentType}` },
       { status: 400 },

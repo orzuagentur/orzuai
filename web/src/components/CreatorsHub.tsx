@@ -4,9 +4,99 @@ import Link from "next/link";
 
 const CARDS = [
   {
+    href: "/dashboard/creators/content",
+    title: "Content",
+    subtitle: "Pro video editor — sources, frames, filters, captions & music",
+    badge: "Editor",
+    accent: "#E8A54B",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect
+          x="3"
+          y="5"
+          width="14"
+          height="14"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="1.75"
+        />
+        <path
+          d="M17 9h4v10a2 2 0 0 1-2 2h-8"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        />
+        <path
+          d="M8 10.5 12 13l-4 2.5v-5Z"
+          fill="currentColor"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/creators/photo-editor",
+    title: "Photo editor",
+    subtitle: "Canva-style workspace — upload, filters, text & layers",
+    badge: "Design",
+    accent: "#34d399",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect
+          x="3"
+          y="4"
+          width="18"
+          height="16"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="1.75"
+        />
+        <circle cx="9" cy="10" r="2" stroke="currentColor" strokeWidth="1.75" />
+        <path
+          d="M3 16.5 8 12l3.5 3.5L15 12l6 5"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/creators/ai-presentation",
+    title: "AI Presentation",
+    subtitle: "Prompt → slides with PDF / Word, QR & permissions — open on OrzuAi",
+    badge: "AI",
+    accent: "#c084fc",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 3v3M12 18v3M3 12h3M18 12h3"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        />
+        <rect
+          x="7"
+          y="7"
+          width="10"
+          height="10"
+          rx="2.5"
+          stroke="currentColor"
+          strokeWidth="1.75"
+        />
+        <path
+          d="M10 12h4M12 10v4"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/creators/presentation",
     title: "Classic presentation",
-    subtitle: "Slides, themes, charts, photos — export all pages PPTX / PDF",
+    subtitle: "Slides, themes, charts, photos — export PDF / Word",
     badge: "Editor",
     accent: "#e8a54b",
     icon: (
@@ -35,29 +125,6 @@ const CARDS = [
       </svg>
     ),
   },
-  {
-    href: "/dashboard/creators/library",
-    title: "Library",
-    subtitle: "3D models, HDRIs, photos, videos, icons & emojis",
-    badge: "Assets",
-    accent: "#60a5fa",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12 12v8M12 12 4 8.5M12 12l8-3.5"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
 ] as const;
 
 export function CreatorsHub() {
@@ -74,12 +141,12 @@ export function CreatorsHub() {
           What will you create?
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
-          Open a classic presentation workspace or browse the asset library for
-          your next project.
+          Content, photo & presentation tools for creators. Asset libraries live
+          in the main menu under Libraries.
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {CARDS.map((card) => (
           <Link
             key={card.href}

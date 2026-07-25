@@ -151,10 +151,19 @@ Rules:
 - For STANDARD videos: choose B-roll search queries in English for stock footage (pexels_queries).
 - For EMOJI videos: do NOT use stock footage. Fill background_colors with solid hex colors and a rich asset_overlays plan.
 - Suggest a subtitle style hint in "subtitle_style" from:
-  classic, karaoke_gold, neon_pink, impact, yellow_pop, soft_shadow, lower_third, minimal.
+  classic, karaoke_gold, neon_pink, impact, yellow_pop, soft_shadow, lower_third, minimal,
+  cyan_glow, fire_orange, lime_pulse, comic_pop, glass_frost, serif_clean, stack_outline, typewriter, hook_banner,
+  viral_white, duotone_sub.
 - Suggest a look filter in "visual_effect" from:
-  cinematic, vivid, teal_orange, warm, cool, drama, neon, vintage, punch, glow, clarity.
+  cinematic, vivid, teal_orange, warm, cool, drama, neon, vintage, punch, glow, clarity,
+  soft, noir, pastel, sunset, arctic, ember, matrix, high_key, low_key,
+  kodak, fuji, bleach_bypass, golden_hour, steel_blue, blockbuster, moody_teal, pop_art.
+- Suggest preferred_transition from xfade names that match the prompt energy
+  (e.g. slam edits → wipeleft/slideright/zoomin; calm → dissolve/fade/smoothleft; bold → circleopen/radial).
+- Suggest montage_pace from: viral, fast, medium, cinematic — match prompt energy.
+- Set flash_cuts true for high-energy / hype / sales prompts; false for calm / luxury / storytelling.
 - Do NOT invent motivational-coach / gym / discipline themes unless the prompt asks for them.
+- Match EVERY creative choice (tone, colors, subtitle look, motion energy) to the user's prompt theme.
 - Return STRICT JSON only, no markdown.
 {duration_rule}
 {video_type_rule}
@@ -171,6 +180,9 @@ JSON schema:
   "subtitle_emphasis": ["WORD1", "WORD2"],
   "subtitle_style": "classic",
   "visual_effect": "cinematic",
+  "preferred_transition": "smoothleft",
+  "montage_pace": "medium",
+  "flash_cuts": false,
   "music_mood": "short english mood phrase",
   "duration_seconds": 30,
   "asset_overlays": [
@@ -178,10 +190,13 @@ JSON schema:
       "kind": "emoji",
       "query": "rocket",
       "label": "rocket",
+      "meaning": "fast growth",
+      "role": "hero",
       "start_pct": 0.08,
-      "duration": 2.2,
-      "position": "top_right",
-      "size_pct": 0.18,
+      "duration": 3.2,
+      "position": "center",
+      "size_pct": 0.38,
+      "animation": "slide_up",
       "color": "#FFFFFF"
     }}
   ]
@@ -274,26 +289,35 @@ def _sanitize_overlay_color(raw: Any) -> str | None:
 
 
 def _sanitize_asset_overlays(raw: Any, *, enabled: bool) -> list[dict[str, Any]]:
-    """Keep AI overlay plans bounded so icons don't cover captions or dominate."""
+    """Sanitize overlay plans: large, dense, caption-safe (avoid lower-center)."""
     if not enabled:
         return []
     items = raw if isinstance(raw, list) else []
     out: list[dict[str, Any]] = []
+    # Cluster-friendly layout: 3-up then 2-up alternating across beats.
     fallback_positions = [
-        "top_right",
         "center_left",
-        "top_left",
-        "center_right",
-        "top_center",
-        "bottom_right",
         "center",
+        "center_right",
+        "top_left",
+        "top_center",
+        "top_right",
         "bottom_left",
+        "bottom_right",
         "center_left",
         "top_right",
         "center_right",
         "top_left",
+        "center",
+        "top_center",
+        "bottom_left",
+        "center_right",
+        "top_right",
+        "center_left",
+        "top_left",
+        "bottom_right",
     ]
-    for idx, item in enumerate(items[:14]):
+    for idx, item in enumerate(items[:24]):
         if not isinstance(item, dict):
             continue
         query = _filled(item.get("query") or item.get("name") or item.get("label"))
@@ -302,14 +326,45 @@ def _sanitize_asset_overlays(raw: Any, *, enabled: bool) -> list[dict[str, Any]]
         kind = str(item.get("kind") or "emoji").strip().lower()
         if kind not in ("emoji", "icon"):
             kind = "emoji"
-        start = max(0.02, min(0.9, _as_float(item.get("start_pct"), 0.06 + idx * 0.07)))
-        duration = max(1.4, min(5.0, _as_float(item.get("duration"), 2.6)))
-        # Hero moments can be larger; still leave room for captions.
-        size = max(0.10, min(0.30, _as_float(item.get("size_pct"), 0.16)))
+        role = str(item.get("role") or "").strip().lower()
+        if role not in ("hero", "support"):
+            role = "hero" if idx % 3 == 1 else "support"
+        start = max(0.01, min(0.92, _as_float(item.get("start_pct"), 0.04 + idx * 0.045)))
+        duration = max(1.8, min(6.0, _as_float(item.get("duration"), 3.2)))
+        default_size = 0.36 if role == "hero" else 0.24
+        size = max(0.18, min(0.46, _as_float(item.get("size_pct"), default_size)))
         position = str(item.get("position") or "").strip().lower()
-        if position not in _OVERLAY_POSITIONS or position == "lower_center":
+        if position not in _OVERLAY_POSITIONS or position in {
+            "lower_center",
+            "bottom_center",
+        }:
             position = fallback_positions[idx % len(fallback_positions)]
         color = _sanitize_overlay_color(item.get("color"))
+        meaning = _filled(item.get("meaning") or item.get("anchor") or item.get("label"))
+        anim = str(item.get("animation") or "auto").strip().lower()
+        if anim not in {
+            "auto",
+            "slide_left",
+            "slide_right",
+            "slide_up",
+            "slide_down",
+            "from_left",
+            "from_right",
+            "from_top",
+            "from_bottom",
+            "pop",
+            "fade",
+            "drop",
+            "rise",
+        }:
+            # Rotate entrance sides so beats feel kinetic
+            anim = (
+                "slide_left",
+                "slide_right",
+                "slide_up",
+                "slide_down",
+                "pop",
+            )[idx % 5]
         entry: dict[str, Any] = {
             "kind": kind,
             "query": query[:80],
@@ -318,11 +373,82 @@ def _sanitize_asset_overlays(raw: Any, *, enabled: bool) -> list[dict[str, Any]]
             "duration": round(duration, 2),
             "position": position,
             "size_pct": round(size, 3),
+            "role": role,
+            "animation": anim,
         }
+        if meaning:
+            entry["meaning"] = meaning[:80]
         if color:
             entry["color"] = color
         out.append(entry)
-    return out[:12]
+    return out[:20]
+
+
+def _plan_emoji_visual_storyboard(
+    *,
+    client: OpenAI,
+    script: str,
+    hook: str,
+    prompt: str,
+    duration_seconds: float | None,
+    user_id: str | None,
+    job_id: str | None,
+) -> list[dict[str, Any]]:
+    """Second-pass storyboard: visuals explain more than the voice."""
+    dur_hint = int(duration_seconds) if duration_seconds else "unknown"
+    system = """You are a senior motion-graphics storyboard director for emoji explainer videos.
+The narration is ONLY a guide. Emoji + icons must carry MOST of the meaning — a muted viewer should still understand the video.
+
+Hard rules:
+- Return STRICT JSON: {"asset_overlays":[...]} only.
+- Plan 14-20 overlays total.
+- Group into BEATS: every beat has 2-4 overlays that share the SAME start_pct (±0.01) and appear TOGETHER as one visual sentence.
+- Advance beats through the whole video (start_pct from ~0.03 to ~0.88).
+- Each overlay query MUST be a concrete OpenMoji/Iconify English name that LITERALLY matches that spoken idea
+  (examples: money bag, rocket, light bulb, chart increasing, briefcase, robot, globe, trophy, fire, red heart, lock, shopping cart).
+- NEVER use decorative fillers (sparkles/star) unless the script is literally about magic/stars.
+- Prefer kind "emoji" for objects/emotions; kind "icon" for abstract UI symbols (check, shield, trend) with color "#F8FAFC" or "#FBBF24".
+- role "hero" = main idea of the beat (size_pct 0.34-0.44); role "support" = flanking explainers (size_pct 0.20-0.30).
+- Positions in a beat MUST differ (e.g. center_left + center + center_right, or top_left + top_right + center).
+- Avoid lower_center / bottom_center (captions live there). bottom_left/bottom_right ok if sparse.
+- duration 2.4-5.0 seconds so beats overlap slightly for flow.
+- Add "meaning": short English phrase of what this glyph explains.
+- Add "animation" for each overlay: slide_left, slide_right, slide_up, slide_down, or pop —
+  vary entrances so glyphs fly in from different sides; match energy to the prompt theme.
+"""
+    user = f"""User brief:
+\"\"\"{prompt}\"\"\"
+
+Hook: {hook}
+Approx duration seconds: {dur_hint}
+
+Full spoken script (map EVERY major idea to emoji/icon beats):
+\"\"\"{script}\"\"\"
+
+Build a dense visual storyboard now. Visuals > voice.
+"""
+    try:
+        response = client.chat.completions.create(
+            model=settings.openai_model,
+            temperature=0.55,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        _log_openai_usage(
+            user_id=user_id,
+            job_id=job_id,
+            response=response,
+            kind="emoji_visual_storyboard",
+        )
+        raw = response.choices[0].message.content or "{}"
+        data = json.loads(raw)
+        return _sanitize_asset_overlays(data.get("asset_overlays"), enabled=True)
+    except Exception as exc:
+        print(f"[EMOJI] visual storyboard planning skipped: {exc}")
+        return []
 
 
 def _training_lines(training: dict[str, Any]) -> str:
@@ -389,20 +515,11 @@ def generate_creativity_script(
     emoji_video = normalized_video_type in {"emoji", "emoji_video", "emojis"}
     if emoji_video:
         video_type_rule = """
-- VIDEO TYPE: Emoji video (NO stock / Pexels video footage).
+- VIDEO TYPE: Emoji explainer video (NO stock / Pexels footage).
 - Set "pexels_queries" to [].
-- Fill "background_colors" with 5-8 solid HEX colors (no #) that match the mood —
-  preferably monochrome / dark cinematic tones (navy, charcoal, deep teal, wine, forest).
-  Backgrounds must be abstract color fields only — NEVER people, faces, products, rooms, or busy scenes.
-- Create a PROFESSIONAL montage plan in "asset_overlays": 6-12 emoji/icon moments that follow the narration beats.
-- Prefer "kind":"emoji" (OpenMoji) for concrete objects/emotions (rocket, money bag, heart, light bulb, fire, chart, trophy).
-- Use "kind":"icon" for clean abstract symbols (check, shield, trend, lock) and set "color" to a contrasting HEX like "#F8FAFC" or "#FBBF24".
-- Every overlay query MUST be short English search keywords for the emoji/icon library.
-- Timing: start_pct 0.02–0.90, duration 1.4–5.0s. Stagger so 1–2 overlays are visible at a time, not a pile-up.
-- Position from: top_left, top_center, top_right, center_left, center, center_right, bottom_left, bottom_right.
-  Alternate left/right. Avoid lower_center / bottom_center (captions live there). Avoid stacking two overlays in the same corner.
-- size_pct 0.12–0.28 (hero beat up to 0.30). Place larger icons on key story beats only.
-- Overlays must support the spoken story — one clear visual idea per moment, not random decoration.
+- Fill "background_colors" with 5-8 solid HEX mood colors (no #) — dark cinematic monochrome only.
+- asset_overlays may be a rough draft (or []); a dedicated visual storyboard pass will refine them.
+- Still prefer meaning-matched emoji queries if you include any draft overlays.
 """
     else:
         video_type_rule = (
@@ -422,11 +539,13 @@ Hard requirements:
 1) Detect language from THIS prompt only and write script+hook+title in that language.
 2) Topic/theme must follow THIS prompt only — do not reuse generic motivational niches.
 3) Title = original short name, never the raw prompt.
-4) If video_type is emoji: pexels_queries=[], fill background_colors (solid mood hex) + rich asset_overlays.
-   If standard: pexels_queries = English stock-search phrases matching the prompt visuals; background_colors=[].
+4) If video_type is emoji: pexels_queries=[], fill background_colors (solid mood hex).
+   Visual storyboard (emoji/icons denser than voice) is planned in a dedicated pass.
+   If standard: pexels_queries = English stock-search phrases; background_colors=[].
 5) Respect safety: no illegal / sexual-minors / real crime-howto content.
-6) Fill subtitle_style + visual_effect to match the mood of the prompt.
+6) Fill subtitle_style + visual_effect + preferred_transition + montage_pace + flash_cuts to match the mood of the prompt.
 7) video_type = {normalized_video_type}.
+8) Every creative choice must feel on-theme with the prompt (not generic stock montage).
 """
 
     response = client.chat.completions.create(
@@ -483,6 +602,19 @@ Hard requirements:
         "subtitle_emphasis": data.get("subtitle_emphasis") or [],
         "subtitle_style": data.get("subtitle_style") or "classic",
         "visual_effect": data.get("visual_effect") or "cinematic",
+        "preferred_transition": str(
+            data.get("preferred_transition") or "smoothleft"
+        ).strip()
+        or "smoothleft",
+        "montage_pace": (
+            str(data.get("montage_pace") or "medium").strip().lower()
+            if str(data.get("montage_pace") or "").strip().lower()
+            in ("viral", "fast", "medium", "cinematic")
+            else "medium"
+        ),
+        "flash_cuts": bool(data.get("flash_cuts"))
+        if data.get("flash_cuts") is not None
+        else False,
         "language": language,
         "music_mood": data.get("music_mood"),
         "video_type": "emoji" if emoji_video else "standard",
@@ -491,43 +623,6 @@ Hard requirements:
             enabled=emoji_video,
         ),
     }
-
-    if emoji_video and not result["asset_overlays"]:
-        fallback_terms = [
-            "sparkles",
-            "light bulb",
-            "rocket",
-            "fire",
-            "star",
-            "trophy",
-            "chart increasing",
-            "red heart",
-        ]
-        fallback_positions = [
-            "top_right",
-            "center_left",
-            "top_left",
-            "center_right",
-            "top_center",
-            "bottom_right",
-            "center",
-            "bottom_left",
-        ]
-        result["asset_overlays"] = _sanitize_asset_overlays(
-            [
-                {
-                    "kind": "emoji",
-                    "query": term,
-                    "label": term,
-                    "start_pct": 0.06 + i * 0.11,
-                    "duration": 2.6,
-                    "position": fallback_positions[i],
-                    "size_pct": 0.16 if i % 3 else 0.22,
-                }
-                for i, term in enumerate(fallback_terms)
-            ],
-            enabled=True,
-        )
 
     if not duration_auto and duration_seconds:
         target = max(creat_min, min(creat_max, int(duration_seconds)))
@@ -582,6 +677,54 @@ Hard requirements:
             )
         except (TypeError, ValueError):
             pass
+
+    if emoji_video:
+        final_script = str(result.get("script") or script)
+        storyboard = _plan_emoji_visual_storyboard(
+            client=client,
+            script=final_script,
+            hook=str(result.get("hook") or ""),
+            prompt=prompt,
+            duration_seconds=(
+                float(result["duration_seconds"])
+                if result.get("duration_seconds") is not None
+                else None
+            ),
+            user_id=user_id,
+            job_id=job_id,
+        )
+        if len(storyboard) >= 8:
+            result["asset_overlays"] = storyboard
+        elif not result.get("asset_overlays"):
+            clusters = [
+                ("money bag", "chart increasing", "rocket"),
+                ("light bulb", "robot", "laptop"),
+                ("globe", "briefcase", "trophy"),
+                ("fire", "zap", "check"),
+                ("locked", "key", "shield"),
+            ]
+            draft: list[dict[str, Any]] = []
+            for bi, trio in enumerate(clusters):
+                start = 0.06 + bi * 0.17
+                positions = ("center_left", "center", "center_right")
+                for ji, term in enumerate(trio):
+                    is_icon = term in {"check", "shield"}
+                    draft.append(
+                        {
+                            "kind": "icon" if is_icon else "emoji",
+                            "query": term,
+                            "label": term,
+                            "meaning": term,
+                            "start_pct": start,
+                            "duration": 3.4,
+                            "position": positions[ji],
+                            "size_pct": 0.38 if ji == 1 else 0.26,
+                            "role": "hero" if ji == 1 else "support",
+                            "color": "#F8FAFC" if is_icon else None,
+                        }
+                    )
+            result["asset_overlays"] = _sanitize_asset_overlays(draft, enabled=True)
+
     return result
 
 

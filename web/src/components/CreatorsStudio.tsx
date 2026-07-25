@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -24,18 +23,9 @@ import {
   CreatorsMediaMasonry,
   mapPexelsMediaToStock,
   mapUnsplashToStock,
-  PexelsCategoryCard,
   type CreatorsStockItem,
 } from "@/components/CreatorsMediaMasonry";
-
-type StudioKind =
-  | "models"
-  | "hdris"
-  | "textures"
-  | "photos"
-  | "videos"
-  | "emojis"
-  | "icons";
+import type { StudioKind } from "@/lib/studio-kind";
 
 const TYPE_OPTIONS: { id: StudioKind; label: string }[] = [
   { id: "models", label: "3D models" },
@@ -46,6 +36,8 @@ const TYPE_OPTIONS: { id: StudioKind; label: string }[] = [
   { id: "emojis", label: "Emojis" },
   { id: "icons", label: "Icons" },
 ];
+
+type PhotoSourceFilter = "all" | "pexels" | "unsplash";
 
 const PEXELS_PHOTOS_ID = "pexels";
 
@@ -125,15 +117,16 @@ async function downloadPackageZip(pack: PolyPackage, assetId: string) {
   URL.revokeObjectURL(url);
 }
 
-export function CreatorsStudio() {
-  const [kind, setKind] = useState<StudioKind>("models");
-  const [view, setView] = useState<ViewMode>("categories");
+export function CreatorsStudio({ kind }: { kind: StudioKind }) {
+  const [view, setView] = useState<ViewMode>(
+    kind === "videos" || kind === "photos" ? "gallery" : "categories",
+  );
   const [category, setCategory] = useState<string | null>(null);
+  const [photoSource, setPhotoSource] = useState<PhotoSourceFilter>("all");
   const [categories, setCategories] = useState<CategoryOpt[]>([]);
   const [catsLoading, setCatsLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
-  const [typeOpen, setTypeOpen] = useState(false);
   const [items, setItems] = useState<PolyHavenAssetMeta[]>([]);
   const [emojis, setEmojis] = useState<OpenMojiItem[]>([]);
   const [emojiViewer, setEmojiViewer] = useState<OpenMojiItem | null>(null);
@@ -159,7 +152,6 @@ export function CreatorsStudio() {
   const [toolbarH, setToolbarH] = useState(64);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const typeRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -176,12 +168,11 @@ export function CreatorsStudio() {
   const isVideos = kind === "videos";
   const isPexelsPhotos = isPhotos && category === PEXELS_PHOTOS_ID;
   const searching = Boolean(submitted);
-  const isStockGallery =
-    isVideos || (isPhotos && (Boolean(category) || searching));
+  /** Photos always open as a full gallery (no category hub). */
+  const isStockGallery = isVideos || isPhotos;
   const showCategories =
     (isEmoji && !emojiGroup && !searching) ||
     (isIcons && !iconPrefix && !searching) ||
-    (isPhotos && !category && !searching) ||
     (isPolyKind(kind) && view === "categories" && !searching);
   const showGallery =
     (isEmoji && (Boolean(emojiGroup) || searching)) ||
@@ -193,16 +184,13 @@ export function CreatorsStudio() {
     (isIcons && showGallery) ||
     isStockGallery ||
     (isPolyKind(kind) && showGallery);
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (typeRef.current && !typeRef.current.contains(e.target as Node)) {
-        setTypeOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  const showBackToCategories =
+    showGallery &&
+    !isPhotos &&
+    !isVideos &&
+    ((isPolyKind(kind) && (view === "gallery" || searching || Boolean(category))) ||
+      (isEmoji && (Boolean(emojiGroup) || searching)) ||
+      (isIcons && (Boolean(iconPrefix) || searching)));
 
   // Live search: update results as you type; empty field restores the list
   useEffect(() => {
@@ -213,9 +201,9 @@ export function CreatorsStudio() {
       setErr(null);
       if (q) {
         setView("gallery");
-      } else if ((isPolyKind(kind) || kind === "photos") && !category) {
+      } else if (isPolyKind(kind) && !category) {
         setView("categories");
-      } else if (kind === "videos") {
+      } else if (kind === "videos" || kind === "photos") {
         setView("gallery");
       }
     }, delay);
@@ -283,49 +271,17 @@ export function CreatorsStudio() {
     };
   }, [kind]);
 
-  // Unsplash topics → Photos categories (page 1; more on scroll)
+  // Unsplash topics — unused for photos (photos open as a full gallery)
   useEffect(() => {
     if (!isPhotos) return;
-    let cancelled = false;
-    setCatsLoading(true);
-    catsPageRef.current = 1;
-    catsHasMoreRef.current = true;
-    void (async () => {
-      const res = await fetch("/api/unsplash/topics?page=1&perPage=24");
-      const data = await res.json().catch(() => ({}));
-      if (cancelled) return;
-      if (!res.ok) {
-        setErr(data.error || "Failed to load Unsplash topics");
-        setCategories([]);
-        catsHasMoreRef.current = false;
-      } else {
-        setCategories(
-          ((data.items || []) as Array<{
-            slug: string;
-            label: string;
-            count: number;
-            thumbUrl: string | null;
-          }>).map((t) => ({
-            id: t.slug,
-            label: t.label,
-            count: t.count,
-            thumbUrl: t.thumbUrl,
-          })),
-        );
-        catsHasMoreRef.current = Boolean(data.hasMore);
-        catsPageRef.current = 1;
-      }
-      setCatsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setCategories([]);
+    setCatsLoading(false);
+    catsHasMoreRef.current = false;
   }, [isPhotos]);
 
   // Photos (Unsplash + Pexels) and Videos (Pexels) — media masonry
   useEffect(() => {
     if (!isPhotos && !isVideos) return;
-    if (isPhotos && !category && !submitted) return;
 
     let cancelled = false;
     const reqId = ++requestIdRef.current;
@@ -343,7 +299,9 @@ export function CreatorsStudio() {
         let hasMore = false;
 
         const wantPexels =
-          isVideos || isPexelsPhotos || (isPhotos && Boolean(submitted));
+          isVideos ||
+          isPexelsPhotos ||
+          (isPhotos && photoSource !== "unsplash");
         if (wantPexels) {
           const params = new URLSearchParams({
             type: isVideos ? "video" : "photo",
@@ -361,7 +319,7 @@ export function CreatorsStudio() {
         }
 
         const wantUnsplash =
-          isPhotos && !isPexelsPhotos && (Boolean(submitted) || Boolean(category));
+          isPhotos && !isPexelsPhotos && photoSource !== "pexels";
         if (wantUnsplash) {
           const params = new URLSearchParams({
             page: "1",
@@ -409,7 +367,14 @@ export function CreatorsStudio() {
     return () => {
       cancelled = true;
     };
-  }, [isPhotos, isVideos, isPexelsPhotos, category, submitted]);
+  }, [
+    isPhotos,
+    isVideos,
+    isPexelsPhotos,
+    category,
+    submitted,
+    photoSource,
+  ]);
 
   // OpenMoji categories (group_name)
   useEffect(() => {
@@ -677,12 +642,14 @@ export function CreatorsStudio() {
             return [...prev, ...batch.filter((b) => !seen.has(b.id))];
           });
         }
-      } else if (isVideos || (isPhotos && (category || submitted))) {
+      } else if (isVideos || isPhotos) {
         const batch: CreatorsStockItem[] = [];
         let hasMore = false;
 
         const wantPexels =
-          isVideos || isPexelsPhotos || (isPhotos && Boolean(submitted));
+          isVideos ||
+          isPexelsPhotos ||
+          (isPhotos && photoSource !== "unsplash");
         if (wantPexels) {
           const params = new URLSearchParams({
             type: isVideos ? "video" : "photo",
@@ -701,7 +668,7 @@ export function CreatorsStudio() {
         }
 
         const wantUnsplash =
-          isPhotos && !isPexelsPhotos && (Boolean(submitted) || Boolean(category));
+          isPhotos && !isPexelsPhotos && photoSource !== "pexels";
         if (wantUnsplash) {
           const params = new URLSearchParams({
             page: String(nextPage),
@@ -774,6 +741,7 @@ export function CreatorsStudio() {
     isPexelsPhotos,
     iconPrefix,
     emojiGroup,
+    photoSource,
   ]);
 
   useEffect(() => {
@@ -801,31 +769,6 @@ export function CreatorsStudio() {
     stockItems.length,
     categories.length,
   ]);
-
-  function selectKind(next: StudioKind) {
-    setTypeOpen(false);
-    if (next === kind) return;
-    setKind(next);
-    setCategory(null);
-    setIconPrefix(null);
-    setEmojiGroup(null);
-    setView("categories");
-    setSubmitted("");
-    setQuery("");
-    setItems([]);
-    setEmojis([]);
-    setIcons([]);
-    setPhotos([]);
-    setStockItems([]);
-    setIconSets([]);
-    setEmojiGroups([]);
-    setViewer(null);
-    setEmojiViewer(null);
-    setIconViewer(null);
-    setPhotoViewer(null);
-    setErr(null);
-    if (next === "videos") setView("gallery");
-  }
 
   function openCategory(cat: CategoryOpt) {
     setCategory(cat.id);
@@ -874,7 +817,7 @@ export function CreatorsStudio() {
       setSubmitted("");
       setQuery("");
       setPhotoViewer(null);
-      setView("categories");
+      setView("gallery");
       return;
     }
     if (isVideos) {
@@ -965,65 +908,13 @@ export function CreatorsStudio() {
         style={{ top: "var(--app-header-height, 3.5rem)" }}
       >
         <form onSubmit={onSearch} className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/dashboard/creators"
-            className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--fg)]"
-          >
-            ← Hub
-          </Link>
           <div className="relative min-w-0 flex-1">
-            <div className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2" ref={typeRef}>
-              <button
-                type="button"
-                title="Filter type"
-                onClick={() => setTypeOpen((v) => !v)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M4 5h16" />
-                  <path d="M7 12h10" />
-                  <path d="M10 19h4" />
-                </svg>
-              </button>
-              {typeOpen && (
-                <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-1 shadow-2xl">
-                  {TYPE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => selectKind(opt.id)}
-                      className="block w-full px-3 py-2 text-left text-sm transition hover:bg-white/5"
-                      style={{
-                        color: kind === opt.id ? "var(--accent)" : "var(--fg)",
-                        background:
-                          kind === opt.id
-                            ? "rgba(232,165,75,0.1)"
-                            : "transparent",
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${typeLabel(kind).toLowerCase()}…`}
-              className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-2.5 pl-11 pr-11 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
+              className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-2.5 pl-4 pr-11 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
             />
             <button
               type="submit"
@@ -1048,7 +939,42 @@ export function CreatorsStudio() {
           </div>
         </form>
 
-        {showGallery && !(isVideos && !searching) && (
+        {isPhotos && (
+          <div
+            className="mt-2 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Photo sources"
+          >
+            {(
+              [
+                { id: "all", label: "All sources" },
+                { id: "pexels", label: "Pexels" },
+                { id: "unsplash", label: "Unsplash" },
+              ] as const
+            ).map((opt) => {
+              const on = photoSource === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPhotoSource(opt.id)}
+                  className="rounded-full border px-3 py-1 text-xs font-semibold transition"
+                  style={{
+                    borderColor: on
+                      ? "rgba(232,165,75,0.55)"
+                      : "var(--line)",
+                    color: on ? "var(--accent)" : "var(--muted)",
+                    background: on ? "rgba(232,165,75,0.12)" : "transparent",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {showBackToCategories && (
           <button
             type="button"
             onClick={backToCategories}
@@ -1148,62 +1074,6 @@ export function CreatorsStudio() {
                         </p>
                         <p className="text-[11px] text-white/75">
                           {cat.count} emoji{cat.count === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : isPhotos ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
-              <PexelsCategoryCard
-                onClick={() =>
-                  openCategory({
-                    id: PEXELS_PHOTOS_ID,
-                    label: "Pexels",
-                    count: 0,
-                    thumbUrl: null,
-                  })
-                }
-                hover={hoverCat === PEXELS_PHOTOS_ID}
-                onHover={(on) => setHoverCat(on ? PEXELS_PHOTOS_ID : null)}
-              />
-              {categories.map((cat) => {
-                const on = hoverCat === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => openCategory(cat)}
-                    onMouseEnter={() => setHoverCat(cat.id)}
-                    onMouseLeave={() => setHoverCat(null)}
-                    className="relative aspect-square overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/40 outline-none"
-                  >
-                    {cat.thumbUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={cat.thumbUrl}
-                        alt=""
-                        className="h-full w-full object-cover transition duration-300"
-                        style={{
-                          transform: on ? "scale(1.04)" : "scale(1)",
-                          filter: on ? "brightness(1.05)" : undefined,
-                        }}
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-white/5" />
-                    )}
-                    <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white">
-                      Unsplash
-                    </span>
-                    {on && (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3 text-left">
-                        <p className="font-[family-name:var(--font-syne)] text-sm font-semibold text-white">
-                          {cat.label}
-                        </p>
-                        <p className="text-[11px] text-white/75">
-                          {cat.count.toLocaleString()} photos · Unsplash
                         </p>
                       </div>
                     )}

@@ -54,6 +54,14 @@ export type AiTraining = {
   } | null;
   voice_id: string;
   subtitle_style: string;
+  /** Color grade id (cinematic, punch, neon, …) */
+  visual_effect?: string;
+  /** Preferred xfade transition id; empty = auto */
+  preferred_transition?: string;
+  /** viral | fast | medium | cinematic */
+  montage_pace?: string;
+  /** Prefer flashy cut pool between clips */
+  flash_cuts?: boolean;
   duration_seconds: number;
   video_format: string;
   video_style: string;

@@ -26,6 +26,7 @@ import {
   SubtitleStyleCard,
   type SubtitleStyleId,
 } from "@/components/SubtitleStylePicker";
+import { useFeatureLocked } from "@/lib/product-locks-client";
 
 const ASPECTS = [
   { id: "9:16", label: "9:16", hint: "Shorts / Reels" },
@@ -159,6 +160,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   const tab: "create" | "clips" =
     tabRaw === "clips" || tabRaw === "create" ? tabRaw : "create";
   const fileRef = useRef<HTMLInputElement>(null);
+  const editorLocked = useFeatureLocked("video_editor");
   const [jobs, setJobs] = useState(() => initialJobs.filter(isClippingJob));
   const [sources, setSources] = useState<ClipSource[]>([]);
   const [aspect, setAspect] = useState<Aspect>("9:16");
@@ -1280,7 +1282,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           )}
                         </div>
                       )}
-                      {ready && (
+                      {ready && !editorLocked && (
                         <a
                           href={`/dashboard/editor/${job.id}`}
                           className="absolute left-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80 sm:left-2 sm:top-2 sm:h-8 sm:w-8"
@@ -1308,10 +1310,14 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           items={[
                             ...(ready
                               ? [
-                                  {
-                                    label: "Edit",
-                                    href: `/dashboard/editor/${job.id}`,
-                                  },
+                                  ...(!editorLocked
+                                    ? [
+                                        {
+                                          label: "Edit",
+                                          href: `/dashboard/editor/${job.id}`,
+                                        },
+                                      ]
+                                    : []),
                                   {
                                     label: "Download",
                                     onClick: () =>

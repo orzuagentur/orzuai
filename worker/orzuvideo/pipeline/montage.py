@@ -30,11 +30,26 @@ def pick_transition(
     exclude: str | None = None,
     *,
     allowed: list[str] | None = None,
+    preferred: str | None = None,
+    flash_cuts: bool = False,
 ) -> str:
     base = list(allowed) if allowed else list(TRANSITION_LIBRARY)
     # Keep only names FFmpeg xfade knows from our library
     pool = [t for t in base if t in TRANSITION_LIBRARY] or list(TRANSITION_LIBRARY)
+    if flash_cuts:
+        from orzuvideo.pipeline.fx_library import FLASH_TRANSITION_POOL
+
+        flashy = [t for t in FLASH_TRANSITION_POOL if t in TRANSITION_LIBRARY]
+        # Bias pool toward punchy transitions
+        pool = list(dict.fromkeys([*flashy, *pool]))
     pool = [t for t in pool if t != exclude] or pool
+    pref = (preferred or "").strip()
+    if pref and pref in pool and pref != exclude and random.random() < 0.55:
+        return pref
+    if flash_cuts and random.random() < 0.45:
+        flashy = [t for t in pool if t in ("fadewhite", "fadeblack", "radial", "zoomin", "hblur")]
+        if flashy:
+            return random.choice(flashy)
     return random.choice(pool)
 
 
@@ -80,6 +95,8 @@ def normalize_clip_pro(
     motion: dict[str, str] | None = None,
     size: tuple[int, int] | None = None,
     effect: str | None = None,
+    flash_in: bool = False,
+    speed: float = 1.0,
 ) -> Path:
     """Normalize clip to target frame with cinematic motion + grade + locked timebase."""
     w, h = size or (settings.output_width, settings.output_height)
@@ -89,15 +106,22 @@ def normalize_clip_pro(
         f"zoompan=z='{motion['zoom']}':d=1:"
         f"x='{motion['x']}':y='{motion['y']}':s={w}x{h}:fps={fps},"
     )
-    fade_in = 0.12 if punch else 0.18
+    fade_in = 0.08 if flash_in else (0.12 if punch else 0.18)
     fade_out = 0.28
     grade = effect_chain(effect) if effect else motion.get("eq") or ""
     grade_part = f"{grade}," if grade else ""
+    spd = max(0.75, min(1.35, float(speed or 1.0)))
+    # Speed via input trim length: faster = consume more source time for same output
+    src_t = duration * spd
+    flash_part = ""
+    if flash_in:
+        flash_part = "fade=t=in:st=0:d=0.09:color=white,"
     vf = (
         f"scale={w}:{h}:force_original_aspect_ratio=increase,"
         f"crop={w}:{h},"
         f"{zoom}"
         f"{grade_part}"
+        f"{flash_part}"
         f"fade=t=in:st=0:d={fade_in},"
         f"fade=t=out:st={max(0.1, duration - fade_out):.3f}:d={fade_out},"
         f"{_tb_chain(fps=fps)}"
@@ -109,7 +133,7 @@ def normalize_clip_pro(
             "-i",
             str(src),
             "-t",
-            f"{duration:.3f}",
+            f"{src_t:.3f}",
             "-an",
             "-vf",
             vf,
@@ -117,8 +141,8 @@ def normalize_clip_pro(
             str(fps),
             "-vsync",
             "cfr",
-            "-video_track_timescale",
-            str(max(fps * 1000, 30000)),
+            "-t",
+            f"{duration:.3f}",
             "-c:v",
             "libx264",
             "-preset",
@@ -295,6 +319,8 @@ def concat_with_pro_transitions(
     size: tuple[int, int] | None = None,
     allowed_transitions: list[str] | None = None,
     transitions_enabled: bool = True,
+    preferred_transition: str | None = None,
+    flash_cuts: bool = False,
 ) -> Path:
     """Crossfade clips with locked timebases + varied cinematic transitions."""
     if len(clips) == 1:
@@ -328,6 +354,8 @@ def concat_with_pro_transitions(
             transition = pick_transition(
                 exclude=last_transition,
                 allowed=allowed_transitions,
+                preferred=preferred_transition,
+                flash_cuts=flash_cuts,
             )
         else:
             transition = "fade"

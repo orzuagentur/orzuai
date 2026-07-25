@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/AppShell";
+import { ProductLocksProvider } from "@/lib/product-locks-client";
 
 export default async function DashboardLayout({
   children,
@@ -13,5 +14,9 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  return <AppShell email={user.email}>{children}</AppShell>;
+  return (
+    <ProductLocksProvider>
+      <AppShell email={user.email}>{children}</AppShell>
+    </ProductLocksProvider>
+  );
 }

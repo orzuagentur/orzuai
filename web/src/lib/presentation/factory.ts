@@ -217,12 +217,18 @@ export function createChartElement(
 }
 
 export type TextStyleId =
+  | "hero"
+  | "display"
   | "title"
   | "subtitle"
+  | "kicker"
   | "body"
   | "caption"
   | "quote"
-  | "bullet";
+  | "bullet"
+  | "stat"
+  | "label"
+  | "emphasis";
 
 export function createStyledText(
   style: TextStyleId,
@@ -230,21 +236,51 @@ export function createStyledText(
 ): TextElement {
   const theme = getTheme(themeId);
   switch (style) {
+    case "hero":
+      return createTextElement(themeId, {
+        text: "Hero headline",
+        fontSize: 56,
+        fontWeight: 800,
+        align: "left",
+        letterSpacing: -0.02,
+        y: 28,
+        h: 20,
+      });
+    case "display":
+      return createTextElement(themeId, {
+        text: "Display title",
+        fontSize: 48,
+        fontWeight: 800,
+        align: "left",
+        y: 24,
+        h: 18,
+      });
     case "title":
       return createTextElement(themeId, {
         text: "Title",
-        fontSize: 44,
+        fontSize: 40,
         fontWeight: 800,
         align: "left",
       });
     case "subtitle":
       return createTextElement(themeId, {
         text: "Subtitle",
-        fontSize: 26,
+        fontSize: 24,
         fontWeight: 600,
         color: theme.bodyColor,
         y: 34,
         h: 10,
+      });
+    case "kicker":
+      return createTextElement(themeId, {
+        text: "KICKER",
+        fontSize: 12,
+        fontWeight: 700,
+        color: theme.accent,
+        letterSpacing: 0.14,
+        y: 14,
+        h: 6,
+        w: 50,
       });
     case "body":
       return createBodyText(themeId, {
@@ -281,6 +317,39 @@ export function createStyledText(
         lineHeight: 1.55,
         y: 28,
         h: 40,
+      });
+    case "stat":
+      return createTextElement(themeId, {
+        text: "128%",
+        fontSize: 64,
+        fontWeight: 800,
+        color: theme.accent,
+        align: "left",
+        x: 10,
+        y: 30,
+        w: 40,
+        h: 22,
+      });
+    case "label":
+      return createTextElement(themeId, {
+        text: "Label",
+        fontSize: 11,
+        fontWeight: 600,
+        color: theme.muted,
+        letterSpacing: 0.08,
+        y: 72,
+        h: 6,
+        w: 30,
+      });
+    case "emphasis":
+      return createTextElement(themeId, {
+        text: "Key line",
+        fontSize: 22,
+        fontWeight: 700,
+        color: theme.titleColor,
+        y: 48,
+        h: 10,
+        w: 70,
       });
   }
 }

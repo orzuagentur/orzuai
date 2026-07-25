@@ -195,3 +195,17 @@ export async function signedPutUrl(
     { expiresIn: expiresInSec },
   );
 }
+
+/** Read UTF-8 object body from R2 (e.g. presentation JSON). */
+export async function getObjectText(key: string): Promise<string | null> {
+  try {
+    const res = await getR2Client().send(
+      new GetObjectCommand({ Bucket: r2Bucket(), Key: key }),
+    );
+    const body = res.Body;
+    if (!body) return null;
+    return await body.transformToString();
+  } catch {
+    return null;
+  }
+}

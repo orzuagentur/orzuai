@@ -134,7 +134,7 @@ export const VOICE_PRESETS: Preset[] = [
 ];
 
 export const SUBTITLE_PRESETS: Preset[] = [
-  { value: "karaoke_bold", label: "Karaoke bold" },
+  { value: "karaoke_gold", label: "Karaoke gold" },
   { value: "minimal_white", label: "Minimal white" },
   { value: "yellow_pop", label: "Yellow pop" },
   { value: "outline_heavy", label: "Heavy outline" },
@@ -205,6 +205,58 @@ export const VIDEO_STYLE_PRESETS: Preset[] = [
   { value: "luxury_slow", label: "Luxury slow" },
   { value: "hype_edit", label: "Hype edit" },
   { value: "clean_minimal", label: "Clean minimal" },
+];
+
+export const MONTAGE_PACE_PRESETS: Preset[] = [
+  { value: "viral", label: "Viral (fast flash cuts)" },
+  { value: "fast", label: "Fast" },
+  { value: "medium", label: "Medium" },
+  { value: "cinematic", label: "Cinematic (slow)" },
+];
+
+export const VISUAL_EFFECT_PRESETS: Preset[] = [
+  { value: "cinematic", label: "Cinematic" },
+  { value: "vivid", label: "Vivid" },
+  { value: "soft", label: "Soft" },
+  { value: "noir", label: "Noir" },
+  { value: "punch", label: "Punch" },
+  { value: "warm", label: "Warm" },
+  { value: "cool", label: "Cool" },
+  { value: "teal_orange", label: "Teal & orange" },
+  { value: "vintage", label: "Vintage" },
+  { value: "neon", label: "Neon" },
+  { value: "drama", label: "Drama" },
+  { value: "blockbuster", label: "Blockbuster" },
+  { value: "golden_hour", label: "Golden hour" },
+  { value: "night_mood", label: "Night mood" },
+  { value: "pop_art", label: "Pop art" },
+  { value: "punch_pop", label: "Punch pop" },
+  { value: "soft_film", label: "Soft film" },
+  { value: "neon_pop", label: "Neon pop" },
+  { value: "warm_glow", label: "Warm glow" },
+  { value: "cold_steel", label: "Cold steel" },
+  { value: "amber_rush", label: "Amber rush" },
+  { value: "none", label: "None" },
+];
+
+export const TRANSITION_PRESETS: Preset[] = [
+  { value: "", label: "Auto (from montage pool)" },
+  { value: "fade", label: "Fade" },
+  { value: "dissolve", label: "Dissolve" },
+  { value: "fadeblack", label: "Fade black" },
+  { value: "fadewhite", label: "Fade white" },
+  { value: "radial", label: "Radial" },
+  { value: "zoomin", label: "Zoom in" },
+  { value: "smoothleft", label: "Smooth left" },
+  { value: "smoothright", label: "Smooth right" },
+  { value: "slideleft", label: "Slide left" },
+  { value: "slideright", label: "Slide right" },
+  { value: "circleopen", label: "Circle open" },
+  { value: "wipeleft", label: "Wipe left" },
+  { value: "wiperight", label: "Wipe right" },
+  { value: "pixelize", label: "Pixelize" },
+  { value: "hblur", label: "Blur" },
+  { value: "diagtl", label: "Diagonal" },
 ];
 
 export const STYLE_PROMPT_PRESETS: Preset[] = [

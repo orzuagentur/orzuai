@@ -27,9 +27,13 @@ import {
   defaultDurationForFormat,
   durationPresetsForFormat,
   LANGUAGE_PRESETS,
+  MONTAGE_PACE_PRESETS,
   NICHE_PRESETS,
   REPLY_STYLE_PRESETS,
+  TRANSITION_PRESETS,
   VIDEO_FORMAT_PRESETS,
+  VIDEO_STYLE_PRESETS,
+  VISUAL_EFFECT_PRESETS,
   ensurePreset,
   type Preset,
 } from "@/lib/training-presets";
@@ -69,6 +73,28 @@ export function TrainingStudio({
       ...initial,
       learning_enabled: false,
     };
+    const look =
+      initial?.music_prefs &&
+      typeof initial.music_prefs === "object" &&
+      (initial.music_prefs as { montage_look?: Record<string, unknown> })
+        .montage_look;
+    if (look && typeof look === "object") {
+      if (!merged.visual_effect && look.visual_effect != null) {
+        merged.visual_effect = String(look.visual_effect);
+      }
+      if (
+        (merged.preferred_transition == null || merged.preferred_transition === "") &&
+        look.preferred_transition != null
+      ) {
+        merged.preferred_transition = String(look.preferred_transition);
+      }
+      if (!merged.montage_pace && look.montage_pace != null) {
+        merged.montage_pace = String(look.montage_pace);
+      }
+      if (merged.flash_cuts == null && look.flash_cuts != null) {
+        merged.flash_cuts = Boolean(look.flash_cuts);
+      }
+    }
     const rawFormat = String(merged.video_format || "shorts");
     const video_format =
       rawFormat === "simple" || rawFormat === "shorts_mixer"
@@ -82,6 +108,14 @@ export function TrainingStudio({
       ...merged,
       video_format,
       subtitle_style: normalizeSubtitleStyle(merged.subtitle_style),
+      visual_effect: String(merged.visual_effect || "cinematic").trim() || "cinematic",
+      preferred_transition: String(merged.preferred_transition ?? "").trim(),
+      montage_pace: ["viral", "fast", "medium", "cinematic"].includes(
+        String(merged.montage_pace || "").trim().toLowerCase(),
+      )
+        ? String(merged.montage_pace).trim().toLowerCase()
+        : "medium",
+      flash_cuts: Boolean(merged.flash_cuts),
       music_prefs: {
         ...defaultMusicPrefs(),
         ...(initial?.music_prefs || {}),
@@ -371,7 +405,7 @@ export function TrainingStudio({
         <section className="panel rise space-y-3 p-3 sm:space-y-4 sm:p-4">
           <SectionTitle
             title="Content"
-            subtitle="Niche, language, format, subtitles, and prompt."
+            subtitle="Niche, language, format, subtitles, look, and prompt."
             required
           />
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
@@ -434,6 +468,85 @@ export function TrainingStudio({
             onChange={(id) => setTraining("subtitle_style", id)}
             disabled={busy}
           />
+
+          <div className="space-y-3 border-t border-[color:var(--line)] pt-3">
+            <div>
+              <p className="text-sm font-semibold">Look & montage</p>
+              <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
+                Applied on every AI Short from this channel — beats script
+                suggestions.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+              <PresetSelect
+                label="Edit style"
+                value={form.video_style || ""}
+                presets={ensurePreset(VIDEO_STYLE_PRESETS, form.video_style || "")}
+                onChange={(v) => setTraining("video_style", v)}
+                optional
+                compact
+              />
+              <PresetSelect
+                label="Color grade"
+                value={form.visual_effect || "cinematic"}
+                presets={ensurePreset(
+                  VISUAL_EFFECT_PRESETS,
+                  form.visual_effect || "cinematic",
+                )}
+                onChange={(v) => setTraining("visual_effect", v)}
+                compact
+              />
+              <PresetSelect
+                label="Transition"
+                value={form.preferred_transition ?? ""}
+                presets={ensurePreset(
+                  TRANSITION_PRESETS,
+                  form.preferred_transition ?? "",
+                )}
+                onChange={(v) => setTraining("preferred_transition", v)}
+                optional
+                compact
+              />
+              <PresetSelect
+                label="Pace"
+                value={form.montage_pace || "medium"}
+                presets={ensurePreset(
+                  MONTAGE_PACE_PRESETS,
+                  form.montage_pace || "medium",
+                )}
+                onChange={(v) => setTraining("montage_pace", v)}
+                compact
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--line)] bg-black/15 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Flash cuts</p>
+                <p className="text-[11px] text-[color:var(--muted)]">
+                  Punchy xfade pool between clips (viral energy).
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(form.flash_cuts)}
+                disabled={busy}
+                onClick={() => setTraining("flash_cuts", !form.flash_cuts)}
+                className="relative h-7 w-12 shrink-0 rounded-full transition"
+                style={{
+                  background: form.flash_cuts
+                    ? "rgba(232,165,75,0.85)"
+                    : "rgba(255,255,255,0.12)",
+                }}
+              >
+                <span
+                  className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition"
+                  style={{
+                    left: form.flash_cuts ? "1.4rem" : "0.2rem",
+                  }}
+                />
+              </button>
+            </div>
+          </div>
 
           <div className="space-y-1.5 border-t border-[color:var(--line)] pt-3">
             <label className="block space-y-1">
