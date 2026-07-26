@@ -77,7 +77,7 @@ export const trainingEmptyDefaults: AiTraining = {
   reply_comments_enabled: false,
   reply_languages: "auto",
   reply_style_prompt: "",
-  learning_enabled: false,
+  learning_enabled: true,
   brand_rules: "",
   is_trained: false,
 };

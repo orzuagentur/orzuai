@@ -8,7 +8,15 @@ import { renderQrDataUrl } from "@/lib/presentation/factory";
 const FONT_OPTIONS = [
   "Syne, system-ui, sans-serif",
   "DM Sans, system-ui, sans-serif",
+  "Inter, system-ui, sans-serif",
+  "Aptos, Calibri, system-ui, sans-serif",
+  "Avenir Next, Avenir, system-ui, sans-serif",
+  "Helvetica Neue, Arial, sans-serif",
   "Georgia, serif",
+  "Times New Roman, serif",
+  "Trebuchet MS, sans-serif",
+  "Verdana, sans-serif",
+  "Impact, Haettenschweiler, sans-serif",
   "Arial, sans-serif",
   "Courier New, monospace",
 ];

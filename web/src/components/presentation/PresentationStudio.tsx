@@ -12,6 +12,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { CHART_COUNT, CHART_PRESETS } from "@/lib/presentation/charts";
 import {
+  downloadPresentationPptx,
   downloadPresentationWord,
   printPresentationPdf,
   solidColorFromBackground,
@@ -29,6 +30,7 @@ import {
   createStyledText,
   loadPresentationDraft,
   savePresentationDraft,
+  uid,
   type TextStyleId,
 } from "@/lib/presentation/factory";
 import {
@@ -37,8 +39,8 @@ import {
   savePresentationDocToLibrary,
 } from "@/lib/presentation/library";
 import { PRESENTATION_THEMES, getTheme } from "@/lib/presentation/themes";
+import { slideSurfaceStyle } from "@/lib/presentation/surface";
 import type {
-  ElementAnimation,
   PresentationDoc,
   ResizeHandle,
   RightPanelTab,
@@ -63,16 +65,7 @@ const TRANSITIONS: SlideTransition[] = [
   "zoom",
   "wipe",
 ];
-const ANIMATIONS: ElementAnimation[] = [
-  "none",
-  "fadeIn",
-  "fadeUp",
-  "fadeDown",
-  "zoomIn",
-  "slideLeft",
-  "slideRight",
-  "bounce",
-];
+const ZOOM_LEVELS = [75, 100, 125, 150] as const;
 const SHAPE_IDS: ShapeKind[] = [
   "rect",
   "roundRect",
@@ -152,14 +145,6 @@ const TEXT_STYLE_HINTS: Record<TextStyleId, string> = {
   label: "Tiny tag",
 };
 
-const FONT_OPTIONS = [
-  "Syne, system-ui, sans-serif",
-  "DM Sans, system-ui, sans-serif",
-  "Georgia, serif",
-  "Arial, sans-serif",
-  "Courier New, monospace",
-];
-
 type MediaItem = {
   id: string;
   src: string;
@@ -182,6 +167,21 @@ type EmojiRow = {
   hex: string;
   public_url: string;
   name: string | null;
+};
+
+type UnsplashMediaApiItem = {
+  id: string;
+  urls?: {
+    regular?: string;
+    full?: string;
+    small?: string;
+    thumb?: string;
+  };
+  alt?: string;
+  description?: string;
+  photographer?: { name?: string };
+  unsplashUrl?: string;
+  downloadLocation?: string;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -244,6 +244,9 @@ export function PresentationStudio() {
   const [chartFilter, setChartFilter] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [qrDraft, setQrDraft] = useState("https://orzuai.com");
+  const [zoom, setZoom] = useState<(typeof ZOOM_LEVELS)[number]>(100);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
   const exportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -361,18 +364,6 @@ export function PresentationStudio() {
     [slideIndex],
   );
 
-  const patchSelected = useCallback(
-    (patch: Partial<SlideElement>) => {
-      if (!selectedId) return;
-      updateSlideElements((els) =>
-        els.map((el) =>
-          el.id === selectedId ? ({ ...el, ...patch } as SlideElement) : el,
-        ),
-      );
-    },
-    [selectedId, updateSlideElements],
-  );
-
   const addElement = useCallback(
     (el: SlideElement) => {
       updateSlideElements((els) => [...els, { ...el, zIndex: els.length + 1 }]);
@@ -393,10 +384,9 @@ export function PresentationStudio() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unsplash failed");
         setMediaItems(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (data.items || []).map((p: any) => ({
+          ((data.items || []) as UnsplashMediaApiItem[]).map((p) => ({
             id: p.id,
-            src: p.urls?.regular || p.urls?.full,
+            src: p.urls?.regular || p.urls?.full || p.urls?.small || "",
             thumb: p.urls?.small || p.urls?.thumb,
             alt: p.alt || p.description || "Photo",
             author: p.photographer?.name,
@@ -412,7 +402,6 @@ export function PresentationStudio() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Pexels failed");
         setMediaItems(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (data.items || [])
             .filter((it: { kind?: string }) => it.kind === "photo")
             .map((it: {
@@ -606,6 +595,113 @@ export function PresentationStudio() {
     );
   };
 
+  const duplicateSlide = useCallback(() => {
+    if (!slide) return;
+    const copy = {
+      ...slide,
+      id: uid("slide"),
+      name: `${slide.name} copy`,
+      elements: slide.elements.map((el) => ({ ...el, id: uid(el.type) })),
+    };
+    updateDoc((d) => {
+      const slides = [...d.slides];
+      slides.splice(slideIndex + 1, 0, copy);
+      return { ...d, slides };
+    });
+    setSlideIndex((i) => i + 1);
+    setSelectedId(null);
+    setEditingId(null);
+  }, [slide, slideIndex, updateDoc]);
+
+  const moveSlide = useCallback(
+    (delta: -1 | 1) => {
+      const next = slideIndex + delta;
+      if (next < 0 || next >= doc.slides.length) return;
+      updateDoc((d) => {
+        const slides = [...d.slides];
+        const [current] = slides.splice(slideIndex, 1);
+        slides.splice(next, 0, current);
+        return { ...d, slides };
+      });
+      setSlideIndex(next);
+      setSelectedId(null);
+      setEditingId(null);
+    },
+    [doc.slides.length, slideIndex, updateDoc],
+  );
+
+  const polishSlide = useCallback(() => {
+    if (!slide) return;
+    const themeNow = getTheme(doc.themeId);
+    updateDoc((d) => ({
+      ...d,
+      slides: d.slides.map((s, i) => {
+        if (i !== slideIndex) return s;
+        const hasBackdrop =
+          s.backgroundImage || s.elements.some((el) => el.type === "shape");
+        const ordered = [...s.elements].sort((a, b) => {
+          const rank = (el: SlideElement) =>
+            el.type === "shape"
+              ? 0
+              : el.type === "image"
+                ? 1
+                : el.type === "chart"
+                  ? 2
+                  : el.type === "icon" || el.type === "emoji"
+                    ? 3
+                    : 4;
+          return rank(a) - rank(b) || a.zIndex - b.zIndex;
+        });
+        const elements: SlideElement[] = ordered.map((el, idx) => {
+          const base = {
+            ...el,
+            zIndex: idx + 2,
+            animationDelay: Math.min(600, idx * 70),
+          };
+          if (base.type === "text") {
+            return {
+              ...base,
+              fontFamily:
+                base.fontSize >= 28 ? themeNow.fontDisplay : themeNow.fontBody,
+              lineHeight: base.lineHeight ?? (base.fontSize >= 32 ? 1.04 : 1.22),
+              animation: base.fontSize >= 36 ? "zoomIn" : "fadeUp",
+            };
+          }
+          if (base.type === "shape") {
+            return { ...base, zIndex: 1, animation: "fadeIn" };
+          }
+          if (base.type === "image" || base.type === "chart") {
+            return { ...base, animation: "fadeIn" };
+          }
+          return { ...base, animation: "fadeUp" };
+        });
+
+        if (!hasBackdrop) {
+          elements.unshift(
+            createShapeElement("roundRect", d.themeId, {
+              x: 5,
+              y: 8,
+              w: 90,
+              h: 78,
+              fill: themeNow.accent,
+              opacity: 0.1,
+              zIndex: 1,
+              animation: "fadeIn",
+            }),
+          );
+        }
+
+        return {
+          ...s,
+          transition: s.transition === "none" ? "fade" : s.transition,
+          elements,
+        };
+      }),
+    }));
+    setSelectedId(null);
+    setEditingId(null);
+  }, [doc.themeId, slide, slideIndex, updateDoc]);
+
   if (presenting && slide) {
     return (
       <div
@@ -635,7 +731,7 @@ export function PresentationStudio() {
             key={presentAnimKey}
             className={`pres-slide-transition-${slide.transition} relative aspect-video w-full max-w-6xl overflow-hidden shadow-2xl`}
             style={{
-              background: slide.background,
+              ...slideSurfaceStyle(slide, theme.slideBg),
               containerType: "inline-size",
             }}
           >
@@ -736,6 +832,29 @@ export function PresentationStudio() {
                       setExportOpen(false);
                       setBusyExport(true);
                       try {
+                        await downloadPresentationPptx(doc);
+                      } catch (e) {
+                        alert(
+                          e instanceof Error
+                            ? e.message
+                            : "PowerPoint export failed",
+                        );
+                      } finally {
+                        setBusyExport(false);
+                      }
+                    }}
+                  >
+                    <span className="font-semibold text-[var(--accent)]">PPTX</span>
+                    PowerPoint
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-white/5"
+                    disabled={busyExport}
+                    onClick={async () => {
+                      setExportOpen(false);
+                      setBusyExport(true);
+                      try {
                         await downloadPresentationWord(doc);
                       } catch (e) {
                         alert(
@@ -770,6 +889,89 @@ export function PresentationStudio() {
             </button>
           </div>
         </header>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--line)] bg-[#111217] px-3 py-2 text-xs text-[var(--muted)]">
+          <div className="flex items-center gap-2">
+            <span className="rounded-md border border-[var(--line)] bg-black/20 px-2 py-1 text-[var(--fg)]">
+              {doc.slides.length} slides
+            </span>
+            <span className="hidden rounded-md border border-[var(--line)] bg-black/20 px-2 py-1 sm:inline-flex">
+              {selected ? selected.type : "No selection"}
+            </span>
+          </div>
+
+          <div className="mx-auto flex items-center gap-1 rounded-lg border border-[var(--line)] bg-black/20 p-1">
+            {ZOOM_LEVELS.map((level) => (
+              <button
+                key={level}
+                type="button"
+                className={`rounded-md px-2 py-1 transition ${
+                  zoom === level
+                    ? "bg-[var(--accent)] text-black"
+                    : "hover:bg-white/5 hover:text-[var(--fg)]"
+                }`}
+                onClick={() => setZoom(level)}
+              >
+                {level}%
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className={`rounded-md border px-2 py-1 ${
+                showGrid
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-[var(--line)] hover:text-[var(--fg)]"
+              }`}
+              onClick={() => setShowGrid((v) => !v)}
+            >
+              Grid
+            </button>
+            <button
+              type="button"
+              className={`rounded-md border px-2 py-1 ${
+                showGuides
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-[var(--line)] hover:text-[var(--fg)]"
+              }`}
+              onClick={() => setShowGuides((v) => !v)}
+            >
+              Guides
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[var(--line)] px-2 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              onClick={polishSlide}
+            >
+              Polish
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[var(--line)] px-2 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              onClick={duplicateSlide}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[var(--line)] px-2 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40"
+              disabled={slideIndex === 0}
+              onClick={() => moveSlide(-1)}
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[var(--line)] px-2 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40"
+              disabled={slideIndex >= doc.slides.length - 1}
+              onClick={() => moveSlide(1)}
+            >
+              Down
+            </button>
+          </div>
+        </div>
 
         <div className="flex min-h-0 flex-1">
           <aside className="hidden w-[148px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-[var(--line)] bg-[#0c0d10] p-2 sm:flex">
@@ -814,7 +1016,7 @@ export function PresentationStudio() {
                       ? "border-[var(--accent)]"
                       : "border-[var(--line)]"
                   }`}
-                  style={{ background: s.background }}
+                  style={slideSurfaceStyle(s)}
                   onClick={() => setSlideIndex(i)}
                 >
                   <span className="absolute inset-0 scale-[0.35] origin-top-left pointer-events-none" style={{ width: "280%", height: "280%", containerType: "inline-size" }}>
@@ -853,9 +1055,11 @@ export function PresentationStudio() {
             <div className="flex flex-1 items-center justify-center overflow-auto p-3 sm:p-6">
               <div
                 ref={canvasRef}
-                className="pres-canvas relative aspect-video w-full max-w-4xl overflow-hidden rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
+                className="pres-canvas relative isolate aspect-video w-full max-w-4xl overflow-hidden rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
                 style={{
-                  background: slide?.background || theme.slideBg,
+                  ...slideSurfaceStyle(slide, theme.slideBg),
+                  width: `${zoom}%`,
+                  maxWidth: `${64 * (zoom / 100)}rem`,
                   containerType: "inline-size",
                 }}
                 onClick={() => {
@@ -863,6 +1067,23 @@ export function PresentationStudio() {
                   setEditingId(null);
                 }}
               >
+                {showGrid && (
+                  <div
+                    className="pointer-events-none absolute inset-0 z-0 opacity-35"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(rgba(255,255,255,0.11) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.11) 1px, transparent 1px), linear-gradient(rgba(232,165,75,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(232,165,75,0.18) 1px, transparent 1px)",
+                      backgroundSize: "5% 8.888%, 5% 8.888%, 25% 25%, 25% 25%",
+                    }}
+                  />
+                )}
+                {showGuides && (
+                  <div className="pointer-events-none absolute inset-0 z-0">
+                    <span className="absolute left-1/2 top-0 h-full w-px bg-[var(--accent)]/25" />
+                    <span className="absolute left-0 top-1/2 h-px w-full bg-[var(--accent)]/25" />
+                    <span className="absolute inset-[8%] border border-white/10" />
+                  </div>
+                )}
                 {slide?.elements
                   .slice()
                   .sort((a, b) => a.zIndex - b.zIndex)
@@ -1475,11 +1696,7 @@ export function PresentationStudio() {
               key={s.id}
               className="pres-print-page"
               style={{
-                backgroundColor: solid,
-                backgroundImage: s.background.includes("gradient")
-                  ? s.background
-                  : undefined,
-                background: s.background,
+                ...slideSurfaceStyle(s, solid),
                 color: "#f2efe8",
               }}
             >
@@ -1509,8 +1726,6 @@ export function PresentationStudio() {
     </>
   );
 }
-
-type TextElementWeight = 400 | 500 | 600 | 700 | 800;
 
 function ShapeMini({ kind }: { kind: ShapeKind }) {
   const fill = "currentColor";

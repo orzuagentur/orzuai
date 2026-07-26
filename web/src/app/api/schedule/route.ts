@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
+import {
+  clampVideosPerDay,
+  defaultTimesForCount,
+  padScheduleTimes,
+  validatePublishTimes,
+} from "@/lib/publish-schedule";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -70,7 +76,7 @@ export async function POST(request: Request) {
         enabled: true,
         mode: "daily",
         videos_per_day: 2,
-        times: ["09:00", "18:00"],
+        times: defaultTimesForCount(2),
         weekdays: [1, 2, 3, 4, 5, 6, 7],
         custom_dates: [],
         timezone: "Europe/Berlin",
@@ -91,19 +97,11 @@ export async function POST(request: Request) {
   const enabled = body.enabled !== undefined ? Boolean(body.enabled) : true;
   const times: string[] = Array.isArray(body.times)
     ? body.times.map((t: unknown) => String(t))
-    : existing?.times || ["09:00", "18:00"];
-  const videos_per_day = Math.min(
-    10,
-    Math.max(1, Number(body.videos_per_day) || existing?.videos_per_day || 2),
+    : existing?.times || defaultTimesForCount(2);
+  const videos_per_day = clampVideosPerDay(
+    body.videos_per_day ?? existing?.videos_per_day ?? 2,
   );
-  const normalizedTimes: string[] = times
-    .map((t: string) => {
-      const [h, m] = String(t).trim().split(":");
-      if (h == null) return "";
-      return `${h.padStart(2, "0")}:${(m || "00").padStart(2, "0")}`;
-    })
-    .filter(Boolean)
-    .slice(0, videos_per_day);
+  const normalizedTimes = padScheduleTimes(videos_per_day, times);
 
   while (normalizedTimes.length < videos_per_day) {
     const fallback = ["09:00", "14:00", "18:00", "20:00", "12:00"][
@@ -123,7 +121,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Cron runs every 15 minutes — slots closer than 15m can block each other
+  // Keep enough time between videos for generation, upload, and YouTube scheduling.
   const sortedMins = [...normalizedTimes]
     .map((t) => {
       const [h, m] = t.split(":");
@@ -131,15 +129,20 @@ export async function POST(request: Request) {
     })
     .sort((a, b) => a - b);
   for (let i = 1; i < sortedMins.length; i++) {
-    if (sortedMins[i] - sortedMins[i - 1] < 15) {
+    if (sortedMins[i] - sortedMins[i - 1] < 6 * 60) {
       return NextResponse.json(
         {
           error:
-            "Keep at least 15 minutes between publish times so the schedule can fire each slot.",
+            "Keep at least 6 hours between scheduled YouTube publish times.",
         },
         { status: 400 },
       );
     }
+  }
+
+  const validationError = validatePublishTimes(normalizedTimes);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   const payload = {

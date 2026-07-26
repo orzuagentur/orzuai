@@ -166,6 +166,7 @@ def requeue_failed_jobs(
             or "unauthorized" in err
             or "no platform music" in err
             or "library empty" in err
+            or "missed publish window" in err
             or ("training" in err and "required" in err)
             or "fill required" in err
         )
@@ -428,6 +429,10 @@ def record_published(
     youtube_url: str,
     title: str,
     script_text: str,
+    planned_publish_at: str | None = None,
+    youtube_publish_at: str | None = None,
+    actual_publish_at: str | None = None,
+    publish_drift_seconds: int | None = None,
 ) -> None:
     existing = None
     if job_id:
@@ -449,6 +454,10 @@ def record_published(
         "youtube_url": youtube_url,
         "title": title,
         "script_text": script_text,
+        "planned_publish_at": planned_publish_at,
+        "youtube_publish_at": youtube_publish_at,
+        "actual_publish_at": actual_publish_at,
+        "publish_drift_seconds": publish_drift_seconds,
     }
     if existing:
         sb.table("published_videos").update(payload).eq("id", existing["id"]).execute()
@@ -458,14 +467,44 @@ def record_published(
     ).execute()
 
 
-def get_montage_settings(sb: Client, user_id: str) -> dict[str, Any]:
-    result = (
-        sb.table("montage_settings")
-        .select("*")
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
-    )
+def get_montage_settings(
+    sb: Client,
+    user_id: str,
+    *,
+    youtube_channel_id: str | None = None,
+) -> dict[str, Any]:
+    if youtube_channel_id:
+        try:
+            result = (
+                sb.table("montage_settings")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("youtube_channel_id", youtube_channel_id)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data or []
+            if rows:
+                return rows[0]
+        except Exception as exc:
+            print(f"channel montage read skipped: {exc}")
+    try:
+        result = (
+            sb.table("montage_settings")
+            .select("*")
+            .eq("user_id", user_id)
+            .is_("youtube_channel_id", "null")
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        result = (
+            sb.table("montage_settings")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
     rows = result.data or []
     if rows:
         return rows[0]
@@ -548,19 +587,27 @@ def record_media_usage(
         print(f"media_usage write skipped: {exc}")
 
 
-def recent_video_topics(sb: Client, user_id: str, *, limit: int = 12) -> list[str]:
+def recent_video_topics(
+    sb: Client,
+    user_id: str,
+    *,
+    youtube_channel_id: str | None = None,
+    limit: int = 12,
+) -> list[str]:
     """Titles/hooks from recent jobs so GPT avoids repeats."""
     topics: list[str] = []
     try:
-        jobs = (
+        jobs_query = (
             sb.table("video_jobs")
             .select("title, script_text, metadata")
             .eq("user_id", user_id)
-            .in_("status", ["ready", "published", "uploading", "editing"])
+            .in_("status", ["ready", "scheduled", "published", "uploading", "editing"])
             .order("created_at", desc=True)
             .limit(limit)
-            .execute()
         )
+        if youtube_channel_id:
+            jobs_query = jobs_query.eq("youtube_channel_id", youtube_channel_id)
+        jobs = jobs_query.execute()
         for row in jobs.data or []:
             if row.get("title"):
                 topics.append(str(row["title"]))

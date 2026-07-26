@@ -5,8 +5,16 @@ import { useTranslations } from "next-intl";
 import type { PublishSchedule } from "@/lib/types";
 import { TimeChip } from "@/components/TimeChip";
 import { ScheduleSelectField } from "@/components/ScheduleSelectField";
+import {
+  MAX_AUTOPUBLISH_VIDEOS_PER_DAY,
+  clampVideosPerDay,
+  padScheduleTimes,
+} from "@/lib/publish-schedule";
 
-const VIDEO_COUNT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({
+const VIDEO_COUNT_OPTIONS = Array.from(
+  { length: MAX_AUTOPUBLISH_VIDEOS_PER_DAY },
+  (_, i) => i + 1,
+).map((n) => ({
   value: String(n),
   label: String(n),
 }));
@@ -34,42 +42,21 @@ const TZ_OPTIONS = [
   "America/Sao_Paulo",
 ].map((tz) => ({ value: tz, label: tz }));
 
-const DEFAULT_TIMES = [
-  "09:00",
-  "14:00",
-  "18:00",
-  "20:00",
-  "12:00",
-  "16:00",
-  "10:00",
-  "21:00",
-  "08:00",
-  "22:00",
-];
-
 export const scheduleDefaults: PublishSchedule = {
   enabled: true,
   mode: "daily",
   videos_per_day: 2,
-  times: ["09:00", "18:00"],
+  times: ["09:00", "17:00"],
   weekdays: [1, 2, 3, 4, 5, 6, 7],
   custom_dates: [],
   timezone: "Europe/Berlin",
 };
 
-export function padScheduleTimes(count: number, existing: string[]): string[] {
-  const out = [...existing];
-  while (out.length < count) {
-    out.push(DEFAULT_TIMES[out.length] || "12:00");
-  }
-  return out.slice(0, count);
-}
-
 export function normalizeSchedule(
   form: PublishSchedule,
   datesText?: string,
 ): PublishSchedule {
-  const videos_per_day = Math.min(10, Math.max(1, form.videos_per_day || 1));
+  const videos_per_day = clampVideosPerDay(form.videos_per_day);
   return {
     ...form,
     videos_per_day,
@@ -181,12 +168,12 @@ export function ScheduleStudio({
             options={videoOptions}
             onChange={(v) =>
               patch({
-                videos_per_day: Math.min(10, Math.max(1, Number(v) || 1)),
+                videos_per_day: clampVideosPerDay(v),
               })
             }
             allowOwn
             ownKind="number"
-            ownPlaceholder="1–10"
+            ownPlaceholder={`1-${MAX_AUTOPUBLISH_VIDEOS_PER_DAY}`}
           />
           <ScheduleSelectField
             label={t("timezone")}

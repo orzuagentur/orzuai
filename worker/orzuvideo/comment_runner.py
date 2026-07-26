@@ -44,6 +44,7 @@ def _save_reply_row(
     comment_author: str,
     reply_text: str | None,
     status: str,
+    youtube_channel_id: str | None = None,
     error: str | None = None,
 ) -> None:
     payload: dict[str, Any] = {
@@ -54,6 +55,7 @@ def _save_reply_row(
         "comment_author": (comment_author or "")[:200],
         "reply_text": reply_text,
         "status": status,
+        "youtube_channel_id": youtube_channel_id,
         "error_message": (error or "")[:1500] if error else None,
     }
     if status == "replied":
@@ -164,7 +166,11 @@ def process_comment_replies(*, max_replies: int = MAX_REPLIES_PER_TICK) -> int:
 
         user_id = training["user_id"]
         channel_id = training.get("youtube_channel_id")
-        profile = db.get_profile(sb, user_id)
+        profile = db.get_youtube_profile(
+            sb,
+            user_id,
+            youtube_channel_id=channel_id,
+        )
         if not profile or not profile.get("youtube_connected"):
             continue
         if not profile.get("youtube_refresh_token"):
@@ -226,6 +232,7 @@ def process_comment_replies(*, max_replies: int = MAX_REPLIES_PER_TICK) -> int:
                             comment_text=text,
                             comment_author=target.get("author"),
                             job_id=job.get("id"),
+                            youtube_channel_id=channel_id,
                         )
                         yt = reply_to_comment(
                             profile,
@@ -233,9 +240,12 @@ def process_comment_replies(*, max_replies: int = MAX_REPLIES_PER_TICK) -> int:
                             text=reply_text,
                         )
                         if yt.get("access_token"):
-                            sb.table("profiles").update(
-                                {"youtube_access_token": yt["access_token"]}
-                            ).eq("id", user_id).execute()
+                            db.update_youtube_access_token(
+                                sb,
+                                user_id,
+                                yt["access_token"],
+                                youtube_channel_id=channel_id,
+                            )
 
                         _save_reply_row(
                             sb,
@@ -246,6 +256,7 @@ def process_comment_replies(*, max_replies: int = MAX_REPLIES_PER_TICK) -> int:
                             comment_author=str(target.get("author") or ""),
                             reply_text=reply_text,
                             status="replied",
+                            youtube_channel_id=channel_id,
                         )
                         replied += 1
                         print(
@@ -262,6 +273,7 @@ def process_comment_replies(*, max_replies: int = MAX_REPLIES_PER_TICK) -> int:
                             comment_author=str(target.get("author") or ""),
                             reply_text=None,
                             status="failed",
+                            youtube_channel_id=channel_id,
                             error=str(exc),
                         )
                         print(f"[comments] reply failed {cid}: {exc}")

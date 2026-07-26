@@ -152,6 +152,8 @@ export async function POST(request: Request) {
     source: resolvedSource,
     pipeline: isCreativity ? "creativity" : "youtube",
     mode: isYoutubeAiAuto ? "ai_auto" : isYoutubePrompt ? "ai_prompt" : mode || null,
+    manual_publish: publish && (isYoutubeAiAuto || isYoutubePrompt),
+    publish_request: publish && (isYoutubeAiAuto || isYoutubePrompt) ? "immediate_public" : null,
     user_brief: brief || null,
     duration_auto: durationAuto,
     duration_seconds: durationAuto ? null : duration_seconds,

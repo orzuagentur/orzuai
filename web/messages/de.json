@@ -68,17 +68,35 @@
     "previewTaskVoice": "Stimme",
     "previewTaskCaptions": "Untertitel",
     "stats": {
-      "one": { "value": "12+", "label": "Tools für Erstellung und Bearbeitung" },
-      "two": { "value": "1 Studio", "label": "für Video, Decks und Medienbibliotheken" },
-      "three": { "value": "9:16", "label": "fertiges Format für Shorts und Reels" }
+      "one": {
+        "value": "12+",
+        "label": "Tools für Erstellung und Bearbeitung"
+      },
+      "two": {
+        "value": "1 Studio",
+        "label": "für Video, Decks und Medienbibliotheken"
+      },
+      "three": {
+        "value": "9:16",
+        "label": "fertiges Format für Shorts und Reels"
+      }
     },
     "workflowEyebrow": "Workflow",
     "workflowTitle": "Von der Idee zur Veröffentlichung ohne Chaos",
     "workflowBody": "OrzuAi führt Sie ruhig durch den gesamten Content-Weg: planen, zusammenstellen, prüfen und veröffentlichen aus einem Ort.",
     "workflow": {
-      "brief": { "title": "Idee beschreiben", "body": "Teilen Sie ein Thema, einen Kanal oder ein Quellvideo und das Studio bereitet die Grundlage vor." },
-      "compose": { "title": "Release bauen", "body": "AI hilft bei Skript, Stimme, Untertiteln, Schnitt und visuellen Materialien." },
-      "publish": { "title": "Prüfen und veröffentlichen", "body": "Das fertige Ergebnis herunterladen, in der Bibliothek speichern oder ins Publishing geben." }
+      "brief": {
+        "title": "Idee beschreiben",
+        "body": "Teilen Sie ein Thema, einen Kanal oder ein Quellvideo und das Studio bereitet die Grundlage vor."
+      },
+      "compose": {
+        "title": "Release bauen",
+        "body": "AI hilft bei Skript, Stimme, Untertiteln, Schnitt und visuellen Materialien."
+      },
+      "publish": {
+        "title": "Prüfen und veröffentlichen",
+        "body": "Das fertige Ergebnis herunterladen, in der Bibliothek speichern oder ins Publishing geben."
+      }
     },
     "toolsEyebrow": "Plattform",
     "toolsTitle": "Jedes wichtige Tool fühlt sich wie ein Studio an",
@@ -97,18 +115,54 @@
     "metaTitle": "OrzuAi — Professionelles AI-Studio für Video und Shorts",
     "metaDescription": "OrzuAi ist ein professionelles AI-Studio für Video, Shorts, Clipping, Präsentationen, Editoren, Mediensuche und Creator-Asset-Bibliotheken.",
     "cards": {
-      "aiVideo": { "title": "AI Video", "body": "Aus einer Idee werden Skript, Stimme, Untertitel und Schnittplan." },
-      "shorts": { "title": "YouTube Shorts", "body": "Erstellen Sie Kurzvideos in einem Format, das bereit zum Veröffentlichen ist." },
-      "clipping": { "title": "AI Clipping", "body": "Starke Momente in langen Videos finden und als vertikale Clips formen." },
-      "presentation": { "title": "AI Presentation", "body": "Präsentationen mit klarer Struktur, Visuals und Creator-Assets bauen." },
-      "videoEditor": { "title": "Videoeditor", "body": "Filter, Untertitel, Musik und Übergänge in einem vertrauten Workspace." },
-      "photoEditor": { "title": "Fotoeditor", "body": "Mit Ebenen, Text und visuellen Materialien für Veröffentlichungen arbeiten." },
-      "models3d": { "title": "3D-Modelle", "body": "CC0-Modelle für Videos, Präsentationen und Designarbeit auswählen." },
-      "hdris": { "title": "HDRIs", "body": "Environment Maps für Licht, Szenen und 3D-Previews nutzen." },
-      "textures": { "title": "Texturen", "body": "PBR-Materialien helfen, saubere visuelle Szenen schneller zu bauen." },
-      "emojis": { "title": "Emojis", "body": "Klare Akzente für Erklärvideos, Thumbnails und Slides setzen." },
-      "icons": { "title": "Icons", "body": "Ein schneller Icon-Katalog für Interfaces, Präsentationen und Cover." },
-      "mediaSearch": { "title": "Foto- & Videosuche", "body": "Stock-Aufnahmen für B-Roll, Cover und visuelle Inserts finden." }
+      "aiVideo": {
+        "title": "AI Video",
+        "body": "Aus einer Idee werden Skript, Stimme, Untertitel und Schnittplan."
+      },
+      "shorts": {
+        "title": "YouTube Shorts",
+        "body": "Erstellen Sie Kurzvideos in einem Format, das bereit zum Veröffentlichen ist."
+      },
+      "clipping": {
+        "title": "AI Clipping",
+        "body": "Starke Momente in langen Videos finden und als vertikale Clips formen."
+      },
+      "presentation": {
+        "title": "AI Presentation",
+        "body": "Präsentationen mit klarer Struktur, Visuals und Creator-Assets bauen."
+      },
+      "videoEditor": {
+        "title": "Videoeditor",
+        "body": "Filter, Untertitel, Musik und Übergänge in einem vertrauten Workspace."
+      },
+      "photoEditor": {
+        "title": "Fotoeditor",
+        "body": "Mit Ebenen, Text und visuellen Materialien für Veröffentlichungen arbeiten."
+      },
+      "models3d": {
+        "title": "3D-Modelle",
+        "body": "CC0-Modelle für Videos, Präsentationen und Designarbeit auswählen."
+      },
+      "hdris": {
+        "title": "HDRIs",
+        "body": "Environment Maps für Licht, Szenen und 3D-Previews nutzen."
+      },
+      "textures": {
+        "title": "Texturen",
+        "body": "PBR-Materialien helfen, saubere visuelle Szenen schneller zu bauen."
+      },
+      "emojis": {
+        "title": "Emojis",
+        "body": "Klare Akzente für Erklärvideos, Thumbnails und Slides setzen."
+      },
+      "icons": {
+        "title": "Icons",
+        "body": "Ein schneller Icon-Katalog für Interfaces, Präsentationen und Cover."
+      },
+      "mediaSearch": {
+        "title": "Foto- & Videosuche",
+        "body": "Stock-Aufnahmen für B-Roll, Cover und visuelle Inserts finden."
+      }
     }
   },
   "about": {
@@ -207,11 +261,17 @@
     "create": "Erstellen",
     "myCreations": "Meine Werke",
     "mineShort": "Meins",
-    "library": "Bibliothek"
+    "library": "Bibliothek",
+    "autopilot": "Autopilot",
+    "createVideo": "Erstellen",
+    "settings": "Einstellungen",
+    "groupCreate": "Erstellen",
+    "groupLabs": "Labs",
+    "assetLibraries": "Asset-Bibliotheken"
   },
   "dashboardHome": {
-    "title": "Start",
-    "lead": "Ihr AI-Studio für YouTube — Kanal verbinden, Shorts erstellen, lange Videos clippen und alles an einem Ort verwalten.",
+    "title": "YouTube Autopilot",
+    "lead": "Kanal verbinden, AI trainieren, Zeitplan setzen: OrzuAi erstellt, schneidet und ver?ffentlicht Videos automatisch.",
     "youtubeTitle": "YouTube-Kanal",
     "youtubeConnect": "Verbinden Sie Ihren Kanal. Professionelle AI analysiert ihn und hilft Ihnen mit Shorts, Antworten und täglichem Publishing zu wachsen.",
     "youtubeTrain": "Richten Sie Ihren AI-Content ein, damit täglich Videos erstellt und Kommentare für Sie beantwortet werden.",
@@ -226,7 +286,40 @@
     "presentationTitle": "Klassische Präsentation",
     "presentationBody": "Folien, Themes, Diagramme, Fotos — Export als PDF / Word.",
     "vaultTitle": "Mein Vault",
-    "vaultBody": "Ihre Clips, Videos und Favoriten — ansehen und herunterladen."
+    "vaultBody": "Ihre Clips, Videos und Favoriten — ansehen und herunterladen.",
+    "kicker": "Hauptprodukt",
+    "nextStep": "N?chster Schritt",
+    "readyLabel": "Autopilot bereit",
+    "done": "Fertig",
+    "current": "Jetzt",
+    "primaryConnect": "YouTube verbinden",
+    "primaryTrain": "AI trainieren",
+    "primarySchedule": "Zeitplan setzen",
+    "primaryCreate": "N?chstes Video erstellen",
+    "nextConnect": "Verbinden Sie zuerst den YouTube-Kanal, den OrzuAi verwalten soll.",
+    "nextTrain": "Trainieren Sie AI auf Nische, Sprache, Stil, Stimme und Publishing-Regeln.",
+    "nextSchedule": "W?hlen Sie Ver?ffentlichungszeiten und aktivieren Sie den t?glichen Autopilot.",
+    "nextReady": "Autopilot ist konfiguriert. Erstellen Sie jetzt ein Video oder lassen Sie den Zeitplan laufen.",
+    "stepConnectTitle": "Kanal verbinden",
+    "stepConnectBody": "Geben Sie OrzuAi Zugriff auf den aktiven YouTube-Kanal.",
+    "stepTrainTitle": "AI trainieren",
+    "stepTrainBody": "Nische, Ton, Sprache, Stimme, Schnittstil und Regeln festlegen.",
+    "stepScheduleTitle": "Zeitplan",
+    "stepScheduleBody": "Taktung, Uhrzeit und Zeitzone f?r p?nktliche Ver?ffentlichungen w?hlen.",
+    "stepRunTitle": "Autopilot",
+    "stepRunBody": "AI erstellt, schneidet, speichert, plant und ver?ffentlicht f?r den Kanal.",
+    "workTitle": "Manuelle Aktionen",
+    "workLead": "Nutzen Sie diese, wenn Sie selbst etwas erstellen oder pr?fen m?chten.",
+    "videosTitle": "Videos",
+    "videosBody": "Entw?rfe, geplante Videos, Ver?ffentlichungen und YouTube-Performance pr?fen.",
+    "aiPresentationTitle": "AI Presentation",
+    "aiPresentationBody": "Komplette Decks per Prompt generieren, wenn Labs aktiviert sind.",
+    "photoTitle": "Fotoeditor",
+    "photoBody": "Bilder mit Ebenen, Text, Filtern und Creator-Medien gestalten.",
+    "assetsTitle": "Asset-Bibliotheken",
+    "assetsBody": "Fotos, Videos, Icons, Emojis, 3D-Modelle, HDRIs und Texturen.",
+    "labsTitle": "Labs",
+    "labsLead": "Zus?tzliche Tools, die im Admin wieder aktiviert wurden. Standardm??ig bleiben sie au?erhalb des Erstnutzer-Flows."
   },
   "legal": {
     "privacyTitle": "Datenschutzerklärung",
@@ -238,11 +331,26 @@
     "termsHtml": "<p>Diese Nutzungsbedingungen regeln Ihre Nutzung von <strong>OrzuAi</strong> unter <a href=\"https://www.orzuai.com\">https://www.orzuai.com</a>. Mit der Erstellung eines Kontos oder der Nutzung des Dienstes stimmen Sie diesen Bedingungen zu.</p><p>Kontakt: <a href=\"mailto:support@orzuai.com\">support@orzuai.com</a>.</p><h2>1. Der Dienst</h2><p>OrzuAi bietet AI-gestützte Tools für Video, Shorts, Clipping, Präsentationen, Bearbeitung und Medienbibliotheken. Funktionen können sich mit der Weiterentwicklung des Produkts ändern.</p><h2>2. Konten</h2><p>Sie müssen korrekte Angaben machen und Zugangsdaten sicher aufbewahren. Sie sind für Aktivitäten unter Ihrem Konto verantwortlich.</p><h2>3. Zulässige Nutzung</h2><p>Missbrauchen Sie den Dienst nicht, verletzen Sie keine Rechte Dritter, laden Sie keine illegalen Inhalte hoch, versuchen Sie nicht, die Sicherheit zu umgehen, und missbrauchen Sie keine AI-/Generierungskontingente.</p><h2>4. Ihre Inhalte</h2><p>Sie behalten die Rechte an hochgeladenen Inhalten. Sie gewähren OrzuAi eine Lizenz zum Hosting und zur Verarbeitung, um den Dienst zu betreiben. Sie müssen über die Rechte an allen Medien verfügen, die Sie hochladen oder veröffentlichen.</p><h2>5. AI-Ausgaben</h2><p>AI-Ausgaben können ungenau oder ähnlich zu anderen Inhalten sein. Sie sind dafür verantwortlich, Ausgaben vor der Veröffentlichung zu prüfen.</p><h2>6. Drittanbieterdienste</h2><p>YouTube, Google und andere Integrationen unterliegen deren Bedingungen. Wir haften nicht für Ausfälle oder Richtlinienänderungen Dritter.</p><h2>7. Abrechnung</h2><p>Kostenpflichtige Pläne, sofern angeboten, werden über unseren Zahlungsanbieter abgerechnet. Gebühren sind nicht erstattungsfähig, außer gesetzlich vorgeschrieben.</p><h2>8. Haftungsausschluss & Haftung</h2><p>Der Dienst wird „wie besehen“ bereitgestellt. Im gesetzlich maximal zulässigen Umfang haftet OrzuAi nicht für indirekte oder Folgeschäden.</p><h2>9. Kündigung</h2><p>Wir können Konten sperren oder beenden, die gegen diese Bedingungen verstoßen. Sie können OrzuAi jederzeit nicht mehr nutzen.</p><h2>10. Änderungen</h2><p>Wir können diese Bedingungen aktualisieren. Die weitere Nutzung nach Änderungen bedeutet Ihre Zustimmung.</p>"
   },
   "seoGroups": {
-    "create": { "label": "Mit AI erstellen", "blurb": "Video, Shorts, Clips und Präsentationen generieren." },
-    "edit": { "label": "Bearbeiten", "blurb": "Profi-Video- und Fotoeditoren im selben Studio." },
-    "media": { "label": "Mediensuche", "blurb": "Stock-Fotos, Videos und Musik für Ihre Projekte." },
-    "assets": { "label": "Creator-Assets", "blurb": "3D-Modelle, HDRIs, Texturen, Emojis und Icons." },
-    "publish": { "label": "Veröffentlichen", "blurb": "YouTube-Kanal-Tools und Autopilot." }
+    "create": {
+      "label": "Mit AI erstellen",
+      "blurb": "Video, Shorts, Clips und Präsentationen generieren."
+    },
+    "edit": {
+      "label": "Bearbeiten",
+      "blurb": "Profi-Video- und Fotoeditoren im selben Studio."
+    },
+    "media": {
+      "label": "Mediensuche",
+      "blurb": "Stock-Fotos, Videos und Musik für Ihre Projekte."
+    },
+    "assets": {
+      "label": "Creator-Assets",
+      "blurb": "3D-Modelle, HDRIs, Texturen, Emojis und Icons."
+    },
+    "publish": {
+      "label": "Veröffentlichen",
+      "blurb": "YouTube-Kanal-Tools und Autopilot."
+    }
   },
   "seoCta": {
     "start": "Kostenlos starten",

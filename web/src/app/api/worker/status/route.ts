@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/middleware";
+import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 
 function configured(...keys: string[]) {
   return keys.every((k) => Boolean(process.env[k]?.trim()));
@@ -17,6 +18,47 @@ export async function GET() {
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const recentCutoff = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  const active = await getActiveYoutubeChannel(user.id);
+  const activeChannelId = active?.channel_id || null;
+
+  let trainingQuery = supabase
+    .from("ai_training")
+    .select("is_trained, niche, language, duration_seconds")
+    .eq("user_id", user.id);
+  let scheduleQuery = supabase
+    .from("publish_schedules")
+    .select("enabled, mode, times, timezone, videos_per_day")
+    .eq("user_id", user.id);
+  let jobsQuery = supabase
+    .from("video_jobs")
+    .select("id, status, created_at, completed_at, updated_at, metadata")
+    .eq("user_id", user.id)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  let recentActivityQuery = supabase
+    .from("video_jobs")
+    .select("id, status, updated_at")
+    .eq("user_id", user.id)
+    .in("status", [
+      "generating_script",
+      "generating_voice",
+      "fetching_media",
+      "editing",
+      "uploading",
+    ])
+    .gte("updated_at", recentCutoff)
+    .limit(5);
+
+  if (activeChannelId) {
+    trainingQuery = trainingQuery.eq("youtube_channel_id", activeChannelId);
+    scheduleQuery = scheduleQuery.eq("youtube_channel_id", activeChannelId);
+    jobsQuery = jobsQuery.eq("youtube_channel_id", activeChannelId);
+    recentActivityQuery = recentActivityQuery.eq(
+      "youtube_channel_id",
+      activeChannelId,
+    );
+  }
 
   const [
     { data: profile },
@@ -32,36 +74,10 @@ export async function GET() {
       )
       .eq("id", user.id)
       .single(),
-    supabase
-      .from("ai_training")
-      .select("is_trained, niche, language, duration_seconds")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("publish_schedules")
-      .select("enabled, mode, times, timezone, videos_per_day")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("video_jobs")
-      .select("id, status, created_at, completed_at, updated_at, metadata")
-      .eq("user_id", user.id)
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("video_jobs")
-      .select("id, status, updated_at")
-      .eq("user_id", user.id)
-      .in("status", [
-        "generating_script",
-        "generating_voice",
-        "fetching_media",
-        "editing",
-        "uploading",
-      ])
-      .gte("updated_at", recentCutoff)
-      .limit(5),
+    trainingQuery.maybeSingle(),
+    scheduleQuery.maybeSingle(),
+    jobsQuery,
+    recentActivityQuery,
   ]);
 
   let heartbeat: { last_seen_at?: string; hostname?: string; meta?: unknown } | null =
@@ -107,6 +123,7 @@ export async function GET() {
       ].includes(j.status),
     ).length,
     ready: list.filter((j) => j.status === "ready").length,
+    scheduled: list.filter((j) => j.status === "scheduled").length,
     published: list.filter((j) => j.status === "published").length,
     failed: list.filter((j) => j.status === "failed").length,
   };
@@ -124,8 +141,8 @@ export async function GET() {
     },
     profile: {
       youtubeConnected: Boolean(profile?.youtube_connected),
-      channelTitle: profile?.youtube_channel_title || null,
-      channelId: profile?.youtube_channel_id || null,
+      channelTitle: active?.title || profile?.youtube_channel_title || null,
+      channelId: activeChannelId || profile?.youtube_channel_id || null,
       dailyEnabled: Boolean(profile?.daily_videos_enabled),
       videosPerDay: profile?.videos_per_day ?? 2,
     },

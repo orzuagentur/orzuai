@@ -1,6 +1,7 @@
 "use client";
 
 import type { PresentationSlide } from "@/lib/presentation/types";
+import { slideSurfaceStyle } from "@/lib/presentation/surface";
 import { PresentationElementView } from "./PresentationElementView";
 
 /** Mini live preview of a slide for the filmstrip */
@@ -24,7 +25,7 @@ export function SlideThumb({
           ? "border-[var(--accent)] ring-1 ring-[var(--accent)]"
           : "border-[var(--line)] hover:border-white/25"
       }`}
-      style={{ background: slide.background }}
+      style={slideSurfaceStyle(slide)}
       title={slide.name}
     >
       <div

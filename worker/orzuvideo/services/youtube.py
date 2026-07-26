@@ -179,8 +179,11 @@ def upload_short(
     thumbnail_path: Path | None = None,
     expected_channel_id: str | None = None,
     privacy_status: str = "public",
+    publish_at: str | None = None,
+    contains_synthetic_media: bool = True,
 ) -> dict[str, str]:
     youtube, creds = youtube_client(profile)
+    resolved_privacy = "private" if publish_at else privacy_status
 
     body = {
         "snippet": {
@@ -190,10 +193,13 @@ def upload_short(
             "categoryId": "22",
         },
         "status": {
-            "privacyStatus": privacy_status,
+            "privacyStatus": resolved_privacy,
             "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": bool(contains_synthetic_media),
         },
     }
+    if publish_at:
+        body["status"]["publishAt"] = publish_at
 
     media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True)
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
@@ -236,6 +242,8 @@ def upload_short(
         "youtube_url": f"https://youtube.com/shorts/{video_id}",
         "youtube_channel_id": uploaded_channel_id,
         "access_token": creds.token or "",
+        "privacy_status": resolved_privacy,
+        "scheduled_publish_at": publish_at or "",
     }
 
 

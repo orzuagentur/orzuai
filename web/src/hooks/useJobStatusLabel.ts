@@ -14,6 +14,7 @@ export function useJobStatusLabel() {
       "editing",
       "uploading",
       "ready",
+      "scheduled",
       "published",
       "failed",
     ] as const;

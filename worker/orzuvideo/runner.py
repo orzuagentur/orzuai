@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import shutil
 import time
@@ -12,7 +13,11 @@ from orzuvideo.config import TEMP_DIR, settings
 from orzuvideo.pipeline import clipping as clip_pipe
 from orzuvideo.pipeline import reedit as reedit_pipe
 from orzuvideo.pipeline.editor import build_short, mix_audio
-from orzuvideo.pipeline.media import ffprobe_duration, synthesize_with_timestamps
+from orzuvideo.pipeline.media import (
+    ffprobe_duration,
+    has_audio_stream,
+    synthesize_with_timestamps,
+)
 from orzuvideo.services import db
 from orzuvideo.services.media_pick import (
     exclude_used_media,
@@ -34,6 +39,8 @@ from orzuvideo.services.storage import (
 from orzuvideo.services.visual_assets import prepare_visual_overlays
 from orzuvideo.services.youtube import upload_short
 
+MAX_PUBLISH_DRIFT_SECONDS = int(os.getenv("MAX_PUBLISH_DRIFT_SECONDS", "600"))
+
 
 def _job_meta(job: dict) -> dict:
     meta = job.get("metadata") or {}
@@ -43,6 +50,101 @@ def _job_meta(job: dict) -> dict:
         except json.JSONDecodeError:
             meta = {}
     return meta if isinstance(meta, dict) else {}
+
+
+def _parse_utc(value: object) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _iso_z(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _planned_publish_at(job: dict, meta: dict) -> datetime | None:
+    if (
+        meta.get("publish_request") == "immediate_public"
+        or meta.get("manual_publish") is True
+    ):
+        return None
+    for value in (
+        job.get("planned_publish_at"),
+        meta.get("planned_publish_at"),
+        meta.get("publish_at"),
+        meta.get("schedule_slot_utc"),
+    ):
+        parsed = _parse_utc(value)
+        if parsed:
+            return parsed
+    return None
+
+
+def _publish_plan(job: dict, meta: dict) -> dict[str, object]:
+    planned = _planned_publish_at(job, meta)
+    now = datetime.now(timezone.utc)
+    if not planned:
+        return {
+            "planned_publish_at": None,
+            "privacy_status": "public",
+            "publish_at": None,
+            "strategy": "immediate_public",
+            "drift_seconds": None,
+        }
+
+    drift_seconds = int((now - planned).total_seconds())
+    if drift_seconds > MAX_PUBLISH_DRIFT_SECONDS:
+        raise RuntimeError(
+            "Missed publish window: planned "
+            f"{_iso_z(planned)}, now {_iso_z(now)}, "
+            f"late by {drift_seconds}s"
+        )
+
+    if now <= planned:
+        return {
+            "planned_publish_at": planned,
+            "privacy_status": "private",
+            "publish_at": _iso_z(planned),
+            "strategy": "youtube_scheduled_private",
+            "drift_seconds": None,
+        }
+
+    return {
+        "planned_publish_at": planned,
+        "privacy_status": "public",
+        "publish_at": None,
+        "strategy": "immediate_public_within_sla",
+        "drift_seconds": max(0, drift_seconds),
+    }
+
+
+def _quality_check_video(video_path: Path) -> dict[str, object]:
+    if not video_path.exists():
+        raise RuntimeError(f"QC failed: missing rendered video {video_path}")
+    size_bytes = video_path.stat().st_size
+    if size_bytes < 100_000:
+        raise RuntimeError(f"QC failed: rendered video is too small ({size_bytes} bytes)")
+    duration = ffprobe_duration(video_path)
+    if duration < 5:
+        raise RuntimeError(f"QC failed: rendered video duration is too short ({duration:.2f}s)")
+    audio_ok = has_audio_stream(video_path)
+    if not audio_ok:
+        raise RuntimeError("QC failed: rendered video has no audio stream")
+    return {
+        "ok": True,
+        "size_bytes": size_bytes,
+        "duration_seconds": round(duration, 3),
+        "has_audio": audio_ok,
+    }
 
 
 def _aspect_size(aspect: str) -> tuple[str, int, int]:
@@ -220,11 +322,23 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
     flash_cuts = bool(look.get("flash_cuts")) or virality_mode
     preferred_motions = look.get("preferred_motions")
     motion_ids: list[str] | None = None
+    motions_disabled = False
     preferred_motion = str(meta0.get("preferred_motion") or "").strip()
-    if preferred_motion:
+    preferred_motion_id = preferred_motion.lower()
+    if preferred_motion_id == "none":
+        motion_ids = []
+        motions_disabled = True
+    elif preferred_motion:
         motion_ids = [preferred_motion]
     elif isinstance(preferred_motions, list) and preferred_motions:
-        motion_ids = [str(m) for m in preferred_motions if m]
+        motion_ids = [
+            str(m)
+            for m in preferred_motions
+            if m and str(m).strip().lower() != "none"
+        ]
+        motions_disabled = not motion_ids and any(
+            str(m).strip().lower() == "none" for m in preferred_motions
+        )
 
     raw_sources = meta0.get("sources")
     sources: list[dict] = []
@@ -329,7 +443,7 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
             height=out_h,
             effects=add_effects,
             effect_id=visual_effect,
-            punch_open=virality_mode or i == 0,
+            punch_open=(virality_mode or i == 0) and not motions_disabled,
             motion_ids=motion_ids,
             flash_in=virality_mode and i == 0,
         )
@@ -938,8 +1052,21 @@ def _process_job(job: dict) -> None:
             publish = False
         else:
             print(f"[YOUTUBE/TRAINING] job={job_id} channel={channel_id}")
-            training = db.get_training(sb, user_id, youtube_channel_id=channel_id)
-            if not training:
+            publish_existing = bool(
+                meta0.get("publish_existing")
+                and (
+                    job.get("preview_url")
+                    or job.get("video_path")
+                    or job.get("storage_path")
+                    or meta0.get("storage_path")
+                )
+            )
+            training = (
+                {}
+                if publish_existing
+                else db.get_training(sb, user_id, youtube_channel_id=channel_id)
+            )
+            if not training and not publish_existing:
                 raise RuntimeError(
                     "AI training not configured for this channel. Open Channel → AI Training."
                 )
@@ -1027,6 +1154,15 @@ def _process_job(job: dict) -> None:
                         r = client.get(preview_url)
                         r.raise_for_status()
                         video_file.write_bytes(r.content)
+            qc = _quality_check_video(video_file)
+            plan = _publish_plan(job, meta0)
+            planned_dt = plan.get("planned_publish_at")
+            finished_at = datetime.now(timezone.utc)
+            final_status = (
+                "scheduled"
+                if plan.get("strategy") == "youtube_scheduled_private"
+                else "published"
+            )
             yt = upload_short(
                 profile,
                 video_file,
@@ -1034,6 +1170,9 @@ def _process_job(job: dict) -> None:
                 description=job.get("description") or "",
                 tags=job.get("tags") or ["shorts"],
                 expected_channel_id=channel_id,
+                privacy_status=str(plan["privacy_status"]),
+                publish_at=plan.get("publish_at") or None,
+                contains_synthetic_media=not bool(meta0.get("from_device")),
             )
             if yt.get("access_token"):
                 db.update_youtube_access_token(
@@ -1042,14 +1181,37 @@ def _process_job(job: dict) -> None:
                     yt["access_token"],
                     youtube_channel_id=channel_id,
                 )
+            youtube_publish_at = yt.get("scheduled_publish_at") or _iso_z(finished_at)
+            actual_publish_at = (
+                _iso_z(finished_at) if final_status == "published" else None
+            )
+            publish_drift_seconds = (
+                int(plan["drift_seconds"])
+                if final_status == "published" and plan.get("drift_seconds") is not None
+                else None
+            )
             db.update_job(
                 sb,
                 job_id,
-                status="published",
+                status=final_status,
                 youtube_video_id=yt["youtube_video_id"],
                 youtube_url=yt["youtube_url"],
                 youtube_upload_finished_at=datetime.now(timezone.utc).isoformat(),
-                completed_at=datetime.now(timezone.utc).isoformat(),
+                planned_publish_at=_iso_z(planned_dt) if isinstance(planned_dt, datetime) else None,
+                youtube_publish_at=youtube_publish_at,
+                actual_publish_at=actual_publish_at,
+                publish_drift_seconds=publish_drift_seconds,
+                publish_strategy=plan.get("strategy"),
+                quality_checked_at=_iso_z(finished_at),
+                quality_check=qc,
+                completed_at=_iso_z(finished_at),
+                metadata={
+                    **meta0,
+                    "publish_strategy": plan.get("strategy"),
+                    "youtube_publish_at": youtube_publish_at,
+                    "actual_publish_at": actual_publish_at,
+                    "quality_check": qc,
+                },
             )
             db.record_published(
                 sb,
@@ -1059,6 +1221,12 @@ def _process_job(job: dict) -> None:
                 youtube_url=yt["youtube_url"],
                 title=job.get("title") or "Short",
                 script_text=job.get("script_text") or "",
+                planned_publish_at=(
+                    _iso_z(planned_dt) if isinstance(planned_dt, datetime) else None
+                ),
+                youtube_publish_at=youtube_publish_at,
+                actual_publish_at=actual_publish_at,
+                publish_drift_seconds=publish_drift_seconds,
             )
             return
 
@@ -1092,7 +1260,11 @@ def _process_job(job: dict) -> None:
                 "duration_auto": False,
             }
         else:
-            avoid_topics = db.recent_video_topics(sb, user_id)
+            avoid_topics = db.recent_video_topics(
+                sb,
+                user_id,
+                youtube_channel_id=channel_id,
+            )
             script_data = generate_script(
                 training,
                 user_id=user_id,
@@ -1201,7 +1373,11 @@ def _process_job(job: dict) -> None:
                 "punch_first_clip": True,
             }
         else:
-            montage = db.get_montage_settings(sb, user_id)
+            montage = db.get_montage_settings(
+                sb,
+                user_id,
+                youtube_channel_id=channel_id,
+            )
         avoid_days = int(montage.get("avoid_reuse_days") or 60)
         base_clips = int(montage.get("clip_count") or 5)
         try:
@@ -1423,10 +1599,17 @@ def _process_job(job: dict) -> None:
             allowed_motions = None
         else:
             allowed_motions = [str(m) for m in allowed_motions if m]
+        motions_forced_off = False
+        if allowed_motions and any(m.strip().lower() == "none" for m in allowed_motions):
+            allowed_motions = [
+                m for m in allowed_motions if m.strip().lower() != "none"
+            ]
+            if not allowed_motions:
+                motions_forced_off = True
 
         # Edit style motion pack intersects with montage pool when present
         style_motions = look.get("preferred_motions")
-        if isinstance(style_motions, list) and style_motions:
+        if not motions_forced_off and isinstance(style_motions, list) and style_motions:
             style_ids = [str(m) for m in style_motions if m]
             if allowed_motions:
                 inter = [m for m in allowed_motions if m in style_ids]
@@ -1436,7 +1619,7 @@ def _process_job(job: dict) -> None:
 
         punch_first = bool(montage.get("punch_first_clip", True))
         transitions_on = bool(montage.get("transitions_enabled", True))
-        motions_on = bool(montage.get("motions_enabled", True))
+        motions_on = bool(montage.get("motions_enabled", True)) and not motions_forced_off
 
         build_short(
             clips=clips,
@@ -1468,6 +1651,20 @@ def _process_job(job: dict) -> None:
             visual_overlays=visual_overlays,
         )
         db.update_job(sb, job_id, video_path=str(out_video), voice_path=str(voice_path))
+        qc = _quality_check_video(out_video)
+        qc_at = datetime.now(timezone.utc)
+        meta = {
+            **meta,
+            "quality_check": qc,
+            "quality_checked_at": _iso_z(qc_at),
+        }
+        db.update_job(
+            sb,
+            job_id,
+            quality_checked_at=_iso_z(qc_at),
+            quality_check=qc,
+            metadata=meta,
+        )
 
         # Cover image from the finished Short (Creativity cards + YouTube thumb)
         from orzuvideo.services.thumbnail import extract_thumbnail, upload_thumbnail
@@ -1535,6 +1732,13 @@ def _process_job(job: dict) -> None:
             status="uploading",
             youtube_upload_started_at=datetime.now(timezone.utc).isoformat(),
         )
+        plan = _publish_plan(job, meta)
+        planned_dt = plan.get("planned_publish_at")
+        final_status = (
+            "scheduled"
+            if plan.get("strategy") == "youtube_scheduled_private"
+            else "published"
+        )
         yt = upload_short(
             profile,
             out_video,
@@ -1543,7 +1747,26 @@ def _process_job(job: dict) -> None:
             tags=script_data["tags"],
             thumbnail_path=thumb_local if thumb_local and thumb_local.exists() else None,
             expected_channel_id=channel_id,
+            privacy_status=str(plan["privacy_status"]),
+            publish_at=plan.get("publish_at") or None,
+            contains_synthetic_media=True,
         )
+        finished_at = datetime.now(timezone.utc)
+        youtube_publish_at = yt.get("scheduled_publish_at") or _iso_z(finished_at)
+        actual_publish_at = (
+            _iso_z(finished_at) if final_status == "published" else None
+        )
+        publish_drift_seconds = (
+            int(plan["drift_seconds"])
+            if final_status == "published" and plan.get("drift_seconds") is not None
+            else None
+        )
+        meta = {
+            **meta,
+            "publish_strategy": plan.get("strategy"),
+            "youtube_publish_at": youtube_publish_at,
+            "actual_publish_at": actual_publish_at,
+        }
 
         if yt.get("access_token"):
             db.update_youtube_access_token(
@@ -1556,11 +1779,19 @@ def _process_job(job: dict) -> None:
         db.update_job(
             sb,
             job_id,
-            status="published",
+            status=final_status,
             youtube_video_id=yt["youtube_video_id"],
             youtube_url=yt["youtube_url"],
-            youtube_upload_finished_at=datetime.now(timezone.utc).isoformat(),
-            completed_at=datetime.now(timezone.utc).isoformat(),
+            youtube_upload_finished_at=_iso_z(finished_at),
+            planned_publish_at=(
+                _iso_z(planned_dt) if isinstance(planned_dt, datetime) else None
+            ),
+            youtube_publish_at=youtube_publish_at,
+            actual_publish_at=actual_publish_at,
+            publish_drift_seconds=publish_drift_seconds,
+            publish_strategy=plan.get("strategy"),
+            completed_at=_iso_z(finished_at),
+            metadata=meta,
         )
         db.record_published(
             sb,
@@ -1570,6 +1801,12 @@ def _process_job(job: dict) -> None:
             youtube_url=yt["youtube_url"],
             title=script_data["title"],
             script_text=script_data["script"],
+            planned_publish_at=(
+                _iso_z(planned_dt) if isinstance(planned_dt, datetime) else None
+            ),
+            youtube_publish_at=youtube_publish_at,
+            actual_publish_at=actual_publish_at,
+            publish_drift_seconds=publish_drift_seconds,
         )
         from orzuvideo.services.usage import log_usage as log_usage2
 
@@ -1581,7 +1818,11 @@ def _process_job(job: dict) -> None:
             units=1,
             unit_label="actions",
             cost_usd=0,
-            meta={"youtube_video_id": yt["youtube_video_id"]},
+            meta={
+                "youtube_video_id": yt["youtube_video_id"],
+                "publish_strategy": plan.get("strategy"),
+                "youtube_publish_at": youtube_publish_at,
+            },
         )
     except Exception as exc:
         db.update_job(
@@ -1597,8 +1838,8 @@ def _process_job(job: dict) -> None:
                 current = (
                     sb.table("video_jobs").select("status").eq("id", job_id).limit(1).execute()
                 )
-                # Keep drafts locally for a bit; wipe only after YouTube publish
-                if current.data and current.data[0]["status"] == "published":
+                # Keep drafts locally for a bit; wipe after YouTube accepted the upload.
+                if current.data and current.data[0]["status"] in ("published", "scheduled"):
                     shutil.rmtree(work, ignore_errors=True)
             except Exception:
                 pass

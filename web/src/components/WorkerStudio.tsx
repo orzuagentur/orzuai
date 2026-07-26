@@ -41,6 +41,7 @@ type WorkerStatus = {
     queued: number;
     processing: number;
     ready: number;
+    scheduled: number;
     published: number;
     failed: number;
   };
@@ -150,7 +151,7 @@ export function WorkerStudio() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -211,7 +212,7 @@ export function WorkerStudio() {
           label={t("queue24h")}
           value={String(data?.pipeline24h.queued ?? "—")}
           tone="var(--accent)"
-          sub={`${data?.pipeline24h.processing ?? 0} processing · ${data?.pipeline24h.failed ?? 0} failed`}
+          sub={`${data?.pipeline24h.processing ?? 0} processing · ${data?.pipeline24h.scheduled ?? 0} scheduled · ${data?.pipeline24h.failed ?? 0} failed`}
         />
         <StatCard
           label="Schedule"

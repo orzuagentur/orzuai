@@ -30,6 +30,10 @@ export function ChannelPicker() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function connectYoutube() {
+    window.location.assign("/api/youtube/connect");
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -65,7 +69,7 @@ export function ChannelPicker() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   async function confirm() {
     if (!selectedId) return;
@@ -155,9 +159,13 @@ export function ChannelPicker() {
       {error && (
         <div className="space-y-3">
           <p className="text-sm text-[color:var(--danger)]">{error}</p>
-          <a href="/api/youtube/connect" className="btn btn-primary text-sm">
+          <button
+            type="button"
+            onClick={connectYoutube}
+            className="btn btn-primary text-sm"
+          >
             {t("connectYoutube")}
-          </a>
+          </button>
         </div>
       )}
 
@@ -239,9 +247,13 @@ export function ChannelPicker() {
         >
           {saving ? tc("saving") : t("addChannel")}
         </button>
-        <a href="/api/youtube/connect" className="btn btn-ghost text-sm">
+        <button
+          type="button"
+          onClick={connectYoutube}
+          className="btn btn-ghost text-sm"
+        >
           + Google account
-        </a>
+        </button>
         <Link href="/dashboard/channel" className="btn btn-ghost text-sm">
           {tCommon("cancel")}
         </Link>

@@ -70,7 +70,7 @@ export function MusicLibraryStudio() {
       if (!prev) return null;
       return items.find((g) => g.id === prev.id) || null;
     });
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     void loadGenres();
@@ -276,7 +276,7 @@ function GenreDetail({
       })),
     );
     setTotal(Number(data.total || 0));
-  }, [genre.id, toast]);
+  }, [genre.id, toast, t]);
 
   useEffect(() => {
     void loadTracks();

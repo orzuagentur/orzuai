@@ -20,6 +20,8 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { MusicUploadProvider } from "@/components/MusicUploadProvider";
 import { MusicUploadDock } from "@/components/MusicUploadDock";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { isFeatureLocked, type ProductLockId } from "@/lib/product-locks";
+import { useProductLocks } from "@/lib/product-locks-client";
 
 type NavItem = {
   href: string;
@@ -33,31 +35,28 @@ type NavItem = {
     | "creativity"
     | "presentation"
     | "library"
-    | "account";
+    | "account"
+    | "settings"
+    | "videos";
 };
 
 /** Primary tabs — bottom bar + desktop center */
 const PRIMARY_NAV: NavItem[] = [
   {
     href: "/dashboard",
-    labelKey: "home",
+    labelKey: "autopilot",
     exact: true,
     icon: "home",
   },
   {
-    href: "/dashboard/clipping",
-    labelKey: "aiClipping",
-    icon: "clipping",
-  },
-  {
     href: "/dashboard/content",
-    labelKey: "aiVideo",
+    labelKey: "createVideo",
     icon: "creativity",
   },
   {
-    href: "/dashboard/creators/ai-presentation",
-    labelKey: "aiPresent",
-    icon: "presentation",
+    href: "/dashboard/channel",
+    labelKey: "youtube",
+    icon: "youtube",
   },
 ];
 
@@ -65,13 +64,8 @@ const PRIMARY_NAV: NavItem[] = [
 const MENU_NAV: NavItem[] = [
   {
     href: "/dashboard/channel",
-    labelKey: "youtube",
-    icon: "youtube",
-  },
-  {
-    href: "/dashboard/creators",
-    labelKey: "forCreators",
-    icon: "creators",
+    labelKey: "videos",
+    icon: "videos",
   },
   {
     href: "/dashboard/favorites",
@@ -100,83 +94,23 @@ type MenuItemIcon =
 type MenuGroup = {
   id: string;
   labelKey: string;
-  items: { href: string; labelKey: string; icon: MenuItemIcon }[];
+  items: {
+    href: string;
+    labelKey: string;
+    icon: MenuItemIcon;
+    featureId?: ProductLockId;
+    featureIds?: ProductLockId[];
+    requiredFeatureIds?: ProductLockId[];
+  }[];
 };
 
 const MENU_GROUPS: MenuGroup[] = [
   {
-    id: "ai",
-    labelKey: "groupAi",
+    id: "create",
+    labelKey: "groupCreate",
     items: [
       { href: "/dashboard/content", labelKey: "aiVideo", icon: "ai-video" },
       { href: "/dashboard/clipping", labelKey: "aiClipping", icon: "ai-clip" },
-      {
-        href: "/dashboard/creators/ai-presentation",
-        labelKey: "aiPresentation",
-        icon: "ai-present",
-      },
-    ],
-  },
-  {
-    id: "editors",
-    labelKey: "groupEditors",
-    items: [
-      {
-        href: "/dashboard/creators/photo-editor",
-        labelKey: "photoEditor",
-        icon: "photo-edit",
-      },
-      {
-        href: "/dashboard/creators/content",
-        labelKey: "videoEditor",
-        icon: "video-edit",
-      },
-      {
-        href: "/dashboard/creators/presentation",
-        labelKey: "presentations",
-        icon: "present",
-      },
-    ],
-  },
-  {
-    id: "libraries",
-    labelKey: "groupLibraries",
-    items: [
-      {
-        href: "/dashboard/creators/library/videos",
-        labelKey: "videos",
-        icon: "videos",
-      },
-      {
-        href: "/dashboard/creators/library/photos",
-        labelKey: "photos",
-        icon: "photos",
-      },
-      {
-        href: "/dashboard/creators/library/models",
-        labelKey: "models3d",
-        icon: "models",
-      },
-      {
-        href: "/dashboard/creators/library/hdris",
-        labelKey: "hdris",
-        icon: "hdris",
-      },
-      {
-        href: "/dashboard/creators/library/textures",
-        labelKey: "textures",
-        icon: "textures",
-      },
-      {
-        href: "/dashboard/creators/library/emojis",
-        labelKey: "emojis",
-        icon: "emojis",
-      },
-      {
-        href: "/dashboard/creators/library/icons",
-        labelKey: "icons",
-        icon: "icons",
-      },
     ],
   },
   {
@@ -194,11 +128,6 @@ const MENU_GROUPS: MenuGroup[] = [
         icon: "ai-video",
       },
       {
-        href: "/dashboard/favorites?tab=presentations",
-        labelKey: "myPresentations",
-        icon: "present",
-      },
-      {
         href: "/dashboard/favorites?tab=favorites",
         labelKey: "favorites",
         icon: "vault",
@@ -206,13 +135,44 @@ const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    id: "more",
-    labelKey: "groupMore",
+    id: "labs",
+    labelKey: "groupLabs",
     items: [
       {
-        href: "/dashboard/creators",
-        labelKey: "forCreators",
-        icon: "creators",
+        href: "/dashboard/creators/ai-presentation",
+        labelKey: "aiPresentation",
+        icon: "ai-present",
+        requiredFeatureIds: ["ai_presentation", "presentation_editor"],
+      },
+      {
+        href: "/dashboard/creators/presentation",
+        labelKey: "presentations",
+        icon: "present",
+        featureId: "presentation_editor",
+      },
+      {
+        href: "/dashboard/creators/photo-editor",
+        labelKey: "photoEditor",
+        icon: "photo-edit",
+        featureId: "photo_editor",
+      },
+      {
+        href: "/dashboard/creators/content",
+        labelKey: "videoEditor",
+        icon: "video-edit",
+        featureId: "content",
+      },
+      {
+        href: "/dashboard/creators/library/photos",
+        labelKey: "assetLibraries",
+        icon: "photos",
+        featureId: "asset_libraries",
+      },
+      {
+        href: "/dashboard/favorites?tab=presentations",
+        labelKey: "myPresentations",
+        icon: "present",
+        featureId: "presentation_editor",
       },
     ],
   },
@@ -275,13 +235,13 @@ function NavIcon({
       return (
         <svg {...common} viewBox="0 0 28 20" width={size} height={Math.round(size * 0.72)}>
           <path
-            fill={active ? "var(--accent)" : "currentColor"}
+            fill="#FF0000"
             stroke="none"
             d="M27.43 3.13A3.52 3.52 0 0 0 24.95.64C22.74 0 14 0 14 0S5.26 0 3.05.64A3.52 3.52 0 0 0 .57 3.13 36.8 36.8 0 0 0 0 10a36.8 36.8 0 0 0 .57 6.87 3.52 3.52 0 0 0 2.48 2.49C5.26 20 14 20 14 20s8.74 0 10.95-.64a3.52 3.52 0 0 0 2.48-2.49A36.8 36.8 0 0 0 28 10a36.8 36.8 0 0 0-.57-6.87Z"
             opacity={active ? 1 : 0.85}
           />
           <path
-            fill={active ? "#0c0c0c" : "#FF0000"}
+            fill="#fff"
             stroke="none"
             d="M11.2 14.29V5.71L18.4 10l-7.2 4.29Z"
           />
@@ -333,6 +293,25 @@ function NavIcon({
         <svg {...common}>
           <path d="M5 4.5h10.5A1.5 1.5 0 0 1 17 6v13.2l-5.5-2.6L6 19.2V6A1.5 1.5 0 0 1 7.5 4.5" />
           <path d="M17 7.2h1.5A1.5 1.5 0 0 1 20 8.7v10.5" />
+        </svg>
+      );
+    case "videos":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="3" />
+          <path d="M7 9h4M7 13h3" />
+          <path
+            d="M14 9.3v5.4l4.4-2.7L14 9.3Z"
+            fill={active ? "var(--accent)" : "currentColor"}
+            stroke="none"
+          />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg {...common}>
+          <path d="M12 3v3M12 18v3M4.2 7.5l2.6 1.5M17.2 15l2.6 1.5M4.2 16.5l2.6-1.5M17.2 9l2.6-1.5" />
+          <circle cx="12" cy="12" r="3.2" />
         </svg>
       );
     case "account":
@@ -620,7 +599,13 @@ function LibraryHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations("nav");
+  const locks = useProductLocks();
   const raw = searchParams.get("tab");
+  const tabs = LIBRARY_TABS.filter(
+    (item) =>
+      item.id !== "presentations" ||
+      !isFeatureLocked(locks, "presentation_editor"),
+  );
   const tab =
     raw === "videos" ||
     raw === "favorites" ||
@@ -634,7 +619,7 @@ function LibraryHeaderTabs() {
       className="mx-auto flex w-full max-w-4xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
       aria-label={t("myVault")}
     >
-      {LIBRARY_TABS.map((item) => (
+      {tabs.map((item) => (
         <SectionTabButton
           key={item.id}
           on={tab === item.id}
@@ -851,9 +836,10 @@ function AppMenu({ email }: { email?: string | null }) {
   const t = useTranslations("nav");
   const tc = useTranslations("common");
   const ts = useTranslations("studio.common");
+  const locks = useProductLocks();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [openGroup, setOpenGroup] = useState<string | null>("ai");
+  const [openGroup, setOpenGroup] = useState<string | null>("create");
   const [isMobile, setIsMobile] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -887,6 +873,17 @@ function AppMenu({ email }: { email?: string | null }) {
   const youtubeActive =
     pathname === "/dashboard/channel" ||
     pathname.startsWith("/dashboard/channel/");
+  const visibleMenuGroups = MENU_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) =>
+        item.requiredFeatureIds
+          ? item.requiredFeatureIds.every((id) => !isFeatureLocked(locks, id))
+          : item.featureIds
+            ? item.featureIds.some((id) => !isFeatureLocked(locks, id))
+            : !item.featureId || !isFeatureLocked(locks, item.featureId),
+    ),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <div className="relative" ref={rootRef}>
@@ -929,7 +926,7 @@ function AppMenu({ email }: { email?: string | null }) {
               <span className="flex-1">{t("youtube")}</span>
             </Link>
 
-            {MENU_GROUPS.map((group) => {
+            {visibleMenuGroups.map((group) => {
               const expanded = !isMobile || openGroup === group.id;
               return (
                 <div key={group.id} className="mb-1">
@@ -1067,15 +1064,20 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const locks = useProductLocks();
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerH, setHeaderH] = useState(56);
   const headerRef = useRef<HTMLElement | null>(null);
   const isLibrary = pathname.startsWith("/dashboard/favorites");
   const isClipping = pathname.startsWith("/dashboard/clipping");
   const isCreativity = pathname.startsWith("/dashboard/content");
-  const isAiPresentation = pathname.startsWith(
+  const isAiPresentationPath = pathname.startsWith(
     "/dashboard/creators/ai-presentation",
   );
+  const isAiPresentation =
+    isAiPresentationPath &&
+    !isFeatureLocked(locks, "ai_presentation") &&
+    !isFeatureLocked(locks, "presentation_editor");
   const isEditor =
     pathname.startsWith("/dashboard/editor") ||
     pathname.startsWith("/dashboard/creators/presentation") ||
@@ -1103,7 +1105,7 @@ export function AppShell({
   const pageTitle =
     (activeNav ? t(activeNav.labelKey) : null) ||
     assetsLibraryTitle ||
-    (isAiPresentation ? t("aiPresentation") : "OrzuAi");
+    (isAiPresentationPath ? t("aiPresentation") : "OrzuAi");
   const ctx = { menuOpen, setMenuOpen };
 
   useEffect(() => {
@@ -1158,22 +1160,29 @@ export function AppShell({
 
               {/* Desktop / tablet top nav */}
               <nav className="pointer-events-none absolute inset-0 hidden items-center justify-center pt-3 lg:flex lg:pt-4">
-                <div className="pointer-events-auto flex max-w-[min(100%,48rem)] items-center gap-1 overflow-x-auto px-2 md:gap-2">
+                <div className="pointer-events-auto flex max-w-[min(100%,36rem)] items-stretch justify-center gap-1 overflow-x-auto px-2 md:gap-2">
                   {PRIMARY_NAV.map((item) => {
                     const active = isNavActive(pathname, item);
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="shrink-0 rounded-xl px-4 py-2.5 text-[1.05rem] font-semibold transition md:px-5 md:py-3 md:text-lg"
+                        className="flex min-w-[5.75rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-center text-xs font-semibold leading-tight transition md:min-w-[6.5rem] md:px-4 md:py-2.5 md:text-sm"
                         style={{
                           color: active ? "var(--fg)" : "var(--muted)",
                           background: active
                             ? "rgba(255,255,255,0.07)"
                             : "transparent",
+                          boxShadow: active
+                            ? "inset 0 1px 0 rgba(255,255,255,0.1)"
+                            : undefined,
                         }}
+                        aria-current={active ? "page" : undefined}
                       >
-                        {t(item.labelKey)}
+                        <span className="flex h-5 w-5 items-center justify-center">
+                          <NavIcon name={item.icon} active={active} size={20} />
+                        </span>
+                        <span>{t(item.labelKey)}</span>
                       </Link>
                     );
                   })}

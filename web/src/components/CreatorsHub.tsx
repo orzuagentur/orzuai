@@ -1,18 +1,35 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { UnderDevelopmentCard } from "@/components/UnderDevelopmentCard";
 import { Link } from "@/i18n/navigation";
+import { isFeatureLocked, type ProductLockId } from "@/lib/product-locks";
+import { useProductLocks } from "@/lib/product-locks-client";
+
+type CreatorCard = {
+  href: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  accent: string;
+  featureId: ProductLockId;
+  requiredFeatureIds?: ProductLockId[];
+  icon: ReactNode;
+};
 
 export function CreatorsHub() {
   const t = useTranslations("studio.creators");
+  const locks = useProductLocks();
 
-  const cards = [
+  const allCards: CreatorCard[] = [
     {
       href: "/dashboard/creators/content",
       title: t("contentTitle"),
       subtitle: t("contentSubtitle"),
       badge: t("contentBadge"),
       accent: "#E8A54B",
+      featureId: "content",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
           <rect x="3" y="5" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" />
@@ -27,6 +44,7 @@ export function CreatorsHub() {
       subtitle: t("photoSubtitle"),
       badge: t("photoBadge"),
       accent: "#34d399",
+      featureId: "photo_editor",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
           <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.75" />
@@ -41,6 +59,8 @@ export function CreatorsHub() {
       subtitle: t("aiPresentSubtitle"),
       badge: t("aiPresentBadge"),
       accent: "#c084fc",
+      featureId: "ai_presentation",
+      requiredFeatureIds: ["ai_presentation", "presentation_editor"],
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
@@ -55,6 +75,7 @@ export function CreatorsHub() {
       subtitle: t("classicSubtitle"),
       badge: t("classicBadge"),
       accent: "#e8a54b",
+      featureId: "presentation_editor",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
           <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" />
@@ -63,7 +84,16 @@ export function CreatorsHub() {
         </svg>
       ),
     },
-  ] as const;
+  ];
+  const cards = allCards.filter((card) =>
+    card.requiredFeatureIds
+      ? card.requiredFeatureIds.every((id) => !isFeatureLocked(locks, id))
+      : !isFeatureLocked(locks, card.featureId),
+  );
+
+  if (cards.length === 0) {
+    return <UnderDevelopmentCard title={t("title")} />;
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(var(--mobile-nav-space)+1.5rem)] pt-6 sm:px-6 sm:pt-10">

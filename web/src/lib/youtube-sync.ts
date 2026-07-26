@@ -245,14 +245,14 @@ export async function syncYoutubeChannel(opts: {
 
     const { data: existing } = await sb
       .from("video_jobs")
-      .select("id, youtube_video_id")
+      .select("id, youtube_video_id, planned_publish_at, youtube_publish_at")
       .eq("user_id", opts.userId)
       .in("youtube_video_id", videoIds);
 
     const byYtId = new Map(
       (existing || []).map((j) => [
         j.youtube_video_id as string,
-        j.id as string,
+        j,
       ]),
     );
 
@@ -264,6 +264,17 @@ export async function syncYoutubeChannel(opts: {
         null;
       const publishedAt =
         video.snippet?.publishedAt || new Date().toISOString();
+      const existingRow = byYtId.get(video.id);
+      const plannedForDrift =
+        existingRow?.planned_publish_at || existingRow?.youtube_publish_at || null;
+      const plannedMs = plannedForDrift
+        ? new Date(plannedForDrift as string).getTime()
+        : Number.NaN;
+      const publishedMs = new Date(publishedAt).getTime();
+      const publishDriftSeconds =
+        Number.isFinite(plannedMs) && Number.isFinite(publishedMs)
+          ? Math.round((publishedMs - plannedMs) / 1000)
+          : null;
       const patch = {
         title: video.snippet?.title || null,
         description: video.snippet?.description || null,
@@ -277,10 +288,12 @@ export async function syncYoutubeChannel(opts: {
         youtube_channel_id: channelId,
         youtube_url: `https://www.youtube.com/watch?v=${video.id}`,
         status: "published" as const,
+        actual_publish_at: publishedAt,
+        publish_drift_seconds: publishDriftSeconds,
         completed_at: publishedAt,
       };
 
-      const existingId = byYtId.get(video.id);
+      const existingId = existingRow?.id as string | undefined;
       if (existingId) {
         const { error } = await sb
           .from("video_jobs")

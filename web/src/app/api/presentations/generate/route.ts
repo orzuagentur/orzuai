@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 type Body = {
   prompt?: string;
-  format?: "pdf" | "word";
+  format?: "pdf" | "word" | "pptx";
   slide_count?: number | "auto";
   info?: {
     author?: string;
@@ -35,7 +35,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const format = body.format === "word" ? "word" : "pdf";
+  const format =
+    body.format === "word" || body.format === "pptx" ? body.format : "pdf";
   const slideCountRaw = body.slide_count;
   const slideCount =
     slideCountRaw === "auto" || slideCountRaw == null
@@ -57,7 +58,8 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model =
+    process.env.OPENAI_PRESENTATION_MODEL || process.env.OPENAI_MODEL || "gpt-4o";
 
   const lengthRule = slideCount
     ? `Create exactly ${slideCount} content slides.`
@@ -79,6 +81,16 @@ CREATIVITY MANDATE:
 - Almost every slide needs real media: image and/or OpenMoji emoji and/or icons.
 - English queries only for image/emoji/icon fields.
 
+DESIGN QUALITY CONTRACT:
+- Think like a senior keynote designer, not a generic slide generator.
+- Every slide must have one visual hierarchy: one hero idea, one support layer, one optional proof layer.
+- Keep important elements inside safe margins: x 4-92, y 5-86. Avoid overlaps unless a shape is intentionally behind text.
+- Text must be short enough to fit its box. Use strong titles, compact bullets, and precise labels.
+- Prefer asymmetric editorial layouts, large negative space, and meaningful contrast.
+- Use backgroundImageQuery on cover, media_focus, quote, and at least 40% of the deck.
+- Add slide notes with speaker intent, not generic narration.
+- Before returning JSON, silently audit: visual variety, readable contrast, no crowded slides, no repeated stock query, no duplicate chart type.
+
 Layouts (vary across deck): cover, split, icons, emoji, media_focus, stats, quote, content, comparison, timeline, mosaic
 
 TEXT element (rich typography):
@@ -89,11 +101,11 @@ Other elements:
 - emoji: {"type":"emoji","query":"rocket|money bag|light bulb|…","x","y","w":14-24,"h":16-28}
 - icon: {"type":"icon","query":"growth|shield|users|…","color":"#F8FAFC","x","y","w","h"}
 - shape: {"type":"shape","shape":"roundRect|rect|ellipse|diamond|chevron","fill":"#hex","opacity":0.2-0.9,"x","y","w","h"}
-- chart: {"type":"chart","chart":"bar|barH|line|area|pie|donut|donutThin|stacked|radar|funnel|gauge|progress|kpi|comparison|lollipop|ring|waterfall|groupedBar","title":"...","labels":[],"values":[],"x","y","w","h"}
+- chart: {"type":"chart","chart":"bar|barH|line|area|pie|donut|donutThin|stacked|radar|funnel|gauge|progress|kpi|comparison|lollipop|ring|waterfall|groupedBar|stackedBarH|bullet|sparkline|pyramid|treemap|bubble|radialBar|meter","title":"...","labels":[],"values":[],"x","y","w","h"}
 
 Also set slide.backgroundImageQuery on cover/media slides.
 Keep readable hierarchy: 1 dominant text + 1–2 support texts max on most slides.
-Max ~7 elements/slide. Meaning-matched emoji/icons only.
+Max 5-8 elements/slide. Meaning-matched emoji/icons only. Include notes on each slide.
 
 JSON:
 {
@@ -104,6 +116,7 @@ JSON:
       "name":"Hook",
       "layout":"cover",
       "backgroundImageQuery":"cinematic neon city rain reflections",
+      "notes":"Open with a sharp transformation promise, then pause before the proof.",
       "elements":[
         {"type":"text","style":"kicker","text":"CHAPTER 01","fontSize":12,"fontWeight":700,"x":8,"y":18,"w":40,"h":6},
         {"type":"text","style":"hero","text":"Bold opening line","fontSize":54,"fontWeight":800,"x":8,"y":32,"w":72,"h":20},

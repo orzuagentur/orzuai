@@ -10,17 +10,24 @@ from orzuvideo.services.db import get_supabase
 from orzuvideo.services.usage import estimate_openai_cost, log_usage
 
 
-def load_learning_examples(user_id: str, limit: int = 8) -> list[dict[str, Any]]:
+def load_learning_examples(
+    user_id: str,
+    *,
+    youtube_channel_id: str | None = None,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
     sb = get_supabase()
-    result = (
+    query = (
         sb.table("ai_learning_memory")
         .select("input_text, output_text, language, feedback")
         .eq("user_id", user_id)
         .eq("source", "comment_reply")
         .order("created_at", desc=True)
         .limit(limit)
-        .execute()
     )
+    if youtube_channel_id:
+        query = query.eq("youtube_channel_id", youtube_channel_id)
+    result = query.execute()
     return result.data or []
 
 
@@ -31,13 +38,18 @@ def generate_comment_reply(
     comment_text: str,
     comment_author: str | None = None,
     job_id: str | None = None,
+    youtube_channel_id: str | None = None,
 ) -> str:
     if not training.get("reply_comments_enabled"):
         raise RuntimeError("Comment replies are disabled in AI training")
 
     examples = []
     if training.get("learning_enabled", True):
-        examples = load_learning_examples(user_id)
+        examples = load_learning_examples(
+            user_id,
+            youtube_channel_id=youtube_channel_id
+            or training.get("youtube_channel_id"),
+        )
 
     example_block = "\n".join(
         [
@@ -104,6 +116,8 @@ Return JSON: {{"reply": "...", "language": "xx"}}
                 "output_text": reply,
                 "language": language,
                 "feedback": "neutral",
+                "youtube_channel_id": youtube_channel_id
+                or training.get("youtube_channel_id"),
                 "meta": {"author": comment_author},
             }
         ).execute()

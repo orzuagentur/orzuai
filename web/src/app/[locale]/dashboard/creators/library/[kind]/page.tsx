@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { CreatorsStudio } from "@/components/CreatorsStudio";
+import { UnderDevelopmentCard } from "@/components/UnderDevelopmentCard";
+import { getProductLocks } from "@/lib/product-locks-server";
+import { isFeatureLocked } from "@/lib/product-locks";
 import { isStudioKind } from "@/lib/studio-kind";
 
 export default async function CreatorsLibraryKindPage({
@@ -13,6 +16,11 @@ export default async function CreatorsLibraryKindPage({
   if (!isStudioKind(kind)) notFound();
 
   const t = await getTranslations("studio.library");
+  const navT = await getTranslations("nav");
+  const locks = await getProductLocks();
+  if (isFeatureLocked(locks, "asset_libraries")) {
+    return <UnderDevelopmentCard title={navT("assetLibraries")} />;
+  }
 
   return (
     <Suspense

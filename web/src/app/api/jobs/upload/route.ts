@@ -83,6 +83,8 @@ export async function POST(request: Request) {
     source: "youtube_device",
     pipeline: "youtube",
     youtube_channel_id: active.channel_id,
+    manual_publish: true,
+    publish_request: "immediate_public",
     used_ai_training: false,
     from_device: true,
   };

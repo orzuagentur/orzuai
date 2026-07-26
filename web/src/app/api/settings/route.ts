@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { clampVideosPerDay } from "@/lib/publish-schedule";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     updates.daily_videos_enabled = body.daily_videos_enabled;
   }
   if (typeof body.videos_per_day === "number") {
-    updates.videos_per_day = Math.min(5, Math.max(1, body.videos_per_day));
+    updates.videos_per_day = clampVideosPerDay(body.videos_per_day);
   }
 
   if (Object.keys(updates).length === 0) {

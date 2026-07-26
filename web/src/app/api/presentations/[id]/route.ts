@@ -7,6 +7,10 @@ export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+function validPresentationId(id: string) {
+  return /^[A-Za-z0-9_-]{6,120}$/.test(id);
+}
+
 /** Load full presentation JSON from R2. */
 export async function GET(_request: Request, ctx: Ctx) {
   if (!r2Configured()) {
@@ -20,6 +24,9 @@ export async function GET(_request: Request, ctx: Ctx) {
   const presentationId = String(id || "").trim();
   if (!presentationId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  if (!validPresentationId(presentationId)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -66,6 +73,9 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   const presentationId = String(id || "").trim();
   if (!presentationId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+  if (!validPresentationId(presentationId)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
   const supabase = await createClient();

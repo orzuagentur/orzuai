@@ -4,6 +4,12 @@ import {
   requeueFailedJobs,
   requeueStuckJobs,
 } from "@/lib/requeue-failed-jobs";
+import {
+  MAX_PUBLISH_DRIFT_MINUTES,
+  SCHEDULE_GENERATION_LEAD_MINUTES,
+  clampVideosPerDay,
+  padScheduleTimes,
+} from "@/lib/publish-schedule";
 
 export const runtime = "nodejs";
 
@@ -53,29 +59,48 @@ function todayInTz(timezone: string): {
   return { dateStr, weekday, hhmm, minutesOfDay };
 }
 
-function slotMinutes(hhmm: string): number {
-  const [h, m] = String(hhmm).split(":");
-  return Number(h || 0) * 60 + Number(m || 0);
-}
+type DueSlot = {
+  dateStr: string;
+  matchedTime: string;
+  slotUtc: Date;
+  generationDueAt: Date;
+};
 
 /**
- * All schedule times that are due now:
- * - slot time has been reached today (minutesOfDay >= slot)
- * - within catch-up window (default 3h) so missed cron ticks still enqueue
- * Every due slot is returned (not just the first match) so close times don't block each other.
+ * All schedule slots whose generation window is open now.
+ * The publish slot itself stays in planned_publish_at; scheduled_for is only
+ * when the worker should start generating/uploading the video.
  */
 function dueScheduleSlots(
   activeTimes: string[],
-  minutesOfDay: number,
-  catchUpMinutes = 180,
-): string[] {
-  const due: string[] = [];
+  dateStr: string,
+  timeZone: string,
+  now = new Date(),
+  leadMinutes = SCHEDULE_GENERATION_LEAD_MINUTES,
+  maxDriftMinutes = MAX_PUBLISH_DRIFT_MINUTES,
+): DueSlot[] {
+  const due: DueSlot[] = [];
+  const leadMs = leadMinutes * 60 * 1000;
+  const maxDriftMs = maxDriftMinutes * 60 * 1000;
   for (const t of activeTimes) {
-    const slot = slotMinutes(t);
-    if (minutesOfDay < slot) continue;
-    if (minutesOfDay - slot <= catchUpMinutes) due.push(t);
+    const slotUtc = zonedSlotToUtc(dateStr, t, timeZone);
+    const generationDueAt = new Date(slotUtc.getTime() - leadMs);
+    const latestStartAt = new Date(slotUtc.getTime() + maxDriftMs);
+    if (now >= generationDueAt && now <= latestStartAt) {
+      due.push({ dateStr, matchedTime: t, slotUtc, generationDueAt });
+    }
   }
   return due;
+}
+
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  return dt.toISOString().slice(0, 10);
+}
+
+function weekdayForDateStr(dateStr: string): number {
+  return weekdayMon1(new Date(`${dateStr}T12:00:00Z`));
 }
 
 /** Convert local calendar date + HH:MM in `timeZone` to a UTC Date. */
@@ -235,41 +260,37 @@ export async function GET(request: Request) {
     }
 
     const tz = schedule.timezone || "UTC";
-    let dateStr: string;
-    let weekday: number;
-    let minutesOfDay: number;
+    let today: string;
     try {
       const nowTz = todayInTz(tz);
-      dateStr = nowTz.dateStr;
-      weekday = nowTz.weekday;
-      minutesOfDay = nowTz.minutesOfDay;
+      today = nowTz.dateStr;
     } catch {
       skipped += 1;
       reasons.push(`${schedule.user_id}: invalid timezone ${tz}`);
       continue;
     }
 
-    if (!dayAllowed(schedule, weekday, dateStr)) {
-      skipped += 1;
-      reasons.push(`${schedule.user_id}: day not allowed (${schedule.mode})`);
-      continue;
-    }
-
     const times = normalizeTimes(schedule.times || []);
-    const perDay = Math.min(
-      10,
-      Math.max(1, Number(schedule.videos_per_day) || 1),
-    );
-    const activeTimes = times.slice(0, perDay);
-    const dueTimes = dueScheduleSlots(activeTimes, minutesOfDay);
+    const perDay = clampVideosPerDay(schedule.videos_per_day || 1);
+    const activeTimes = padScheduleTimes(perDay, times);
+    const candidates = [
+      addDaysToDateStr(today, -1),
+      today,
+      addDaysToDateStr(today, 1),
+    ];
+    const dueTimes = candidates.flatMap((dateStr) => {
+      const weekday = weekdayForDateStr(dateStr);
+      if (!dayAllowed(schedule, weekday, dateStr)) return [];
+      return dueScheduleSlots(activeTimes, dateStr, tz);
+    });
 
     if (!dueTimes.length) {
       skipped += 1;
       continue;
     }
 
-    for (const matchedTime of dueTimes) {
-      const slotKey = `${dateStr}T${matchedTime}`;
+    for (const due of dueTimes) {
+      const slotKey = `${due.dateStr}T${due.matchedTime}`;
       let existingQuery = sb
         .from("video_jobs")
         .select("id")
@@ -285,28 +306,27 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const slotUtc = zonedSlotToUtc(dateStr, matchedTime, tz);
-      // Past slots (catch-up) become claimable immediately; future exact slot waits
-      const scheduledFor =
-        slotUtc.getTime() <= Date.now()
-          ? new Date().toISOString()
-          : slotUtc.toISOString();
-
       const { error } = await sb.from("video_jobs").insert({
         user_id: schedule.user_id,
         youtube_channel_id: schedule.youtube_channel_id || null,
         status: "queued",
-        scheduled_for: scheduledFor,
+        scheduled_for: new Date().toISOString(),
+        planned_publish_at: due.slotUtc.toISOString(),
         metadata: {
           schedule_slot: slotKey,
-          schedule_time: matchedTime,
+          schedule_time: due.matchedTime,
           schedule_timezone: tz,
-          schedule_slot_utc: slotUtc.toISOString(),
+          schedule_slot_utc: due.slotUtc.toISOString(),
+          planned_publish_at: due.slotUtc.toISOString(),
+          generation_due_at: due.generationDueAt.toISOString(),
+          generation_lead_minutes: SCHEDULE_GENERATION_LEAD_MINUTES,
+          max_publish_drift_minutes: MAX_PUBLISH_DRIFT_MINUTES,
           videos_per_day: perDay,
           youtube_channel_id: schedule.youtube_channel_id || null,
           source: "schedule",
           pipeline: "youtube",
           publish: true,
+          publish_strategy: "youtube_scheduled_private",
         },
       });
       if (!error) created += 1;
@@ -338,7 +358,7 @@ export async function GET(request: Request) {
       .maybeSingle();
     if (!training) continue;
 
-    const count = Math.min(10, Math.max(1, user.videos_per_day || 2));
+    const count = clampVideosPerDay(user.videos_per_day || 2);
     const dayKey = new Date().toISOString().slice(0, 10);
     for (let i = 0; i < count; i++) {
       const slotKey = `legacy-${dayKey}-${i}`;
@@ -352,17 +372,23 @@ export async function GET(request: Request) {
         skipped += 1;
         continue;
       }
+      const plannedPublishAt = new Date(
+        Date.now() + i * SCHEDULE_GENERATION_LEAD_MINUTES * 60 * 1000,
+      ).toISOString();
       const { error } = await sb.from("video_jobs").insert({
         user_id: user.id,
         status: "queued",
-        scheduled_for: new Date(
-          Date.now() + i * 4 * 60 * 60 * 1000,
-        ).toISOString(),
+        scheduled_for: new Date().toISOString(),
+        planned_publish_at: plannedPublishAt,
         metadata: {
           schedule_slot: slotKey,
+          planned_publish_at: plannedPublishAt,
+          generation_lead_minutes: SCHEDULE_GENERATION_LEAD_MINUTES,
+          max_publish_drift_minutes: MAX_PUBLISH_DRIFT_MINUTES,
           source: "schedule_legacy",
           pipeline: "youtube",
           publish: true,
+          publish_strategy: "youtube_scheduled_private",
         },
       });
       if (!error) created += 1;

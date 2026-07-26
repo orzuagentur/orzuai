@@ -69,6 +69,8 @@ export async function POST(_request: Request, ctx: Ctx) {
         publish: true,
         publish_existing: true,
         youtube_channel_id: active.channel_id,
+        manual_publish: true,
+        publish_request: "immediate_public",
       },
       youtube_channel_id: active.channel_id,
     })

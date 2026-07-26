@@ -126,7 +126,9 @@ Both app hosts allowed:
     "AllowedOrigins": [
       "https://www.orzuai.com",
       "https://orzuai.com",
-      "http://localhost:3000"
+      "https://orzuvideo-admin.vercel.app",
+      "http://localhost:3000",
+      "http://localhost:3001"
     ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
@@ -135,6 +137,10 @@ Both app hosts allowed:
   }
 ]
 ```
+
+Admin music uploads PUT directly to the R2 S3 endpoint from the browser — without
+`https://orzuvideo-admin.vercel.app` (and local `:3001`) in AllowedOrigins, the
+preflight fails with “No Access-Control-Allow-Origin”.
 
 Env (Vercel + Railway worker):
 
@@ -174,7 +180,7 @@ Production URLs live in **Vercel env**, not in `.env.local`.
 | Google consent | `https://www.orzuai.com` (+ `/privacy`, `/terms`) |
 | Supabase Site URL | `https://www.orzuai.com` |
 | Supabase Redirect | оба `/**` + localhost |
-| R2 CORS | оба origin + localhost |
+| R2 CORS | www + apex + **admin** + localhost:3000/3001 |
 | R2 custom domain | `media.orzuai.com` |
 
 ---
@@ -185,3 +191,4 @@ Production URLs live in **Vercel env**, not in `.env.local`.
 2. Connect YouTube → returns to `/dashboard/channel`  
 3. Media from `media.orzuai.com` / signed preview works  
 4. Clipping upload CORS OK from either host
+5. Admin music upload CORS OK from `https://orzuvideo-admin.vercel.app`

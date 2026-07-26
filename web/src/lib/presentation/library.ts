@@ -1,6 +1,6 @@
 import type { PresentationDoc } from "./types";
 
-export type PresentationExportFormat = "pdf" | "word";
+export type PresentationExportFormat = "pdf" | "word" | "pptx";
 
 export type PresentationInfoFields = {
   author: string;

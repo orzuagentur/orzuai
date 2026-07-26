@@ -381,9 +381,13 @@ def build_short(
                     tries += 1
                 used_motions.add(motion["id"])
         else:
-            # Motions off: hold a gentle body motion (no punch)
-            body = [m for m in MOTION_PRESETS if m["id"] != "punch_in"]
-            motion = body[0] if body else pick_motion(punch=False)
+            motion = {
+                "id": "none",
+                "zoom": "1",
+                "x": "iw/2-(iw/zoom/2)",
+                "y": "ih/2-(ih/zoom/2)",
+                "eq": "",
+            }
         do_flash = flash_on and i > 0 and (i % 2 == 1)
         clip_speed = 1.0 if punch else body_speed
         print(

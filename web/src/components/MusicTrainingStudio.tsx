@@ -85,7 +85,7 @@ export function MusicTrainingStudio({
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     let cancelled = false;

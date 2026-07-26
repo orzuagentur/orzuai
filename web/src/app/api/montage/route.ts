@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 
 const DEFAULTS = {
   clip_count: 5,
@@ -82,6 +83,19 @@ const DEFAULTS = {
   avoid_reuse_days: 60,
 };
 
+function normalizeMotionSettings(body: Record<string, unknown>) {
+  const raw = Array.isArray(body.enabled_motions)
+    ? body.enabled_motions.map(String).filter(Boolean)
+    : DEFAULTS.enabled_motions;
+  const explicitNone = raw.includes("none");
+  const enabled = raw.filter((id) => id !== "none");
+
+  return {
+    motions_enabled: body.motions_enabled !== false && !(explicitNone && !enabled.length),
+    enabled_motions: enabled.length ? enabled : DEFAULTS.enabled_motions,
+  };
+}
+
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -89,13 +103,23 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data } = await supabase
+  const active = await getActiveYoutubeChannel(user.id);
+  let query = supabase
     .from("montage_settings")
     .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .eq("user_id", user.id);
+  query = active?.channel_id
+    ? query.eq("youtube_channel_id", active.channel_id)
+    : query.is("youtube_channel_id", null);
+  const { data } = await query.maybeSingle();
 
-  return NextResponse.json({ settings: data || { user_id: user.id, ...DEFAULTS } });
+  return NextResponse.json({
+    settings: data || {
+      user_id: user.id,
+      youtube_channel_id: active?.channel_id || null,
+      ...DEFAULTS,
+    },
+  });
 }
 
 export async function POST(request: Request) {
@@ -105,9 +129,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const active = await getActiveYoutubeChannel(user.id);
   const body = await request.json();
+  const motionSettings = normalizeMotionSettings(body);
   const payload = {
     user_id: user.id,
+    youtube_channel_id: active?.channel_id || null,
     clip_count: Math.min(8, Math.max(3, Number(body.clip_count) || 5)),
     music_mood: String(body.music_mood || "motivational epic"),
     music_volume_hook: Math.min(
@@ -120,20 +147,30 @@ export async function POST(request: Request) {
     ),
     voice_volume: Math.min(1.4, Math.max(0.7, Number(body.voice_volume) || 1.05)),
     transitions_enabled: body.transitions_enabled !== false,
-    motions_enabled: body.motions_enabled !== false,
+    motions_enabled: motionSettings.motions_enabled,
     punch_first_clip: body.punch_first_clip !== false,
     enabled_transitions: Array.isArray(body.enabled_transitions)
       ? body.enabled_transitions.map(String)
       : DEFAULTS.enabled_transitions,
-    enabled_motions: Array.isArray(body.enabled_motions)
-      ? body.enabled_motions.map(String)
-      : DEFAULTS.enabled_motions,
+    enabled_motions: motionSettings.enabled_motions,
     avoid_reuse_days: Math.min(365, Math.max(7, Number(body.avoid_reuse_days) || 60)),
   };
 
-  const { error } = await supabase
+  let existingQuery = supabase
     .from("montage_settings")
-    .upsert(payload, { onConflict: "user_id" });
+    .select("id")
+    .eq("user_id", user.id);
+  existingQuery = active?.channel_id
+    ? existingQuery.eq("youtube_channel_id", active.channel_id)
+    : existingQuery.is("youtube_channel_id", null);
+  const { data: existing, error: readError } = await existingQuery.maybeSingle();
+  if (readError) {
+    return NextResponse.json({ error: readError.message }, { status: 500 });
+  }
+
+  const { error } = existing?.id
+    ? await supabase.from("montage_settings").update(payload).eq("id", existing.id)
+    : await supabase.from("montage_settings").insert(payload);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, settings: payload });

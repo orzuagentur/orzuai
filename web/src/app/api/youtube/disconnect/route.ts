@@ -32,5 +32,19 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const { error: channelsError } = await supabase
+    .from("youtube_channels")
+    .update({
+      is_active: false,
+      access_token: null,
+      refresh_token: null,
+      token_expires_at: null,
+    })
+    .eq("user_id", user.id);
+
+  if (channelsError) {
+    return NextResponse.json({ error: channelsError.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

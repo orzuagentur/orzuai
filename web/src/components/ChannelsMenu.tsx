@@ -42,7 +42,7 @@ export function ChannelsMenu({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t, tc]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +86,10 @@ export function ChannelsMenu({
     onClose();
     router.push("/dashboard/channel");
     router.refresh();
+  }
+
+  function connectYoutube() {
+    window.location.assign("/api/youtube/connect");
   }
 
   if (!open) return null;
@@ -142,13 +146,14 @@ export function ChannelsMenu({
       </div>
 
       <div className="border-t border-[color:var(--line)] p-2">
-        <a
-          href="/api/youtube/connect"
+        <button
+          type="button"
+          onClick={connectYoutube}
           className="flex w-full items-center justify-center gap-2 rounded-full px-3 py-2.5 text-xs font-semibold text-white transition hover:brightness-110"
           style={{ background: "#FF0000" }}
         >
           + {t("connectYoutube")}
-        </a>
+        </button>
       </div>
     </div>
   );

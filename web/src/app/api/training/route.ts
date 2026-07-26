@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 import { trainingRequiredComplete } from "@/lib/training-required";
 import { EFFECT_IDS, SUBTITLE_STYLE_IDS, TRANSITION_IDS } from "@/lib/editor-catalog";
+import {
+  clampVideosPerDay,
+  defaultTimesForCount,
+  padScheduleTimes,
+} from "@/lib/publish-schedule";
 import type { AiTraining } from "@/lib/types";
 
 function normalizeSubtitleStyle(raw: string): string {
@@ -96,7 +101,7 @@ export async function POST(request: Request) {
     reply_comments_enabled: Boolean(body.reply_comments_enabled),
     reply_languages: String(body.reply_languages || "auto").trim(),
     reply_style_prompt: String(body.reply_style_prompt || "").trim(),
-    learning_enabled: false,
+    learning_enabled: body.learning_enabled !== false,
     brand_rules: String(body.brand_rules || "").trim(),
     is_trained: false,
   };
@@ -167,7 +172,7 @@ export async function POST(request: Request) {
     reply_comments_enabled: formLike.reply_comments_enabled,
     reply_languages: formLike.reply_languages,
     reply_style_prompt: formLike.reply_style_prompt || "",
-    learning_enabled: false,
+    learning_enabled: formLike.learning_enabled,
     brand_rules: formLike.brand_rules || "",
     is_trained: true,
   };
@@ -202,13 +207,11 @@ export async function POST(request: Request) {
 
   let { error } = await writePayload(payload);
   if (error && /visual_effect|preferred_transition|montage_pace|flash_cuts/i.test(error.message)) {
-    const {
-      visual_effect: _ve,
-      preferred_transition: _pt,
-      montage_pace: _mp,
-      flash_cuts: _fc,
-      ...legacy
-    } = payload;
+    const legacy: Record<string, unknown> = { ...payload };
+    delete legacy.visual_effect;
+    delete legacy.preferred_transition;
+    delete legacy.montage_pace;
+    delete legacy.flash_cuts;
     ({ error } = await writePayload(legacy));
   }
 
@@ -223,13 +226,17 @@ export async function POST(request: Request) {
       .eq("youtube_channel_id", active.channel_id)
       .maybeSingle();
 
+    const scheduleVideosPerDay = clampVideosPerDay(sched?.videos_per_day || 2);
     const scheduleRow = {
       user_id: user.id,
       youtube_channel_id: active.channel_id,
       enabled: true,
       mode: sched?.mode || "daily",
-      videos_per_day: sched?.videos_per_day || 2,
-      times: sched?.times || ["09:00", "18:00"],
+      videos_per_day: scheduleVideosPerDay,
+      times: padScheduleTimes(
+        scheduleVideosPerDay,
+        sched?.times || defaultTimesForCount(scheduleVideosPerDay),
+      ),
       weekdays: sched?.weekdays || [1, 2, 3, 4, 5, 6, 7],
       custom_dates: sched?.custom_dates || [],
       timezone: sched?.timezone || "Europe/Berlin",

@@ -95,6 +95,7 @@ begin
       'editing',
       'uploading',
       'ready',
+      'scheduled',
       'published',
       'failed'
     );
@@ -347,6 +348,19 @@ begin
     where t.typname = 'job_status' and e.enumlabel = 'ready'
   ) then
     alter type public.job_status add value 'ready';
+  end if;
+end $$;
+
+-- Scheduled = private YouTube upload waiting for publishAt
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_enum e
+    join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'job_status' and e.enumlabel = 'scheduled'
+  ) then
+    alter type public.job_status add value 'scheduled' after 'ready';
   end if;
 end $$;
 
@@ -612,3 +626,324 @@ create policy "Users manage own montage"
   on public.montage_settings for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Latest YouTube architecture hardening (multi-channel, worker leases, publish SLA)
+create table if not exists public.youtube_channels (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  channel_id text not null,
+  title text,
+  custom_url text,
+  thumbnail_url text,
+  access_token text,
+  refresh_token text,
+  token_expires_at timestamptz,
+  subscriber_count int default 0,
+  view_count bigint default 0,
+  video_count int default 0,
+  stats_synced_at timestamptz,
+  is_active boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, channel_id)
+);
+
+create index if not exists youtube_channels_user_active_idx
+  on public.youtube_channels (user_id, is_active);
+
+drop trigger if exists youtube_channels_updated_at on public.youtube_channels;
+create trigger youtube_channels_updated_at
+  before update on public.youtube_channels
+  for each row execute function public.set_updated_at();
+
+alter table public.youtube_channels enable row level security;
+
+drop policy if exists "Users manage own yt channels" on public.youtube_channels;
+create policy "Users manage own yt channels"
+  on public.youtube_channels for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+alter table public.video_jobs
+  add column if not exists youtube_channel_id text,
+  add column if not exists worker_run_id uuid,
+  add column if not exists worker_id text,
+  add column if not exists claimed_at timestamptz,
+  add column if not exists lease_expires_at timestamptz,
+  add column if not exists youtube_upload_started_at timestamptz,
+  add column if not exists youtube_upload_finished_at timestamptz,
+  add column if not exists planned_publish_at timestamptz,
+  add column if not exists youtube_publish_at timestamptz,
+  add column if not exists actual_publish_at timestamptz,
+  add column if not exists publish_drift_seconds int,
+  add column if not exists publish_strategy text,
+  add column if not exists quality_checked_at timestamptz,
+  add column if not exists quality_check jsonb not null default '{}'::jsonb;
+
+alter table public.ai_training
+  add column if not exists youtube_channel_id text,
+  add column if not exists music_group text,
+  add column if not exists music_volume numeric not null default 0.58,
+  add column if not exists voice_volume numeric not null default 1.05,
+  add column if not exists music_prefs jsonb not null default '{}'::jsonb,
+  add column if not exists visual_effect text not null default 'cinematic',
+  add column if not exists preferred_transition text not null default '',
+  add column if not exists montage_pace text not null default 'medium',
+  add column if not exists flash_cuts boolean not null default false;
+
+update public.ai_training
+set subtitle_style = 'karaoke_gold'
+where subtitle_style in ('karaoke_bold', 'karaoke');
+
+alter table public.publish_schedules
+  add column if not exists youtube_channel_id text;
+
+alter table public.montage_settings
+  add column if not exists youtube_channel_id text,
+  add column if not exists id uuid default gen_random_uuid();
+
+update public.montage_settings set id = gen_random_uuid() where id is null;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'montage_settings'
+      and constraint_type = 'PRIMARY KEY'
+  ) then
+    alter table public.montage_settings drop constraint montage_settings_pkey;
+  end if;
+exception when others then null;
+end $$;
+
+alter table public.montage_settings
+  alter column id set not null;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'montage_settings'
+      and constraint_type = 'PRIMARY KEY'
+  ) then
+    alter table public.montage_settings add primary key (id);
+  end if;
+end $$;
+
+alter table public.ai_training drop constraint if exists ai_training_user_id_key;
+alter table public.publish_schedules drop constraint if exists publish_schedules_user_id_key;
+
+create unique index if not exists ai_training_user_channel_uidx
+  on public.ai_training (user_id, coalesce(youtube_channel_id, ''));
+
+create unique index if not exists publish_schedules_user_channel_uidx
+  on public.publish_schedules (user_id, coalesce(youtube_channel_id, ''));
+
+create unique index if not exists montage_settings_user_channel_uidx
+  on public.montage_settings (user_id, coalesce(youtube_channel_id, ''));
+
+create index if not exists video_jobs_user_channel_idx
+  on public.video_jobs (user_id, youtube_channel_id, created_at desc);
+
+create index if not exists video_jobs_due_claim_idx
+  on public.video_jobs (scheduled_for, created_at)
+  where status = 'queued';
+
+create index if not exists video_jobs_lease_idx
+  on public.video_jobs (status, lease_expires_at)
+  where status in ('generating_script', 'generating_voice', 'fetching_media', 'editing');
+
+create index if not exists video_jobs_schedule_slot_idx
+  on public.video_jobs (
+    user_id,
+    coalesce(youtube_channel_id, ''),
+    ((metadata ->> 'schedule_slot'))
+  )
+  where metadata ? 'schedule_slot';
+
+create index if not exists video_jobs_planned_publish_idx
+  on public.video_jobs (user_id, coalesce(youtube_channel_id, ''), planned_publish_at desc)
+  where planned_publish_at is not null;
+
+with ranked as (
+  select
+    id,
+    row_number() over (
+      partition by user_id
+      order by updated_at desc nulls last, created_at desc nulls last, id desc
+    ) as rn
+  from public.youtube_channels
+  where is_active = true
+)
+update public.youtube_channels yc
+set is_active = false
+from ranked r
+where yc.id = r.id
+  and r.rn > 1;
+
+create unique index if not exists youtube_channels_one_active_uidx
+  on public.youtube_channels (user_id)
+  where is_active = true;
+
+alter table public.published_videos
+  add column if not exists planned_publish_at timestamptz,
+  add column if not exists youtube_publish_at timestamptz,
+  add column if not exists actual_publish_at timestamptz,
+  add column if not exists publish_drift_seconds int;
+
+with ranked as (
+  select
+    id,
+    row_number() over (
+      partition by job_id
+      order by published_at desc nulls last, id desc
+    ) as rn
+  from public.published_videos
+  where job_id is not null
+)
+delete from public.published_videos p
+using ranked r
+where p.id = r.id
+  and r.rn > 1;
+
+create unique index if not exists published_videos_job_uidx
+  on public.published_videos (job_id)
+  where job_id is not null;
+
+alter table public.ai_learning_memory
+  add column if not exists youtube_channel_id text;
+
+create index if not exists ai_learning_user_channel_idx
+  on public.ai_learning_memory (user_id, coalesce(youtube_channel_id, ''), created_at desc);
+
+alter table public.comment_replies
+  add column if not exists youtube_channel_id text;
+
+create index if not exists comment_replies_user_channel_idx
+  on public.comment_replies (user_id, coalesce(youtube_channel_id, ''), created_at desc);
+
+update public.publish_schedules
+set
+  videos_per_day = least(4, greatest(1, videos_per_day)),
+  times = case
+    when array_length(times, 1) > 4 then times[1:4]
+    else times
+  end;
+
+alter table public.publish_schedules
+  drop constraint if exists publish_schedules_videos_per_day_check;
+
+alter table public.publish_schedules
+  add constraint publish_schedules_videos_per_day_check
+  check (videos_per_day between 1 and 4);
+
+update public.profiles
+set videos_per_day = least(4, greatest(1, videos_per_day));
+
+alter table public.profiles
+  drop constraint if exists profiles_videos_per_day_check;
+
+alter table public.profiles
+  add constraint profiles_videos_per_day_check
+  check (videos_per_day between 1 and 4);
+
+create or replace function public.claim_next_video_job(
+  p_worker_id text,
+  p_lease_seconds integer default 7200
+)
+returns setof public.video_jobs
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_job_id uuid;
+  v_run_id uuid := gen_random_uuid();
+begin
+  select id
+    into v_job_id
+  from public.video_jobs
+  where status = 'queued'
+    and scheduled_for <= now()
+  order by scheduled_for asc, created_at asc
+  for update skip locked
+  limit 1;
+
+  if v_job_id is null then
+    return;
+  end if;
+
+  return query
+  update public.video_jobs
+  set
+    status = 'generating_script',
+    attempt_count = attempt_count + 1,
+    worker_run_id = v_run_id,
+    worker_id = coalesce(nullif(p_worker_id, ''), 'unknown'),
+    claimed_at = now(),
+    lease_expires_at = now() + make_interval(secs => greatest(60, p_lease_seconds)),
+    error_message = null
+  where id = v_job_id
+    and status = 'queued'
+  returning *;
+end;
+$$;
+
+grant execute on function public.claim_next_video_job(text, integer) to service_role;
+
+-- User presentation library metadata (JSON docs live in Cloudflare R2)
+create table if not exists public.presentation_library (
+  id text primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  title text not null default 'Presentation',
+  format text not null default 'pdf' check (format in ('pdf', 'word', 'pptx')),
+  source text not null default 'classic' check (source in ('ai', 'classic')),
+  storage_path text not null,
+  storage_bucket text not null default 'orzu-media',
+  slide_count integer not null default 0,
+  info jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.presentation_library
+  alter column id type text using id::text;
+
+alter table public.presentation_library
+  drop constraint if exists presentation_library_format_check;
+
+alter table public.presentation_library
+  add constraint presentation_library_format_check
+  check (format in ('pdf', 'word', 'pptx'));
+
+create index if not exists presentation_library_user_idx
+  on public.presentation_library (user_id, updated_at desc);
+
+alter table public.presentation_library enable row level security;
+
+drop policy if exists presentation_library_select_own on public.presentation_library;
+create policy presentation_library_select_own
+  on public.presentation_library for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists presentation_library_insert_own on public.presentation_library;
+create policy presentation_library_insert_own
+  on public.presentation_library for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists presentation_library_update_own on public.presentation_library;
+create policy presentation_library_update_own
+  on public.presentation_library for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists presentation_library_delete_own on public.presentation_library;
+create policy presentation_library_delete_own
+  on public.presentation_library for delete
+  to authenticated
+  using (auth.uid() = user_id);

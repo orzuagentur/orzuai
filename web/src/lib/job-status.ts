@@ -6,6 +6,7 @@ export const JOB_STATUS_LABEL: Record<string, string> = {
   editing: "Editing",
   uploading: "Uploading",
   ready: "Ready",
+  scheduled: "Scheduled",
   published: "Published",
   failed: "Failed",
 };
@@ -17,9 +18,11 @@ export const QUEUE_STATUSES = new Set([
   "fetching_media",
   "editing",
   "uploading",
+  "scheduled",
 ]);
 
 export function statusColor(status: string): string {
+  if (status === "scheduled") return "var(--accent)";
   if (status === "published") return "var(--success)";
   if (status === "ready") return "var(--accent)";
   if (status === "failed") return "var(--danger)";
@@ -43,6 +46,7 @@ export function jobProgressPercent(status: string): number {
     case "uploading":
       return 92;
     case "ready":
+    case "scheduled":
     case "published":
       return 100;
     case "failed":

@@ -83,6 +83,13 @@ export type VideoJob = {
   youtube_video_id?: string | null;
   error_message: string | null;
   scheduled_for: string;
+  planned_publish_at?: string | null;
+  youtube_publish_at?: string | null;
+  actual_publish_at?: string | null;
+  publish_drift_seconds?: number | null;
+  publish_strategy?: string | null;
+  quality_checked_at?: string | null;
+  quality_check?: Record<string, unknown> | null;
   created_at: string;
   completed_at: string | null;
   thumbnail_url?: string | null;

@@ -87,7 +87,9 @@ Optional: `R2_ENDPOINT`, `R2_REGION=auto`
     "AllowedOrigins": [
       "https://www.orzuai.com",
       "https://orzuai.com",
-      "http://localhost:3000"
+      "https://orzuvideo-admin.vercel.app",
+      "http://localhost:3000",
+      "http://localhost:3001"
     ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
@@ -96,6 +98,8 @@ Optional: `R2_ENDPOINT`, `R2_REGION=auto`
   }
 ]
 ```
+
+Required for browser PUT from the web app **and** admin (`orzuvideo-admin.vercel.app`).
 
 Full domain checklist: see [`DOMAIN.md`](DOMAIN.md).
 ---

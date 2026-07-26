@@ -9,6 +9,10 @@ function presentationKey(userId: string, id: string) {
   return `${userId}/presentations/${id}.json`;
 }
 
+function validPresentationId(id: string) {
+  return /^[A-Za-z0-9_-]{6,120}$/.test(id);
+}
+
 function emptyInfo() {
   return {
     author: "",
@@ -95,12 +99,19 @@ export async function PUT(request: Request) {
       { status: 400 },
     );
   }
+  if (!validPresentationId(id)) {
+    return NextResponse.json(
+      { error: "Invalid presentation id" },
+      { status: 400 },
+    );
+  }
 
   const now = new Date().toISOString();
   const title = String(item.title || item.doc.title || "Presentation")
     .trim()
     .slice(0, 200);
-  const format = item.format === "word" ? "word" : "pdf";
+  const format =
+    item.format === "word" || item.format === "pptx" ? item.format : "pdf";
   const source = item.source === "ai" ? "ai" : "classic";
   const info = { ...emptyInfo(), ...(item.info || {}) };
   const storagePath = presentationKey(user.id, id);

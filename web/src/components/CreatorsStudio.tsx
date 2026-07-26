@@ -106,7 +106,6 @@ async function downloadPackageZip(pack: PolyPackage, assetId: string) {
 
 export function CreatorsStudio({ kind }: { kind: StudioKind }) {
   const t = useTranslations("studio.creators");
-  const tc = useTranslations("studio.common");
   const tCommon = useTranslations("common");
 
   function typeLabel(k: StudioKind) {
@@ -386,6 +385,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
     category,
     submitted,
     photoSource,
+    t,
   ]);
 
   // OpenMoji categories (group_name)
@@ -469,7 +469,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
     return () => {
       cancelled = true;
     };
-  }, [isIcons, iconPrefix, submitted]);
+  }, [isIcons, iconPrefix, submitted, t]);
 
   // OpenMoji gallery (category and/or live search)
   useEffect(() => {
@@ -508,7 +508,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
     return () => {
       cancelled = true;
     };
-  }, [isEmoji, emojiGroup, submitted]);
+  }, [isEmoji, emojiGroup, submitted, t]);
 
   // Gallery fetch (category or search) — Poly Haven only
   useEffect(() => {
@@ -561,7 +561,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
     return () => {
       cancelled = true;
     };
-  }, [showGallery, searching, category, kind, submitted]);
+  }, [showGallery, searching, category, kind, submitted, isEmoji, t]);
 
   const loadMore = useCallback(async () => {
     // Photos: load more topic categories while browsing the catalog

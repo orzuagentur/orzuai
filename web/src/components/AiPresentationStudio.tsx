@@ -25,6 +25,7 @@ import {
   type PresentationLibraryItem,
 } from "@/lib/presentation/library";
 import {
+  downloadPresentationPptx,
   downloadPresentationWord,
   printPresentationPdf,
 } from "@/lib/presentation/export";
@@ -32,6 +33,7 @@ import { savePresentationDraft } from "@/lib/presentation/factory";
 
 const FORMATS = [
   { id: "pdf" as const, labelKey: "pdf" as const, hintKey: "printReady" as const },
+  { id: "pptx" as const, labelKey: "pptx" as const, hintKey: "powerPoint" as const },
   { id: "word" as const, labelKey: "word" as const, hintKey: "docForWord" as const },
 ];
 
@@ -41,6 +43,29 @@ const PAGE_COUNTS = [
   { id: "8", label: "8" },
   { id: "10", label: "10" },
   { id: "12", label: "12" },
+] as const;
+
+const PROMPT_STARTERS = [
+  {
+    label: "Pitch",
+    prompt:
+      "Create a premium investor pitch deck for a fast-growing AI creator platform. Include problem, market shift, product, traction, business model, moat, go-to-market, roadmap, and ask.",
+  },
+  {
+    label: "Keynote",
+    prompt:
+      "Create a cinematic keynote about the future of autonomous content creation. Make it visionary, visual, and persuasive with bold statistics and memorable chapter slides.",
+  },
+  {
+    label: "Sales",
+    prompt:
+      "Create a high-converting sales presentation for a B2B product. Include buyer pain, before/after story, proof, ROI, objection handling, pricing logic, and next step.",
+  },
+  {
+    label: "Report",
+    prompt:
+      "Create an executive strategy report presentation. Use clean charts, decision-ready insights, risks, opportunities, timeline, and recommended actions.",
+  },
 ] as const;
 
 function PromptChip({
@@ -218,6 +243,9 @@ export function AiPresentationStudio() {
       if (kind === "word") {
         await downloadPresentationWord(full.doc);
         toast(t("wordDownloaded"));
+      } else if (kind === "pptx") {
+        await downloadPresentationPptx(full.doc);
+        toast("PowerPoint downloaded.");
       } else {
         // Open editor print surface for PDF (same as classic export)
         router.push(
@@ -240,7 +268,7 @@ export function AiPresentationStudio() {
   }
 
   return (
-    <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-8 pb-28">
+    <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-28">
       {notice}
       <header className="rise">
         <h1
@@ -256,6 +284,19 @@ export function AiPresentationStudio() {
 
       {tab === "create" && (
         <section className="rise-delay space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {PROMPT_STARTERS.map((starter) => (
+              <button
+                key={starter.label}
+                type="button"
+                className="rounded-lg border border-[color:var(--line)] bg-white/[0.03] px-3 py-2 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                onClick={() => setPrompt(starter.prompt)}
+                disabled={creating}
+              >
+                {starter.label}
+              </button>
+            ))}
+          </div>
           <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] focus-within:border-[color:rgba(232,165,75,0.45)]">
             <textarea
               className="min-h-[160px] w-full resize-y border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-relaxed outline-none placeholder:text-[color:var(--muted)]"
@@ -437,6 +478,11 @@ export function AiPresentationStudio() {
                           disabled: busyId === item.id,
                         },
                         {
+                          label: t("exportPptx"),
+                          onClick: () => void exportItem(item, "pptx"),
+                          disabled: busyId === item.id,
+                        },
+                        {
                           label: t("exportWord"),
                           onClick: () => void exportItem(item, "word"),
                           disabled: busyId === item.id,
@@ -459,7 +505,11 @@ export function AiPresentationStudio() {
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[color:var(--muted)]">
                       <span className="uppercase tracking-wide">
-                        {item.format === "word" ? tPres("word") : tPres("pdf")}
+                        {item.format === "word"
+                          ? tPres("word")
+                          : item.format === "pptx"
+                            ? "PPTX"
+                            : tPres("pdf")}
                       </span>
                       <span>·</span>
                       <span>{item.doc.slides.length} slides</span>

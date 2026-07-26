@@ -7,6 +7,7 @@ const PERMANENT_ERROR_SNIPPETS = [
   "library empty",
   "training required",
   "fill required",
+  "missed publish window",
 ] as const;
 
 function isPermanentError(errorMessage: string | null | undefined): boolean {

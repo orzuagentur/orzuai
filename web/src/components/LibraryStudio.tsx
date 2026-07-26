@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 import { useToast } from "@/components/ToastNotice";
+import { isFeatureLocked } from "@/lib/product-locks";
+import { useProductLocks } from "@/lib/product-locks-client";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoJob } from "@/lib/types";
 import {
@@ -289,7 +291,15 @@ export function LibraryStudio() {
   const tFav = useTranslations("studio.favorites");
   const searchParams = useSearchParams();
   const router = useRouter();
+  const locks = useProductLocks();
   const tab = parseTab(searchParams.get("tab"));
+  const presentationsHidden = isFeatureLocked(locks, "presentation_editor");
+  const classicPresentationVisible = !isFeatureLocked(
+    locks,
+    "presentation_editor",
+  );
+  const aiPresentationVisible =
+    !isFeatureLocked(locks, "ai_presentation") && classicPresentationVisible;
   const { show: toast, notice } = useToast();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [favs, setFavs] = useState<FavoriteItem[]>([]);
@@ -347,7 +357,7 @@ export function LibraryStudio() {
   }, [loadJobs, loadFavs]);
 
   useEffect(() => {
-    if (tab !== "presentations") return;
+    if (tab !== "presentations" || presentationsHidden) return;
     let cancelled = false;
     void (async () => {
       const items = await fetchPresentationLibrary();
@@ -356,7 +366,7 @@ export function LibraryStudio() {
     return () => {
       cancelled = true;
     };
-  }, [tab]);
+  }, [presentationsHidden, tab]);
 
   useEffect(() => {
     return () => {
@@ -559,6 +569,10 @@ export function LibraryStudio() {
 
       {loading ? (
         <p className="text-sm text-[color:var(--muted)]">{t("loadingLibrary")}</p>
+      ) : tab === "presentations" && presentationsHidden ? (
+        <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
+          {t("presentationsHidden")}
+        </p>
       ) : tab === "presentations" ? (
         presentations.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center">
@@ -566,19 +580,23 @@ export function LibraryStudio() {
               {t("noPresentations")}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/dashboard/creators/presentation"
-                className="rounded-full px-4 py-2 text-sm font-semibold text-black"
-                style={{ background: "#E8A54B" }}
-              >
-                {t("classicPresentation")}
-              </Link>
-              <Link
-                href="/dashboard/creators/ai-presentation"
-                className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--fg)]"
-              >
-                {t("aiPresentation")}
-              </Link>
+              {classicPresentationVisible && (
+                <Link
+                  href="/dashboard/creators/presentation"
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-black"
+                  style={{ background: "#E8A54B" }}
+                >
+                  {t("classicPresentation")}
+                </Link>
+              )}
+              {aiPresentationVisible && (
+                <Link
+                  href="/dashboard/creators/ai-presentation"
+                  className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--fg)]"
+                >
+                  {t("aiPresentation")}
+                </Link>
+              )}
             </div>
           </div>
         ) : (

@@ -89,6 +89,10 @@ export function ChannelStudio({
   const analyticsRef = useRef<HTMLDivElement>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
+  function connectYoutube() {
+    window.location.assign("/api/youtube/connect");
+  }
+
   useEffect(() => {
     // Merge server queue with any jobs we are still watching (avoid wipe after router.refresh)
     setQueue((prev) => {
@@ -191,10 +195,11 @@ export function ChannelStudio({
 
     const next = (data as VideoJob[]).filter(isYoutubeQueueJob);
     const nextIds = new Set(next.map((j) => j.id));
+    const finishedIds = [...watchingRef.current].filter((id) => !nextIds.has(id));
 
     // Drop watchers that finished (left QUEUE_STATUSES)
-    for (const id of [...watchingRef.current]) {
-      if (!nextIds.has(id)) watchingRef.current.delete(id);
+    for (const id of finishedIds) {
+      watchingRef.current.delete(id);
     }
 
     setQueue((prev) => {
@@ -212,7 +217,10 @@ export function ChannelStudio({
       );
     });
     setWatchTick((n) => n + 1);
-  }, [profile?.youtube_channel_id]);
+    if (finishedIds.length > 0) {
+      router.refresh();
+    }
+  }, [profile?.youtube_channel_id, router]);
 
   function trackJob(job: Partial<VideoJob> & { id: string }) {
     watchingRef.current.add(job.id);
@@ -426,7 +434,16 @@ export function ChannelStudio({
     setDrafts((prev) => prev.filter((d) => d.id !== jobId));
     toast(t("draftQueued"));
     setStep("closed");
-    trackJob({ id: jobId, status: "queued", metadata: { source: "draft_publish" } });
+    trackJob({
+      id: jobId,
+      status: "queued",
+      metadata: {
+        source: "draft_publish",
+        publish: true,
+        manual_publish: true,
+        publish_request: "immediate_public",
+      },
+    });
     void refreshQueue();
   }
 
@@ -457,7 +474,13 @@ export function ChannelStudio({
       trackJob({
         id: String(data.job_id),
         status: "queued",
-        metadata: { source: "youtube_ai", pipeline: "youtube", publish: true },
+        metadata: {
+          source: "youtube_ai",
+          pipeline: "youtube",
+          publish: true,
+          manual_publish: true,
+          publish_request: "immediate_public",
+        },
       });
     }
     toast(t("aiCreating"), "info");
@@ -502,6 +525,8 @@ export function ChannelStudio({
           source: "youtube_prompt",
           pipeline: "youtube",
           publish: true,
+          manual_publish: true,
+          publish_request: "immediate_public",
         },
       });
     }
@@ -527,7 +552,13 @@ export function ChannelStudio({
       trackJob({
         id: String(data.job_id),
         status: "queued",
-        metadata: { source: "device_upload", pipeline: "youtube", publish: true },
+        metadata: {
+          source: "device_upload",
+          pipeline: "youtube",
+          publish: true,
+          manual_publish: true,
+          publish_request: "immediate_public",
+        },
       });
     }
     toast("Video uploaded - publishing to YouTube.", "info");
@@ -548,9 +579,13 @@ export function ChannelStudio({
           Connect your YouTube channel. Professional AI will study it and help
           you create Shorts, reply to comments, and publish every day.
         </p>
-        <a href="/api/youtube/connect" className="btn btn-primary inline-flex">
+        <button
+          type="button"
+          onClick={connectYoutube}
+          className="btn btn-primary inline-flex"
+        >
           {t("connectYoutube")}
-        </a>
+        </button>
       </div>
     );
   }
@@ -877,7 +912,7 @@ export function ChannelStudio({
               </button>
               <CardMenu
                 items={[
-                  { label: t("addChannel"), href: "/api/youtube/connect" },
+                  { label: t("addChannel"), onClick: connectYoutube },
                   {
                     label:
                       busy === "disconnect" ? "Disconnecting..." : "Disconnect",
@@ -889,13 +924,14 @@ export function ChannelStudio({
               />
             </div>
             {unauthorized && (
-              <a
-                href="/api/youtube/connect"
+              <button
+                type="button"
+                onClick={connectYoutube}
                 className="inline-flex min-w-[9.5rem] items-center justify-center rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
                 style={{ background: "#FF0000" }}
               >
                 Авторизоваться
-              </a>
+              </button>
             )}
           </div>
         </CardMenuSlot>

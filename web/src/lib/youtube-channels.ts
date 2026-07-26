@@ -25,6 +25,8 @@ export async function getActiveYoutubeChannel(userId: string) {
     .select("*")
     .eq("user_id", userId)
     .eq("is_active", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (data) return data as YtChannelRow & Record<string, unknown>;

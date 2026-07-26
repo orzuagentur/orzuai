@@ -198,6 +198,13 @@ export async function downloadPresentationPptx(doc: PresentationDoc) {
   for (const slide of doc.slides) {
     const s = pptx.addSlide();
     s.background = { color: solidFromGradient(slide.background) };
+    if (slide.backgroundImage) {
+      try {
+        s.addImage({ path: slide.backgroundImage, x: 0, y: 0, w: "100%", h: "100%" });
+      } catch {
+        /* remote image skipped */
+      }
+    }
     const sorted = [...slide.elements].sort((a, b) => a.zIndex - b.zIndex);
     for (const el of sorted) {
       addElement(s, pptx, el, theme.titleColor);

@@ -165,6 +165,14 @@ const CHARTS: ChartKind[] = [
   "semicircle",
   "waterfall",
   "groupedBar",
+  "stackedBarH",
+  "bullet",
+  "sparkline",
+  "pyramid",
+  "treemap",
+  "bubble",
+  "radialBar",
+  "meter",
 ];
 
 const TEXT_STYLES: TextStyleId[] = [
@@ -418,6 +426,29 @@ function applyLayoutHints(layout: string, elements: SlideElement[]): SlideElemen
   });
 }
 
+function clampFrame<T extends SlideElement>(el: T): T {
+  const next = {
+    ...el,
+    x: Math.max(0, Math.min(96, el.x)),
+    y: Math.max(0, Math.min(92, el.y)),
+    w: Math.max(4, Math.min(96, el.w)),
+    h: Math.max(4, Math.min(92, el.h)),
+  } as T;
+  if (next.x + next.w > 98) next.w = Math.max(4, 98 - next.x);
+  if (next.y + next.h > 94) next.h = Math.max(4, 94 - next.y);
+  if (next.type === "text") {
+    const chars = next.text.length;
+    if (chars > 120 && next.fontSize > 18) {
+      next.fontSize = Math.max(18, Math.round(next.fontSize * 0.86));
+    }
+    if (chars > 220 && next.fontSize > 14) {
+      next.fontSize = Math.max(14, Math.round(next.fontSize * 0.78));
+      next.lineHeight = next.lineHeight ?? 1.18;
+    }
+  }
+  return next;
+}
+
 function buildSlide(
   themeId: PresentationThemeId,
   raw: AiSlide,
@@ -473,6 +504,28 @@ function buildSlide(
     }
   }
 
+  if (raw.backgroundCredit) {
+    elements.push(
+      mapText(
+        themeId,
+        {
+          type: "text",
+          style: "caption",
+          text: `Photo: ${String(raw.backgroundCredit).slice(0, 80)}`,
+          fontSize: 10,
+          fontWeight: 500,
+          color: theme.muted,
+          x: 72,
+          y: 89,
+          w: 22,
+          h: 5,
+          align: "right",
+        },
+        z++,
+      ),
+    );
+  }
+
   let finalEls = applyLayoutHints(layout, elements);
 
   if (!finalEls.some((e) => e.type !== "shape")) {
@@ -490,6 +543,8 @@ function buildSlide(
     ];
   }
 
+  finalEls = finalEls.map(clampFrame);
+
   return {
     ...blank,
     id: uid("slide"),
@@ -497,6 +552,7 @@ function buildSlide(
     notes: String(raw.notes || ""),
     background: theme.slideBg,
     backgroundImage: String(raw.backgroundImage || "").trim() || undefined,
+    backgroundCredit: String(raw.backgroundCredit || "").trim() || undefined,
     elements: finalEls,
   };
 }

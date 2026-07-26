@@ -10,7 +10,6 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 function LoginForm() {
   const t = useTranslations("auth");
-  const tc = useTranslations("common");
   const locale = useLocale();
   const params = useSearchParams();
   const [email, setEmail] = useState("");

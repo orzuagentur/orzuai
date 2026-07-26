@@ -194,6 +194,7 @@ export type PresentationSlide = {
   name: string;
   background: string;
   backgroundImage?: string;
+  backgroundCredit?: string;
   transition: SlideTransition;
   transitionMs: number;
   notes: string;

@@ -11,7 +11,7 @@ const NAV = [
   { href: "/media", label: "Media" },
   { href: "/music", label: "Music" },
   { href: "/email", label: "Email" },
-  { href: "/features", label: "Features" },
+  { href: "/features", label: "Deferred" },
   { href: "/sources", label: "Sources" },
   { href: "/costs", label: "Expenses" },
 ] as const;

@@ -1507,6 +1507,18 @@ VIDEO_STYLE_MONTAGE: dict[str, dict[str, str | bool | list[str]]] = {
     },
 }
 
+VIDEO_STYLE_ALIASES: dict[str, str] = {
+    "viral": "boom_viral",
+    "cinema": "cinematic_mixer",
+    "clean": "clean_minimal",
+    "dark": "gritty_handheld",
+    "hype": "hype_edit",
+    "luxury": "luxury_slow",
+    "boom": "boom_viral",
+    "street": "street_reel",
+    "techno": "techno_flash",
+}
+
 
 def resolve_training_montage(
     training: dict | None,
@@ -1533,6 +1545,7 @@ def resolve_training_montage(
     script_data = script_data or {}
     meta0 = meta0 or {}
     style_key = str(training.get("video_style") or "").strip().lower().replace(" ", "_")
+    style_key = VIDEO_STYLE_ALIASES.get(style_key, style_key)
     from_style = VIDEO_STYLE_MONTAGE.get(style_key) or {}
 
     def pick_str(*keys: str, default: str = "") -> str:

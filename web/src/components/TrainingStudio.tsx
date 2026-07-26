@@ -45,6 +45,7 @@ import {
   trainingEmptyDefaults,
   trainingRequiredComplete,
 } from "@/lib/training-required";
+import { validatePublishTimes } from "@/lib/publish-schedule";
 import {
   clampMusicVolume,
   clampVoiceVolume,
@@ -77,7 +78,7 @@ export function TrainingStudio({
     const merged = {
       ...trainingEmptyDefaults,
       ...initial,
-      learning_enabled: false,
+      learning_enabled: initial?.learning_enabled ?? trainingEmptyDefaults.learning_enabled,
     };
     const look =
       initial?.music_prefs &&
@@ -212,24 +213,11 @@ export function TrainingStudio({
       ...schedule,
       enabled: enableAiFlow ? true : schedule.enabled,
     });
-    const unique = new Set(schedulePayload.times);
-    if (unique.size !== schedulePayload.times.length) {
-      toast(t("timesDifferent"), "error");
+    const scheduleError = validatePublishTimes(schedulePayload.times);
+    if (scheduleError) {
+      toast(scheduleError, "error");
       setBusy(false);
       return false;
-    }
-    const sortedMins = [...schedulePayload.times]
-      .map((tm) => {
-        const [h, m] = String(tm).split(":");
-        return Number(h) * 60 + Number(m || 0);
-      })
-      .sort((a, b) => a - b);
-    for (let i = 1; i < sortedMins.length; i++) {
-      if (sortedMins[i] - sortedMins[i - 1] < 15) {
-        toast(t("timesGap"), "error");
-        setBusy(false);
-        return false;
-      }
     }
 
     const musicPrefs: MusicPrefs = {
@@ -246,7 +234,6 @@ export function TrainingStudio({
 
     const trainingBody = {
       ...form,
-      learning_enabled: false,
       enable_ai: enableAiFlow || undefined,
       music_group: "",
       music_volume: musicPrefs.volume,
@@ -285,10 +272,10 @@ export function TrainingStudio({
       ? { ...schedulePayload, enabled: true }
       : schedulePayload;
     savedRef.current = snapshot(
-      { ...form, learning_enabled: false, is_trained: true },
+      { ...form, is_trained: true },
       savedSchedule,
     );
-    setForm((p) => ({ ...p, is_trained: true, learning_enabled: false }));
+    setForm((p) => ({ ...p, is_trained: true }));
     setSchedule(savedSchedule);
     setDirty(false);
     toast(enableAiFlow ? t("savedAiOn") : t("saved"));
