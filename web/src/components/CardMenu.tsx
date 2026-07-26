@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 /** Compact ⋯ menu for card corners */
 export function CardMenu({
@@ -16,6 +17,7 @@ export function CardMenu({
   }>;
   align?: "left" | "right";
 }) {
+  const tc = useTranslations("studio.common");
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -43,7 +45,7 @@ export function CardMenu({
       <button
         type="button"
         className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
-        aria-label="More actions"
+        aria-label={tc("moreActions")}
         aria-expanded={open}
         onClick={(e) => {
           e.stopPropagation();

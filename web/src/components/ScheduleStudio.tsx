@@ -1,19 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { PublishSchedule } from "@/lib/types";
 import { TimeChip } from "@/components/TimeChip";
 import { ScheduleSelectField } from "@/components/ScheduleSelectField";
-
-const DAY_LABELS = [
-  { id: 1, label: "Mon" },
-  { id: 2, label: "Tue" },
-  { id: 3, label: "Wed" },
-  { id: 4, label: "Thu" },
-  { id: 5, label: "Fri" },
-  { id: 6, label: "Sat" },
-  { id: 7, label: "Sun" },
-];
 
 const VIDEO_COUNT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({
   value: String(n),
@@ -42,13 +33,6 @@ const TZ_OPTIONS = [
   "America/Los_Angeles",
   "America/Sao_Paulo",
 ].map((tz) => ({ value: tz, label: tz }));
-
-const MODE_OPTIONS: { value: string; label: string }[] = [
-  { value: "daily", label: "Every day" },
-  { value: "weekdays", label: "Weekdays" },
-  { value: "custom_days", label: "Custom days" },
-  { value: "dates", label: "Dates" },
-];
 
 const DEFAULT_TIMES = [
   "09:00",
@@ -108,9 +92,27 @@ export function ScheduleStudio({
   value: PublishSchedule;
   onChange: (next: PublishSchedule) => void;
 }) {
+  const t = useTranslations("studio.schedule");
   const [datesText, setDatesText] = useState(
     (value.custom_dates || []).join(", "),
   );
+
+  const dayLabels = [
+    { id: 1, label: t("mon") },
+    { id: 2, label: t("tue") },
+    { id: 3, label: t("wed") },
+    { id: 4, label: t("thu") },
+    { id: 5, label: t("fri") },
+    { id: 6, label: t("sat") },
+    { id: 7, label: t("sun") },
+  ];
+
+  const modeOptions: { value: string; label: string }[] = [
+    { value: "daily", label: t("everyDay") },
+    { value: "weekdays", label: t("weekdays") },
+    { value: "custom_days", label: t("customDays") },
+    { value: "dates", label: t("dates") },
+  ];
 
   useEffect(() => {
     const padded = padScheduleTimes(value.videos_per_day, value.times || []);
@@ -157,24 +159,24 @@ export function ScheduleStudio({
   return (
     <section className="panel rise space-y-3 p-4">
       <div>
-        <p className="text-sm font-semibold">Publish schedule</p>
+        <p className="text-sm font-semibold">{t("publishSchedule")}</p>
         <p className="mt-0.5 text-xs text-[color:var(--muted)]">
-          When to post. Turn AI content on/off from the Channel page.
+          {t("whenToPost")}
         </p>
       </div>
 
       <div className="space-y-3 border-t border-[color:var(--line)] pt-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <ScheduleSelectField
-            label="Mode"
+            label={t("mode")}
             value={value.mode}
-            options={MODE_OPTIONS}
+            options={modeOptions}
             onChange={(v) => patch({ mode: v as PublishSchedule["mode"] })}
             allowOwn
             ownPlaceholder="Custom mode id"
           />
           <ScheduleSelectField
-            label="Videos / day"
+            label={t("videosPerDay")}
             value={String(value.videos_per_day)}
             options={videoOptions}
             onChange={(v) =>
@@ -187,7 +189,7 @@ export function ScheduleStudio({
             ownPlaceholder="1–10"
           />
           <ScheduleSelectField
-            label="Timezone"
+            label={t("timezone")}
             value={value.timezone}
             options={tzOptions}
             onChange={(v) => patch({ timezone: v })}
@@ -198,15 +200,15 @@ export function ScheduleStudio({
 
         <div className="space-y-1.5">
           <span className="text-[11px] font-medium text-[color:var(--muted)]">
-            Times
+            {t("times")}
           </span>
           <div className="flex flex-wrap gap-1.5">
             {padScheduleTimes(value.videos_per_day, value.times || []).map(
-              (t, i) => (
+              (time, i) => (
                 <TimeChip
                   key={i}
                   label={`#${i + 1}`}
-                  value={t}
+                  value={time}
                   onChange={(v) => setTimeAt(i, v)}
                 />
               ),
@@ -216,7 +218,7 @@ export function ScheduleStudio({
 
         {(value.mode === "custom_days" || value.mode === "weekdays") && (
           <div className="flex flex-wrap gap-1">
-            {DAY_LABELS.map((d) => {
+            {dayLabels.map((d) => {
               const on = value.weekdays.includes(d.id);
               return (
                 <button
@@ -248,11 +250,11 @@ export function ScheduleStudio({
               patch({
                 custom_dates: e.target.value
                   .split(",")
-                  .map((t) => t.trim())
+                  .map((part) => part.trim())
                   .filter(Boolean),
               });
             }}
-            placeholder="Dates: 2026-07-20, 2026-07-25"
+            placeholder={`${t("dates")}: 2026-07-20, 2026-07-25`}
           />
         )}
       </div>

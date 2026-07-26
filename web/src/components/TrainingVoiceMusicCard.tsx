@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { VoicePicker } from "@/components/VoicePicker";
 import { useToast } from "@/components/ToastNotice";
 import {
@@ -35,6 +36,9 @@ export function TrainingVoiceMusicCard({
   onMusicVolumeChange: (v: number) => void;
   onVoiceVolumeChange: (v: number) => void;
 }) {
+  const t = useTranslations("studio.training");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const { show: toast, notice } = useToast();
   const [track, setTrack] = useState<DemoTrack | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,17 +99,17 @@ export function TrainingVoiceMusicCard({
     a.volume = mv;
     a.onended = () => setPlaying(false);
     musicRef.current = a;
-    void a.play().catch(() => toast("Playback blocked — tap again", "error"));
+    void a.play().catch(() => toast(t("playbackBlockedTap"), "error"));
     setPlaying(true);
   }
 
   async function playDemo() {
     if (!voiceId.trim()) {
-      toast("Choose a voice first", "error");
+      toast(t("chooseVoiceFirst"), "error");
       return;
     }
     if (!track?.previewUrl) {
-      toast("Demo track not available yet", "error");
+      toast(t("demoUnavailable"), "error");
       return;
     }
     stopAll();
@@ -173,7 +177,7 @@ export function TrainingVoiceMusicCard({
       <div className="space-y-4 border-t border-[color:var(--line)] pt-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-            Background music
+            {t("backgroundMusic")}
           </p>
           <p className="mt-1 text-[11px] text-[color:var(--muted)]">
             One system track for testing levels. Final videos use AI-matched
@@ -197,14 +201,14 @@ export function TrainingVoiceMusicCard({
                   : "rgba(255,255,255,0.08)",
               color: playing && !demoOn ? "#111" : "var(--fg)",
             }}
-            aria-label={playing && !demoOn ? "Stop" : "Play demo music"}
+            aria-label={playing && !demoOn ? tc("stop") : t("playDemoMusic")}
           >
             {playing && !demoOn ? "■" : "▶"}
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">
               {loading
-                ? "Loading…"
+                ? tCommon("loading")
                 : track?.name || "System demo track"}
             </p>
             <p className="truncate text-[11px] text-[color:var(--muted)]">
@@ -226,14 +230,14 @@ export function TrainingVoiceMusicCard({
                 : "transparent",
             }}
           >
-            {demoOn ? "Stop demo" : "Demo listen"}
+            {demoOn ? t("stopDemo") : t("demoListen")}
           </button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-1.5">
             <span className="text-xs font-semibold text-[color:var(--muted)]">
-              Music volume
+              {t("musicVolume")}
             </span>
             <input
               type="range"
@@ -251,7 +255,7 @@ export function TrainingVoiceMusicCard({
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-semibold text-[color:var(--muted)]">
-              Voice volume
+              {t("voiceVolume")}
             </span>
             <input
               type="range"

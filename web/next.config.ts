@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 /**
  * Phone / LAN access to `next dev` (e.g. http://192.168.x.x:3000) needs the
@@ -21,4 +22,6 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+export default withNextIntl(nextConfig);

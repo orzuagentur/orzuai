@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { usePathname, useRouter } from "@/i18n/navigation";
 
 const CREATE_URL = "https://www.youtube.com/create_channel";
 
@@ -14,6 +16,8 @@ export function NoYoutubeChannelModal() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("studio.channel");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -142,7 +146,7 @@ export function NoYoutubeChannelModal() {
           id="yt-no-channel-title"
           className="font-[family-name:var(--font-syne)] text-lg font-bold"
         >
-          No YouTube channel on this account
+          {t("noChannel")}
         </h2>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
           This Google account does not have a YouTube channel yet. Create one
@@ -167,7 +171,7 @@ export function NoYoutubeChannelModal() {
             disabled={busy && !waiting}
             onClick={() => void onCancel()}
           >
-            Cancel
+            {tCommon("cancel")}
           </button>
           <button
             type="button"
@@ -175,7 +179,7 @@ export function NoYoutubeChannelModal() {
             disabled={busy && waiting}
             onClick={onCreate}
           >
-            {waiting ? "Waiting…" : "Create channel"}
+            {waiting ? t("waiting") : t("createChannel")}
           </button>
         </div>
       </div>

@@ -6,14 +6,11 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useTranslations } from "next-intl";
 import { SUBTITLE_STYLES } from "@/lib/editor-catalog";
 
 export type SubtitleStyleId = (typeof SUBTITLE_STYLES)[number]["id"];
 
-/** Full sentence for live karaoke-style preview on each subtitle card */
-const PREVIEW_SENTENCE =
-  "This is how your subtitles look on the clip";
-const PREVIEW_WORDS = PREVIEW_SENTENCE.split(/\s+/);
 /** Match burned ASS: ~3 words on screen, then advance to the next group */
 const PREVIEW_CHUNK = 3;
 
@@ -320,6 +317,8 @@ export function SubtitleStyleCard({
   disabled?: boolean;
   onSelect: () => void;
 }) {
+  const t = useTranslations("studio.subtitles");
+  const previewWords = t("previewSentence").split(/\s+/);
   const [cursor, setCursor] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const cursorRef = useRef(0);
@@ -334,7 +333,7 @@ export function SubtitleStyleCard({
     const advance = () => {
       if (cancelled) return;
       const c = cursorRef.current;
-      const next = (c + 1) % PREVIEW_WORDS.length;
+      const next = (c + 1) % previewWords.length;
       const curChunk = Math.floor(c / PREVIEW_CHUNK);
       const nextChunk = Math.floor(next / PREVIEW_CHUNK);
       const wraps = nextChunk !== curChunk || next === 0;
@@ -361,12 +360,12 @@ export function SubtitleStyleCard({
       cancelled = true;
       timers.forEach((id) => window.clearTimeout(id));
     };
-  }, []);
+  }, [previewWords.length]);
 
   const css = liveSubtitleStyle(style.id);
   const bg = subtitlePreviewBg(style.id);
   const chunkStart = Math.floor(cursor / PREVIEW_CHUNK) * PREVIEW_CHUNK;
-  const chunk = PREVIEW_WORDS.slice(chunkStart, chunkStart + PREVIEW_CHUNK);
+  const chunk = previewWords.slice(chunkStart, chunkStart + PREVIEW_CHUNK);
   const activeInChunk = cursor - chunkStart;
 
   return (
@@ -451,10 +450,12 @@ export function SubtitleStylePicker({
   className?: string;
   defaultOpen?: boolean;
 }) {
+  const t = useTranslations("studio.subtitles");
+  const tc = useTranslations("studio.common");
   const [open, setOpen] = useState(defaultOpen);
   const current = normalizeSubtitleStyle(value);
   const label =
-    SUBTITLE_STYLES.find((s) => s.id === current)?.label || "Classic";
+    SUBTITLE_STYLES.find((s) => s.id === current)?.label || tc("classic");
   const headerBg = subtitlePreviewBg(current);
 
   return (
@@ -492,13 +493,13 @@ export function SubtitleStylePicker({
           </span>
           <span className="min-w-0">
             <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--muted)]">
-              Subtitles
+              {t("title")}
             </span>
             <span className="block truncate text-sm font-medium">{label}</span>
           </span>
         </span>
         <span className="shrink-0 text-xs text-[color:var(--muted)]">
-          {open ? "Hide" : "Show"}
+          {open ? tc("hide") : tc("show")}
         </span>
       </button>
       {open && (

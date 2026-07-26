@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 type Option = { value: string; label: string };
 
@@ -14,7 +15,7 @@ export function ScheduleSelectField({
   options,
   onChange,
   allowOwn = true,
-  ownPlaceholder = "Custom value",
+  ownPlaceholder,
   ownKind = "text",
 }: {
   label: string;
@@ -25,6 +26,8 @@ export function ScheduleSelectField({
   ownPlaceholder?: string;
   ownKind?: "text" | "number";
 }) {
+  const tc = useTranslations("studio.common");
+  const resolvedOwnPlaceholder = ownPlaceholder ?? tc("customValue");
   const isPreset = options.some((o) => o.value === value);
   const [open, setOpen] = useState(false);
   const [ownMode, setOwnMode] = useState(() => allowOwn && !isPreset);
@@ -40,8 +43,8 @@ export function ScheduleSelectField({
   const selected = options.find((o) => o.value === value);
   const display =
     allowOwn && !isPreset
-      ? value || "+ Own"
-      : selected?.label || value || "Select";
+      ? value || tc("own")
+      : selected?.label || value || tc("select");
 
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return;
@@ -71,9 +74,9 @@ export function ScheduleSelectField({
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
-      const t = e.target as Node;
-      if (btnRef.current?.contains(t)) return;
-      if (popRef.current?.contains(t)) return;
+      const node = e.target as Node;
+      if (btnRef.current?.contains(node)) return;
+      if (popRef.current?.contains(node)) return;
       setOpen(false);
       setOwnMode(allowOwn && !options.some((o) => o.value === value));
     }
@@ -109,7 +112,7 @@ export function ScheduleSelectField({
 
   const variants: Option[] = [
     ...options,
-    ...(allowOwn ? [{ value: OWN_VALUE, label: "+ Own" }] : []),
+    ...(allowOwn ? [{ value: OWN_VALUE, label: tc("own") }] : []),
   ];
 
   return (
@@ -163,7 +166,7 @@ export function ScheduleSelectField({
                       style={{ background: "rgba(232,165,75,0.1)" }}
                     >
                       <p className="px-1 text-sm font-medium text-[color:var(--accent)]">
-                        + Own
+                        {tc("own")}
                       </p>
                       <input
                         className="field !py-2 text-sm"
@@ -171,7 +174,7 @@ export function ScheduleSelectField({
                         min={ownKind === "number" ? 1 : undefined}
                         max={ownKind === "number" ? 10 : undefined}
                         autoFocus
-                        placeholder={ownPlaceholder}
+                        placeholder={resolvedOwnPlaceholder}
                         value={draftOwn}
                         onChange={(e) => setDraftOwn(e.target.value)}
                         onKeyDown={(e) => {
@@ -187,14 +190,14 @@ export function ScheduleSelectField({
                           className="btn btn-ghost px-3 py-1.5 text-xs"
                           onClick={() => setOwnMode(false)}
                         >
-                          Back
+                          {tc("back")}
                         </button>
                         <button
                           type="button"
                           className="btn btn-primary px-3 py-1.5 text-xs"
                           onClick={applyOwn}
                         >
-                          OK
+                          {tc("ok")}
                         </button>
                       </div>
                     </div>

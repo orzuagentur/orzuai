@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 
 type YtChannel = {
   id: string;
@@ -20,6 +20,9 @@ type Saved = {
 
 export function ChannelPicker() {
   const router = useRouter();
+  const t = useTranslations("studio.channel");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [available, setAvailable] = useState<YtChannel[]>([]);
   const [saved, setSaved] = useState<Saved[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export function ChannelPicker() {
       if (cancelled) return;
       setLoading(false);
       if (!res.ok) {
-        setError(data.error || data.googleError || "Could not load channels");
+        setError(data.error || data.googleError || t("couldNotLoadChannels"));
         setSaved(data.saved || []);
         return;
       }
@@ -93,7 +96,7 @@ export function ChannelPicker() {
       setError(
         data.error === "channel_owned"
           ? data.message || "Channel already connected elsewhere"
-          : data.error || "Could not save channel",
+          : data.error || t("couldNotSave"),
       );
       return;
     }
@@ -106,15 +109,15 @@ export function ChannelPicker() {
   return (
     <div className="panel rise space-y-5 p-6">
       <div>
-        <h1 className="text-xl font-semibold">Add YouTube channel</h1>
+        <h1 className="text-xl font-semibold">{t("addChannel")}</h1>
         <p className="mt-1 text-sm text-[color:var(--muted)]">
-          Choose a channel from this Google account.
+          {t("chooseChannel")}
         </p>
       </div>
 
       {saved.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-[color:var(--muted)]">Saved</h2>
+          <h2 className="text-sm font-semibold text-[color:var(--muted)]">{t("saved")}</h2>
           <ul className="space-y-2">
             {saved.map((c) => (
               <li
@@ -136,7 +139,7 @@ export function ChannelPicker() {
                 <span className="flex-1 font-medium">{c.title || c.channel_id}</span>
                 {c.is_active && (
                   <span className="text-xs" style={{ color: "var(--accent)" }}>
-                    Active
+                    {t("active")}
                   </span>
                 )}
               </li>
@@ -146,21 +149,21 @@ export function ChannelPicker() {
       )}
 
       {loading && (
-        <p className="text-sm text-[color:var(--muted)]">Loading...</p>
+        <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       )}
 
       {error && (
         <div className="space-y-3">
           <p className="text-sm text-[color:var(--danger)]">{error}</p>
           <a href="/api/youtube/connect" className="btn btn-primary text-sm">
-            Connect Google
+            {t("connectYoutube")}
           </a>
         </div>
       )}
 
       {!loading && available.length === 0 && !error && (
         <div className="space-y-3 rounded-xl border border-[color:var(--line)] p-4">
-          <p className="text-sm font-semibold">No YouTube channel on this account</p>
+          <p className="text-sm font-semibold">{t("noChannel")}</p>
           <p className="text-sm text-[color:var(--muted)]">
             This Google account does not have a YouTube channel yet. Create one,
             then we will connect it automatically.
@@ -178,7 +181,7 @@ export function ChannelPicker() {
               router.push("/dashboard?youtube=no_channel");
             }}
           >
-            Create channel
+            {t("createChannel")}
           </button>
         </div>
       )}
@@ -234,13 +237,13 @@ export function ChannelPicker() {
           disabled={!selectedId || saving || loading}
           onClick={() => void confirm()}
         >
-          {saving ? "Saving..." : "Add channel"}
+          {saving ? tc("saving") : t("addChannel")}
         </button>
         <a href="/api/youtube/connect" className="btn btn-ghost text-sm">
           + Google account
         </a>
         <Link href="/dashboard/channel" className="btn btn-ghost text-sm">
-          Cancel
+          {tCommon("cancel")}
         </Link>
       </div>
     </div>

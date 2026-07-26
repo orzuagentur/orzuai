@@ -1,17 +1,22 @@
 "use client";
 
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 /** Beautiful gate when admin locks a tool as under development. */
 export function UnderDevelopmentCard({
-  title = "Coming soon",
+  title,
   backHref = "/dashboard",
-  backLabel = "Back to Home",
+  backLabel,
 }: {
   title?: string;
   backHref?: string;
   backLabel?: string;
 }) {
+  const t = useTranslations("studio.underDev");
+  const resolvedTitle = title ?? t("comingSoon");
+  const resolvedBack = backLabel ?? t("backHome");
+
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-lg flex-col items-center justify-center px-4 py-16 text-center">
       <div
@@ -29,24 +34,23 @@ export function UnderDevelopmentCard({
           ✦
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">
-          In development
+          {t("inDevelopment")}
         </p>
         <h1
           className="mt-3 text-2xl font-bold tracking-tight text-[color:var(--fg)] sm:text-3xl"
           style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
         >
-          {title}
+          {resolvedTitle}
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-[color:var(--muted)] sm:text-base">
-          These tools are currently in development and will be available soon.
-          Thanks for your patience — we&apos;re already working on them.
+          {t("body")}
         </p>
         <Link
           href={backHref}
           className="mt-8 inline-flex rounded-full px-5 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
           style={{ background: "#E8A54B" }}
         >
-          {backLabel}
+          {resolvedBack}
         </Link>
       </div>
     </div>

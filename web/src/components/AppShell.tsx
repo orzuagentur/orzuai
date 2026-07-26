@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Suspense,
   createContext,
@@ -16,12 +16,14 @@ import { ChannelTransferModal } from "@/components/ChannelTransferModal";
 import { NoYoutubeChannelModal } from "@/components/NoYoutubeChannelModal";
 import { ChannelsMenu } from "@/components/ChannelsMenu";
 import { ClippingProgressDock } from "@/components/ClippingProgressDock";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { MusicUploadProvider } from "@/components/MusicUploadProvider";
 import { MusicUploadDock } from "@/components/MusicUploadDock";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;
   exact?: boolean;
   icon:
     | "home"
@@ -38,23 +40,23 @@ type NavItem = {
 const PRIMARY_NAV: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Home",
+    labelKey: "home",
     exact: true,
     icon: "home",
   },
   {
     href: "/dashboard/clipping",
-    label: "AI Clipping",
+    labelKey: "aiClipping",
     icon: "clipping",
   },
   {
     href: "/dashboard/content",
-    label: "AI Video",
+    labelKey: "aiVideo",
     icon: "creativity",
   },
   {
     href: "/dashboard/creators/ai-presentation",
-    label: "AI Present",
+    labelKey: "aiPresent",
     icon: "presentation",
   },
 ];
@@ -63,17 +65,17 @@ const PRIMARY_NAV: NavItem[] = [
 const MENU_NAV: NavItem[] = [
   {
     href: "/dashboard/channel",
-    label: "YouTube",
+    labelKey: "youtube",
     icon: "youtube",
   },
   {
     href: "/dashboard/creators",
-    label: "For creators",
+    labelKey: "forCreators",
     icon: "creators",
   },
   {
     href: "/dashboard/favorites",
-    label: "My vault",
+    labelKey: "myVault",
     icon: "library",
   },
 ];
@@ -97,119 +99,119 @@ type MenuItemIcon =
 
 type MenuGroup = {
   id: string;
-  label: string;
-  items: { href: string; label: string; icon: MenuItemIcon }[];
+  labelKey: string;
+  items: { href: string; labelKey: string; icon: MenuItemIcon }[];
 };
 
 const MENU_GROUPS: MenuGroup[] = [
   {
     id: "ai",
-    label: "AI",
+    labelKey: "groupAi",
     items: [
-      { href: "/dashboard/content", label: "AI Video", icon: "ai-video" },
-      { href: "/dashboard/clipping", label: "AI Clipping", icon: "ai-clip" },
+      { href: "/dashboard/content", labelKey: "aiVideo", icon: "ai-video" },
+      { href: "/dashboard/clipping", labelKey: "aiClipping", icon: "ai-clip" },
       {
         href: "/dashboard/creators/ai-presentation",
-        label: "AI Presentation",
+        labelKey: "aiPresentation",
         icon: "ai-present",
       },
     ],
   },
   {
     id: "editors",
-    label: "Editors",
+    labelKey: "groupEditors",
     items: [
       {
         href: "/dashboard/creators/photo-editor",
-        label: "Photo editor",
+        labelKey: "photoEditor",
         icon: "photo-edit",
       },
       {
         href: "/dashboard/creators/content",
-        label: "Video editor",
+        labelKey: "videoEditor",
         icon: "video-edit",
       },
       {
         href: "/dashboard/creators/presentation",
-        label: "Presentations",
+        labelKey: "presentations",
         icon: "present",
       },
     ],
   },
   {
     id: "libraries",
-    label: "Libraries",
+    labelKey: "groupLibraries",
     items: [
       {
         href: "/dashboard/creators/library/videos",
-        label: "Videos",
+        labelKey: "videos",
         icon: "videos",
       },
       {
         href: "/dashboard/creators/library/photos",
-        label: "Photos",
+        labelKey: "photos",
         icon: "photos",
       },
       {
         href: "/dashboard/creators/library/models",
-        label: "3D models",
+        labelKey: "models3d",
         icon: "models",
       },
       {
         href: "/dashboard/creators/library/hdris",
-        label: "HDRIs",
+        labelKey: "hdris",
         icon: "hdris",
       },
       {
         href: "/dashboard/creators/library/textures",
-        label: "Textures",
+        labelKey: "textures",
         icon: "textures",
       },
       {
         href: "/dashboard/creators/library/emojis",
-        label: "Emojis",
+        labelKey: "emojis",
         icon: "emojis",
       },
       {
         href: "/dashboard/creators/library/icons",
-        label: "Icons",
+        labelKey: "icons",
         icon: "icons",
       },
     ],
   },
   {
     id: "vault",
-    label: "My vault",
+    labelKey: "groupVault",
     items: [
       {
         href: "/dashboard/favorites?tab=clips",
-        label: "My clips",
+        labelKey: "myClips",
         icon: "ai-clip",
       },
       {
         href: "/dashboard/favorites?tab=videos",
-        label: "My videos",
+        labelKey: "myVideos",
         icon: "ai-video",
       },
       {
         href: "/dashboard/favorites?tab=presentations",
-        label: "My presentations",
+        labelKey: "myPresentations",
         icon: "present",
       },
       {
         href: "/dashboard/favorites?tab=favorites",
-        label: "Favorites",
+        labelKey: "favorites",
         icon: "vault",
       },
     ],
   },
   {
     id: "more",
-    label: "More",
+    labelKey: "groupMore",
     items: [
       {
         href: "/dashboard/creators",
-        label: "For creators",
+        labelKey: "forCreators",
         icon: "creators",
       },
     ],
@@ -219,25 +221,25 @@ const MENU_GROUPS: MenuGroup[] = [
 const ALL_NAV: NavItem[] = [...PRIMARY_NAV, ...MENU_NAV];
 
 const LIBRARY_TABS = [
-  { id: "clips", label: "My clips", short: "Clips" },
-  { id: "videos", label: "My videos", short: "Videos" },
-  { id: "presentations", label: "My presentations", short: "Decks" },
-  { id: "favorites", label: "Favorites", short: "Favs" },
+  { id: "clips", labelKey: "myClips", shortKey: "clipsShort" },
+  { id: "videos", labelKey: "myVideos", shortKey: "videosShort" },
+  { id: "presentations", labelKey: "myPresentations", shortKey: "decksShort" },
+  { id: "favorites", labelKey: "favorites", shortKey: "favsShort" },
 ] as const;
 
 const CLIPPING_TABS = [
-  { id: "create", label: "Create", short: "Create" },
-  { id: "clips", label: "My clips", short: "Clips" },
+  { id: "create", labelKey: "create", shortKey: "create" },
+  { id: "clips", labelKey: "myClips", shortKey: "clipsShort" },
 ] as const;
 
 const CREATIVITY_TABS = [
-  { id: "create", label: "Create", short: "Create" },
-  { id: "library", label: "My creations", short: "Mine" },
+  { id: "create", labelKey: "create", shortKey: "create" },
+  { id: "library", labelKey: "myCreations", shortKey: "mineShort" },
 ] as const;
 
 const AI_PRESENTATION_TABS = [
-  { id: "create", label: "Create", short: "Create" },
-  { id: "library", label: "My presentations", short: "Mine" },
+  { id: "create", labelKey: "create", shortKey: "create" },
+  { id: "library", labelKey: "myPresentations", shortKey: "mineShort" },
 ] as const;
 
 function NavIcon({
@@ -532,6 +534,7 @@ function isNavActive(pathname: string, item: NavItem): boolean {
 
 function MobileBottomNav() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
 
   return (
     <nav
@@ -576,7 +579,7 @@ function MobileBottomNav() {
                 <NavIcon name={item.icon} active={active} size={20} />
               </span>
               <span className="max-w-full text-center text-[10px] font-semibold leading-tight tracking-tight">
-                {item.label}
+                {t(item.labelKey)}
               </span>
             </Link>
           );
@@ -616,6 +619,7 @@ function SectionTabButton({
 function LibraryHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("nav");
   const raw = searchParams.get("tab");
   const tab =
     raw === "videos" ||
@@ -628,14 +632,14 @@ function LibraryHeaderTabs() {
   return (
     <nav
       className="mx-auto flex w-full max-w-4xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label="My vault"
+      aria-label={t("myVault")}
     >
       {LIBRARY_TABS.map((item) => (
         <SectionTabButton
           key={item.id}
           on={tab === item.id}
-          label={item.label}
-          short={item.short}
+          label={t(item.labelKey)}
+          short={t(item.shortKey)}
           onClick={() => {
             const next = new URLSearchParams(searchParams.toString());
             next.set("tab", item.id);
@@ -652,20 +656,21 @@ function LibraryHeaderTabs() {
 function ClippingHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("nav");
   const raw = searchParams.get("tab");
   const tab = raw === "clips" || raw === "create" ? raw : "create";
 
   return (
     <nav
       className="mx-auto flex w-full max-w-2xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label="AI Clipping sections"
+      aria-label={t("aiClipping")}
     >
       {CLIPPING_TABS.map((item) => (
         <SectionTabButton
           key={item.id}
           on={tab === item.id}
-          label={item.label}
-          short={item.short}
+          label={t(item.labelKey)}
+          short={t(item.shortKey)}
           onClick={() => {
             const next = new URLSearchParams(searchParams.toString());
             next.set("tab", item.id);
@@ -682,20 +687,21 @@ function ClippingHeaderTabs() {
 function CreativityHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("nav");
   const raw = searchParams.get("tab");
   const tab = raw === "library" || raw === "create" ? raw : "create";
 
   return (
     <nav
       className="mx-auto flex w-full max-w-2xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label="AI Video sections"
+      aria-label={t("aiVideo")}
     >
       {CREATIVITY_TABS.map((item) => (
         <SectionTabButton
           key={item.id}
           on={tab === item.id}
-          label={item.label}
-          short={item.short}
+          label={t(item.labelKey)}
+          short={t(item.shortKey)}
           onClick={() => {
             const next = new URLSearchParams(searchParams.toString());
             next.set("tab", item.id);
@@ -712,20 +718,21 @@ function CreativityHeaderTabs() {
 function AiPresentationHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("nav");
   const raw = searchParams.get("tab");
   const tab = raw === "library" || raw === "create" ? raw : "create";
 
   return (
     <nav
       className="mx-auto flex w-full max-w-2xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label="AI Presentation sections"
+      aria-label={t("aiPresentation")}
     >
       {AI_PRESENTATION_TABS.map((item) => (
         <SectionTabButton
           key={item.id}
           on={tab === item.id}
-          label={item.label}
-          short={item.short}
+          label={t(item.labelKey)}
+          short={t(item.shortKey)}
           onClick={() => {
             const next = new URLSearchParams(searchParams.toString());
             next.set("tab", item.id);
@@ -803,6 +810,7 @@ export function YouTubeChannelsButton({
   className?: string;
 }) {
   const pathname = usePathname();
+  const tc = useTranslations("common");
   const { menuOpen, setMenuOpen } = useChannelsMenu();
   const onChannel =
     pathname === "/dashboard/channel" ||
@@ -826,9 +834,9 @@ export function YouTubeChannelsButton({
         }}
       >
         <YouTubeIcon />
-        <span className="truncate sm:hidden">Channels</span>
+        <span className="truncate sm:hidden">{tc("channels")}</span>
         <span className="hidden whitespace-nowrap sm:inline">
-          YouTube Channels
+          {tc("youtubeChannels")}
         </span>
         <TinyChevron open={menuOpen} />
       </button>
@@ -840,6 +848,9 @@ export function YouTubeChannelsButton({
 function AppMenu({ email }: { email?: string | null }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const t = useTranslations("nav");
+  const tc = useTranslations("common");
+  const ts = useTranslations("studio.common");
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>("ai");
@@ -884,7 +895,7 @@ function AppMenu({ email }: { email?: string | null }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={open ? "Close menu" : "Open menu"}
+        aria-label={open ? tc("closeMenu") : tc("openMenu")}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--line)] bg-white/5 text-[color:var(--fg)] transition hover:bg-white/10 sm:h-10 sm:w-10"
         style={{
           boxShadow: open ? "0 0 0 2px rgba(232,165,75,0.35)" : undefined,
@@ -897,7 +908,7 @@ function AppMenu({ email }: { email?: string | null }) {
         <div
           className="absolute right-0 top-full z-[80] mt-2 max-h-[min(80vh,560px)] w-[min(100vw-2rem,320px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl"
           role="dialog"
-          aria-label="Main menu"
+          aria-label={ts("mainMenu")}
         >
           <div className="p-2">
             <Link
@@ -915,7 +926,7 @@ function AppMenu({ email }: { email?: string | null }) {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/15">
                 <YouTubeMenuMark size={20} />
               </span>
-              <span className="flex-1">YouTube</span>
+              <span className="flex-1">{t("youtube")}</span>
             </Link>
 
             {MENU_GROUPS.map((group) => {
@@ -931,12 +942,12 @@ function AppMenu({ email }: { email?: string | null }) {
                       }
                       aria-expanded={expanded}
                     >
-                      <span className="flex-1">{group.label}</span>
+                      <span className="flex-1">{t(group.labelKey)}</span>
                       <TinyChevron open={expanded} />
                     </button>
                   ) : (
                     <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-                      {group.label}
+                      {t(group.labelKey)}
                     </p>
                   )}
                   {expanded && (
@@ -978,7 +989,7 @@ function AppMenu({ email }: { email?: string | null }) {
                             >
                               <MenuEntryIcon name={item.icon} />
                             </span>
-                            <span>{item.label}</span>
+                            <span>{t(item.labelKey)}</span>
                           </Link>
                         );
                       })}
@@ -990,6 +1001,9 @@ function AppMenu({ email }: { email?: string | null }) {
           </div>
 
           <div className="border-t border-[color:var(--line)] p-2">
+            <div className="mb-1 flex items-center justify-end px-2 py-1">
+              <LanguageSwitcher compact />
+            </div>
             <button
               type="button"
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-white/5"
@@ -999,23 +1013,23 @@ function AppMenu({ email }: { email?: string | null }) {
               <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--muted)]">
                 <NavIcon name="account" size={18} />
               </span>
-              <span className="flex-1">Account</span>
+              <span className="flex-1">{tc("account")}</span>
               <TinyChevron open={accountOpen} />
             </button>
             {accountOpen && (
               <div className="mx-1 mb-1 mt-1 space-y-1 rounded-xl border border-[color:var(--line)] bg-black/20 px-3 py-2.5">
                 <p className="text-[11px] text-[color:var(--muted)]">
-                  Signed in
+                  {ts("signedIn")}
                 </p>
                 <p className="truncate text-sm font-medium">
-                  {email || "Account"}
+                  {email || tc("account")}
                 </p>
                 <form action="/auth/signout" method="post" className="pt-1">
                   <button
                     type="submit"
                     className="w-full rounded-lg py-2 text-left text-sm text-[color:var(--muted)] transition hover:text-[color:var(--fg)]"
                   >
-                    Sign out
+                    {tc("signOut")}
                   </button>
                 </form>
               </div>
@@ -1052,6 +1066,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerH, setHeaderH] = useState(56);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -1070,24 +1085,25 @@ export function AppShell({
   )?.[1];
   const assetsLibraryTitle =
     assetsLibraryKind === "photos"
-      ? "Photos"
+      ? t("photos")
       : assetsLibraryKind === "videos"
-        ? "Videos"
+        ? t("videos")
         : assetsLibraryKind === "models"
-          ? "3D models"
+          ? t("models3d")
           : assetsLibraryKind === "hdris"
-            ? "HDRIs"
+            ? t("hdris")
             : assetsLibraryKind === "textures"
-              ? "Textures"
+              ? t("textures")
               : assetsLibraryKind === "emojis"
-                ? "Emojis"
+                ? t("emojis")
                 : assetsLibraryKind === "icons"
-                  ? "Icons"
+                  ? t("icons")
                   : null;
+  const activeNav = ALL_NAV.find((item) => isNavActive(pathname, item));
   const pageTitle =
-    ALL_NAV.find((item) => isNavActive(pathname, item))?.label ||
+    (activeNav ? t(activeNav.labelKey) : null) ||
     assetsLibraryTitle ||
-    (isAiPresentation ? "AI Presentation" : "OrzuAi");
+    (isAiPresentation ? t("aiPresentation") : "OrzuAi");
   const ctx = { menuOpen, setMenuOpen };
 
   useEffect(() => {
@@ -1157,7 +1173,7 @@ export function AppShell({
                             : "transparent",
                         }}
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </Link>
                     );
                   })}
@@ -1194,7 +1210,7 @@ export function AppShell({
                     className="mb-2 w-full text-center font-[family-name:var(--font-syne)] text-xl tracking-tight lg:hidden"
                     style={{ fontWeight: 800 }}
                   >
-                    AI Clipping
+                    {t("aiClipping")}
                   </h1>
                 )}
                 <div

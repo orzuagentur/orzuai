@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoJob } from "@/lib/types";
@@ -26,36 +27,39 @@ function isProgressDockJob(job: VideoJob) {
   return isClippingJob(job);
 }
 
-function clipStatusLabel(status: string): string {
-  switch (status) {
-    case "queued":
-      return "In queue";
-    case "generating_script":
-      return "Analyzing";
-    case "generating_voice":
-      return "Captions";
-    case "fetching_media":
-      return "Music";
-    case "editing":
-      return "Editing";
-    case "uploading":
-      return "Saving";
-    case "ready":
-      return "Ready";
-    case "failed":
-      return "Failed";
-    default:
-      return status;
-  }
-}
-
 /**
  * Global bottom-right status for AI Clipping jobs — stays visible across dashboard.
  */
 export function ClippingProgressDock() {
+  const t = useTranslations("studio.clipping");
+  const ts = useTranslations("studio.common");
+  const tStatus = useTranslations("studio.status");
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [collapsed, setCollapsed] = useState(false);
+
+  function clipStatusLabel(status: string): string {
+    switch (status) {
+      case "queued":
+        return tStatus("queued");
+      case "generating_script":
+        return tStatus("analyzing");
+      case "generating_voice":
+        return tStatus("captions");
+      case "fetching_media":
+        return tStatus("music");
+      case "editing":
+        return tStatus("editing");
+      case "uploading":
+        return tStatus("saving");
+      case "ready":
+        return tStatus("ready");
+      case "failed":
+        return tStatus("failed");
+      default:
+        return status;
+    }
+  }
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
@@ -76,8 +80,8 @@ export function ClippingProgressDock() {
 
   useEffect(() => {
     void refresh();
-    const t = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(t);
+    const timer = window.setInterval(() => void refresh(), 3000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
 
   const active = useMemo(
@@ -93,8 +97,8 @@ export function ClippingProgressDock() {
     return jobs.filter((j) => {
       if (dismissed.has(j.id)) return false;
       if (j.status !== "ready" && j.status !== "failed") return false;
-      const ts = new Date(j.completed_at || j.created_at).getTime();
-      return Number.isFinite(ts) && ts >= cutoff;
+      const tsMs = new Date(j.completed_at || j.created_at).getTime();
+      return Number.isFinite(tsMs) && tsMs >= cutoff;
     });
   }, [jobs, dismissed]);
 
@@ -117,13 +121,13 @@ export function ClippingProgressDock() {
             href="/dashboard/clipping"
             className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            AI Clipping
+            {t("title")}
           </Link>
           <button
             type="button"
             className="text-xs text-[color:var(--muted)] hover:text-[color:var(--fg)]"
             onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "Expand" : "Collapse"}
+            aria-label={collapsed ? ts("expand") : ts("collapse")}
           >
             {collapsed ? "▴" : "▾"}
           </button>
@@ -131,7 +135,7 @@ export function ClippingProgressDock() {
             <button
               type="button"
               className="text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
-              aria-label="Dismiss"
+              aria-label={ts("dismiss")}
               onClick={() =>
                 setDismissed((prev) => {
                   const next = new Set(prev);
@@ -157,7 +161,7 @@ export function ClippingProgressDock() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-sm font-semibold">
-                        {job.title || "AI Clip"}
+                        {job.title || t("aiClip")}
                       </p>
                       <span
                         className="shrink-0 text-[11px] font-semibold tabular-nums"
@@ -197,7 +201,7 @@ export function ClippingProgressDock() {
           <div className="px-3 py-2.5">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate font-semibold">
-                {primary.title || "AI Clip"}
+                {primary.title || t("aiClip")}
               </span>
               <span
                 className="tabular-nums text-xs font-semibold"

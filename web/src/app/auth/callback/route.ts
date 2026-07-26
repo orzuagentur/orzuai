@@ -5,16 +5,43 @@ import {
   recordLoginDevice,
   sendWelcomeIfNeeded,
 } from "@/lib/email/devices";
+import { withLocale } from "@/i18n/path";
+import { routing } from "@/i18n/routing";
 
 export const runtime = "nodejs";
+
+function localeFromRequest(request: Request): string {
+  const cookie = request.headers.get("cookie") || "";
+  const match = cookie.match(/(?:^|;\s*)NEXT_LOCALE=(en|ru|de)/);
+  if (match?.[1]) return match[1];
+  return routing.defaultLocale;
+}
+
+function localizeNext(locale: string, next: string): string {
+  if (
+    next.startsWith("/en/") ||
+    next.startsWith("/ru/") ||
+    next.startsWith("/de/") ||
+    next === "/en" ||
+    next === "/ru" ||
+    next === "/de"
+  ) {
+    return next;
+  }
+  return withLocale(locale, next);
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/dashboard";
+  const locale = localeFromRequest(request);
+  const nextRaw = url.searchParams.get("next") || "/dashboard";
+  const next = localizeNext(locale, nextRaw);
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=oauth", url.origin));
+    return NextResponse.redirect(
+      new URL(`${withLocale(locale, "/login")}?error=oauth`, url.origin),
+    );
   }
 
   const cookieStore = await cookies();
@@ -37,13 +64,14 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.user?.email) {
-    return NextResponse.redirect(new URL("/login?error=oauth", url.origin));
+    return NextResponse.redirect(
+      new URL(`${withLocale(locale, "/login")}?error=oauth`, url.origin),
+    );
   }
 
   const user = data.user;
   const email = user.email!;
 
-  // Save device/IP first. First device = silent. Later new device/IP = alert.
   await recordLoginDevice({
     userId: user.id,
     email,
@@ -51,7 +79,6 @@ export async function GET(request: Request) {
     action: "Google sign-in",
   });
 
-  // Welcome only once (first successful entry) — not a “new device” mail.
   await sendWelcomeIfNeeded({
     userId: user.id,
     email,

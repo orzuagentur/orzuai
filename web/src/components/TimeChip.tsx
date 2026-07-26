@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
@@ -28,6 +29,8 @@ export function TimeChip({
   onChange: (v: string) => void;
   label?: string;
 }) {
+  const t = useTranslations("studio.time");
+  const tc = useTranslations("studio.common");
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -133,12 +136,12 @@ export function TimeChip({
             role="dialog"
           >
             <p className="mb-2 text-xs font-medium text-[color:var(--muted)]">
-              Pick time
+              {t("pickTime")}
             </p>
             <div className="flex gap-2">
               <div className="flex-1">
                 <p className="mb-1 text-[10px] uppercase tracking-wide text-[color:var(--muted)]">
-                  Hour
+                  {t("hour")}
                 </p>
                 <div className="max-h-36 space-y-0.5 overflow-y-auto rounded-lg border border-[color:var(--line)] p-1">
                   {HOURS.map((hour) => (
@@ -162,7 +165,7 @@ export function TimeChip({
               </div>
               <div className="flex-1">
                 <p className="mb-1 text-[10px] uppercase tracking-wide text-[color:var(--muted)]">
-                  Min
+                  {t("min")}
                 </p>
                 <div className="max-h-36 space-y-0.5 overflow-y-auto rounded-lg border border-[color:var(--line)] p-1">
                   {MINS.map((min) => (
@@ -191,14 +194,14 @@ export function TimeChip({
                 className="btn btn-ghost px-3 py-1.5 text-xs"
                 onClick={() => setOpen(false)}
               >
-                Cancel
+                {tc("cancel")}
               </button>
               <button
                 type="button"
                 className="btn btn-primary px-3 py-1.5 text-xs"
                 onClick={apply}
               >
-                OK
+                {tc("ok")}
               </button>
             </div>
           </div>,

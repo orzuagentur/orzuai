@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -8,6 +7,9 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { CHART_COUNT, CHART_PRESETS } from "@/lib/presentation/charts";
 import {
   downloadPresentationWord,
@@ -49,7 +51,6 @@ import { ObjectSettingsCard } from "./ObjectSettingsCard";
 import { PresentationElementView } from "./PresentationElementView";
 import { SlideResourcesPanel } from "./SlideResourcesPanel";
 import { SlideThumb } from "./SlideThumb";
-import { useSearchParams } from "next/navigation";
 
 type MediaProvider = "unsplash" | "pexels" | "upload";
 type DragMode = "move" | "resize" | null;
@@ -72,37 +73,84 @@ const ANIMATIONS: ElementAnimation[] = [
   "slideRight",
   "bounce",
 ];
-const SHAPES: { id: ShapeKind; label: string }[] = [
-  { id: "rect", label: "Rectangle" },
-  { id: "roundRect", label: "Rounded" },
-  { id: "ellipse", label: "Circle" },
-  { id: "triangle", label: "Triangle" },
-  { id: "diamond", label: "Diamond" },
-  { id: "star", label: "Star" },
-  { id: "hexagon", label: "Hexagon" },
-  { id: "pentagon", label: "Pentagon" },
-  { id: "arrow", label: "Arrow" },
-  { id: "chevron", label: "Chevron" },
-  { id: "line", label: "Line" },
-  { id: "cross", label: "Cross" },
-  { id: "parallelogram", label: "Parallelogram" },
-  { id: "trapezoid", label: "Trapezoid" },
+const SHAPE_IDS: ShapeKind[] = [
+  "rect",
+  "roundRect",
+  "ellipse",
+  "triangle",
+  "diamond",
+  "star",
+  "hexagon",
+  "pentagon",
+  "arrow",
+  "chevron",
+  "line",
+  "cross",
+  "parallelogram",
+  "trapezoid",
 ];
 
-const TEXT_STYLES: { id: TextStyleId; label: string; hint: string }[] = [
-  { id: "hero", label: "Hero", hint: "56px impact" },
-  { id: "display", label: "Display", hint: "48px big" },
-  { id: "title", label: "Title", hint: "40px headline" },
-  { id: "subtitle", label: "Subtitle", hint: "Secondary" },
-  { id: "kicker", label: "Kicker", hint: "Small caps" },
-  { id: "stat", label: "Stat", hint: "Big number" },
-  { id: "emphasis", label: "Emphasis", hint: "Key line" },
-  { id: "body", label: "Body", hint: "Paragraph" },
-  { id: "bullet", label: "Bullets", hint: "List points" },
-  { id: "quote", label: "Quote", hint: "Pull quote" },
-  { id: "caption", label: "Caption", hint: "Small note" },
-  { id: "label", label: "Label", hint: "Tiny tag" },
+const SHAPE_LABEL_FALLBACK: Record<ShapeKind, string> = {
+  rect: "Rectangle",
+  roundRect: "Rounded",
+  ellipse: "Circle",
+  triangle: "Triangle",
+  diamond: "Diamond",
+  star: "Star",
+  hexagon: "Hexagon",
+  pentagon: "Pentagon",
+  arrow: "Arrow",
+  chevron: "Chevron",
+  line: "Line",
+  cross: "Cross",
+  parallelogram: "Parallelogram",
+  trapezoid: "Trapezoid",
+};
+
+const TEXT_STYLE_IDS: TextStyleId[] = [
+  "hero",
+  "display",
+  "title",
+  "subtitle",
+  "kicker",
+  "stat",
+  "emphasis",
+  "body",
+  "bullet",
+  "quote",
+  "caption",
+  "label",
 ];
+
+const TEXT_STYLE_LABEL_FALLBACK: Record<TextStyleId, string> = {
+  hero: "Hero",
+  display: "Display",
+  title: "Title",
+  subtitle: "Subtitle",
+  kicker: "Kicker",
+  stat: "Stat",
+  emphasis: "Emphasis",
+  body: "Body",
+  bullet: "Bullets",
+  quote: "Quote",
+  caption: "Caption",
+  label: "Label",
+};
+
+const TEXT_STYLE_HINTS: Record<TextStyleId, string> = {
+  hero: "56px impact",
+  display: "48px big",
+  title: "40px headline",
+  subtitle: "Secondary",
+  kicker: "Small caps",
+  stat: "Big number",
+  emphasis: "Key line",
+  body: "Paragraph",
+  bullet: "List points",
+  quote: "Pull quote",
+  caption: "Small note",
+  label: "Tiny tag",
+};
 
 const FONT_OPTIONS = [
   "Syne, system-ui, sans-serif",
@@ -140,13 +188,37 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+function shapeLabel(
+  id: ShapeKind,
+  t: ReturnType<typeof useTranslations<"studio.presentation">>,
+): string {
+  if (id === "rect") return t("rectangle");
+  if (id === "ellipse") return t("circle");
+  return SHAPE_LABEL_FALLBACK[id];
+}
+
+function textStyleLabel(
+  id: TextStyleId,
+  t: ReturnType<typeof useTranslations<"studio.presentation">>,
+): string {
+  if (id === "hero") return t("hero");
+  if (id === "bullet") return t("bullets");
+  if (id === "quote") return t("pullQuote");
+  return TEXT_STYLE_LABEL_FALLBACK[id];
+}
+
 export function PresentationStudio() {
   const searchParams = useSearchParams();
+  const t = useTranslations("studio.presentation");
+  const tCreators = useTranslations("studio.creators");
+  const tCommon = useTranslations("common");
   const fromVault = searchParams.get("from") === "vault";
   const backHref = fromVault
     ? "/dashboard/favorites?tab=presentations"
     : "/dashboard/creators";
-  const backLabel = fromVault ? "← My presentations" : "← Creators";
+  const backLabel = fromVault
+    ? `← ${t("myPresentations")}`
+    : tCreators("backToCreators");
   const [doc, setDoc] = useState<PresentationDoc>(() => createNewPresentation());
   const [hydrated, setHydrated] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -364,11 +436,11 @@ export function PresentationStudio() {
       }
     } catch (e) {
       setMediaItems([]);
-      setMediaError(e instanceof Error ? e.message : "Search failed");
+      setMediaError(e instanceof Error ? e.message : t("searchFailed"));
     } finally {
       setMediaLoading(false);
     }
-  }, [mediaProvider, mediaQ]);
+  }, [mediaProvider, mediaQ, t]);
 
   useEffect(() => {
     if (panel === "media" && mediaProvider !== "upload") void searchMedia();
@@ -555,7 +627,7 @@ export function PresentationStudio() {
               setPresenting(false);
             }}
           >
-            Exit (Esc)
+            {t("exitEsc")}
           </button>
         </div>
         <div className="flex flex-1 items-center justify-center p-4">
@@ -600,7 +672,7 @@ export function PresentationStudio() {
               href="/dashboard/favorites?tab=presentations"
               className="rounded-md px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
             >
-              My presentations
+              {t("myPresentations")}
             </Link>
           )}
           <input
@@ -609,17 +681,15 @@ export function PresentationStudio() {
             onChange={(e) =>
               updateDoc((d) => ({ ...d, title: e.target.value }))
             }
-            aria-label="Presentation title"
+            aria-label={t("presentationTitle")}
           />
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              title="New presentation"
+              title={t("newPresentation")}
               className="btn-ghost flex h-9 w-9 items-center justify-center !p-0"
               onClick={() => {
-                if (
-                  confirm("Start a new presentation? Current draft is saved.")
-                ) {
+                if (confirm(t("newConfirm"))) {
                   setDoc(createNewPresentation());
                   setSlideIndex(0);
                   setSelectedId(null);
@@ -633,7 +703,7 @@ export function PresentationStudio() {
             <div className="relative" ref={exportRef}>
               <button
                 type="button"
-                title="Export"
+                title={t("export")}
                 className="btn-ghost flex h-9 items-center gap-1.5 !px-3 text-xs"
                 disabled={busyExport}
                 onClick={() => setExportOpen((v) => !v)}
@@ -643,7 +713,7 @@ export function PresentationStudio() {
                   <path d="M7 10l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M5 21h14" strokeLinecap="round" />
                 </svg>
-                Export
+                {t("export")}
               </button>
               {exportOpen && (
                 <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)] py-1 shadow-2xl">
@@ -655,8 +725,8 @@ export function PresentationStudio() {
                       printPresentationPdf();
                     }}
                   >
-                    <span className="font-semibold text-[var(--accent)]">PDF</span>
-                    All slides
+                    <span className="font-semibold text-[var(--accent)]">{t("pdf")}</span>
+                    {t("allSlides")}
                   </button>
                   <button
                     type="button"
@@ -671,14 +741,14 @@ export function PresentationStudio() {
                         alert(
                           e instanceof Error
                             ? e.message
-                            : "Word export failed",
+                            : t("wordExportFailed"),
                         );
                       } finally {
                         setBusyExport(false);
                       }
                     }}
                   >
-                    <span className="font-semibold text-[var(--accent)]">Word</span>
+                    <span className="font-semibold text-[var(--accent)]">{t("word")}</span>
                     .doc file
                   </button>
                 </div>
@@ -686,7 +756,7 @@ export function PresentationStudio() {
             </div>
             <button
               type="button"
-              title="Present"
+              title={t("present")}
               className="btn-primary flex h-9 items-center gap-1.5 !px-3 text-xs"
               onClick={() => {
                 setPresentAnimKey((k) => k + 1);
@@ -696,7 +766,7 @@ export function PresentationStudio() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <path d="M8 5v14l11-7L8 5Z" />
               </svg>
-              Present
+              {t("present")}
             </button>
           </div>
         </header>
@@ -914,7 +984,7 @@ export function PresentationStudio() {
               {panel === "design" && (
                 <div className="space-y-4">
                   <p className="text-xs text-[var(--muted)]">
-                    Pick a theme. Titles, accents and empty slides update.
+                    {t("pickTheme")}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {PRESENTATION_THEMES.map((t) => (
@@ -949,7 +1019,7 @@ export function PresentationStudio() {
                   {slide && (
                     <label className="block space-y-1">
                       <span className="text-xs text-[var(--muted)]">
-                        Slide name
+                        {t("slideName")}
                       </span>
                       <input
                         className="field !py-2 !text-sm"
@@ -979,7 +1049,7 @@ export function PresentationStudio() {
                       setSlideIndex((i) => Math.max(0, i - 1));
                     }}
                   >
-                    Delete slide
+                    {t("deleteSlide")}
                   </button>
                 </div>
               )}
@@ -990,18 +1060,20 @@ export function PresentationStudio() {
                     Text styles — click a card to insert.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    {TEXT_STYLES.map((s) => (
+                    {TEXT_STYLE_IDS.map((id) => (
                       <button
-                        key={s.id}
+                        key={id}
                         type="button"
                         className="rounded-lg border border-[var(--line)] p-2.5 text-left hover:border-[var(--accent)]"
                         onClick={() =>
-                          addElement(createStyledText(s.id, doc.themeId))
+                          addElement(createStyledText(id, doc.themeId))
                         }
                       >
-                        <div className="text-xs font-semibold">{s.label}</div>
+                        <div className="text-xs font-semibold">
+                          {textStyleLabel(id, t)}
+                        </div>
                         <div className="text-[10px] text-[var(--muted)]">
-                          {s.hint}
+                          {TEXT_STYLE_HINTS[id]}
                         </div>
                       </button>
                     ))}
@@ -1044,7 +1116,7 @@ export function PresentationStudio() {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") void searchMedia();
                           }}
-                          placeholder="Search photos…"
+                          placeholder={t("searchPhotos")}
                         />
                         <button
                           type="button"
@@ -1060,7 +1132,9 @@ export function PresentationStudio() {
                         </p>
                       )}
                       {mediaLoading ? (
-                        <p className="text-xs text-[var(--muted)]">Loading…</p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {tCommon("loading")}
+                        </p>
                       ) : (
                         <div className="grid grid-cols-2 gap-1.5">
                           {mediaItems.map((item) => (
@@ -1119,20 +1193,20 @@ export function PresentationStudio() {
               {panel === "shapes" && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    {SHAPES.map((shape) => (
+                    {SHAPE_IDS.map((id) => (
                       <button
-                        key={shape.id}
+                        key={id}
                         type="button"
                         className="rounded-lg border border-[var(--line)] px-2 py-3 text-left hover:border-[var(--accent)]"
                         onClick={() =>
-                          addElement(createShapeElement(shape.id, doc.themeId))
+                          addElement(createShapeElement(id, doc.themeId))
                         }
                       >
                         <div className="mb-2 h-8 text-[var(--accent)]">
-                          <ShapeMini kind={shape.id} />
+                          <ShapeMini kind={id} />
                         </div>
                         <span className="text-[11px] font-medium">
-                          {shape.label}
+                          {shapeLabel(id, t)}
                         </span>
                       </button>
                     ))}
@@ -1154,7 +1228,7 @@ export function PresentationStudio() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void searchIcons(1, false);
                       }}
-                      placeholder="Search all icons…"
+                      placeholder={t("searchIcons")}
                     />
                     <button
                       type="button"
@@ -1223,7 +1297,7 @@ export function PresentationStudio() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void searchEmojis();
                       }}
-                      placeholder="Search emoji…"
+                      placeholder={t("searchEmoji")}
                     />
                     <button
                       type="button"
@@ -1303,7 +1377,7 @@ export function PresentationStudio() {
                     className="field !py-1.5 !text-xs"
                     value={chartFilter}
                     onChange={(e) => setChartFilter(e.target.value)}
-                    placeholder="Filter charts…"
+                    placeholder={t("filterCharts")}
                   />
                   <div className="grid max-h-[none] grid-cols-2 gap-2">
                     {CHART_PRESETS.filter((preset) => {

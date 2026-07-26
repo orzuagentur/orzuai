@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ToastNotice";
 import { useMusicUpload } from "@/components/MusicUploadProvider";
 import {
@@ -38,6 +39,8 @@ function formatDuration(sec: number | null): string {
 }
 
 export function MusicLibraryStudio() {
+  const t = useTranslations("studio.music");
+  const tCommon = useTranslations("common");
   const { show: toast, notice } = useToast();
   const { startUpload } = useMusicUpload();
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -51,7 +54,7 @@ export function MusicLibraryStudio() {
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      toast(data.error || "Failed to load genres", "error");
+      toast(data.error || t("failedLoadGenres"), "error");
       setGenres([]);
       return;
     }
@@ -84,9 +87,7 @@ export function MusicLibraryStudio() {
 
   async function deleteGenre(g: Genre) {
     if (
-      !confirm(
-        `Delete genre “${g.name}” and all its tracks from the library?`,
-      )
+      !confirm(t("deleteGroup"))
     ) {
       return;
     }
@@ -98,7 +99,7 @@ export function MusicLibraryStudio() {
       toast(data.error || "Delete failed", "error");
       return;
     }
-    toast("Genre deleted", "ok");
+    toast(t("genreDeleted"), "ok");
     if (openGenre?.id === g.id) setOpenGenre(null);
     await loadGenres();
   }
@@ -126,7 +127,7 @@ export function MusicLibraryStudio() {
             onStart={(genreId, genreName, files) => {
               startUpload({ genreId, genreName, files });
               setModal(null);
-              toast("Upload started — see progress bottom-right", "ok");
+              toast(t("uploadStarted"), "ok");
             }}
             toast={toast}
           />
@@ -152,16 +153,17 @@ export function MusicLibraryStudio() {
           onClick={() => setModal({ type: "create" })}
           className="shrink-0 rounded-xl bg-[color:var(--accent)] px-4 py-2.5 text-sm font-semibold text-black"
         >
-          Add genre
+          {t("addGenre")}
         </button>
       </header>
 
       {loading ? (
-        <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+        <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       ) : genres.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--line)] px-6 py-16 text-center">
           <p className="text-sm text-[color:var(--muted)]">
-            No genres yet. Click <strong>Add genre</strong> to create one and
+            {t("noGenresYet")}{" "}
+            <strong>{t("addGenre")}</strong> to create one and
             upload a music folder.
           </p>
         </div>
@@ -199,11 +201,11 @@ export function MusicLibraryStudio() {
                 </button>
                 <button
                   type="button"
-                  title="Delete genre"
+                  title={t("deleteGenre")}
                   onClick={() => void deleteGenre(g)}
                   className="rounded-xl px-3 py-2 text-xs text-[color:var(--muted)] hover:text-[color:var(--danger)]"
                 >
-                  Delete
+                  {tCommon("delete")}
                 </button>
               </div>
             </article>
@@ -222,7 +224,7 @@ export function MusicLibraryStudio() {
           onStart={(genreId, genreName, files) => {
             startUpload({ genreId, genreName, files });
             setModal(null);
-            toast("Upload started — see progress bottom-right", "ok");
+            toast(t("uploadStarted"), "ok");
           }}
           toast={toast}
         />
@@ -246,6 +248,8 @@ function GenreDetail({
   onDeleteGenre: () => void;
   onChanged: () => void;
 }) {
+  const t = useTranslations("studio.music");
+  const tCommon = useTranslations("common");
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -258,7 +262,7 @@ function GenreDetail({
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      toast(data.error || "Failed to load tracks", "error");
+      toast(data.error || t("failedLoadTracks"), "error");
       setTracks([]);
       return;
     }
@@ -287,17 +291,20 @@ function GenreDetail({
       window.removeEventListener("orzu-music-library-changed", onLib);
   }, [loadTracks]);
 
-  async function deleteTrack(t: Track) {
-    if (!confirm(`Remove “${t.title}” from this genre?`)) return;
-    const res = await fetch(`/api/music/tracks?id=${encodeURIComponent(t.id)}`, {
-      method: "DELETE",
-    });
+  async function deleteTrack(track: Track) {
+    if (!confirm(`Remove “${track.title}” from this genre?`)) return;
+    const res = await fetch(
+      `/api/music/tracks?id=${encodeURIComponent(track.id)}`,
+      {
+        method: "DELETE",
+      },
+    );
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       toast(data.error || "Delete failed", "error");
       return;
     }
-    toast("Track removed", "ok");
+    toast(t("trackRemoved"), "ok");
     await loadTracks();
     onChanged();
   }
@@ -341,48 +348,48 @@ function GenreDetail({
             onClick={onDeleteGenre}
             className="rounded-xl border border-[color:var(--line)] px-3 py-2 text-sm text-[color:var(--muted)] hover:text-[color:var(--danger)]"
           >
-            Delete genre
+            {t("deleteGenre")}
           </button>
         </div>
       </header>
 
       {loading ? (
-        <p className="text-sm text-[color:var(--muted)]">Loading tracks…</p>
+        <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       ) : tracks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--line)] px-6 py-12 text-center">
           <p className="text-sm text-[color:var(--muted)]">
-            No tracks yet. Click <strong>+ Music</strong> and drop a folder.
+            {t("noTracksYet")}
           </p>
         </div>
       ) : (
         <ul className="divide-y divide-[color:var(--line)] overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]">
-          {tracks.map((t) => (
+          {tracks.map((track) => (
             <li
-              key={t.id}
+              key={track.id}
               className="flex items-center gap-3 px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{t.title}</p>
+                <p className="truncate text-sm font-medium">{track.title}</p>
                 <p className="mt-0.5 text-xs text-[color:var(--muted)]">
-                  {formatDuration(t.durationSec)}
+                  {formatDuration(track.durationSec)}
                   {" · "}
-                  {t.fileSizeBytes > 0 ? formatBytes(t.fileSizeBytes) : "—"}
+                  {track.fileSizeBytes > 0 ? formatBytes(track.fileSizeBytes) : "—"}
                 </p>
               </div>
-              {t.previewUrl ? (
+              {track.previewUrl ? (
                 <audio
                   controls
                   preload="none"
-                  src={t.previewUrl}
+                  src={track.previewUrl}
                   className="h-8 max-w-[140px] sm:max-w-[180px]"
                 />
               ) : null}
               <button
                 type="button"
-                onClick={() => void deleteTrack(t)}
+                onClick={() => void deleteTrack(track)}
                 className="shrink-0 text-xs text-[color:var(--muted)] hover:text-[color:var(--danger)]"
               >
-                Remove
+                {tCommon("delete")}
               </button>
             </li>
           ))}
@@ -405,6 +412,8 @@ function UploadModal({
   onStart: (genreId: string, genreName: string, files: File[]) => void;
   toast: (msg: string, tone?: "ok" | "error" | "info") => void;
 }) {
+  const t = useTranslations("studio.music");
+  const tCommon = useTranslations("common");
   const isCreate = mode.type === "create";
   const [name, setName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -415,7 +424,7 @@ function UploadModal({
     if (!list?.length) return;
     const audio = await collectAudioFilesFromList(list);
     setFiles(audio);
-    if (!audio.length) toast("No audio files in that folder", "error");
+    if (!audio.length) toast(t("noAudio"), "error");
   }
 
   async function onDrop(e: React.DragEvent) {
@@ -424,7 +433,7 @@ function UploadModal({
     try {
       const audio = await collectAudioFromDataTransfer(e.dataTransfer);
       setFiles(audio);
-      if (!audio.length) toast("No audio files found", "error");
+      if (!audio.length) toast(t("noAudio"), "error");
     } catch {
       toast("Could not read folder", "error");
     }
@@ -433,7 +442,7 @@ function UploadModal({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (isCreate && !name.trim()) {
-      toast("Enter a genre name", "error");
+      toast(t("enterGenre"), "error");
       return;
     }
     if (!isCreate && !files.length) {
@@ -457,7 +466,7 @@ function UploadModal({
           onStart(genre.id, genre.name, files);
         } else {
           onClose();
-          toast("Genre created", "ok");
+          toast(t("genreCreated"), "ok");
         }
       } else {
         onStart(mode.genre.id, mode.genre.name, files);
@@ -483,7 +492,7 @@ function UploadModal({
         className="w-full max-w-md rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-5 shadow-2xl"
       >
         <h2 className="font-[family-name:var(--font-syne)] text-lg font-semibold">
-          {isCreate ? "Add genre" : `Add music · ${mode.genre.name}`}
+          {isCreate ? t("addGenre") : `Add music · ${mode.genre.name}`}
         </h2>
         <p className="mt-1 text-xs text-[color:var(--muted)]">
           Only files inside the folder are uploaded. Folder name is not created
@@ -493,12 +502,12 @@ function UploadModal({
         {isCreate && (
           <label className="mt-4 block">
             <span className="mb-1.5 block text-xs text-[color:var(--muted)]">
-              Genre name
+              {t("genreName")}
             </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Punk & alternative"
+              placeholder={t("genreExample")}
               autoFocus
               className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
             />
@@ -521,7 +530,7 @@ function UploadModal({
           <p className="text-sm">
             {files.length
               ? `${files.length} audio file${files.length === 1 ? "" : "s"} ready`
-              : "Drop a music folder here"}
+              : t("dropFolder")}
           </p>
           <p className="mt-1 text-xs text-[color:var(--muted)]">
             or choose a folder
@@ -546,7 +555,7 @@ function UploadModal({
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Cancel
+            {tCommon("cancel")}
           </button>
           <button
             type="submit"

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useFeatureLocked } from "@/lib/product-locks-client";
@@ -24,6 +24,9 @@ function formatTime(sec: number) {
 
 /** Creators → Content: pick a ready video and open the pro editor workspace. */
 export function ContentWorkspace() {
+  const t = useTranslations("studio.content");
+  const tc = useTranslations("studio.creators");
+  const ts = useTranslations("studio.common");
   const router = useRouter();
   const editorLocked = useFeatureLocked("video_editor");
   const [items, setItems] = useState<ReadyVideo[]>([]);
@@ -64,34 +67,29 @@ export function ContentWorkspace() {
             href="/dashboard/creators"
             className="mb-2 inline-block text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)]"
           >
-            ← For creators
+            {tc("backToCreators")}
           </Link>
           <h1
             className="text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl"
             style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
           >
-            Content studio
+            {t("title")}
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            Open any ready video in the professional CapCut-style editor —
-            sources, filters, captions, music, and frame timeline.
-          </p>
+          <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">{t("lead")}</p>
         </div>
       </header>
 
       {loading ? (
-        <p className="text-sm text-[var(--muted)]">Loading your videos…</p>
+        <p className="text-sm text-[var(--muted)]">{t("loading")}</p>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)] p-10 text-center">
-          <p className="text-sm text-[var(--muted)]">
-            No ready videos yet. Create one in AI Video, then edit it here.
-          </p>
+          <p className="text-sm text-[var(--muted)]">{t("empty")}</p>
           <Link
             href="/dashboard/content"
             className="mt-4 inline-flex rounded-full px-4 py-2 text-sm font-semibold text-black"
             style={{ background: "#E8A54B" }}
           >
-            Go to AI Video
+            {t("goAiVideo")}
           </Link>
         </div>
       ) : (
@@ -117,11 +115,11 @@ export function ContentWorkspace() {
               />
               <div className="p-2.5">
                 <p className="truncate text-sm font-medium text-[var(--fg)]">
-                  {v.title || "Untitled"}
+                  {v.title || ts("untitled")}
                 </p>
                 <p className="text-[11px] text-[var(--muted)]">
                   {formatTime(Number(v.duration_seconds) || 0)}
-                  {editorLocked ? " · Soon" : " · Edit"}
+                  {editorLocked ? ` · ${ts("soon")}` : ` · ${ts("edit")}`}
                 </p>
               </div>
             </button>

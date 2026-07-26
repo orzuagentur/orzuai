@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -8,6 +7,8 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 const ACCENT = "#E8A54B";
 
@@ -42,8 +43,8 @@ const FILTERS: { id: string; label: string; css: string }[] = [
   { id: "punch", label: "Punch", css: "contrast(1.25) saturate(1.2)" },
 ];
 
-const LEFT: { id: Tool; label: string; icon: string }[] = [
-  { id: "upload", label: "Media", icon: "+" },
+const LEFT: { id: Tool; label: string; icon: string; labelKey?: "media" }[] = [
+  { id: "upload", label: "Media", icon: "+", labelKey: "media" },
   { id: "adjust", label: "Adjust", icon: "☀" },
   { id: "filters", label: "Filters", icon: "◐" },
   { id: "text", label: "Text", icon: "T" },
@@ -53,6 +54,9 @@ const LEFT: { id: Tool; label: string; icon: string }[] = [
 
 /** Canva-like photo editor workspace for Creators. */
 export function PhotoEditorStudio() {
+  const t = useTranslations("studio.photoEditor");
+  const tCreators = useTranslations("studio.creators");
+  const tPres = useTranslations("studio.presentation");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [tool, setTool] = useState<Tool>("upload");
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -148,10 +152,10 @@ export function PhotoEditorStudio() {
           href="/dashboard/creators"
           className="text-sm font-medium text-white/60 hover:text-white"
         >
-          ← Back
+          {tCreators("backToCreators")}
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-center text-base font-semibold">
-          Photo editor
+          {t("title")}
         </h1>
         <button
           type="button"
@@ -166,7 +170,7 @@ export function PhotoEditorStudio() {
             a.click();
           }}
         >
-          Export
+          {tPres("export")}
         </button>
       </header>
 
@@ -178,6 +182,7 @@ export function PhotoEditorStudio() {
         >
           {LEFT.map((item) => {
             const on = tool === item.id;
+            const label = item.labelKey ? t(item.labelKey) : item.label;
             return (
               <button
                 key={item.id}
@@ -193,7 +198,7 @@ export function PhotoEditorStudio() {
                 }}
               >
                 <span className="text-base">{item.icon}</span>
-                <span className="text-[9px] font-medium">{item.label}</span>
+                <span className="text-[9px] font-medium">{label}</span>
               </button>
             );
           })}
@@ -219,7 +224,7 @@ export function PhotoEditorStudio() {
                 className="flex flex-col items-center gap-2 text-white/50 transition hover:text-white/80"
               >
                 <span className="text-3xl">+</span>
-                <span className="text-sm">Upload photo</span>
+                <span className="text-sm">{t("uploadPhoto")}</span>
               </button>
             ) : (
               <>
@@ -324,7 +329,7 @@ export function PhotoEditorStudio() {
                   onClick={removeActive}
                   className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300"
                 >
-                  Remove layer
+                  {t("removeLayer")}
                 </button>
               </>
             )}
@@ -389,7 +394,7 @@ export function PhotoEditorStudio() {
                 value={textDraft}
                 onChange={(e) => setTextDraft(e.target.value)}
                 className="min-w-[180px] flex-1 rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm"
-                placeholder="Add text…"
+                placeholder={t("addText")}
               />
               <button
                 type="button"
@@ -397,7 +402,7 @@ export function PhotoEditorStudio() {
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-black"
                 style={{ background: ACCENT }}
               >
-                Add text
+                {t("addText")}
               </button>
             </div>
           )}
@@ -410,7 +415,7 @@ export function PhotoEditorStudio() {
           {tool === "layers" && (
             <div className="flex gap-2 overflow-x-auto">
               {layers.length === 0 ? (
-                <p className="text-sm text-white/45">No layers yet</p>
+                <p className="text-sm text-white/45">{t("noLayers")}</p>
               ) : (
                 layers.map((l) => (
                   <button

@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 import { zipSync } from "fflate";
 import {
   buildGltfObjectUrl,
@@ -26,16 +27,6 @@ import {
   type CreatorsStockItem,
 } from "@/components/CreatorsMediaMasonry";
 import type { StudioKind } from "@/lib/studio-kind";
-
-const TYPE_OPTIONS: { id: StudioKind; label: string }[] = [
-  { id: "models", label: "3D models" },
-  { id: "hdris", label: "HDRIs" },
-  { id: "textures", label: "Textures" },
-  { id: "photos", label: "Photos" },
-  { id: "videos", label: "Videos" },
-  { id: "emojis", label: "Emojis" },
-  { id: "icons", label: "Icons" },
-];
 
 type PhotoSourceFilter = "all" | "pexels" | "unsplash";
 
@@ -83,10 +74,6 @@ type CategoryOpt = {
 
 type ViewMode = "categories" | "gallery";
 
-function typeLabel(t: StudioKind) {
-  return TYPE_OPTIONS.find((o) => o.id === t)?.label || t;
-}
-
 function isPolyKind(
   t: StudioKind,
 ): t is Exclude<PolyHavenType, "all"> {
@@ -118,6 +105,31 @@ async function downloadPackageZip(pack: PolyPackage, assetId: string) {
 }
 
 export function CreatorsStudio({ kind }: { kind: StudioKind }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+
+  function typeLabel(k: StudioKind) {
+    switch (k) {
+      case "models":
+        return t("models3d");
+      case "hdris":
+        return t("hdris");
+      case "textures":
+        return t("textures");
+      case "photos":
+        return t("photos");
+      case "videos":
+        return t("videos");
+      case "emojis":
+        return t("emojis");
+      case "icons":
+        return t("icons");
+      default:
+        return k;
+    }
+  }
+
   const [view, setView] = useState<ViewMode>(
     kind === "videos" || kind === "photos" ? "gallery" : "categories",
   );
@@ -353,7 +365,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         pageRef.current = 1;
       } catch (e) {
         if (cancelled || reqId !== requestIdRef.current) return;
-        setErr(e instanceof Error ? e.message : "Failed to load media");
+        setErr(e instanceof Error ? e.message : t("failedLoadMedia"));
         setStockItems([]);
         hasMoreRef.current = false;
       } finally {
@@ -443,7 +455,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
       const data = await res.json().catch(() => ({}));
       if (cancelled || reqId !== requestIdRef.current) return;
       if (!res.ok) {
-        setErr(data.error || "Failed to load icons");
+        setErr(data.error || t("failedLoadIcons"));
         setIcons([]);
         hasMoreRef.current = false;
       } else {
@@ -482,7 +494,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
       const data = await res.json().catch(() => ({}));
       if (cancelled || reqId !== requestIdRef.current) return;
       if (!res.ok) {
-        setErr(data.error || "Failed to load emojis");
+        setErr(data.error || t("failedLoadEmojis"));
         setEmojis([]);
         hasMoreRef.current = false;
       } else {
@@ -528,7 +540,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         });
         const data = await res.json();
         if (cancelled || reqId !== requestIdRef.current) return;
-        if (!res.ok) throw new Error(data.error || "Failed to load assets");
+        if (!res.ok) throw new Error(data.error || t("failedLoadAssets"));
         const batch: PolyHavenAssetMeta[] = data.items || [];
         hasMoreRef.current = Boolean(data.hasMore);
         setItems(batch);
@@ -913,12 +925,12 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${typeLabel(kind).toLowerCase()}…`}
+              placeholder={`${tCommon("search")} ${typeLabel(kind).toLowerCase()}…`}
               className="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-2.5 pl-4 pr-11 text-sm outline-none focus:border-[color:rgba(232,165,75,0.55)]"
             />
             <button
               type="submit"
-              title="Search"
+              title={tCommon("search")}
               className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--accent)]"
             >
               <svg
@@ -943,11 +955,11 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
           <div
             className="mt-2 flex flex-wrap gap-1.5"
             role="group"
-            aria-label="Photo sources"
+            aria-label={t("photoSources")}
           >
             {(
               [
-                { id: "all", label: "All sources" },
+                { id: "all", label: t("allSources") },
                 { id: "pexels", label: "Pexels" },
                 { id: "unsplash", label: "Unsplash" },
               ] as const
@@ -996,7 +1008,7 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
       {showCategories && (
         <section>
           {catsLoading ? (
-            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+            <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
           ) : isIcons ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4">
               {iconSets.map((set) => {
@@ -1140,13 +1152,13 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         <section>
           <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
             {searching
-              ? `Search · ${submitted}`
-              : activeEmojiLabel || "Emojis"}
+              ? `${tCommon("search")} · ${submitted}`
+              : activeEmojiLabel || t("emojis")}
           </h1>
           {loading && !emojis.length ? (
-            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+            <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
           ) : !emojis.length ? (
-            <p className="text-sm text-[color:var(--muted)]">No emojis found.</p>
+            <p className="text-sm text-[color:var(--muted)]">{t("noEmojis")}</p>
           ) : (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:gap-3">
               {emojis.map((emo) => {
@@ -1198,13 +1210,13 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
             {searching
               ? activeIconLabel
                 ? `${activeIconLabel} · ${submitted}`
-                : `Search · ${submitted}`
-              : activeIconLabel || "Icons"}
+                : `${tCommon("search")} · ${submitted}`
+              : activeIconLabel || t("icons")}
           </h1>
           {loading && !icons.length ? (
-            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+            <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
           ) : !icons.length ? (
-            <p className="text-sm text-[color:var(--muted)]">No icons found.</p>
+            <p className="text-sm text-[color:var(--muted)]">{t("noIcons")}</p>
           ) : (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:gap-3">
               {icons.map((ico) => {
@@ -1252,12 +1264,12 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         <section>
           <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
             {searching
-              ? `Search · ${submitted}`
+              ? `${tCommon("search")} · ${submitted}`
               : isVideos
-                ? "Videos"
+                ? t("videos")
                 : isPexelsPhotos
                   ? "Pexels"
-                  : activeCategoryLabel || "Photos"}
+                  : activeCategoryLabel || t("photos")}
           </h1>
           <CreatorsMediaMasonry
             items={stockItems}
@@ -1277,14 +1289,14 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         <section>
           <h1 className="mb-3 font-[family-name:var(--font-syne)] text-xl font-bold tracking-tight">
             {searching
-              ? `Search · ${submitted}`
+              ? `${tCommon("search")} · ${submitted}`
               : activeCategoryLabel || typeLabel(kind)}
           </h1>
 
           {loading && !items.length ? (
-            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+            <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
           ) : !items.length ? (
-            <p className="text-sm text-[color:var(--muted)]">No assets found.</p>
+            <p className="text-sm text-[color:var(--muted)]">{t("noAssets")}</p>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
               {items.map((asset) => {
@@ -1402,8 +1414,8 @@ export function CreatorsStudio({ kind }: { kind: StudioKind }) {
         <button
           type="button"
           onClick={scrollToTop}
-          title="Back to top"
-          aria-label="Back to top"
+          title={t("backToTop")}
+          aria-label={t("backToTop")}
           className="fixed bottom-24 right-4 z-[80] flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] text-[color:var(--fg)] shadow-lg transition hover:border-[color:rgba(232,165,75,0.55)] hover:text-[color:var(--accent)] md:bottom-8 md:right-8"
         >
           <svg
@@ -1433,6 +1445,10 @@ function EmojiViewer({
   item: OpenMojiItem;
   onClose: () => void;
 }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -1468,7 +1484,7 @@ function EmojiViewer({
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
         <div className="flex items-center justify-center bg-white/5 p-8">
@@ -1487,7 +1503,7 @@ function EmojiViewer({
             rel="noopener noreferrer"
             className="btn btn-primary flex-1 text-center text-sm"
           >
-            Download SVG
+            {t("downloadSvg")}
           </a>
           <button
             type="button"
@@ -1500,7 +1516,7 @@ function EmojiViewer({
               }
             }}
           >
-            Copy link
+            {tc("copyLink")}
           </button>
         </div>
       </div>
@@ -1516,6 +1532,10 @@ function IconViewer({
   item: IconifyIconItem;
   onClose: () => void;
 }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -1552,7 +1572,7 @@ function IconViewer({
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
         <div className="flex items-center justify-center bg-white/5 p-8">
@@ -1571,7 +1591,7 @@ function IconViewer({
             rel="noopener noreferrer"
             className="btn btn-primary flex-1 text-center text-sm"
           >
-            Download SVG
+            {t("downloadSvg")}
           </a>
           <button
             type="button"
@@ -1584,7 +1604,7 @@ function IconViewer({
               }
             }}
           >
-            Copy link
+            {tc("copyLink")}
           </button>
         </div>
       </div>
@@ -1602,6 +1622,9 @@ function UnsplashPhotoViewer({
   onClose: () => void;
   onError: (msg: string) => void;
 }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -1627,7 +1650,7 @@ function UnsplashPhotoViewer({
       // Open hotlinked full URL (guideline) — not the download_location response
       window.open(photo.urls.full, "_blank", "noopener,noreferrer");
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Download failed");
+      onError(e instanceof Error ? e.message : tc("downloadFailed"));
     } finally {
       setBusy(false);
     }
@@ -1662,7 +1685,7 @@ function UnsplashPhotoViewer({
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
         <div className="relative flex max-h-[55vh] items-center justify-center bg-black/40">
@@ -1679,7 +1702,7 @@ function UnsplashPhotoViewer({
           </p>
         )}
         <p className="px-4 pt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-          Photo by{" "}
+          {t("photoBy")}{" "}
           <a
             href={photo.photographer.profileUrl}
             target="_blank"
@@ -1705,7 +1728,7 @@ function UnsplashPhotoViewer({
             disabled={busy}
             onClick={() => void trackAndOpen()}
           >
-            {busy ? "Opening…" : "Download"}
+            {busy ? "…" : tCommon("download")}
           </button>
           <a
             href={photo.unsplashUrl}
@@ -1713,7 +1736,7 @@ function UnsplashPhotoViewer({
             rel="noopener noreferrer"
             className="btn btn-ghost flex-1 text-center text-sm"
           >
-            View on Unsplash
+            {t("viewOnUnsplash")}
           </a>
         </div>
       </div>
@@ -1731,6 +1754,9 @@ function AssetFullscreen({
   onClose: () => void;
   onError: (msg: string) => void;
 }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [sides, setSides] = useState<PolyPreviewSide[]>([]);
   const [packages, setPackages] = useState<PolyPackage[]>([]);
   const [activeSide, setActiveSide] = useState<string>("primary");
@@ -1849,7 +1875,7 @@ function AssetFullscreen({
       setMode3d(true);
       setPackId(pack.id);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "3D preview failed");
+      onError(e instanceof Error ? e.message : t("preview3dFailed"));
     } finally {
       setLoading3d(false);
     }
@@ -1874,7 +1900,7 @@ function AssetFullscreen({
         await downloadPackageZip(selectedPack, asset.id);
       }
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Download failed");
+      onError(e instanceof Error ? e.message : tc("downloadFailed"));
     } finally {
       setBusy(false);
     }
@@ -1918,7 +1944,7 @@ function AssetFullscreen({
             onClick={onClose}
             className="rounded-xl px-3 py-2 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
       </header>
@@ -1952,14 +1978,14 @@ function AssetFullscreen({
               className="max-h-full max-w-full object-contain p-4"
             />
           ) : loading ? (
-            <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+            <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
           ) : null}
         </div>
 
         <aside className="flex w-full shrink-0 flex-col border-t border-[color:var(--line)] md:h-full md:w-[320px] md:overflow-hidden md:border-l md:border-t-0">
           <div className="shrink-0 border-b border-[color:var(--line)] p-3">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
-              Sides / maps
+              {t("sidesMaps")}
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {sides.map((s) => (
@@ -2071,6 +2097,8 @@ function AssetFullscreen({
 
 /** Equirectangular HDRI preview — drag to look around (CORS-safe via proxy). */
 function HdriSphereViewer({ imageUrl }: { imageUrl: string }) {
+  const t = useTranslations("studio.creators");
+  const tCommon = useTranslations("common");
   const hostRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
@@ -2300,11 +2328,11 @@ function HdriSphereViewer({ imageUrl }: { imageUrl: string }) {
       <div
         ref={hostRef}
         className="absolute inset-0 cursor-grab active:cursor-grabbing"
-        title="Drag to look around"
+        title={t("dragLook")}
       />
       {status === "loading" && (
         <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-[color:var(--muted)]">
-          Loading 3D…
+          {tCommon("loading")}
         </p>
       )}
       {status === "error" && (

@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 export type CreatorsStockProvider = "pexels" | "unsplash";
 
@@ -223,6 +224,8 @@ export function CreatorsMediaMasonry({
   sentinelRef: RefObject<HTMLDivElement | null>;
   onError: (msg: string) => void;
 }) {
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const colCount = useMasonryColumnCount();
   const columns = useStickyMasonry(items, colCount, resetKey);
   const [viewer, setViewer] = useState<CreatorsStockItem | null>(null);
@@ -234,16 +237,16 @@ export function CreatorsMediaMasonry({
       try {
         await downloadStock(item);
       } catch (e) {
-        onError(e instanceof Error ? e.message : "Download failed");
+        onError(e instanceof Error ? e.message : tc("downloadFailed"));
       } finally {
         setBusyKey(null);
       }
     },
-    [onError],
+    [onError, tc],
   );
 
   if (loading && !items.length) {
-    return <p className="text-sm text-[color:var(--muted)]">Loading…</p>;
+    return <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>;
   }
   if (!items.length) {
     return <p className="text-sm text-[color:var(--muted)]">{emptyText}</p>;
@@ -269,7 +272,7 @@ export function CreatorsMediaMasonry({
       <div ref={sentinelRef} className="h-10" />
       {loadingMore && (
         <p className="pb-2 text-center text-xs text-[color:var(--muted)]">
-          Loading more…
+          {tc("loadingMore")}
         </p>
       )}
       {viewer && (
@@ -295,6 +298,7 @@ function StockCard({
   onOpen: () => void;
   onDownload: () => void;
 }) {
+  const tc = useTranslations("studio.common");
   const dur = formatDuration(item.durationSec);
   const w = item.width && item.width > 0 ? item.width : 3;
   const h = item.height && item.height > 0 ? item.height : 4;
@@ -369,7 +373,7 @@ function StockCard({
             onDownload();
           }}
         >
-          {busy ? "…" : "Save"}
+          {busy ? "…" : tc("save")}
         </button>
       </div>
     </article>
@@ -387,6 +391,10 @@ function StockViewer({
   onClose: () => void;
   onDownload: () => void;
 }) {
+  const t = useTranslations("studio.creators");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -426,7 +434,7 @@ function StockViewer({
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-[color:var(--muted)] hover:text-[color:var(--fg)]"
           >
-            Close
+            {tCommon("close")}
           </button>
         </div>
         <div className="relative flex max-h-[60vh] items-center justify-center bg-black">
@@ -449,7 +457,7 @@ function StockViewer({
           )}
         </div>
         <p className="px-4 pt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-          {item.kind === "video" ? "Video" : "Photo"} by{" "}
+          {item.kind === "video" ? t("videoBy") : t("photoBy")}{" "}
           {item.authorUrl ? (
             <a
               href={item.authorUrl}
@@ -479,7 +487,7 @@ function StockViewer({
             disabled={busy || !item.downloadUrl}
             onClick={onDownload}
           >
-            {busy ? "Saving…" : "Download"}
+            {busy ? tc("saving") : tCommon("download")}
           </button>
           {item.pageUrl && (
             <a
@@ -488,7 +496,9 @@ function StockViewer({
               rel="noopener noreferrer"
               className="btn btn-ghost flex-1 text-center text-sm"
             >
-              View on {providerLabel}
+              {item.provider === "unsplash"
+                ? t("viewOnUnsplash")
+                : `View on ${providerLabel}`}
             </a>
           )}
         </div>
@@ -581,6 +591,8 @@ export function PexelsCategoryCard({
   hover: boolean;
   onHover: (on: boolean) => void;
 }): ReactNode {
+  const t = useTranslations("studio.creators");
+
   return (
     <button
       type="button"
@@ -595,7 +607,7 @@ export function PexelsCategoryCard({
           Pexels
         </span>
         <span className="text-[11px] text-[color:var(--muted)]">
-          Photos & stock
+          {t("photosStock")}
         </span>
       </span>
       {hover && (
@@ -603,7 +615,7 @@ export function PexelsCategoryCard({
           <p className="font-[family-name:var(--font-syne)] text-sm font-semibold text-white">
             Pexels
           </p>
-          <p className="text-[11px] text-white/75">Official Pexels API</p>
+          <p className="text-[11px] text-white/75">{t("officialPexels")}</p>
         </div>
       )}
     </button>

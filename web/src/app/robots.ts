@@ -1,36 +1,54 @@
 import type { MetadataRoute } from "next";
 import { seoFeatureSlugs } from "@/lib/seo-features";
+import { routing } from "@/i18n/routing";
 
 const SITE = (
   process.env.NEXT_PUBLIC_APP_URL || "https://www.orzuai.com"
 ).replace(/\/$/, "");
 
-const FEATURE_PATHS = [
+const FEATURE_SUFFIXES = [
   "/features",
   ...seoFeatureSlugs().map((s) => `/features/${s}`),
 ];
 
-/** Public pages only — dashboard / API stay private. */
-const PUBLIC_ALLOW = [
+function withLocales(paths: string[]): string[] {
+  const out: string[] = [];
+  for (const locale of routing.locales) {
+    for (const path of paths) {
+      out.push(path === "/" ? `/${locale}` : `/${locale}${path}`);
+    }
+  }
+  return out;
+}
+
+const PUBLIC_PATHS = [
   "/",
   "/login",
   "/signup",
   "/privacy",
   "/terms",
   "/about",
-  ...FEATURE_PATHS,
+  ...FEATURE_SUFFIXES,
 ];
 
-const PRIVATE_DISALLOW = [
+const PUBLIC_ALLOW = withLocales(PUBLIC_PATHS);
+
+const PRIVATE_DISALLOW = withLocales([
   "/dashboard",
-  "/api/",
-  "/auth/",
   "/login/verify",
   "/auth/reset-password",
   "/auth/forgot-password",
-];
+]).concat(["/api/", "/auth/callback", "/auth/signout"]);
 
-const AI_ALLOW = ["/", "/about", "/features", ...FEATURE_PATHS, "/privacy", "/terms", "/signup"];
+const AI_ALLOW = withLocales([
+  "/",
+  "/about",
+  "/features",
+  ...FEATURE_SUFFIXES,
+  "/privacy",
+  "/terms",
+  "/signup",
+]);
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -47,8 +65,8 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "Googlebot-Image",
-        allow: ["/", "/og.png", "/logo.png", "/logo-mark.png", "/icons/", "/features"],
-        disallow: ["/dashboard", "/api/"],
+        allow: ["/", "/og.png", "/logo.png", "/logo-mark.png", "/icons/", ...withLocales(["/features"])],
+        disallow: [...withLocales(["/dashboard"]), "/api/"],
       },
       {
         userAgent: "Bingbot",
@@ -90,16 +108,15 @@ export default function robots(): MetadataRoute.Robots {
         allow: PUBLIC_ALLOW,
         disallow: PRIVATE_DISALLOW,
       },
-      // AI crawlers — marketing + feature pages so ChatGPT / Claude can recommend tools
       {
         userAgent: "GPTBot",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
       {
         userAgent: "ChatGPT-User",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
       {
         userAgent: "Google-Extended",
@@ -108,22 +125,22 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "anthropic-ai",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
       {
         userAgent: "ClaudeBot",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
       {
         userAgent: "PerplexityBot",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
       {
         userAgent: "CCBot",
         allow: AI_ALLOW,
-        disallow: ["/dashboard", "/api/", "/auth/"],
+        disallow: [...withLocales(["/dashboard"]), "/api/", "/auth/"],
       },
     ],
     sitemap: `${SITE}/sitemap.xml`,

@@ -1,6 +1,10 @@
-import Link from "next/link";
+"use client";
+
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 /** Public marketing / legal pages — shared chrome. */
 export function SiteChrome({
@@ -13,6 +17,8 @@ export function SiteChrome({
   /** Full-bleed layout (landing) — no content max-width wrapper */
   bare?: boolean;
 }) {
+  const t = useTranslations("chrome");
+
   return (
     <div className="relative min-h-screen bg-[color:var(--bg)] text-[color:var(--fg)]">
       <div
@@ -20,7 +26,7 @@ export function SiteChrome({
         aria-hidden
         style={{
           background:
-            "radial-gradient(1000px 480px at 6% -10%, rgba(196,125,34,0.07), transparent 55%), radial-gradient(700px 400px at 100% 0%, rgba(90,120,180,0.05), transparent 50%)",
+            "linear-gradient(180deg, rgba(255,255,255,0.82), rgba(247,248,251,0)), linear-gradient(135deg, rgba(15,118,110,0.055), transparent 42%)",
         }}
       />
       <div
@@ -31,37 +37,39 @@ export function SiteChrome({
         }`}
       >
         <header
-          className={`flex items-center justify-between gap-3 ${
+          className={`z-30 flex items-center justify-between gap-3 ${
             bare
-              ? "border-b border-[color:var(--line)] bg-[color:var(--bg-elevated)]/90 px-4 py-3 backdrop-blur-md sm:px-8"
+              ? "sticky top-0 border-b border-[color:var(--line)] bg-[color:var(--bg-elevated)]/92 px-4 py-3 backdrop-blur-md sm:px-8"
               : ""
           }`}
         >
           <BrandLogo href="/" size={34} />
           <nav
             className="flex items-center gap-1.5 sm:gap-2.5"
-            aria-label="Account"
+            aria-label={t("navAccount")}
           >
+            <span className="hidden sm:inline-flex">
+              <LanguageSwitcher compact />
+            </span>
             <Link
               href="/features"
-              className="hidden rounded-full px-3 py-2 text-sm font-medium text-[color:var(--muted)] transition hover:bg-[color:var(--overlay-med)] hover:text-[color:var(--fg)] sm:inline-flex sm:px-4"
+              className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-[color:var(--muted)] transition hover:bg-[color:var(--overlay-med)] hover:text-[color:var(--fg)] sm:inline-flex sm:px-4"
             >
-              Features
+              {t("features")}
             </Link>
             <Link
               href="/login"
-              className="rounded-full px-3 py-2 text-sm font-medium text-[color:var(--muted)] transition hover:bg-[color:var(--overlay-med)] hover:text-[color:var(--fg)] sm:px-4"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[color:var(--muted)] transition hover:bg-[color:var(--overlay-med)] hover:text-[color:var(--fg)] sm:px-4"
             >
-              Log in
+              {t("logIn")}
             </Link>
             <Link
               href="/signup"
-              className="btn btn-primary inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm sm:min-h-11 sm:px-5"
-              style={{
-                boxShadow: "0 8px 20px rgba(196,125,34,0.2)",
-              }}
+              className="btn btn-primary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm sm:min-h-11 sm:px-5"
+              aria-label={t("startFree")}
             >
-              Start free
+              <span className="hidden sm:inline">{t("startFree")}</span>
+              <span className="sm:hidden">{t("startShort")}</span>
             </Link>
           </nav>
         </header>
@@ -73,6 +81,8 @@ export function SiteChrome({
 }
 
 export function SiteFooter() {
+  const t = useTranslations("chrome");
+  const tc = useTranslations("common");
   const year = new Date().getFullYear();
   return (
     <footer className="mt-auto border-t border-[color:var(--line)] bg-[color:var(--bg-elevated)] px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-8 sm:px-8">
@@ -82,36 +92,42 @@ export function SiteFooter() {
             OrzuAi
           </p>
           <p className="mt-1 text-sm text-[color:var(--muted)]">
-            © {year} · AI creator studio · www.orzuai.com
+            {t("footerTagline", { year })}
           </p>
+          <div className="mt-3 sm:hidden">
+            <LanguageSwitcher />
+          </div>
         </div>
         <nav
-          className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-[color:var(--muted)]"
-          aria-label="Legal"
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[color:var(--muted)]"
+          aria-label={t("navLegal")}
         >
+          <span className="hidden sm:inline-flex">
+            <LanguageSwitcher compact />
+          </span>
           <Link href="/about" className="transition hover:text-[color:var(--fg)]">
-            About
+            {t("about")}
           </Link>
           <Link
             href="/features"
             className="transition hover:text-[color:var(--fg)]"
           >
-            Features
+            {t("features")}
           </Link>
           <Link
             href="/privacy"
             className="transition hover:text-[color:var(--fg)]"
           >
-            Privacy
+            {t("privacy")}
           </Link>
           <Link href="/terms" className="transition hover:text-[color:var(--fg)]">
-            Terms
+            {t("terms")}
           </Link>
           <a
             href="mailto:support@orzuai.com"
             className="transition hover:text-[color:var(--fg)]"
           >
-            Support
+            {tc("support")}
           </a>
         </nav>
       </div>
@@ -128,13 +144,14 @@ export function LegalArticle({
   updated: string;
   children: ReactNode;
 }) {
+  const t = useTranslations("chrome");
   return (
     <article className="mt-12">
       <h1 className="font-[family-name:var(--font-syne)] text-3xl font-bold tracking-tight sm:text-4xl">
         {title}
       </h1>
       <p className="mt-2 text-sm text-[color:var(--muted)]">
-        Last updated: {updated}
+        {t("lastUpdated", { date: updated })}
       </p>
       <div className="prose-legal mt-8 space-y-5 text-[15px] leading-relaxed text-[color:var(--fg)]">
         {children}

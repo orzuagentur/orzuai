@@ -8,8 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { useToast } from "@/components/ToastNotice";
 import { CardMenu } from "@/components/CardMenu";
 import { buildPresentationFromAiPlan } from "@/lib/presentation/ai-build";
@@ -30,8 +31,8 @@ import {
 import { savePresentationDraft } from "@/lib/presentation/factory";
 
 const FORMATS = [
-  { id: "pdf" as const, label: "PDF", hint: "Print-ready pages" },
-  { id: "word" as const, label: "Word", hint: ".doc for Word" },
+  { id: "pdf" as const, labelKey: "pdf" as const, hintKey: "printReady" as const },
+  { id: "word" as const, labelKey: "word" as const, hintKey: "docForWord" as const },
 ];
 
 const PAGE_COUNTS = [
@@ -121,6 +122,10 @@ function formatDate(iso: string) {
 export function AiPresentationStudio() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("studio.aiPresentation");
+  const tPres = useTranslations("studio.presentation");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const tab = searchParams.get("tab") === "library" ? "library" : "create";
   const { show: toast, notice } = useToast();
 
@@ -144,9 +149,13 @@ export function AiPresentationStudio() {
     refresh();
   }, [refresh, tab]);
 
-  const formatLabel = FORMATS.find((f) => f.id === format)?.label || "PDF";
+  const formatLabel = FORMATS.find((f) => f.id === format)
+    ? tPres(FORMATS.find((f) => f.id === format)!.labelKey)
+    : tPres("pdf");
   const pagesLabel =
-    PAGE_COUNTS.find((p) => p.id === pagesId)?.label || "Auto";
+    pagesId === "auto"
+      ? tc("auto")
+      : PAGE_COUNTS.find((p) => p.id === pagesId)?.label || tc("auto");
 
   const libraryEmpty = useMemo(() => items.length === 0, [items.length]);
 
@@ -181,7 +190,7 @@ export function AiPresentationStudio() {
       });
       savePresentationDraft(saved.doc);
       refresh();
-      toast("Presentation ready.");
+      toast(t("ready"));
       router.push(`/dashboard/creators/presentation?id=${saved.id}`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Could not create presentation");
@@ -208,7 +217,7 @@ export function AiPresentationStudio() {
       savePresentationDraft(full.doc);
       if (kind === "word") {
         await downloadPresentationWord(full.doc);
-        toast("Word file downloaded.");
+        toast(t("wordDownloaded"));
       } else {
         // Open editor print surface for PDF (same as classic export)
         router.push(
@@ -238,7 +247,7 @@ export function AiPresentationStudio() {
           className="font-[family-name:var(--font-syne)] text-3xl tracking-tight sm:text-4xl"
           style={{ fontWeight: 800 }}
         >
-          AI Presentation
+          {t("title")}
         </h1>
         <p className="mt-2 text-sm text-[color:var(--muted)]">
           Prompt → slides → open on OrzuAi, export PDF or Word.
@@ -250,7 +259,7 @@ export function AiPresentationStudio() {
           <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] focus-within:border-[color:rgba(232,165,75,0.45)]">
             <textarea
               className="min-h-[160px] w-full resize-y border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-relaxed outline-none placeholder:text-[color:var(--muted)]"
-              placeholder="Describe the presentation you want…"
+              placeholder={t("placeholder")}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               disabled={creating}
@@ -283,9 +292,9 @@ export function AiPresentationStudio() {
                         setOpenChip(null);
                       }}
                     >
-                      <span className="font-semibold">{f.label}</span>
+                      <span className="font-semibold">{tPres(f.labelKey)}</span>
                       <span className="text-xs text-[color:var(--muted)]">
-                        {f.hint}
+                        {t(f.hintKey)}
                       </span>
                     </button>
                   );
@@ -313,10 +322,12 @@ export function AiPresentationStudio() {
                         setOpenChip(null);
                       }}
                     >
-                      <span className="font-semibold">{p.label}</span>
+                      <span className="font-semibold">
+                        {p.id === "auto" ? tc("auto") : p.label}
+                      </span>
                       {p.id === "auto" && (
                         <span className="text-[10px] text-[color:var(--muted)]">
-                          AI picks
+                          {tc("aiPicks")}
                         </span>
                       )}
                     </button>
@@ -331,7 +342,7 @@ export function AiPresentationStudio() {
                   disabled={creating || prompt.trim().length < 8}
                   onClick={() => void createPresentation()}
                 >
-                  {creating ? "Designing…" : "Generate"}
+                  {creating ? t("designing") : t("generate")}
                 </button>
               </div>
             </div>
@@ -339,7 +350,7 @@ export function AiPresentationStudio() {
 
           <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 sm:p-5">
             <h2 className="text-sm font-semibold tracking-tight text-[var(--fg)]">
-              Info & permissions
+              {t("permissions")}
             </h2>
             <p className="mt-1 text-xs text-[color:var(--muted)]">
               Optional fields — AI uses them on slides and QR / contact page.
@@ -351,12 +362,12 @@ export function AiPresentationStudio() {
                   className="mt-1 w-full rounded-xl border border-[color:var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[rgba(232,165,75,0.45)]"
                   value={info.author}
                   onChange={(e) => patchInfo("author", e.target.value)}
-                  placeholder="Your name"
+                  placeholder={t("yourName")}
                   disabled={creating}
                 />
               </label>
               <label className="block text-xs text-[color:var(--muted)]">
-                Company / brand
+                {t("companyBrand")}
                 <input
                   className="mt-1 w-full rounded-xl border border-[color:var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[rgba(232,165,75,0.45)]"
                   value={info.company}
@@ -366,7 +377,7 @@ export function AiPresentationStudio() {
                 />
               </label>
               <label className="block text-xs text-[color:var(--muted)] sm:col-span-2">
-                Website / QR link
+                {t("websiteQr")}
                 <input
                   className="mt-1 w-full rounded-xl border border-[color:var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[rgba(232,165,75,0.45)]"
                   value={info.website}
@@ -376,12 +387,12 @@ export function AiPresentationStudio() {
                 />
               </label>
               <label className="block text-xs text-[color:var(--muted)] sm:col-span-2">
-                Permissions / usage rights
+                {t("permissions")}
                 <textarea
                   className="mt-1 min-h-[72px] w-full resize-y rounded-xl border border-[color:var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[rgba(232,165,75,0.45)]"
                   value={info.permissions}
                   onChange={(e) => patchInfo("permissions", e.target.value)}
-                  placeholder="Internal use only · do not redistribute…"
+                  placeholder={t("internalOnly")}
                   disabled={creating}
                 />
               </label>
@@ -391,7 +402,7 @@ export function AiPresentationStudio() {
                   className="mt-1 min-h-[64px] w-full resize-y rounded-xl border border-[color:var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[rgba(232,165,75,0.45)]"
                   value={info.notes}
                   onChange={(e) => patchInfo("notes", e.target.value)}
-                  placeholder="Audience, deadline, must-include facts…"
+                  placeholder={t("audienceHint")}
                   disabled={creating}
                 />
               </label>
@@ -404,7 +415,7 @@ export function AiPresentationStudio() {
         <section className="rise-delay space-y-4">
           {libraryEmpty ? (
             <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
-              No presentations yet. Create one in the Create tab.
+              {t("noPresentations")}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -417,21 +428,21 @@ export function AiPresentationStudio() {
                     <CardMenu
                       items={[
                         {
-                          label: "Open in platform",
+                          label: t("openPlatform"),
                           onClick: () => void openItem(item),
                         },
                         {
-                          label: "Export PDF",
+                          label: t("exportPdf"),
                           onClick: () => void exportItem(item, "pdf"),
                           disabled: busyId === item.id,
                         },
                         {
-                          label: "Export Word",
+                          label: t("exportWord"),
                           onClick: () => void exportItem(item, "word"),
                           disabled: busyId === item.id,
                         },
                         {
-                          label: "Delete",
+                          label: tCommon("delete"),
                           onClick: () => removeItem(item.id),
                           danger: true,
                         },
@@ -444,16 +455,18 @@ export function AiPresentationStudio() {
                     onClick={() => void openItem(item)}
                   >
                     <p className="pr-8 text-base font-semibold tracking-tight text-[var(--fg)]">
-                      {item.title || "Untitled"}
+                      {item.title || tc("untitled")}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[color:var(--muted)]">
                       <span className="uppercase tracking-wide">
-                        {item.format === "word" ? "Word" : "PDF"}
+                        {item.format === "word" ? tPres("word") : tPres("pdf")}
                       </span>
                       <span>·</span>
                       <span>{item.doc.slides.length} slides</span>
                       <span>·</span>
-                      <span>{item.source === "ai" ? "AI" : "Classic"}</span>
+                      <span>
+                        {item.source === "ai" ? "AI" : tc("classic")}
+                      </span>
                       <span>·</span>
                       <span>{formatDate(item.updatedAt)}</span>
                     </div>
@@ -471,13 +484,13 @@ export function AiPresentationStudio() {
                       className="btn btn-primary flex-1 px-3 py-2 text-xs"
                       onClick={() => void openItem(item)}
                     >
-                      Open
+                      {tc("open")}
                     </button>
                     <Link
                       href={`/dashboard/creators/presentation?id=${item.id}`}
                       className="btn flex-1 px-3 py-2 text-center text-xs"
                     >
-                      Edit
+                      {tc("edit")}
                     </Link>
                   </div>
                 </article>

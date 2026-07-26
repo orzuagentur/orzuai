@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 type HomeQuickActionsProps = {
   youtubeConnected: boolean;
@@ -96,13 +97,16 @@ function CardIcon({ name }: { name: ActionCard["icon"] }) {
   );
 }
 
-function youtubeCard(props: HomeQuickActionsProps): ActionCard {
+function youtubeCard(
+  props: HomeQuickActionsProps,
+  t: ReturnType<typeof useTranslations<"dashboardHome">>,
+): ActionCard {
   if (!props.youtubeConnected) {
     return {
       key: "youtube",
       href: "/dashboard/channel",
-      title: "YouTube channel",
-      body: "Connect your channel. Professional AI will study it and help you grow with Shorts, replies, and daily publishing.",
+      title: t("youtubeTitle"),
+      body: t("youtubeConnect"),
       icon: "youtube",
     };
   }
@@ -110,59 +114,58 @@ function youtubeCard(props: HomeQuickActionsProps): ActionCard {
     return {
       key: "youtube",
       href: "/dashboard/channel",
-      title: "YouTube channel",
-      body: "Set up your AI content so it can create videos every day and reply to comments for you.",
+      title: t("youtubeTitle"),
+      body: t("youtubeTrain"),
       icon: "youtube",
     };
   }
   return {
     key: "youtube",
     href: "/dashboard/channel",
-    title: "YouTube channel",
-    body: props.aiEnabled
-      ? "Your AI assistant is ready — review results on your channel and keep publishing."
-      : "AI is trained. Turn on AI content so it creates and replies for you every day.",
+    title: t("youtubeTitle"),
+    body: props.aiEnabled ? t("youtubeReady") : t("youtubeEnable"),
     icon: "youtube",
   };
 }
 
 /** Home shortcuts — phone + desktop. */
 export function HomeQuickActions(props: HomeQuickActionsProps) {
+  const t = useTranslations("dashboardHome");
   const cards: ActionCard[] = [
-    youtubeCard(props),
+    youtubeCard(props, t),
     {
       key: "creators",
       href: "/dashboard/creators",
-      title: "For creators",
-      body: "Content studio, photo tools, AI & classic presentations.",
+      title: t("creatorsTitle"),
+      body: t("creatorsBody"),
       icon: "creators",
     },
     {
       key: "clip",
       href: "/dashboard/clipping",
-      title: "AI Clipping",
-      body: "Turn long videos into vertical Shorts with AI.",
+      title: t("clipTitle"),
+      body: t("clipBody"),
       icon: "clip",
     },
     {
       key: "create",
       href: "/dashboard/content",
-      title: "AI Video",
-      body: "Generate new videos from a prompt — ready to download or publish.",
+      title: t("videoTitle"),
+      body: t("videoBody"),
       icon: "create",
     },
     {
       key: "presentation",
       href: "/dashboard/creators/presentation",
-      title: "Classic presentation",
-      body: "Slides, themes, charts, photos — export PDF / Word.",
+      title: t("presentationTitle"),
+      body: t("presentationBody"),
       icon: "presentation",
     },
     {
       key: "library",
       href: "/dashboard/favorites",
-      title: "My vault",
-      body: "Your clips, videos, and favorites — watch and download.",
+      title: t("vaultTitle"),
+      body: t("vaultBody"),
       icon: "library",
     },
   ];
@@ -174,11 +177,10 @@ export function HomeQuickActions(props: HomeQuickActionsProps) {
           className="font-[family-name:var(--font-syne)] text-2xl tracking-tight sm:text-3xl"
           style={{ fontWeight: 800 }}
         >
-          Home
+          {t("title")}
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[color:var(--muted)] sm:text-base">
-          Your AI studio for YouTube — connect a channel, create Shorts, clip
-          long videos, and manage everything in one place.
+          {t("lead")}
         </p>
       </div>
 

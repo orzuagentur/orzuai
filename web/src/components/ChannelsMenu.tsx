@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 
 type SavedChannel = {
   channel_id: string;
@@ -19,6 +20,9 @@ export function ChannelsMenu({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const t = useTranslations("studio.channel");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const rootRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState<SavedChannel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,9 +36,9 @@ export function ChannelsMenu({
       const res = await fetch("/api/youtube/channels", { cache: "no-store" });
       const data = await res.json();
       setSaved(data.saved || []);
-      if (!res.ok) setErr(data.error || "Could not load channels");
+      if (!res.ok) setErr(data.error || t("couldNotLoadChannels"));
     } catch {
-      setErr("Network error");
+      setErr(tc("networkError"));
     } finally {
       setLoading(false);
     }
@@ -48,11 +52,11 @@ export function ChannelsMenu({
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
-      const t = e.target as Node | null;
-      if (!t) return;
+      const target = e.target as Node | null;
+      if (!target) return;
       // Ignore the toggle button so a second press can close the menu
-      if ((t as Element).closest?.("[data-channels-toggle]")) return;
-      if (!rootRef.current?.contains(t)) onClose();
+      if ((target as Element).closest?.("[data-channels-toggle]")) return;
+      if (!rootRef.current?.contains(target)) onClose();
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -76,7 +80,7 @@ export function ChannelsMenu({
     setBusy(null);
     if (!res.ok) {
       const data = await res.json();
-      setErr(data.error || "Could not open channel");
+      setErr(data.error || t("couldNotOpen"));
       return;
     }
     onClose();
@@ -91,10 +95,10 @@ export function ChannelsMenu({
       ref={rootRef}
       className="absolute left-0 top-full z-[80] mt-1.5 w-[min(calc(100vw-1.25rem),340px)] overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-2xl sm:w-[min(100vw-2rem,300px)] sm:rounded-xl"
       role="dialog"
-      aria-label="YouTube channels"
+      aria-label={t("youtubeChannels")}
     >
       <div className="flex items-center justify-between gap-2 border-b border-[color:var(--line)] px-3 py-2">
-        <p className="text-xs font-semibold">Your channels</p>
+        <p className="text-xs font-semibold">{t("youtubeChannels")}</p>
         <button
           type="button"
           className="rounded-md px-2 py-1 text-[11px] text-[color:var(--muted)]"
@@ -107,7 +111,7 @@ export function ChannelsMenu({
       <div className="max-h-[240px] space-y-1.5 overflow-y-auto p-2">
         {loading && (
           <p className="px-1 py-2 text-xs text-[color:var(--muted)]">
-            Loading...
+            {tCommon("loading")}
           </p>
         )}
         {err && (
@@ -115,7 +119,7 @@ export function ChannelsMenu({
         )}
         {!loading && saved.length === 0 && (
           <p className="px-1 py-2 text-center text-xs text-[color:var(--muted)]">
-            No channels yet
+            {t("noChannel")}
           </p>
         )}
         {saved.map((c) => (
@@ -124,7 +128,11 @@ export function ChannelsMenu({
             title={c.title || "YouTube"}
             thumb={c.thumbnail_url}
             meta={
-              busy === c.channel_id ? "..." : c.is_active ? "Active" : "Open"
+              busy === c.channel_id
+                ? "..."
+                : c.is_active
+                  ? t("active")
+                  : tc("open")
             }
             active={c.is_active}
             disabled={busy === c.channel_id}
@@ -139,7 +147,7 @@ export function ChannelsMenu({
           className="flex w-full items-center justify-center gap-2 rounded-full px-3 py-2.5 text-xs font-semibold text-white transition hover:brightness-110"
           style={{ background: "#FF0000" }}
         >
-          + Connect / change channel
+          + {t("connectYoutube")}
         </a>
       </div>
     </div>

@@ -1,10 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   getPasswordChecks,
   getPasswordStrength,
   PASSWORD_MIN_LENGTH,
-  PASSWORD_STRENGTH_LABEL,
   type PasswordStrength,
 } from "@/lib/password";
 
@@ -16,36 +16,35 @@ const STRENGTH_COLOR: Record<Exclude<PasswordStrength, "empty">, string> = {
 
 /** Live checklist + strength label under a password field. */
 export function PasswordStrengthMeter({ password }: { password: string }) {
+  const t = useTranslations("studio.password");
+  const tc = useTranslations("studio.common");
   const checks = getPasswordChecks(password);
   const strength = getPasswordStrength(password);
   if (!password) {
     return (
       <p className="text-xs text-[color:var(--muted)]">
-        At least {PASSWORD_MIN_LENGTH} characters with a letter, number, and
-        symbol.
+        {t("hint", { n: PASSWORD_MIN_LENGTH })}
       </p>
     );
   }
 
   const items = [
-    { ok: checks.length, label: `${PASSWORD_MIN_LENGTH}+ characters` },
-    { ok: checks.letter, label: "Letter" },
-    { ok: checks.number, label: "Number" },
-    { ok: checks.symbol, label: "Symbol" },
+    { ok: checks.length, label: t("minChars", { n: PASSWORD_MIN_LENGTH }) },
+    { ok: checks.letter, label: t("letter") },
+    { ok: checks.number, label: t("number") },
+    { ok: checks.symbol, label: t("symbol") },
   ];
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-[color:var(--muted)]">
-          Password strength
-        </span>
+        <span className="text-xs text-[color:var(--muted)]">{t("strength")}</span>
         {strength !== "empty" && (
           <span
             className="text-xs font-semibold"
             style={{ color: STRENGTH_COLOR[strength] }}
           >
-            {PASSWORD_STRENGTH_LABEL[strength]}
+            {tc(strength)}
           </span>
         )}
       </div>

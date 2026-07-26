@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, VideoJob } from "@/lib/types";
 import { YouTubeVideoCards } from "@/components/YouTubeVideoCards";
@@ -50,6 +51,8 @@ export function ChannelStudio({
   /** True when DB cache is older than 24h — one quiet YouTube sync on mount. */
   needsAutoSync?: boolean;
 }) {
+  const t = useTranslations("studio.channel");
+  const tc = useTranslations("studio.common");
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const { show: toast, notice } = useToast();
@@ -269,11 +272,11 @@ export function ChannelStudio({
         router.push(String(data.redirect));
         return;
       }
-      toast(data.message || data.error || "Failed to toggle AI", "error");
+      toast(data.message || data.error || t("failedToggleAi"), "error");
       return;
     }
     setAiOn(next);
-    toast(next ? "AI content enabled." : "AI content disabled.");
+    toast(next ? t("aiEnabled") : t("aiDisabled"));
     router.refresh();
   }
 
@@ -320,7 +323,7 @@ export function ChannelStudio({
         });
         const data = await res.json();
         if (!res.ok) {
-          const msg = String(data.error || "Failed to refresh");
+          const msg = String(data.error || t("failedRefresh"));
           if (
             /token|unauthorized|expired|not connected|refresh failed|session/i.test(
               msg,
@@ -343,7 +346,7 @@ export function ChannelStudio({
 
         if (!quiet) {
           if (data.cached) {
-            toast("Showing cached channel data (updated within 24h).");
+            toast(t("cachedData"));
           } else {
             const imported = Number(data.imported || 0);
             const updated = Number(data.updated || 0);
@@ -353,17 +356,17 @@ export function ChannelStudio({
                   (updated ? `, updated ${updated}.` : ".")
                 : updated > 0
                   ? `Updated ${updated} videos.`
-                  : "Channel data updated.",
+                  : t("channelUpdated"),
             );
           }
         } else if (!data.cached) {
-          toast("Channel stats refreshed.", "info");
+          toast(t("statsRefreshed"), "info");
         }
       } finally {
         setBusy(null);
       }
     },
-    [applySyncPayload, refreshQueue, router, toast],
+    [applySyncPayload, refreshQueue, router, t, toast],
   );
 
   // Auto-sync once per visit only when DB cache is older than 24h
@@ -380,21 +383,21 @@ export function ChannelStudio({
   }
 
   async function disconnect() {
-    if (!confirm("Disconnect this YouTube channel?")) return;
+    if (!confirm(t("disconnectConfirm"))) return;
     setBusy("disconnect");
     const res = await fetch("/api/youtube/disconnect", { method: "POST" });
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
-      toast(data.error || "Failed to disconnect", "error");
+      toast(data.error || t("failedDisconnect"), "error");
       return;
     }
-    toast("Channel disconnected.");
+    toast(t("disconnected"));
     router.refresh();
   }
 
   async function removeVideo(youtubeVideoId: string) {
-    if (!confirm("Delete this video from YouTube?")) return;
+    if (!confirm(t("deleteYoutubeConfirm"))) return;
     setBusy(youtubeVideoId);
     const res = await fetch("/api/youtube/videos", {
       method: "DELETE",
@@ -404,10 +407,10 @@ export function ChannelStudio({
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
-      toast(data.error || "Failed to delete", "error");
+      toast(data.error || tc("failedToDelete"), "error");
       return;
     }
-    toast("Video deleted.");
+    toast(t("videoDeleted"));
     router.refresh();
   }
 
@@ -421,7 +424,7 @@ export function ChannelStudio({
       return;
     }
     setDrafts((prev) => prev.filter((d) => d.id !== jobId));
-    toast("Draft queued for YouTube");
+    toast(t("draftQueued"));
     setStep("closed");
     trackJob({ id: jobId, status: "queued", metadata: { source: "draft_publish" } });
     void refreshQueue();
@@ -429,7 +432,7 @@ export function ChannelStudio({
 
   async function startAiAuto() {
     if (!isTrained) {
-      toast("Save AI Training for this channel first.", "error");
+      toast(t("saveTrainingFirst"), "error");
       return;
     }
     setBusy("ai_auto");
@@ -446,7 +449,7 @@ export function ChannelStudio({
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
-      toast(data.error || "Failed to start", "error");
+      toast(data.error || tc("failedToStart"), "error");
       return;
     }
     setStep("closed");
@@ -457,7 +460,7 @@ export function ChannelStudio({
         metadata: { source: "youtube_ai", pipeline: "youtube", publish: true },
       });
     }
-    toast("AI is creating a video and will publish it to YouTube.", "info");
+    toast(t("aiCreating"), "info");
     await refreshQueue();
   }
 
@@ -468,7 +471,7 @@ export function ChannelStudio({
       return;
     }
     if (!isTrained) {
-      toast("Save AI Training for this channel first.", "error");
+      toast(t("saveTrainingFirst"), "error");
       return;
     }
     setBusy("ai_prompt");
@@ -486,7 +489,7 @@ export function ChannelStudio({
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
-      toast(data.error || "Failed to start", "error");
+      toast(data.error || tc("failedToStart"), "error");
       return;
     }
     setPrompt("");
@@ -502,7 +505,7 @@ export function ChannelStudio({
         },
       });
     }
-    toast("AI is creating a video from your prompt and will publish it to YouTube.", "info");
+    toast(t("aiCreating"), "info");
     await refreshQueue();
   }
 
@@ -539,14 +542,14 @@ export function ChannelStudio({
           <YouTubeChannelsButton />
         </div>
         <h1 className="mt-12 text-xl font-semibold sm:mt-14 sm:text-2xl">
-          YouTube channel
+          {t("noChannel")}
         </h1>
         <p className="text-sm text-[color:var(--muted)]">
           Connect your YouTube channel. Professional AI will study it and help
           you create Shorts, reply to comments, and publish every day.
         </p>
         <a href="/api/youtube/connect" className="btn btn-primary inline-flex">
-          Connect YouTube
+          {t("connectYoutube")}
         </a>
       </div>
     );
@@ -559,8 +562,8 @@ export function ChannelStudio({
       {/* Centered publication modals */}
       {step === "ai" && (
         <PubModal
-          title="AI publish"
-          subtitle="Create a video from Training or a prompt"
+          title={t("aiPublish")}
+          subtitle={t("createFromTraining")}
           onClose={() => setStep("closed")}
         >
           <div className="grid gap-2">
@@ -570,12 +573,12 @@ export function ChannelStudio({
               className="rounded-xl border border-[color:var(--line)] px-3.5 py-3 text-left transition hover:border-[color:rgba(232,165,75,0.45)] disabled:opacity-50"
               onClick={() => void startAiAuto()}
             >
-              <p className="text-sm font-semibold">AI auto</p>
+              <p className="text-sm font-semibold">{t("aiAuto")}</p>
               <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
                 Uses niche / style from AI Training and publishes right away
               </p>
               <p className="mt-2 text-xs" style={{ color: "var(--accent)" }}>
-                {busy === "ai_auto" ? "Starting..." : "Create and publish"}
+                {busy === "ai_auto" ? t("waiting") : "Create and publish"}
               </p>
             </button>
             <button
@@ -583,7 +586,7 @@ export function ChannelStudio({
               className="rounded-xl border border-[color:var(--line)] px-3.5 py-3 text-left transition hover:border-[color:rgba(232,165,75,0.45)]"
               onClick={() => setStep("prompt")}
             >
-              <p className="text-sm font-semibold">Prompt</p>
+              <p className="text-sm font-semibold">{t("prompt")}</p>
               <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
                 You write the idea — AI makes a video and publishes
               </p>
@@ -594,14 +597,14 @@ export function ChannelStudio({
 
       {step === "prompt" && (
         <PubModal
-          title="Prompt"
+          title={t("prompt")}
           subtitle="Describe the video — AI will create and publish it"
           onClose={() => setStep("closed")}
           onBack={() => setStep("ai")}
         >
           <textarea
             className="field min-h-[110px] w-full text-sm"
-            placeholder="Topic, hook, tone..."
+            placeholder={t("topicPlaceholder")}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={busy === "ai_prompt"}
@@ -614,7 +617,7 @@ export function ChannelStudio({
               disabled={busy === "ai_prompt" || prompt.trim().length < 8}
               onClick={() => void startAiPrompt()}
             >
-              {busy === "ai_prompt" ? "Starting..." : "Create and publish"}
+              {busy === "ai_prompt" ? t("waiting") : "Create and publish"}
             </button>
           </div>
         </PubModal>
@@ -622,13 +625,13 @@ export function ChannelStudio({
 
       {step === "device" && (
         <PubModal
-          title="From device"
-          subtitle="Upload an MP4 and publish to YouTube"
+          title={t("fromDevice")}
+          subtitle={t("uploadMp4")}
           onClose={() => setStep("closed")}
         >
           <input
             className="field w-full text-sm"
-            placeholder="YouTube title (optional)"
+            placeholder={t("titleOptional")}
             value={deviceTitle}
             onChange={(e) => setDeviceTitle(e.target.value)}
             disabled={busy === "device"}
@@ -650,7 +653,7 @@ export function ChannelStudio({
             disabled={busy === "device"}
             onClick={() => fileRef.current?.click()}
           >
-            {busy === "device" ? "Uploading..." : "Choose video from device"}
+            {busy === "device" ? tc("uploading") : "Choose video from device"}
           </button>
         </PubModal>
       )}
@@ -672,8 +675,8 @@ export function ChannelStudio({
               <div className="relative sm:hidden" ref={analyticsRef}>
                 <button
                   type="button"
-                  title="Analytics"
-                  aria-label="Analytics"
+                  title={t("analytics")}
+                  aria-label={t("analytics")}
                   aria-expanded={analyticsOpen}
                   onClick={() => {
                     setStep("closed");
@@ -707,24 +710,24 @@ export function ChannelStudio({
                   <div
                     className="absolute right-0 top-10 z-30 w-52 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-2 shadow-2xl"
                     role="dialog"
-                    aria-label="Channel analytics"
+                    aria-label={t("analytics")}
                   >
                     <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
-                      Analytics
+                      {t("analytics")}
                     </p>
                     <div className="grid grid-cols-1 gap-1.5">
                       <Stat
-                        label="Views"
+                        label={t("views")}
                         value={channelStats.views}
                         compact
                       />
                       <Stat
-                        label="Likes"
+                        label={t("likes")}
                         value={channelStats.likes}
                         compact
                       />
                       <Stat
-                        label="Comments"
+                        label={t("comments")}
                         value={channelStats.comments}
                         compact
                       />
@@ -736,8 +739,8 @@ export function ChannelStudio({
               <div className="relative" ref={pubMenuRef}>
                 <button
                   type="button"
-                  title="Publications"
-                  aria-label="Publications"
+                  title={t("publications")}
+                  aria-label={t("publications")}
                   aria-expanded={step === "root"}
                   onClick={() => {
                     setAnalyticsOpen(false);
@@ -781,7 +784,7 @@ export function ChannelStudio({
                       className="flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition hover:bg-white/5"
                       onClick={() => setStep("ai")}
                     >
-                      <span className="text-sm font-semibold">AI publish</span>
+                      <span className="text-sm font-semibold">{t("aiPublish")}</span>
                       <span className="text-[11px] text-[color:var(--muted)]">
                         Training niche or your prompt
                       </span>
@@ -792,7 +795,7 @@ export function ChannelStudio({
                       className="flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition hover:bg-white/5"
                       onClick={() => setStep("device")}
                     >
-                      <span className="text-sm font-semibold">From device</span>
+                      <span className="text-sm font-semibold">{t("fromDevice")}</span>
                       <span className="text-[11px] text-[color:var(--muted)]">
                         Upload MP4 from phone or PC
                       </span>
@@ -805,10 +808,10 @@ export function ChannelStudio({
                 type="button"
                 title={
                   drafts.length
-                    ? `Drafts (${drafts.length})`
-                    : "Drafts — unpublished videos"
+                    ? `${t("drafts")} (${drafts.length})`
+                    : t("drafts")
                 }
-                aria-label="Drafts"
+                aria-label={t("drafts")}
                 aria-expanded={step === "drafts"}
                 onClick={() => {
                   setAnalyticsOpen(false);
@@ -850,8 +853,8 @@ export function ChannelStudio({
 
               <button
                 type="button"
-                title="Refresh"
-                aria-label="Refresh"
+                title={tc("refresh")}
+                aria-label={tc("refresh")}
                 disabled={busy === "sync"}
                 onClick={() => void sync()}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80 disabled:opacity-50"
@@ -874,7 +877,7 @@ export function ChannelStudio({
               </button>
               <CardMenu
                 items={[
-                  { label: "+ YouTube channel", href: "/api/youtube/connect" },
+                  { label: t("addChannel"), href: "/api/youtube/connect" },
                   {
                     label:
                       busy === "disconnect" ? "Disconnecting..." : "Disconnect",
@@ -943,26 +946,26 @@ export function ChannelStudio({
           <div className="flex flex-wrap items-end justify-between gap-2.5 sm:gap-3">
             {/* Mobile: only subscribers + videos */}
             <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 text-center sm:hidden">
-              <Stat label="Subscribers" value={channelStats.subscribers} />
+              <Stat label={t("subscribers")} value={channelStats.subscribers} />
               <Stat label="Videos" value={channelStats.videos} />
             </div>
             {/* Desktop / tablet: full stats */}
             <div className="hidden min-w-0 flex-1 grid-cols-3 gap-2 text-center sm:grid sm:max-w-2xl sm:grid-cols-5 sm:gap-3">
-              <Stat label="Subscribers" value={channelStats.subscribers} />
-              <Stat label="Views" value={channelStats.views} />
+              <Stat label={t("subscribers")} value={channelStats.subscribers} />
+              <Stat label={t("views")} value={channelStats.views} />
               <Stat label="Videos" value={channelStats.videos} />
-              <Stat label="Likes" value={channelStats.likes} />
-              <Stat label="Comments" value={channelStats.comments} />
+              <Stat label={t("likes")} value={channelStats.likes} />
+              <Stat label={t("comments")} value={channelStats.comments} />
             </div>
 
             {/* AI Training + AI content toggle */}
             <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-              <a
+              <Link
                 href="/dashboard/channel/training"
                 className="rounded-xl border border-[color:var(--line)] bg-[color:var(--bg)]/80 px-2.5 py-1.5 text-xs font-semibold transition hover:border-[color:rgba(232,165,75,0.45)] sm:px-3 sm:py-2 sm:text-sm"
               >
                 AI Training
-              </a>
+              </Link>
               <div className="flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--bg)]/80 px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2">
                 <div className="min-w-0 text-right">
                   <p className="text-[10px] font-semibold leading-tight sm:text-[11px]">
@@ -997,7 +1000,7 @@ export function ChannelStudio({
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-semibold">Published videos</h3>
+        <h3 className="font-semibold">{t("publishedVideos")}</h3>
         <YouTubeVideoCards
           jobs={videos}
           onDelete={removeVideo}
@@ -1009,7 +1012,7 @@ export function ChannelStudio({
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold">
-            Drafts
+            {t("drafts")}
             {drafts.length > 0 ? (
               <span className="ml-2 text-sm font-normal text-[color:var(--muted)]">
                 ({drafts.length})
@@ -1030,7 +1033,7 @@ export function ChannelStudio({
 
       {step === "drafts" && (
         <PubModal
-          title="Drafts"
+          title={t("drafts")}
           subtitle="Unpublished videos ready to send to YouTube"
           onClose={() => setStep("closed")}
         >
@@ -1056,7 +1059,7 @@ export function ChannelStudio({
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold">YouTube video</p>
+                    <p className="truncate text-xs font-semibold">{t("youtubeVideo")}</p>
                     <p className="truncate text-[10px] text-[color:var(--muted)]">
                       {JOB_STATUS_LABEL[job.status] || job.status}
                       {job.title ? ` · ${job.title}` : ""}
@@ -1104,6 +1107,7 @@ function PubModal({
   onBack?: () => void;
   children: ReactNode;
 }) {
+  const tCommon = useTranslations("common");
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1114,7 +1118,7 @@ function PubModal({
       <button
         type="button"
         className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-        aria-label="Close"
+        aria-label={tCommon("close")}
         onClick={onClose}
       />
       <div className="relative z-10 w-full max-w-[340px] overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 shadow-2xl">
@@ -1126,7 +1130,7 @@ function PubModal({
                 className="mb-1 text-[11px] text-[color:var(--muted)] transition hover:text-[color:var(--fg)]"
                 onClick={onBack}
               >
-                ← Back
+                ← {tCommon("back")}
               </button>
             )}
             <h2
@@ -1145,7 +1149,7 @@ function PubModal({
           <button
             type="button"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[color:var(--muted)] transition hover:bg-white/8 hover:text-[color:var(--fg)]"
-            aria-label="Close"
+            aria-label={tCommon("close")}
             onClick={onClose}
           >
             ✕

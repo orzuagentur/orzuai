@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 import { useToast } from "@/components/ToastNotice";
 
@@ -22,13 +23,6 @@ type FavoriteItem = {
   created_at: string;
 };
 
-const FILTERS: { id: FavKind; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "video", label: "Video" },
-  { id: "photo", label: "Photos" },
-  { id: "music", label: "Music" },
-];
-
 function formatDuration(sec: number | null) {
   if (sec == null || Number.isNaN(sec)) return null;
   const s = Math.round(sec);
@@ -38,6 +32,9 @@ function formatDuration(sec: number | null) {
 }
 
 export function FavoritesStudio() {
+  const t = useTranslations("studio.favorites");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const { show: toast, notice } = useToast();
   const [filter, setFilter] = useState<FavKind>("all");
   const [items, setItems] = useState<FavoriteItem[]>([]);
@@ -45,6 +42,17 @@ export function FavoritesStudio() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audio] = useState(() =>
     typeof Audio !== "undefined" ? new Audio() : null,
+  );
+
+  const filters = useMemo(
+    () =>
+      [
+        { id: "all" as const, label: t("all") },
+        { id: "video" as const, label: t("video") },
+        { id: "photo" as const, label: t("photos") },
+        { id: "music" as const, label: t("music") },
+      ] as const,
+    [t],
   );
 
   const load = useCallback(async () => {
@@ -55,12 +63,12 @@ export function FavoritesStudio() {
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      toast(data.error || "Failed to load favorites", "error");
+      toast(data.error || t("failedLoad"), "error");
       setItems([]);
       return;
     }
     setItems((data.items || []) as FavoriteItem[]);
-  }, [filter, toast]);
+  }, [filter, t, toast]);
 
   useEffect(() => {
     void load();
@@ -81,7 +89,7 @@ export function FavoritesStudio() {
     );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      toast(data.error || "Failed to remove", "error");
+      toast(data.error || t("failedRemove"), "error");
       return;
     }
     setItems((prev) =>
@@ -112,10 +120,10 @@ export function FavoritesStudio() {
           className="font-[family-name:var(--font-syne)] text-3xl tracking-tight sm:text-4xl"
           style={{ fontWeight: 800 }}
         >
-          Favorites
+          {t("title")}
         </h1>
         <nav className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => {
+          {filters.map((f) => {
             const on = filter === f.id;
             return (
               <button
@@ -137,10 +145,10 @@ export function FavoritesStudio() {
       </header>
 
       {loading ? (
-        <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+        <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       ) : visible.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
-          No favorites yet. Tap the heart on Media videos, photos, or music.
+          {t("empty")}
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -168,7 +176,7 @@ export function FavoritesStudio() {
                   <button
                     type="button"
                     className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 transition hover:bg-black/75"
-                    aria-label="Remove from favorites"
+                    aria-label={t("removeFromFavorites")}
                     onClick={() => void removeFav(item)}
                     style={{ color: "#ff4d6d" }}
                   >
@@ -190,7 +198,7 @@ export function FavoritesStudio() {
                         ...(item.kind === "music" && item.preview_url
                           ? [
                               {
-                                label: playing ? "Stop" : "Play",
+                                label: playing ? tc("stop") : tc("play"),
                                 onClick: () => togglePlay(item),
                               },
                             ]
@@ -198,13 +206,13 @@ export function FavoritesStudio() {
                         ...(item.download_url
                           ? [
                               {
-                                label: "Download",
+                                label: tCommon("download"),
                                 href: `/api/media/download?url=${encodeURIComponent(item.download_url)}&type=${item.kind === "music" ? "music" : item.kind === "photo" ? "photo" : "video"}&filename=${encodeURIComponent(item.title || item.asset_id)}`,
                               },
                             ]
                           : []),
                         {
-                          label: "Remove",
+                          label: tc("remove"),
                           danger: true,
                           onClick: () => void removeFav(item),
                         },
@@ -218,7 +226,7 @@ export function FavoritesStudio() {
                 </div>
                 <div className="space-y-0.5 px-2.5 py-2">
                   <p className="truncate text-xs font-semibold">
-                    {item.title || "Untitled"}
+                    {item.title || tc("untitled")}
                   </p>
                   <p className="truncate text-[11px] text-[color:var(--muted)]">
                     {item.author || "—"}

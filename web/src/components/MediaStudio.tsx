@@ -8,6 +8,8 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 type MediaKind = "all" | "video" | "photo" | "music";
 
@@ -29,15 +31,15 @@ type MediaCard = {
   genreId?: string | null;
 };
 
-const TYPE_OPTIONS: { id: MediaKind; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "video", label: "Video" },
-  { id: "photo", label: "Photos" },
-  { id: "music", label: "Music" },
+const TYPE_OPTIONS: { id: MediaKind; labelKey: "video" | "photos" | "music" | null }[] = [
+  { id: "all", labelKey: null },
+  { id: "video", labelKey: "video" },
+  { id: "photo", labelKey: "photos" },
+  { id: "music", labelKey: "music" },
 ];
 
 const FORMAT_OPTIONS = [
-  { id: "all", label: "All formats" },
+  { id: "all", labelKey: "allFormats" as const },
   { id: "portrait", label: "Portrait" },
   { id: "landscape", label: "Landscape" },
   { id: "square", label: "Square" },
@@ -202,6 +204,9 @@ function defaultQueryFor(kind: MediaKind) {
 }
 
 export function MediaStudio() {
+  const t = useTranslations("studio.media");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [kind, setKind] = useState<MediaKind>("all");
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
@@ -559,7 +564,7 @@ export function MediaStudio() {
       .play()
       .then(() => setPlayingId(key))
       .catch(() => {
-        setErr("Could not play preview");
+        setErr(t("couldNotPlay"));
         setPlayingId(null);
       });
     audio.onended = () => {
@@ -578,10 +583,17 @@ export function MediaStudio() {
     });
   }
 
-  const typeLabel =
-    TYPE_OPTIONS.find((t) => t.id === kind)?.label || "All";
-  const formatLabel =
-    FORMAT_OPTIONS.find((f) => f.id === orientation)?.label || "All formats";
+  const typeLabel = (() => {
+    const opt = TYPE_OPTIONS.find((o) => o.id === kind);
+    if (!opt?.labelKey) return "All";
+    return t(opt.labelKey);
+  })();
+  const formatLabel = (() => {
+    const opt = FORMAT_OPTIONS.find((f) => f.id === orientation);
+    if (!opt) return t("allFormats");
+    if ("labelKey" in opt) return t(opt.labelKey);
+    return opt.label;
+  })();
   const formatActive = showFormatFilter && orientation !== "all";
 
   return (
@@ -640,7 +652,7 @@ export function MediaStudio() {
                             : "transparent",
                       }}
                     >
-                      {opt.label}
+                      {"labelKey" in opt ? t(opt.labelKey) : opt.label}
                     </button>
                   ))}
                 </div>
@@ -729,7 +741,7 @@ export function MediaStudio() {
                         : "transparent",
                   }}
                 >
-                  {opt.label}
+                  {opt.labelKey ? t(opt.labelKey) : "All"}
                 </button>
               ))}
             </div>
@@ -746,7 +758,7 @@ export function MediaStudio() {
             }}
             className="h-[42px] shrink-0 rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] px-3 text-sm"
           >
-            <option value="">All genres</option>
+            <option value="">{t("allGenres")}</option>
             {genres.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -783,18 +795,18 @@ export function MediaStudio() {
       {err && <p className="text-sm text-[color:var(--danger)]">{err}</p>}
 
       {loading && items.length === 0 ? (
-        <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+        <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       ) : items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[color:var(--line)] p-8 text-center text-sm text-[color:var(--muted)]">
           {kind === "music" ? (
             <>
               No tracks yet. Upload music in{" "}
-              <a
+              <Link
                 href="/dashboard/music"
                 className="text-[color:var(--accent)] underline"
               >
-                Music library
-              </a>
+                {t("musicLibrary")}
+              </Link>
               .
             </>
           ) : (
@@ -807,10 +819,10 @@ export function MediaStudio() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-[color:var(--bg-elevated)] text-[11px] uppercase tracking-wide text-[color:var(--muted)]">
                 <tr>
-                  <th className="px-3 py-2.5 font-medium">Play</th>
-                  <th className="px-3 py-2.5 font-medium">Title</th>
-                  <th className="px-3 py-2.5 font-medium">Genre</th>
-                  <th className="px-3 py-2.5 font-medium">Duration</th>
+                  <th className="px-3 py-2.5 font-medium">{tc("play")}</th>
+                  <th className="px-3 py-2.5 font-medium">{t("titleCol")}</th>
+                  <th className="px-3 py-2.5 font-medium">{t("genreCol")}</th>
+                  <th className="px-3 py-2.5 font-medium">{t("durationCol")}</th>
                   <th className="px-3 py-2.5 font-medium" />
                 </tr>
               </thead>
@@ -830,7 +842,7 @@ export function MediaStudio() {
                           onClick={() => togglePlay(item)}
                           className="rounded-lg border border-[color:var(--line)] px-2 py-1 text-xs disabled:opacity-40"
                         >
-                          {playing ? "Pause" : "Play"}
+                          {playing ? "Pause" : tc("play")}
                         </button>
                       </td>
                       <td className="px-3 py-2 font-medium">{item.title}</td>
@@ -847,7 +859,7 @@ export function MediaStudio() {
                           onClick={() => void onDownload(item)}
                           className="text-xs text-[color:var(--muted)] hover:text-[color:var(--accent)] disabled:opacity-40"
                         >
-                          {busyId === key ? "…" : "Download"}
+                          {busyId === key ? "…" : tCommon("download")}
                         </button>
                       </td>
                     </tr>
@@ -917,11 +929,13 @@ function FavHeart({
   active: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("studio.media");
+  const tFav = useTranslations("studio.favorites");
   return (
     <button
       type="button"
       className="absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-base leading-none backdrop-blur transition hover:bg-black/75"
-      aria-label={active ? "Remove from favorites" : "Add to favorites"}
+      aria-label={active ? tFav("removeFromFavorites") : t("addFavorite")}
       aria-pressed={active}
       onClick={(e) => {
         e.stopPropagation();
@@ -962,6 +976,8 @@ function VisualCard({
   onDownload: () => void;
   onToggleFavorite: () => void;
 }) {
+  const t = useTranslations("studio.media");
+  const tCommon = useTranslations("common");
   const dur = formatDuration(item.durationSec);
   const w = item.width && item.width > 0 ? item.width : 3;
   const h = item.height && item.height > 0 ? item.height : 4;
@@ -992,7 +1008,7 @@ function VisualCard({
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-[color:var(--muted)]">
-            No preview
+            {t("noPreview")}
           </div>
         )}
 
@@ -1002,7 +1018,7 @@ function VisualCard({
           <CardMenu
             items={[
               {
-                label: busy ? "Downloading…" : "Download",
+                label: busy ? "Downloading…" : tCommon("download"),
                 disabled: !item.downloadAllowed || busy,
                 onClick: onDownload,
               },
@@ -1046,6 +1062,7 @@ function MusicCard({
   onDownload: () => void;
   onToggleFavorite: () => void;
 }) {
+  const tCommon = useTranslations("common");
   const total =
     progress.duration > 0
       ? progress.duration
@@ -1079,7 +1096,7 @@ function MusicCard({
           <CardMenu
             items={[
               {
-                label: busy ? "Downloading…" : "Download",
+                label: busy ? "Downloading…" : tCommon("download"),
                 disabled: !item.downloadAllowed || busy,
                 onClick: onDownload,
               },
@@ -1166,6 +1183,8 @@ function MediaViewer({
   onClose: () => void;
   onDownload: () => void;
 }) {
+  const t = useTranslations("studio.media");
+  const tCommon = useTranslations("common");
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -1216,14 +1235,14 @@ function MediaViewer({
               disabled={!item.downloadAllowed || busy}
               onClick={onDownload}
             >
-              {busy ? "…" : "Download"}
+              {busy ? "…" : tCommon("download")}
             </button>
             <button
               type="button"
               className="btn btn-ghost !py-1.5 text-xs"
               onClick={onClose}
             >
-              Close
+              {tCommon("close")}
             </button>
           </div>
         </div>
@@ -1258,7 +1277,7 @@ function MediaViewer({
               className="max-h-[75vh] w-auto max-w-full rounded-lg object-contain"
             />
           ) : (
-            <p className="text-sm text-[color:var(--muted)]">No preview</p>
+            <p className="text-sm text-[color:var(--muted)]">{t("noPreview")}</p>
           )}
         </div>
       </div>

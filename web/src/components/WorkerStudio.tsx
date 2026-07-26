@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   FLOW_EDGES,
   FLOW_NODES,
@@ -126,6 +127,9 @@ function statusDot(s: "ok" | "warn" | "off" | "unknown") {
 }
 
 export function WorkerStudio() {
+  const t = useTranslations("studio.worker");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [data, setData] = useState<WorkerStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,12 +141,12 @@ export function WorkerStudio() {
       const res = await fetch("/api/worker/status");
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || "Failed to load worker status");
+        setError(json.error || t("failedStatus"));
         return;
       }
       setData(json);
     } catch {
-      setError("Failed to load worker status");
+      setError(t("failedStatus"));
     } finally {
       setLoading(false);
     }
@@ -178,7 +182,7 @@ export function WorkerStudio() {
     <div className="space-y-5">
       <header className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Worker</h1>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="mt-1 max-w-2xl text-sm text-[color:var(--muted)]">
             Full system map — click any node for how it works, what is connected, and how
             data flows (n8n-style).
@@ -190,7 +194,7 @@ export function WorkerStudio() {
           onClick={() => void load()}
           disabled={loading}
         >
-          {loading ? "Loading…" : "Refresh"}
+          {loading ? tCommon("loading") : tc("refresh")}
         </button>
       </header>
 
@@ -198,13 +202,13 @@ export function WorkerStudio() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Worker"
-          value={data?.worker.online ? "Online" : "Offline"}
+          label={t("title")}
+          value={data?.worker.online ? t("online") : "Offline"}
           tone={data?.worker.online ? "var(--success)" : "var(--danger)"}
           sub={data?.worker.hint}
         />
         <StatCard
-          label="Queue (24h)"
+          label={t("queue24h")}
           value={String(data?.pipeline24h.queued ?? "—")}
           tone="var(--accent)"
           sub={`${data?.pipeline24h.processing ?? 0} processing · ${data?.pipeline24h.failed ?? 0} failed`}
@@ -230,7 +234,7 @@ export function WorkerStudio() {
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="panel rise overflow-hidden">
           <div className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
-            <p className="text-sm font-medium">Pipeline graph</p>
+            <p className="text-sm font-medium">{t("pipelineGraph")}</p>
             <p className="text-xs text-[color:var(--muted)]">
               {data?.worker.lastSeenAt
                 ? `Last seen ${new Date(data.worker.lastSeenAt).toLocaleString()}`
@@ -338,7 +342,7 @@ export function WorkerStudio() {
 
         <aside className="panel rise-delay flex max-h-[78vh] flex-col overflow-hidden xl:sticky xl:top-4">
           {!selected ? (
-            <p className="p-5 text-sm text-[color:var(--muted)]">Select a node.</p>
+            <p className="p-5 text-sm text-[color:var(--muted)]">{t("selectNode")}</p>
           ) : (
             <>
               <div className="border-b border-[color:var(--line)] px-5 py-4">
@@ -361,20 +365,20 @@ export function WorkerStudio() {
                 </p>
               </div>
               <div className="space-y-4 overflow-auto px-5 py-4 text-sm leading-relaxed">
-                <Block title="How it works" body={selected.how} />
-                <List title="Connections" items={selected.connects} />
-                <List title="Requirements" items={selected.needs} />
-                <List title="Tips" items={selected.tips} />
+                <Block title={t("howItWorks")} body={selected.how} />
+                <List title={t("connections")} items={selected.connects} />
+                <List title={t("requirements")} items={selected.needs} />
+                <List title={t("tips")} items={selected.tips} />
                 {selected.integrationId && integMap.get(selected.integrationId)?.note && (
                   <Block
-                    title="Note"
+                    title={t("note")}
                     body={integMap.get(selected.integrationId)!.note!}
                   />
                 )}
                 {selected.id === "worker" && data && (
                   <Block
-                    title="Live"
-                    body={`${data.worker.online ? "Online" : "Offline"} via ${data.worker.source}. ${data.worker.hint}`}
+                    title={t("live")}
+                    body={`${data.worker.online ? t("online") : "Offline"} via ${data.worker.source}. ${data.worker.hint}`}
                   />
                 )}
               </div>
@@ -384,7 +388,7 @@ export function WorkerStudio() {
       </div>
 
       <section className="panel rise p-5">
-        <h3 className="font-semibold">Integrations checklist</h3>
+        <h3 className="font-semibold">{t("integrationsChecklist")}</h3>
         <p className="mt-1 text-sm text-[color:var(--muted)]">
           Platform keys live on Vercel; AI/media keys must also be in worker/.env on the
           machine that runs FFmpeg.
@@ -412,7 +416,7 @@ export function WorkerStudio() {
       </section>
 
       <section className="panel rise p-5">
-        <h3 className="font-semibold">How to run the worker</h3>
+        <h3 className="font-semibold">{t("howToRun")}</h3>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-[color:var(--muted)]">
           <li>
             Open a terminal:{" "}
@@ -427,7 +431,7 @@ export function WorkerStudio() {
           </li>
           <li>
             Leave it open. This page should flip Worker to{" "}
-            <span style={{ color: "var(--success)" }}>Online</span> within ~15s (after
+            <span style={{ color: "var(--success)" }}>{t("online")}</span> within ~15s (after
             migration 004).
           </li>
         </ol>

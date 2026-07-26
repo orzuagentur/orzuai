@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type TransferState = {
@@ -12,6 +13,7 @@ type TransferState = {
 
 /** Modal when OAuth/connect finds the YouTube channel on another OrzuAi account. */
 export function ChannelTransferModal() {
+  const t = useTranslations("studio.channel");
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -139,7 +141,7 @@ export function ChannelTransferModal() {
             disabled={busy !== null}
             onClick={() => void onTransfer()}
           >
-            {busy === "transfer" ? "Transferring…" : "Transfer"}
+            {busy === "transfer" ? t("transferring") : t("transfer")}
           </button>
         </div>
       </div>

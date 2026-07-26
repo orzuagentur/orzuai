@@ -1,9 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { stripLocale, withLocale } from "@/i18n/path";
+import { routing } from "@/i18n/routing";
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+export async function updateSession(
+  request: NextRequest,
+  baseResponse?: NextResponse,
+) {
+  let supabaseResponse =
+    baseResponse ??
+    NextResponse.next({
+      request,
+    });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +26,19 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          // Preserve cookies/headers from intl middleware when present
+          if (baseResponse) {
+            baseResponse.cookies.getAll().forEach((c) => {
+              supabaseResponse.cookies.set(c.name, c.value);
+            });
+            baseResponse.headers.forEach((value, key) => {
+              if (key.toLowerCase() === "set-cookie") return;
+              supabaseResponse.headers.set(key, value);
+            });
+          }
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -30,7 +51,14 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
+  const rawPath = request.nextUrl.pathname;
+  const { locale: pathLocale, pathnameWithoutLocale: path } =
+    stripLocale(rawPath);
+  const locale =
+    pathLocale ||
+    (request.cookies.get("NEXT_LOCALE")?.value as string | undefined) ||
+    routing.defaultLocale;
+
   const isAuthPage =
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
@@ -42,13 +70,13 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = withLocale(locale, "/login");
     return NextResponse.redirect(url);
   }
 
   if (!user && isVerifyPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = withLocale(locale, "/login");
     return NextResponse.redirect(url);
   }
 
@@ -65,20 +93,20 @@ export async function updateSession(request: NextRequest) {
 
   if (user && otpPending && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login/verify";
+    url.pathname = withLocale(locale, "/login/verify");
     url.searchParams.set("mode", "signup");
     return NextResponse.redirect(url);
   }
 
   if (user && isVerifyPage && !otpPending) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = withLocale(locale, "/dashboard");
     return NextResponse.redirect(url);
   }
 
   if (user && isAuthPage && !isVerifyPage && !otpPending) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = withLocale(locale, "/dashboard");
     return NextResponse.redirect(url);
   }
 

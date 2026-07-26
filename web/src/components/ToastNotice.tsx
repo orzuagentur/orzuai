@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export type ToastTone = "ok" | "error" | "info";
 
@@ -20,6 +21,8 @@ export function ToastNotice({
   onClose: () => void;
   ms?: number;
 }) {
+  const tCommon = useTranslations("common");
+
   useEffect(() => {
     if (!message) return;
     const t = window.setTimeout(onClose, ms);
@@ -53,7 +56,7 @@ export function ToastNotice({
         <button
           type="button"
           className="shrink-0 text-sm text-[color:var(--muted)] transition hover:text-[color:var(--fg)]"
-          aria-label="Close"
+          aria-label={tCommon("close")}
           onClick={onClose}
         >
           ×

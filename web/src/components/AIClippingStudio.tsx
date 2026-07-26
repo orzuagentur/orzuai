@@ -8,12 +8,12 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoJob } from "@/lib/types";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 import {
-  JOB_STATUS_LABEL,
   QUEUE_STATUSES,
   jobProgressPercent,
   statusColor,
@@ -39,9 +39,9 @@ const MONTAGE_STYLE_OPTIONS = [
 ] as const;
 
 const ASPECTS = [
-  { id: "9:16", label: "9:16", hint: "Shorts / Reels" },
-  { id: "16:9", label: "16:9", hint: "Landscape" },
-  { id: "1:1", label: "1:1", hint: "Square" },
+  { id: "9:16", label: "9:16", hintKey: "aspectShorts" as const },
+  { id: "16:9", label: "16:9", hintKey: "aspectLandscape" as const },
+  { id: "1:1", label: "1:1", hintKey: "aspectSquare" as const },
 ] as const;
 
 const DURATIONS = [
@@ -77,23 +77,6 @@ function isClippingJob(job: VideoJob) {
     return String(job.metadata?.library || "") === "clipping";
   }
   return src === "ai_clipping" || pipe === "ai_clipping" || src === "clipping";
-}
-
-function clipStatusLabel(status: string): string {
-  switch (status) {
-    case "generating_script":
-      return "Analyzing";
-    case "generating_voice":
-      return "Captions";
-    case "fetching_media":
-      return "Music";
-    case "editing":
-      return "Cutting";
-    case "uploading":
-      return "Saving";
-    default:
-      return JOB_STATUS_LABEL[status] || status;
-  }
 }
 
 function uid() {
@@ -164,6 +147,10 @@ function Toggle({
 }
 
 export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
+  const t = useTranslations("studio.clipping");
+  const ts = useTranslations("studio.common");
+  const tStatus = useTranslations("studio.status");
+  const tc = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabRaw = searchParams.get("tab");
@@ -171,6 +158,28 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
     tabRaw === "clips" || tabRaw === "create" ? tabRaw : "create";
   const fileRef = useRef<HTMLInputElement>(null);
   const editorLocked = useFeatureLocked("video_editor");
+
+  function clipStatusLabel(status: string): string {
+    switch (status) {
+      case "generating_script":
+        return tStatus("analyzing");
+      case "generating_voice":
+        return tStatus("captions");
+      case "fetching_media":
+        return tStatus("music");
+      case "editing":
+        return tStatus("cutting");
+      case "uploading":
+        return tStatus("saving");
+      case "queued":
+      case "ready":
+      case "published":
+      case "failed":
+        return tStatus(status);
+      default:
+        return status;
+    }
+  }
   const [jobs, setJobs] = useState(() => initialJobs.filter(isClippingJob));
   const [sources, setSources] = useState<ClipSource[]>([]);
   const [aspect, setAspect] = useState<Aspect>("9:16");
@@ -263,18 +272,18 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
           artist?: string | null;
           previewUrl?: string | null;
         }>
-      ).map((t) => ({
-        id: String(t.id),
-        name: t.name || "Track",
-        artist: t.artist || "Library",
-        previewUrl: t.previewUrl || null,
+      ).map((track) => ({
+        id: String(track.id),
+        name: track.name || ts("track"),
+        artist: track.artist || ts("library"),
+        previewUrl: track.previewUrl || null,
       }));
       setMusicTracks(tracks);
     })();
     return () => {
       cancelled = true;
     };
-  }, [addMusic]);
+  }, [addMusic, ts]);
 
   useEffect(() => {
     return () => {
@@ -370,7 +379,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
 
   async function startClip() {
     if (sources.length === 0) {
-      toast("Add at least one video first.", "error");
+      toast(t("addAtLeastOne"), "error");
       return;
     }
     setCreating(true);
@@ -380,7 +389,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Sign in required");
+      if (!user) throw new Error(ts("signInRequired"));
 
       const jobId = crypto.randomUUID();
       const payloadSources: Array<Record<string, unknown>> = [];
@@ -456,7 +465,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to start clipping");
+      if (!res.ok) throw new Error(data.error || t("failedStartClipping"));
 
       sources.forEach((s) => {
         if (s.kind === "device" && s.previewUrl?.startsWith("blob:")) {
@@ -466,27 +475,27 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
       setSources([]);
       setInstructions("");
       router.replace("/dashboard/clipping?tab=clips", { scroll: false });
-      toast("Clip queued — see My clips.", "info");
+      toast(t("clipQueued"), "info");
       await refreshJobs();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to start", "error");
+      toast(err instanceof Error ? err.message : ts("failedToStart"), "error");
     } finally {
       setCreating(false);
     }
   }
 
   async function removeJob(jobId: string) {
-    if (!confirm("Remove this clip?")) return;
+    if (!confirm(t("removeClip"))) return;
     setBusyId(jobId);
     const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     setBusyId(null);
     if (!res.ok) {
-      toast(data.error || "Failed to delete", "error");
+      toast(data.error || ts("failedToDelete"), "error");
       return;
     }
     setJobs((prev) => prev.filter((j) => j.id !== jobId));
-    toast("Clip deleted.");
+    toast(t("clipDeleted"));
   }
 
   return (
@@ -498,7 +507,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
           className="font-[family-name:var(--font-syne)] text-3xl tracking-tight sm:text-4xl"
           style={{ fontWeight: 800 }}
         >
-          AI Clipping
+          {t("title")}
         </h1>
       </header>
 
@@ -518,7 +527,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
             <div className="order-2 min-w-0 space-y-4 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-3 sm:order-1 sm:space-y-5 sm:p-5">
               <div>
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)] sm:mb-2">
-                  Format
+                  {t("format")}
                 </p>
                 <p className="mb-1.5 text-[11px] text-[color:var(--muted)] sm:mb-2">
                   Output is locked to the format you pick.
@@ -549,7 +558,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           {a.label}
                         </span>
                         <span className="mt-0.5 block truncate text-[9px] text-[color:var(--muted)] sm:text-[11px]">
-                          {a.hint}
+                          {t(a.hintKey)}
                         </span>
                       </button>
                     );
@@ -559,7 +568,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
 
               <div>
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)] sm:mb-2">
-                  Length
+                  {t("length")}
                 </p>
                 <p className="mb-1.5 text-[11px] text-[color:var(--muted)] sm:mb-2">
                   Clip is cut to this duration — not longer.
@@ -595,92 +604,92 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                 <Toggle
                   on={useVoice}
                   disabled={creating}
-                  label="Voice"
+                  label={t("voice")}
                   onChange={setUseVoice}
                 />
                 <Toggle
                   on={addMusic}
                   disabled={creating}
-                  label="Music"
+                  label={t("music")}
                   onChange={setAddMusic}
                 />
                 <Toggle
                   on={addSubtitles}
                   disabled={creating}
-                  label="Subtitles"
+                  label={t("subtitles")}
                   onChange={setAddSubtitles}
                 />
               </div>
 
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  Style / Montage
+                  {t("styleMontage")}
                 </p>
                 <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2">
                   {(
                     [
                       {
                         key: "style",
-                        label: "Style",
+                        label: t("style"),
                         open: styleOpen,
                         set: setStyleOpen,
                         value: videoStyle
                           ? MONTAGE_STYLE_OPTIONS.find((s) => s.value === videoStyle)
-                              ?.label || "Style"
-                          : "Auto",
+                              ?.label || t("style")
+                          : ts("auto"),
                       },
                       {
                         key: "look",
-                        label: "Look",
+                        label: t("look"),
                         open: lookOpen,
                         set: setLookOpen,
-                        value: "Packs",
+                        value: ts("packs"),
                       },
                       {
                         key: "grade",
-                        label: "Grade",
+                        label: t("grade"),
                         open: gradeOpen,
                         set: setGradeOpen,
                         value: visualEffect
                           ? EFFECTS.find((e) => e.id === visualEffect)?.label ||
                             visualEffect
-                          : "Auto",
+                          : ts("auto"),
                       },
                       {
                         key: "transition",
-                        label: "Transition",
+                        label: t("transition"),
                         open: transitionOpen,
                         set: setTransitionOpen,
                         value: preferredTransition
-                          ? TRANSITIONS.find((t) => t.id === preferredTransition)
+                          ? TRANSITIONS.find((tr) => tr.id === preferredTransition)
                               ?.label || preferredTransition
-                          : "Auto",
+                          : ts("auto"),
                       },
                       {
                         key: "pace",
-                        label: "Pace",
+                        label: t("pace"),
                         open: paceOpen,
                         set: setPaceOpen,
                         value: viralityMode
-                          ? "Viral"
+                          ? ts("viral")
                           : montagePace
                             ? MONTAGE_PACE_PRESETS.find((p) => p.value === montagePace)
                                 ?.label || montagePace
-                            : "Auto",
+                            : ts("auto"),
                       },
                       {
                         key: "motion",
-                        label: "Motion",
+                        label: t("motion"),
                         open: motionOpen,
                         set: setMotionOpen,
                         value: preferredMotion
                           ? MOTIONS.find((m) => m.id === preferredMotion)?.label ||
                             preferredMotion
-                          : "Auto",
+                          : ts("auto"),
                       },
                       {
                         key: "virality",
-                        label: "Virality",
+                        label: t("virality"),
                         open: viralityOpen,
                         set: setViralityOpen,
                         value: viralityMode ? "On" : "Off",
@@ -781,7 +790,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                             }
                           }}
                         >
-                          <span>{s.label}</span>
+                          <span>{s.value === "" ? ts("auto") : s.label}</span>
                           {on && (
                             <span className="text-[10px] text-[color:var(--accent)]">
                               Selected
@@ -849,7 +858,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       }}
                       onClick={() => setVisualEffect("")}
                     >
-                      Auto
+                      {ts("auto")}
                     </button>
                     {EFFECTS.filter((e) => e.id !== "none").map((e) => {
                       const on = visualEffect === e.id;
@@ -886,13 +895,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       }}
                       onClick={() => setPreferredTransition("")}
                     >
-                      Auto
+                      {ts("auto")}
                     </button>
-                    {TRANSITIONS.map((t) => {
-                      const on = preferredTransition === t.id;
+                    {TRANSITIONS.map((tr) => {
+                      const on = preferredTransition === tr.id;
                       return (
                         <button
-                          key={t.id}
+                          key={tr.id}
                           type="button"
                           disabled={creating}
                           className="flex w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold sm:text-sm"
@@ -901,9 +910,9 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                               ? "rgba(232,165,75,0.12)"
                               : "transparent",
                           }}
-                          onClick={() => setPreferredTransition(t.id)}
+                          onClick={() => setPreferredTransition(tr.id)}
                         >
-                          {t.label}
+                          {tr.label}
                         </button>
                       );
                     })}
@@ -924,7 +933,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       }}
                       onClick={() => setMontagePace("")}
                     >
-                      Auto
+                      {ts("auto")}
                     </button>
                     {MONTAGE_PACE_PRESETS.map((p) => {
                       const on =
@@ -962,7 +971,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       }}
                       onClick={() => setPreferredMotion("")}
                     >
-                      Auto
+                      {ts("auto")}
                     </button>
                     {MOTIONS.filter((m) => m.id !== "none").map((m) => {
                       const on = preferredMotion === m.id;
@@ -1000,7 +1009,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold">Virality mode</p>
+                        <p className="text-sm font-semibold">{t("viralityMode")}</p>
                         <p className="mt-0.5 text-[11px] leading-snug text-[color:var(--muted)]">
                           Opt-in boom-boom edit: hook in the first second, ~1s
                           punch cuts, flash transitions. Off by default — you
@@ -1078,7 +1087,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           color: voiceOpen ? "var(--accent)" : "var(--fg)",
                         }}
                       >
-                        <span>Voice</span>
+                        <span>{t("voice")}</span>
                         <svg
                           width="10"
                           height="10"
@@ -1129,7 +1138,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           color: musicOpen ? "var(--accent)" : "var(--fg)",
                         }}
                       >
-                        <span>Music</span>
+                        <span>{t("music")}</span>
                         <svg
                           width="10"
                           height="10"
@@ -1180,7 +1189,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           color: subsOpen ? "var(--accent)" : "var(--fg)",
                         }}
                       >
-                        <span>Subtitles</span>
+                        <span>{t("subtitles")}</span>
                         <svg
                           width="10"
                           height="10"
@@ -1218,11 +1227,11 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     <div className="min-w-0 space-y-2 overflow-hidden rounded-xl border border-[color:var(--line)] p-2">
                       {musicLoading ? (
                         <p className="text-xs text-[color:var(--muted)]">
-                          Loading tracks…
+                          {t("loadingTracks")}
                         </p>
                       ) : musicTracks.length === 0 ? (
                         <p className="text-xs text-[color:var(--muted)]">
-                          No tracks available yet.
+                          {t("noTracksYet")}
                         </p>
                       ) : (
                         <div className="max-h-[280px] space-y-1.5 overflow-y-auto overflow-x-hidden">
@@ -1247,10 +1256,10 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                             </span>
                             <span className="min-w-0 flex-1 overflow-hidden">
                               <span className="block truncate text-sm font-medium">
-                                Auto
+                                {ts("auto")}
                               </span>
                               <span className="block truncate text-[11px] text-[color:var(--muted)]">
-                                AI picks a track
+                                {t("aiPicksTrack")}
                               </span>
                             </span>
                             {!musicTrackId && (
@@ -1259,12 +1268,12 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                               </span>
                             )}
                           </button>
-                          {musicTracks.map((t) => {
-                            const on = musicTrackId === t.id;
-                            const playing = musicPlayingId === t.id;
+                          {musicTracks.map((track) => {
+                            const on = musicTrackId === track.id;
+                            const playing = musicPlayingId === track.id;
                             return (
                               <div
-                                key={t.id}
+                                key={track.id}
                                 className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5"
                                 style={{
                                   background: on
@@ -1286,9 +1295,9 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                       : "rgba(255,255,255,0.08)",
                                     color: playing ? "#111" : "var(--fg)",
                                   }}
-                                  disabled={!t.previewUrl || creating}
-                                  aria-label={playing ? "Stop" : "Play"}
-                                  onClick={() => toggleMusicPreview(t)}
+                                  disabled={!track.previewUrl || creating}
+                                  aria-label={playing ? ts("stop") : ts("play")}
+                                  onClick={() => toggleMusicPreview(track)}
                                 >
                                   {playing ? "■" : "▶"}
                                 </button>
@@ -1296,13 +1305,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                   type="button"
                                   disabled={creating}
                                   className="min-w-0 flex-1 overflow-hidden text-left"
-                                  onClick={() => setMusicTrackId(t.id)}
+                                  onClick={() => setMusicTrackId(track.id)}
                                 >
                                   <span className="block truncate text-sm font-medium">
-                                    {t.name}
+                                    {track.name}
                                   </span>
                                   <span className="block truncate text-[11px] text-[color:var(--muted)]">
-                                    {t.artist}
+                                    {track.artist}
                                   </span>
                                 </button>
                                 {on && (
@@ -1348,14 +1357,14 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     >
                       <span className="min-w-0">
                         <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                          Voice
+                          {t("voice")}
                         </span>
                         <span className="block truncate text-sm">
-                          {voiceId ? "Custom voice" : "Auto — AI picks"}
+                          {voiceId ? ts("customVoice") : ts("autoAiPicks")}
                         </span>
                       </span>
                       <span className="shrink-0 text-xs text-[color:var(--muted)]">
-                        {voiceOpen ? "Hide" : "Show"}
+                        {voiceOpen ? ts("hide") : ts("show")}
                       </span>
                     </button>
                     {voiceOpen && (
@@ -1381,28 +1390,28 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     >
                       <span className="min-w-0">
                         <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                          Music
+                          {t("music")}
                         </span>
                         <span className="block truncate text-sm">
                           {musicTrackId
-                            ? musicTracks.find((t) => t.id === musicTrackId)
-                                ?.name || "Selected track"
-                            : "Auto"}
+                            ? musicTracks.find((tr) => tr.id === musicTrackId)
+                                ?.name || ts("selectedTrack")
+                            : ts("auto")}
                         </span>
                       </span>
                       <span className="shrink-0 text-xs text-[color:var(--muted)]">
-                        {musicOpen ? "Hide" : "Show"}
+                        {musicOpen ? ts("hide") : ts("show")}
                       </span>
                     </button>
                     {musicOpen && (
                       <div className="min-w-0 space-y-2 overflow-hidden border-t border-[color:var(--line)] p-3">
                         {musicLoading ? (
                           <p className="text-xs text-[color:var(--muted)]">
-                            Loading tracks…
+                            {t("loadingTracks")}
                           </p>
                         ) : musicTracks.length === 0 ? (
                           <p className="text-xs text-[color:var(--muted)]">
-                            No tracks available yet.
+                            {t("noTracksYet")}
                           </p>
                         ) : (
                           <div className="max-h-[280px] space-y-1.5 overflow-y-auto overflow-x-hidden">
@@ -1427,10 +1436,10 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                               </span>
                               <span className="min-w-0 flex-1 overflow-hidden">
                                 <span className="block truncate text-sm font-medium">
-                                  Auto
+                                  {ts("auto")}
                                 </span>
                                 <span className="block truncate text-[11px] text-[color:var(--muted)]">
-                                  AI picks a track
+                                  {t("aiPicksTrack")}
                                 </span>
                               </span>
                               {!musicTrackId && (
@@ -1439,12 +1448,12 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                 </span>
                               )}
                             </button>
-                            {musicTracks.map((t) => {
-                              const on = musicTrackId === t.id;
-                              const playing = musicPlayingId === t.id;
+                            {musicTracks.map((track) => {
+                              const on = musicTrackId === track.id;
+                              const playing = musicPlayingId === track.id;
                               return (
                                 <div
-                                  key={t.id}
+                                  key={track.id}
                                   className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5"
                                   style={{
                                     background: on
@@ -1466,9 +1475,9 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                         : "rgba(255,255,255,0.08)",
                                       color: playing ? "#111" : "var(--fg)",
                                     }}
-                                    disabled={!t.previewUrl || creating}
-                                    aria-label={playing ? "Stop" : "Play"}
-                                    onClick={() => toggleMusicPreview(t)}
+                                    disabled={!track.previewUrl || creating}
+                                    aria-label={playing ? ts("stop") : ts("play")}
+                                    onClick={() => toggleMusicPreview(track)}
                                   >
                                     {playing ? "■" : "▶"}
                                   </button>
@@ -1476,13 +1485,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                     type="button"
                                     disabled={creating}
                                     className="min-w-0 flex-1 overflow-hidden text-left"
-                                    onClick={() => setMusicTrackId(t.id)}
+                                    onClick={() => setMusicTrackId(track.id)}
                                   >
                                     <span className="block truncate text-sm font-medium">
-                                      {t.name}
+                                      {track.name}
                                     </span>
                                     <span className="block truncate text-[11px] text-[color:var(--muted)]">
-                                      {t.artist}
+                                      {track.artist}
                                     </span>
                                   </button>
                                   {on && (
@@ -1510,15 +1519,15 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     >
                       <span className="min-w-0">
                         <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                          Subtitle style
+                          {t("subtitles")}
                         </span>
                         <span className="block truncate text-sm">
                           {SUBTITLE_STYLES.find((s) => s.id === subtitleStyle)
-                            ?.label || "Classic"}
+                            ?.label || ts("classic")}
                         </span>
                       </span>
                       <span className="shrink-0 text-xs text-[color:var(--muted)]">
-                        {subsOpen ? "Hide" : "Show"}
+                        {subsOpen ? ts("hide") : ts("show")}
                       </span>
                     </button>
                     {subsOpen && (
@@ -1549,7 +1558,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                 </label>
                 <textarea
                   className="field min-h-[88px] w-full resize-y text-sm"
-                  placeholder="e.g. keep the funny ending…"
+                  placeholder={t("tipPlaceholder")}
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                   disabled={creating}
@@ -1563,14 +1572,14 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                 disabled={creating || sources.length === 0}
                 onClick={() => void startClip()}
               >
-                {creating ? "Uploading…" : "Create short clip"}
+                {creating ? ts("uploading") : t("createClip")}
               </button>
             </div>
 
             {/* Videos — above settings on mobile */}
             <div className="order-1 flex flex-col overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] sm:order-2 lg:sticky lg:top-4 lg:max-h-[min(720px,calc(100vh-7rem))]">
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[color:var(--line)] px-4 py-3">
-                <p className="text-sm font-semibold">Videos</p>
+                <p className="text-sm font-semibold">{t("videos")}</p>
                 {sources.length > 0 && sources.length < MAX_SOURCES && (
                   <button
                     type="button"
@@ -1581,7 +1590,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       borderColor: "var(--line)",
                       color: "var(--accent)",
                     }}
-                    aria-label="Add video from device"
+                    aria-label={t("addVideo")}
                   >
                     +
                   </button>
@@ -1605,7 +1614,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                         +
                       </span>
                       <span className="text-sm font-semibold">
-                        Add video from device
+                        {t("addVideo")}
                       </span>
                       <span className="text-xs text-[color:var(--muted)]">
                         MP4 / MOV / WebM · max {MAX_MB} MB
@@ -1658,7 +1667,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                             </div>
                           )}
                           <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                            {s.kind === "device" ? "Device" : "Media"}
+                            {s.kind === "device" ? ts("device") : ts("media")}
                           </span>
                           {watchUrl && (
                             <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition hover:opacity-100">
@@ -1670,7 +1679,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                           <button
                             type="button"
                             className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-sm text-white hover:bg-black/80"
-                            aria-label="Remove"
+                            aria-label={ts("remove")}
                             disabled={creating}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1700,7 +1709,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
         <section className="rise-delay space-y-3 sm:space-y-4">
           {jobs.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-[color:var(--line)] px-4 py-10 text-center text-sm text-[color:var(--muted)]">
-              No clips yet. Create one in the Create tab.
+              {t("noClipsYet")}
             </p>
           ) : (
             <ul className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3">
@@ -1769,8 +1778,8 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                         <a
                           href={`/dashboard/editor/${job.id}`}
                           className="absolute left-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80 sm:left-2 sm:top-2 sm:h-8 sm:w-8"
-                          aria-label="Edit"
-                          title="Edit"
+                          aria-label={ts("edit")}
+                          title={ts("edit")}
                         >
                           <svg
                             width="13"
@@ -1796,13 +1805,13 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                   ...(!editorLocked
                                     ? [
                                         {
-                                          label: "Edit",
+                                          label: ts("edit"),
                                           href: `/dashboard/editor/${job.id}`,
                                         },
                                       ]
                                     : []),
                                   {
-                                    label: "Download",
+                                    label: tc("download"),
                                     onClick: () =>
                                       void downloadVideo(
                                         job.id,
@@ -1812,7 +1821,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                 ]
                               : []),
                             {
-                              label: "Delete",
+                              label: tc("delete"),
                               danger: true,
                               disabled: busyId === job.id,
                               onClick: () => void removeJob(job.id),
@@ -1823,7 +1832,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     </div>
                     <div className="min-w-0 space-y-0.5 border-t border-[color:var(--line)] px-2 py-1.5 sm:space-y-1 sm:px-3.5 sm:py-3">
                       <p className="truncate text-xs font-semibold sm:text-sm">
-                        {job.title || "AI Clip"}
+                        {job.title || t("aiClip")}
                       </p>
                       <p className="truncate text-[10px] text-[color:var(--muted)] sm:text-xs">
                         {job.duration_seconds ? `${job.duration_seconds}s` : "—"}
@@ -1858,7 +1867,7 @@ export function AIClippingStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
               <button
                 type="button"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg text-white hover:bg-white/20"
-                aria-label="Close"
+                aria-label={tc("close")}
                 onClick={() => setWatchSource(null)}
               >
                 ×

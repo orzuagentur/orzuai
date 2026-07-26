@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { UsageEvent } from "@/lib/types";
 
 export function CostsStudio({
@@ -15,30 +16,31 @@ export function CostsStudio({
     all: number;
   };
 }) {
+  const t = useTranslations("studio.costs");
   return (
     <div className="space-y-6">
       <header className="rise">
-        <h1 className="text-2xl font-semibold">Costs</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <p className="mt-1 text-sm text-[color:var(--muted)]">
           Usage from AI scripts, voice, and YouTube operations.
         </p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card title="Scripts (AI)" cost={totals.openai.cost} units={`${Math.round(totals.openai.units)} tokens`} />
-        <Card title="Voice" cost={totals.elevenlabs.cost} units={`${Math.round(totals.elevenlabs.units)} chars`} />
-        <Card title="YouTube ops" cost={totals.youtube.cost} units={`${Math.round(totals.youtube.units)} actions`} />
-        <Card title="Total" cost={totals.all} units="this month" highlight />
+        <Card title={t("scriptsAi")} cost={totals.openai.cost} units={`${Math.round(totals.openai.units)} tokens`} />
+        <Card title={t("voice")} cost={totals.elevenlabs.cost} units={`${Math.round(totals.elevenlabs.units)} chars`} />
+        <Card title={t("youtubeOps")} cost={totals.youtube.cost} units={`${Math.round(totals.youtube.units)} actions`} />
+        <Card title={t("total")} cost={totals.all} units={t("thisMonth")} highlight />
       </section>
 
       <section className="panel rise-delay overflow-hidden">
         <div className="border-b border-[color:var(--line)] p-5">
-          <h2 className="font-semibold">Usage log</h2>
+          <h2 className="font-semibold">{t("usageLog")}</h2>
         </div>
         <ul className="divide-y divide-[color:var(--line)]">
           {events.length === 0 && (
             <li className="p-6 text-sm text-[color:var(--muted)]">
-              No usage yet. Costs appear when videos are generated.
+              {t("noUsage")}
             </li>
           )}
           {events.map((e) => (

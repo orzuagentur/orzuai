@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { VideoJob } from "@/lib/types";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
@@ -22,9 +24,9 @@ import { useToast } from "@/components/ToastNotice";
 import { useFeatureLocked } from "@/lib/product-locks-client";
 
 const ASPECTS = [
-  { id: "9:16", label: "9:16", hint: "Vertical" },
-  { id: "16:9", label: "16:9", hint: "Wide" },
-  { id: "1:1", label: "1:1", hint: "Square" },
+  { id: "9:16", label: "9:16", hintKey: "vertical" as const },
+  { id: "16:9", label: "16:9", hintKey: "wide" as const },
+  { id: "1:1", label: "1:1", hintKey: "square" as const },
 ] as const;
 
 const DURATIONS = [
@@ -34,14 +36,14 @@ const DURATIONS = [
   { id: "45", label: "45s" },
   { id: "60", label: "60s" },
   { id: "90", label: "90s" },
-  { id: "120", label: "2 min" },
-  { id: "180", label: "3 min" },
-  { id: "300", label: "5 min" },
+  { id: "120", labelKey: "min2" as const },
+  { id: "180", labelKey: "min3" as const },
+  { id: "300", labelKey: "min5" as const },
 ] as const;
 
 const VIDEO_TYPES = [
-  { id: "standard", label: "Standard", hint: "Stock montage" },
-  { id: "emoji", label: "Emoji", hint: "Big emoji storyboard" },
+  { id: "standard", labelKey: "standard" as const, hintKey: "stockMontage" as const },
+  { id: "emoji", labelKey: "emoji" as const, hintKey: "emojiStoryboard" as const },
 ] as const;
 
 type Aspect = (typeof ASPECTS)[number]["id"];
@@ -66,22 +68,26 @@ function aspectOf(job: VideoJob): string {
   return String(job.metadata?.aspect_ratio || "9:16");
 }
 
-function titleOf(job: VideoJob): string {
+function titleOf(job: VideoJob, generatingTitle: string): string {
   if (job.title?.trim()) return job.title.trim();
-  return "Generating title…";
+  return generatingTitle;
 }
 
-function durationLabel(job: VideoJob): string {
-  if (job.metadata?.duration_auto && !job.duration_seconds) return "Auto";
+function durationLabel(job: VideoJob, autoLabel: string): string {
+  if (job.metadata?.duration_auto && !job.duration_seconds) return autoLabel;
   if (job.duration_seconds) return `${job.duration_seconds}s`;
   if (job.metadata?.duration_seconds) return `${job.metadata.duration_seconds}s`;
-  return "Auto";
+  return autoLabel;
 }
 
-function videoTypeLabel(job: VideoJob): string {
+function videoTypeLabel(
+  job: VideoJob,
+  emojiVideo: string,
+  aiVideo: string,
+): string {
   return String(job.metadata?.video_type || "").toLowerCase() === "emoji"
-    ? "Emoji video"
-    : "AI video";
+    ? emojiVideo
+    : aiVideo;
 }
 
 async function downloadVideo(jobId: string, filename: string) {
@@ -166,6 +172,9 @@ function PromptChip({
 }
 
 export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
+  const t = useTranslations("studio.creativity");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -226,15 +235,23 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   }, [activeJobs.length, refreshJobs]);
 
   const durationChipLabel =
-    DURATIONS.find((d) => d.id === durationId)?.label || "Auto";
+    durationId === "auto"
+      ? tc("auto")
+      : (() => {
+          const picked = DURATIONS.find((d) => d.id === durationId);
+          if (!picked) return tc("auto");
+          if ("labelKey" in picked) return t(picked.labelKey);
+          return picked.label;
+        })();
   const aspectChipLabel = ASPECTS.find((a) => a.id === aspect)?.label || "9:16";
-  const videoTypeChipLabel =
-    VIDEO_TYPES.find((t) => t.id === videoType)?.label || "Standard";
+  const videoTypeChipLabel = t(
+    VIDEO_TYPES.find((vt) => vt.id === videoType)?.labelKey || "standard",
+  );
 
   async function createVideo() {
     const text = prompt.trim();
     if (text.length < 8) {
-      toast("Describe the video in at least one sentence.", "error");
+      toast(t("needSentence"), "error");
       return;
     }
     setCreating(true);
@@ -258,11 +275,11 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
     const data = await res.json();
     setCreating(false);
     if (!res.ok) {
-      toast(data.error || "Failed to start generation", "error");
+      toast(data.error || t("failedStart"), "error");
       return;
     }
     setPrompt("");
-    toast("Generation started", "info");
+    toast(t("started"), "info");
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", "library");
     router.replace(`/dashboard/content?${next.toString()}`, { scroll: false });
@@ -270,17 +287,17 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
   }
 
   async function removeCreation(jobId: string) {
-    if (!confirm("Remove this video from your library?")) return;
+    if (!confirm(t("removeVideo"))) return;
     setBusyId(jobId);
     const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     setBusyId(null);
     if (!res.ok) {
-      toast(data.error || "Failed to delete", "error");
+      toast(data.error || tc("failedToDelete"), "error");
       return;
     }
     setJobs((prev) => prev.filter((j) => j.id !== jobId));
-    toast("Video deleted.");
+    toast(t("videoDeleted"));
   }
 
   return (
@@ -291,7 +308,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
           className="font-[family-name:var(--font-syne)] text-3xl tracking-tight sm:text-4xl"
           style={{ fontWeight: 800 }}
         >
-          AI Video
+          {t("title")}
         </h1>
       </header>
 
@@ -300,7 +317,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
           <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] focus-within:border-[color:rgba(232,165,75,0.45)]">
             <textarea
               className="min-h-[160px] w-full resize-y border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-relaxed outline-none placeholder:text-[color:var(--muted)]"
-              placeholder="Describe the video you want…"
+              placeholder={t("placeholder")}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               disabled={creating}
@@ -313,7 +330,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
             />
             <div className="flex flex-wrap items-center gap-2 border-t border-[color:var(--line)] px-3 py-2.5">
               <PromptChip
-                label="Format"
+                label={t("format")}
                 value={aspectChipLabel}
                 open={openChip === "format"}
                 onOpenChange={(open) => setOpenChip(open ? "format" : null)}
@@ -335,7 +352,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                     >
                       <span className="font-semibold">{a.label}</span>
                       <span className="text-xs text-[color:var(--muted)]">
-                        {a.hint}
+                        {t(a.hintKey)}
                       </span>
                     </button>
                   );
@@ -343,7 +360,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
               </PromptChip>
 
               <PromptChip
-                label="Time"
+                label={t("time")}
                 value={durationChipLabel}
                 open={openChip === "duration"}
                 onOpenChange={(open) => setOpenChip(open ? "duration" : null)}
@@ -363,10 +380,12 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                         setOpenChip(null);
                       }}
                     >
-                      <span className="font-semibold">{d.label}</span>
+                      <span className="font-semibold">
+                        {d.id === "auto" ? tc("auto") : "labelKey" in d ? t(d.labelKey) : d.label}
+                      </span>
                       {d.id === "auto" && (
                         <span className="text-[10px] text-[color:var(--muted)]">
-                          AI picks
+                          {tc("aiPicks")}
                         </span>
                       )}
                     </button>
@@ -375,29 +394,29 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
               </PromptChip>
 
               <PromptChip
-                label="Type"
+                label={t("type")}
                 value={videoTypeChipLabel}
                 open={openChip === "type"}
                 onOpenChange={(open) => setOpenChip(open ? "type" : null)}
               >
-                {VIDEO_TYPES.map((t) => {
-                  const on = videoType === t.id;
+                {VIDEO_TYPES.map((vt) => {
+                  const on = videoType === vt.id;
                   return (
                     <button
-                      key={t.id}
+                      key={vt.id}
                       type="button"
                       role="option"
                       aria-selected={on}
                       className="flex w-full items-center justify-between gap-4 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white/5"
                       style={{ color: on ? "var(--accent)" : "var(--fg)" }}
                       onClick={() => {
-                        setVideoType(t.id);
+                        setVideoType(vt.id);
                         setOpenChip(null);
                       }}
                     >
-                      <span className="font-semibold">{t.label}</span>
+                      <span className="font-semibold">{t(vt.labelKey)}</span>
                       <span className="text-xs text-[color:var(--muted)]">
-                        {t.hint}
+                        {t(vt.hintKey)}
                       </span>
                     </button>
                   );
@@ -411,7 +430,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                   disabled={creating || prompt.trim().length < 8}
                   onClick={() => void createVideo()}
                 >
-                  {creating ? "Starting…" : "Generate"}
+                  {creating ? "Starting…" : t("create")}
                 </button>
               </div>
             </div>
@@ -423,7 +442,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
         <section className="rise-delay space-y-4">
           {libraryJobs.length === 0 && activeJobs.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
-              No videos yet. Create one in the Create tab.
+              {t("noVideosYet")}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -492,11 +511,11 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                       )}
 
                       {canWatch && !failed && !busy && !editorLocked && (
-                        <a
+                        <Link
                           href={`/dashboard/editor/${job.id}`}
                           className="absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-black/80"
-                          aria-label="Edit"
-                          title="Edit"
+                          aria-label={tc("edit")}
+                          title={tc("edit")}
                         >
                           <svg
                             width="14"
@@ -512,7 +531,7 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                             <path d="M12 20h9" />
                             <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                           </svg>
-                        </a>
+                        </Link>
                       )}
 
                       <CardMenuSlot>
@@ -523,13 +542,16 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                   ...(!editorLocked
                                     ? [
                                         {
-                                          label: "Edit",
-                                          href: `/dashboard/editor/${job.id}`,
+                                          label: tc("edit"),
+                                          onClick: () =>
+                                            router.push(
+                                              `/dashboard/editor/${job.id}`,
+                                            ),
                                         },
                                       ]
                                     : []),
                                   {
-                                    label: "Download",
+                                    label: tCommon("download"),
                                     onClick: () =>
                                       void downloadVideo(
                                         job.id,
@@ -537,13 +559,13 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
                                       ),
                                   },
                                   {
-                                    label: "Open",
+                                    label: tc("open"),
                                     href: mediaSrc,
                                   },
                                 ]
                               : []),
                             {
-                              label: busyId === job.id ? "Deleting…" : "Delete",
+                              label: busyId === job.id ? "Deleting…" : tCommon("delete"),
                               danger: true,
                               disabled: busyId === job.id || busy,
                               onClick: () => void removeCreation(job.id),
@@ -555,14 +577,16 @@ export function CreativityStudio({ initialJobs }: { initialJobs: VideoJob[] }) {
 
                     <div className="space-y-1 border-t border-[color:var(--line)] p-3">
                       <p className="line-clamp-2 text-sm font-medium leading-snug">
-                        {titleOf(job)}
+                        {titleOf(job, t("generatingTitle"))}
                       </p>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--muted)]">
                         <span>{aspectOf(job)}</span>
                         <span>·</span>
-                        <span>{durationLabel(job)}</span>
+                        <span>{durationLabel(job, tc("auto"))}</span>
                         <span>·</span>
-                        <span>{videoTypeLabel(job)}</span>
+                        <span>
+                          {videoTypeLabel(job, t("emojiVideo"), t("aiVideo"))}
+                        </span>
                       </div>
                     </div>
                   </article>

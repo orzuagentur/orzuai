@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import {
   useCallback,
   useEffect,
@@ -74,40 +74,40 @@ const ACCENT = "#E8A54B";
 
 const LEFT_NAV: {
   group: string;
-  items: { id: Category; label: string; icon: string }[];
+  items: { id: Category; labelKey: string; icon: string }[];
 }[] = [
   {
     group: "Media",
     items: [
-      { id: "sources", label: "Sources", icon: "▣" },
-      { id: "clip", label: "Video", icon: "▶" },
-      { id: "music", label: "Music", icon: "♪" },
-      { id: "text", label: "Text", icon: "T" },
-      { id: "captions", label: "Subs", icon: "Aa" },
+      { id: "sources", labelKey: "sources", icon: "▣" },
+      { id: "clip", labelKey: "video", icon: "▶" },
+      { id: "music", labelKey: "music", icon: "♪" },
+      { id: "text", labelKey: "text", icon: "T" },
+      { id: "captions", labelKey: "subs", icon: "Aa" },
     ],
   },
   {
     group: "Edit",
     items: [
-      { id: "presets", label: "Presets", icon: "★" },
-      { id: "trim", label: "Trim", icon: "⟷" },
-      { id: "speed", label: "Speed", icon: "⏩" },
-      { id: "transform", label: "Flip", icon: "⇄" },
-      { id: "adjust", label: "Adjust", icon: "☀" },
+      { id: "presets", labelKey: "presets", icon: "★" },
+      { id: "trim", labelKey: "trim", icon: "⟷" },
+      { id: "speed", labelKey: "speed", icon: "⏩" },
+      { id: "transform", labelKey: "flip", icon: "⇄" },
+      { id: "adjust", labelKey: "adjust", icon: "☀" },
     ],
   },
   {
     group: "Look",
     items: [
-      { id: "filters", label: "Filters", icon: "◐" },
-      { id: "motion", label: "Motion", icon: "↗" },
-      { id: "inout", label: "In/Out", icon: "◫" },
-      { id: "transition", label: "Trans", icon: "⧉" },
+      { id: "filters", labelKey: "filters", icon: "◐" },
+      { id: "motion", labelKey: "motion", icon: "↗" },
+      { id: "inout", labelKey: "inOut", icon: "◫" },
+      { id: "transition", labelKey: "trans", icon: "⧉" },
     ],
   },
   {
     group: "Audio",
-    items: [{ id: "sound", label: "Voice", icon: "🎤" }],
+    items: [{ id: "sound", labelKey: "voice", icon: "🎤" }],
   },
 ];
 
@@ -343,6 +343,9 @@ function Chip({
 
 export function VideoEditorStudio({ job }: { job: VideoJob }) {
   const router = useRouter();
+  const t = useTranslations("studio.videoEditor");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const { show: toast, notice } = useToast();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const musicRef = useRef<HTMLAudioElement | null>(null);
@@ -613,7 +616,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
   async function onExport() {
     if (exporting) return;
     if (trimEnd - trimStart < 0.5) {
-      toast("Trim range is too short", "error");
+      toast(t("trimTooShort"), "error");
       return;
     }
     setExporting(true);
@@ -659,7 +662,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
       toast(data.error || "Export failed", "error");
       return;
     }
-    toast("Export started", "info");
+    toast(t("exportStarted"), "info");
     router.push(backHref);
   }
 
@@ -713,7 +716,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                           });
                         }}
                       >
-                        {gone ? "Restore" : "Remove"}
+                        {gone ? "Restore" : tc("remove")}
                       </button>
                     </div>
                   );
@@ -751,9 +754,9 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
             </p>
             <div className="flex max-h-[140px] gap-2 overflow-x-auto pb-1">
               {libraryLoading ? (
-                <p className="text-xs text-white/45">Loading library…</p>
+                <p className="text-xs text-white/45">{t("loadingLibrary")}</p>
               ) : library.length === 0 ? (
-                <p className="text-xs text-white/45">No other ready videos</p>
+                <p className="text-xs text-white/45">{t("noOtherVideos")}</p>
               ) : (
                 library.map((clip) => (
                   <button
@@ -771,7 +774,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                       }}
                     />
                     <span className="truncate text-[10px] text-white/70">
-                      {clip.title || "Untitled"}
+                      {clip.title || tc("untitled")}
                     </span>
                   </button>
                 ))
@@ -818,8 +821,8 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
         return (
           <div className="flex w-full min-w-0 flex-col gap-3">
             <div className="flex gap-3 overflow-x-auto pb-1">
-              <Chip label="Flip H" active={flipH} onClick={() => setFlipH((v) => !v)} />
-              <Chip label="Flip V" active={flipV} onClick={() => setFlipV((v) => !v)} />
+              <Chip label={t("flipH")} active={flipH} onClick={() => setFlipH((v) => !v)} />
+              <Chip label={t("flipV")} active={flipV} onClick={() => setFlipV((v) => !v)} />
               <Chip
                 label="Reset"
                 active={!flipH && !flipV && zoom <= 1.01}
@@ -851,7 +854,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
             {(
               [
                 {
-                  label: "Brightness",
+                  labelKey: "brightness" as const,
                   value: brightness,
                   min: -0.35,
                   max: 0.35,
@@ -860,7 +863,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                   display: `${brightness >= 0 ? "+" : ""}${brightness.toFixed(2)}`,
                 },
                 {
-                  label: "Contrast",
+                  labelKey: "contrast" as const,
                   value: contrast,
                   min: 0.6,
                   max: 1.6,
@@ -869,7 +872,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                   display: contrast.toFixed(2),
                 },
                 {
-                  label: "Saturation",
+                  labelKey: "saturation" as const,
                   value: saturation,
                   min: 0,
                   max: 1.8,
@@ -879,9 +882,9 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                 },
               ] as const
             ).map((row) => (
-              <label key={row.label} className="block space-y-1 text-[10px] text-white/50">
+              <label key={row.labelKey} className="block space-y-1 text-[10px] text-white/50">
                 <span className="flex justify-between">
-                  <span>{row.label}</span>
+                  <span>{t(row.labelKey)}</span>
                   <span>{row.display}</span>
                 </span>
                 <input
@@ -907,7 +910,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                 setSaturation(1);
               }}
             >
-              Reset color
+              {t("resetColor")}
             </button>
           </div>
         );
@@ -921,14 +924,14 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                 className="rounded-lg border border-white/12 px-3 py-1.5 text-[11px] text-white/70"
                 onClick={() => seekTo(trimStart / Math.max(duration, 0.01))}
               >
-                Go In
+                {t("goIn")}
               </button>
               <button
                 type="button"
                 className="rounded-lg border border-white/12 px-3 py-1.5 text-[11px] text-white/70"
                 onClick={() => seekTo(trimEnd / Math.max(duration, 0.01))}
               >
-                Go Out
+                {t("goOut")}
               </button>
               <Chip
                 label="Loop"
@@ -938,7 +941,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
             </div>
             <div>
               <div className="mb-1 flex justify-between text-[10px] text-white/50">
-                <span>Start</span>
+                <span>{t("trimStart")}</span>
                 <span>{formatTime(trimStart)}</span>
               </div>
               <input
@@ -952,12 +955,12 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                   setTrimStart(Math.min(v, trimEnd - 0.5));
                 }}
                 className="w-full accent-[#E8A54B]"
-                aria-label="Trim start"
+                aria-label={t("trimStart")}
               />
             </div>
             <div>
               <div className="mb-1 flex justify-between text-[10px] text-white/50">
-                <span>End</span>
+                <span>{t("trimEnd")}</span>
                 <span>{formatTime(trimEnd)}</span>
               </div>
               <input
@@ -971,7 +974,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                   setTrimEnd(Math.max(v, trimStart + 0.5));
                 }}
                 className="w-full accent-[#E8A54B]"
-                aria-label="Trim end"
+                aria-label={t("trimEnd")}
               />
             </div>
           </div>
@@ -1050,12 +1053,12 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
               Applied between stitched clips when your source has multiple segments.
             </p>
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {TRANSITIONS.map((t) => (
+              {TRANSITIONS.map((tr) => (
                 <Chip
-                  key={t.id}
-                  label={t.label}
-                  active={transition === t.id}
-                  onClick={() => setTransition(t.id)}
+                  key={tr.id}
+                  label={tr.label}
+                  active={transition === tr.id}
+                  onClick={() => setTransition(tr.id)}
                 />
               ))}
             </div>
@@ -1068,7 +1071,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
             <input
               value={overlayText}
               onChange={(e) => setOverlayText(e.target.value.slice(0, 120))}
-              placeholder="Title / hook…"
+              placeholder={t("titleHook")}
               className="w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
             />
             <div className="flex gap-3 overflow-x-auto pb-1">
@@ -1090,7 +1093,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
             <input
               value={captionText}
               onChange={(e) => setCaptionText(e.target.value.slice(0, 120))}
-              placeholder="Caption / subtitle…"
+              placeholder={t("captionPlaceholder")}
               className="w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
             />
             <div className="flex gap-3 overflow-x-auto pb-1">
@@ -1113,7 +1116,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
               {(
                 [
                   { id: "none" as const, label: "Off" },
-                  { id: "auto" as const, label: "Auto" },
+                  { id: "auto" as const, label: tc("auto") },
                   { id: "track" as const, label: "Pick" },
                 ] as const
               ).map((m) => (
@@ -1157,7 +1160,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                   <input
                     name="q"
                     defaultValue={musicQuery}
-                    placeholder="Search music…"
+                    placeholder={t("searchMusic")}
                     className="min-w-0 flex-1 rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
                   />
                   <button
@@ -1165,21 +1168,21 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                     className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-black"
                     style={{ background: ACCENT }}
                   >
-                    Search
+                    {tCommon("search")}
                   </button>
                 </form>
                 <div className="max-h-[120px] space-y-1 overflow-y-auto">
                   {musicLoading ? (
-                    <p className="text-xs text-white/45">Loading…</p>
+                    <p className="text-xs text-white/45">{tCommon("loading")}</p>
                   ) : tracks.length === 0 ? (
-                    <p className="text-xs text-white/45">No tracks found</p>
+                    <p className="text-xs text-white/45">{t("noTracks")}</p>
                   ) : (
-                    tracks.map((t) => {
-                      const on = musicTrackId === t.id;
-                      const playingTrack = playingMusicId === t.id;
+                    tracks.map((track) => {
+                      const on = musicTrackId === track.id;
+                      const playingTrack = playingMusicId === track.id;
                       return (
                         <div
-                          key={t.id}
+                          key={track.id}
                           className="flex items-center gap-2 rounded-lg px-2 py-1.5"
                           style={{
                             background: on ? "rgba(232,165,75,0.12)" : "transparent",
@@ -1189,21 +1192,21 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                           <button
                             type="button"
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] text-white"
-                            disabled={!t.previewUrl}
-                            onClick={() => toggleMusicPreview(t)}
+                            disabled={!track.previewUrl}
+                            onClick={() => toggleMusicPreview(track)}
                           >
                             {playingTrack ? "■" : "▶"}
                           </button>
                           <button
                             type="button"
                             className="min-w-0 flex-1 text-left"
-                            onClick={() => setMusicTrackId(t.id)}
+                            onClick={() => setMusicTrackId(track.id)}
                           >
                             <span className="block truncate text-xs font-medium text-white">
-                              {t.title}
+                              {track.title}
                             </span>
                             <span className="block truncate text-[10px] text-white/45">
-                              {t.author}
+                              {track.author}
                             </span>
                           </button>
                         </div>
@@ -1221,19 +1224,19 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
           <div className="flex w-full min-w-0 flex-col gap-3">
             <div className="flex gap-3 overflow-x-auto pb-1">
               <Chip
-                label="Keep VO"
+                label={t("keepVo")}
                 active={keepOriginal}
                 onClick={() => setKeepOriginal(true)}
               />
               <Chip
-                label="Mute VO"
+                label={t("muteVo")}
                 active={!keepOriginal}
                 onClick={() => setKeepOriginal(false)}
               />
             </div>
             {keepOriginal && (
               <label className="block space-y-1 text-[10px] text-white/50">
-                Voice volume {voiceVolume.toFixed(2)}
+                {t("voice")} {voiceVolume.toFixed(2)}
                 <input
                   type="range"
                   min={0.2}
@@ -1268,10 +1271,10 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
           href={backHref}
           className="shrink-0 text-sm font-medium text-white/60 transition hover:text-white"
         >
-          ← Back
+          {t("backHome")}
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-center text-base font-semibold">
-          {job.title || "Edit"}
+          {job.title || t("title")}
         </h1>
         <button
           type="button"
@@ -1289,7 +1292,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
         <nav
           className="flex w-[72px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 py-2"
           style={{ background: "#0c0c0c" }}
-          aria-label="Editor tools"
+          aria-label={t("editorTools")}
         >
           {LEFT_NAV.map((group) => (
             <div key={group.group} className="mb-1">
@@ -1308,11 +1311,11 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                       background: on ? "rgba(232,165,75,0.16)" : "transparent",
                       color: on ? ACCENT : "rgba(255,255,255,0.55)",
                     }}
-                    title={item.label}
+                    title={t(item.labelKey)}
                   >
                     <span className="text-base leading-none">{item.icon}</span>
                     <span className="max-w-full truncate text-[9px] font-medium">
-                      {item.label}
+                      {t(item.labelKey)}
                     </span>
                   </button>
                 );
@@ -1372,7 +1375,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                       type="button"
                       onClick={togglePlay}
                       className="absolute inset-0 flex items-center justify-center bg-black/25 transition hover:bg-black/35"
-                      aria-label="Play"
+                      aria-label={tc("play")}
                     >
                       <span
                         className="flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-lg"
@@ -1447,9 +1450,9 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                 </p>
                 <div className="space-y-2">
                   {libraryLoading ? (
-                    <p className="text-xs text-white/45">Loading…</p>
+                    <p className="text-xs text-white/45">{tCommon("loading")}</p>
                   ) : library.length === 0 ? (
-                    <p className="text-xs text-white/45">No other ready videos</p>
+                    <p className="text-xs text-white/45">{t("noOtherVideos")}</p>
                   ) : (
                     library.slice(0, 10).map((clip) => (
                       <button
@@ -1468,7 +1471,7 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
                         />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-medium text-white">
-                            {clip.title || "Untitled"}
+                            {clip.title || tc("untitled")}
                           </span>
                           <span className="block text-[10px] text-white/40">
                             {formatTime(Number(clip.duration_seconds) || 0)}
@@ -1489,8 +1492,12 @@ export function VideoEditorStudio({ job }: { job: VideoJob }) {
           >
             <div className="border-b border-white/8 px-4 py-2">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                {LEFT_NAV.flatMap((g) => g.items).find((i) => i.id === cat)?.label ||
-                  "Tools"}
+                {(() => {
+                  const key = LEFT_NAV.flatMap((g) => g.items).find(
+                    (i) => i.id === cat,
+                  )?.labelKey;
+                  return key ? t(key) : t("editorTools");
+                })()}
               </p>
               <div className="min-h-[110px]">{renderDockTools()}</div>
             </div>

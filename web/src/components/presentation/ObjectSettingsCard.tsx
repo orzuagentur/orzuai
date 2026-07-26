@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { SlideElement } from "@/lib/presentation/types";
 import { renderQrDataUrl } from "@/lib/presentation/factory";
 
@@ -99,6 +100,9 @@ export function ObjectSettingsCard({
   onEditText?: () => void;
   onClose?: () => void;
 }) {
+  const t = useTranslations("studio.presentation");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [qrBusy, setQrBusy] = useState(false);
   const title =
     el.type === "text"
@@ -108,13 +112,13 @@ export function ObjectSettingsCard({
         : el.type === "shape"
           ? "Shape"
           : el.type === "icon"
-            ? "Icon"
+            ? t("icon")
             : el.type === "image"
-              ? "Photo"
+              ? t("photo")
               : el.type === "emoji"
-                ? "Emoji"
+                ? t("emoji")
                 : el.type === "qr"
-                  ? "QR code"
+                  ? t("qrCode")
                   : "Object";
 
   useEffect(() => {
@@ -145,14 +149,14 @@ export function ObjectSettingsCard({
         <div>
           <p className="text-sm font-semibold text-[var(--fg)]">{title}</p>
           <p className="text-[11px] text-[var(--muted)]">
-            Changes apply instantly on the slide
+            {t("changesInstant")}
           </p>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            title="Delete"
-            aria-label="Delete object"
+            title={tCommon("delete")}
+            aria-label={t("deleteObject")}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] text-[var(--danger)] hover:bg-[var(--danger)]/15"
             onClick={onDelete}
           >
@@ -161,7 +165,7 @@ export function ObjectSettingsCard({
           {onClose && (
             <button
               type="button"
-              title="Deselect"
+              title={tc("deselect")}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] text-[var(--muted)] hover:text-[var(--fg)]"
               onClick={onClose}
             >
@@ -173,12 +177,12 @@ export function ObjectSettingsCard({
 
       {el.type === "text" && (
         <>
-          <Section title="Content">
+          <Section title={t("content")}>
             <textarea
               className="field min-h-[96px] !text-sm"
               value={el.text}
               onChange={(e) => onPatch({ text: e.target.value })}
-              placeholder="Write your text…"
+              placeholder={t("writeText")}
             />
             {onEditText && (
               <button
@@ -186,11 +190,11 @@ export function ObjectSettingsCard({
                 className="mt-2 w-full rounded-lg border border-[var(--line)] py-2 text-xs hover:border-[var(--accent)]"
                 onClick={onEditText}
               >
-                Edit directly on slide
+                {t("editOnSlide")}
               </button>
             )}
           </Section>
-          <Section title="Typography">
+          <Section title={t("typography")}>
             <FieldLabel>Size · {el.fontSize}px</FieldLabel>
             <input
               type="range"
@@ -202,7 +206,7 @@ export function ObjectSettingsCard({
             />
             <div className="mt-2 grid grid-cols-2 gap-2">
               <label>
-                <FieldLabel>Weight</FieldLabel>
+                <FieldLabel>{t("weight")}</FieldLabel>
                 <select
                   className="field !py-1.5 !text-xs"
                   value={el.fontWeight}
@@ -225,7 +229,7 @@ export function ObjectSettingsCard({
                 </select>
               </label>
               <label>
-                <FieldLabel>Font</FieldLabel>
+                <FieldLabel>{t("font")}</FieldLabel>
                 <select
                   className="field !py-1.5 !text-xs"
                   value={el.fontFamily}
@@ -278,9 +282,9 @@ export function ObjectSettingsCard({
               </button>
             </div>
           </Section>
-          <Section title="Color">
+          <Section title={t("color")}>
             <div className="flex items-center justify-between">
-              <FieldLabel>Text color</FieldLabel>
+              <FieldLabel>{t("textColor")}</FieldLabel>
               <input
                 type="color"
                 value={hex(el.color)}
@@ -297,14 +301,14 @@ export function ObjectSettingsCard({
 
       {el.type === "chart" && (
         <>
-          <Section title="Data">
+          <Section title={t("data")}>
             <FieldLabel>Title</FieldLabel>
             <input
               className="field !py-2 !text-sm"
               value={el.title}
               onChange={(e) => onPatch({ title: e.target.value })}
             />
-            <FieldLabel>Values (comma-separated)</FieldLabel>
+            <FieldLabel>{t("valuesComma")}</FieldLabel>
             <input
               className="field !py-2 !text-sm"
               value={el.values.join(", ")}
@@ -330,7 +334,7 @@ export function ObjectSettingsCard({
               }
             />
           </Section>
-          <Section title="Colors">
+          <Section title={t("colors")}>
             <p className="text-[11px] text-[var(--muted)]">
               Each slice / bar has its own color
             </p>
@@ -370,7 +374,7 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "shape" && (
-        <Section title="Appearance">
+        <Section title={t("appearance")}>
           <label className="flex items-center justify-between text-[11px] text-[var(--muted)]">
             Fill
             <input
@@ -416,7 +420,7 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "icon" && (
-        <Section title="Icon">
+        <Section title={t("icon")}>
           <p className="truncate text-[11px] text-[var(--muted)]">{el.iconId}</p>
           <label className="flex items-center justify-between text-[11px] text-[var(--muted)]">
             Color
@@ -434,8 +438,8 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "image" && (
-        <Section title="Photo">
-          <FieldLabel>Alt text</FieldLabel>
+        <Section title={t("photo")}>
+          <FieldLabel>{t("altText")}</FieldLabel>
           <input
             className="field !py-2 !text-sm"
             value={el.alt}
@@ -464,7 +468,7 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "emoji" && (
-        <Section title="Emoji">
+        <Section title={t("emoji")}>
           <p className="text-[11px] text-[var(--muted)]">
             {el.label || el.emoji}
           </p>
@@ -476,8 +480,8 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "qr" && (
-        <Section title="QR code">
-          <FieldLabel>Link or text</FieldLabel>
+        <Section title={t("qrCode")}>
+          <FieldLabel>{t("linkOrText")}</FieldLabel>
           <input
             className="field !py-2 !text-sm"
             value={el.data}
@@ -492,7 +496,7 @@ export function ObjectSettingsCard({
             disabled={qrBusy}
             onClick={() => void refreshQr({})}
           >
-            {qrBusy ? "Updating…" : "Update QR"}
+            {qrBusy ? "Updating…" : t("updateQr")}
           </button>
           <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted)]">
             <label className="flex items-center gap-2">
@@ -522,14 +526,14 @@ export function ObjectSettingsCard({
       )}
 
       {el.type === "video" && (
-        <Section title="Video">
+        <Section title={t("video")}>
           <p className="text-[11px] text-[var(--muted)]">
             Legacy video — you can delete this object.
           </p>
         </Section>
       )}
 
-      <Section title="Animation">
+      <Section title={t("animation")}>
         <div className="flex flex-wrap gap-1">
           {ANIMATIONS.map((a) => (
             <button
@@ -548,7 +552,7 @@ export function ObjectSettingsCard({
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <label>
-            <FieldLabel>Delay ms</FieldLabel>
+            <FieldLabel>{t("delayMs")}</FieldLabel>
             <input
               type="number"
               className="field !py-1.5 !text-xs"
@@ -559,7 +563,7 @@ export function ObjectSettingsCard({
             />
           </label>
           <label>
-            <FieldLabel>Duration ms</FieldLabel>
+            <FieldLabel>{t("durationMs")}</FieldLabel>
             <input
               type="number"
               className="field !py-1.5 !text-xs"

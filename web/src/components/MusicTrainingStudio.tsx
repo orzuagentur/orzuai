@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   clampMusicVolume,
   clampVoiceVolume,
@@ -27,6 +28,9 @@ export function MusicTrainingStudio({
   voiceId = "",
   required = false,
 }: Props) {
+  const t = useTranslations("studio.music");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const prefs = useMemo(() => ({ ...defaultMusicPrefs(), ...value }), [value]);
   const { show: toast, notice } = useToast();
   const [genres, setGenres] = useState<LibraryGenre[]>([]);
@@ -73,10 +77,10 @@ export function MusicTrainingStudio({
         `/api/music/group?group=${encodeURIComponent(groupId)}`,
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load tracks");
+      if (!res.ok) throw new Error(data.error || t("failedLoadTracks"));
       setTracks((data.tracks || []) as MusicTrackRef[]);
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Failed to load tracks", "error");
+      toast(e instanceof Error ? e.message : t("failedLoadTracks"), "error");
       setTracks([]);
     } finally {
       setLoading(false);
@@ -161,14 +165,14 @@ export function MusicTrainingStudio({
     a.onended = () => setPlayingId(null);
     musicRef.current = a;
     void a.play().catch(() =>
-      toast("Playback blocked - tap again", "error"),
+      toast(t("playbackBlocked"), "error"),
     );
     setPlayingId(track.id);
   }
 
   async function playDemo() {
     if (!voiceId.trim()) {
-      toast("Choose a voice in the Voice section first", "error");
+      toast(t("chooseVoice"), "error");
       return;
     }
 
@@ -176,7 +180,7 @@ export function MusicTrainingStudio({
       displayTracks.find((x) => prefs.selected_track_ids.includes(x.id)) ||
       displayTracks[0];
     if (!track?.previewUrl) {
-      toast("Select a track in the group first", "error");
+      toast(t("selectTrackFirst"), "error");
       return;
     }
 
@@ -197,7 +201,7 @@ export function MusicTrainingStudio({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
-          typeof data.error === "string" ? data.error : "Failed to create demo",
+          typeof data.error === "string" ? data.error : t("failedDemo"),
         );
       }
 
@@ -224,7 +228,7 @@ export function MusicTrainingStudio({
       await voice.play();
     } catch (e) {
       stopAll();
-      toast(e instanceof Error ? e.message : "Failed to create demo", "error");
+      toast(e instanceof Error ? e.message : t("failedDemo"), "error");
     }
   }
 
@@ -308,7 +312,7 @@ export function MusicTrainingStudio({
   }
 
   function deleteCustomGroup(groupId: string) {
-    if (!confirm("Delete this group?")) return;
+    if (!confirm(t("deleteGroup"))) return;
     stopAll();
     const next = prefs.custom_groups.filter((g) => g.id !== groupId);
     const switchingAway = prefs.active_group_id === groupId;
@@ -371,7 +375,7 @@ export function MusicTrainingStudio({
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {genresLoading && (
-          <p className="text-xs text-[color:var(--muted)]">Loading genres…</p>
+          <p className="text-xs text-[color:var(--muted)]">{t("loadingGenres")}</p>
         )}
         {!genresLoading && genres.length === 0 && (
           <p className="text-xs text-[color:var(--muted)]">
@@ -420,7 +424,7 @@ export function MusicTrainingStudio({
               <button
                 type="button"
                 className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-xs text-[color:var(--muted)] transition hover:bg-red-500/20 hover:text-[color:var(--danger)]"
-                title="Delete group"
+                title={t("deleteGroupBtn")}
                 onClick={(e) => {
                   e.stopPropagation();
                   deleteCustomGroup(g.id);
@@ -495,13 +499,13 @@ export function MusicTrainingStudio({
         </button>
         {demoOn && (
           <button type="button" className="btn btn-ghost text-sm" onClick={stopAll}>
-            Stop
+            {tc("stop")}
           </button>
         )}
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <input
             className="field !py-2 text-sm sm:max-w-[180px]"
-            placeholder="Custom group name"
+            placeholder={t("customGroup")}
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
           />
@@ -510,7 +514,7 @@ export function MusicTrainingStudio({
             className="btn btn-primary text-sm"
             onClick={createCustomGroup}
           >
-            + Custom group
+            + {t("customGroup")}
           </button>
           {isCustom && (
             <button
@@ -518,7 +522,7 @@ export function MusicTrainingStudio({
               className="btn btn-ghost text-sm"
               onClick={() => setSourceOpen((v) => !v)}
             >
-              {sourceOpen ? "Hide" : "Add tracks"}
+              {sourceOpen ? tc("hide") : "Add tracks"}
             </button>
           )}
         </div>
@@ -531,7 +535,7 @@ export function MusicTrainingStudio({
               className="field !py-2 flex-1 text-sm"
               value={sourceQ}
               onChange={(e) => setSourceQ(e.target.value)}
-              placeholder="Search library tracks…"
+              placeholder={t("searchTracks")}
             />
             <button
               type="button"
@@ -539,7 +543,7 @@ export function MusicTrainingStudio({
               disabled={sourceLoading}
               onClick={() => void searchSource()}
             >
-              {sourceLoading ? "…" : "Find"}
+              {sourceLoading ? "…" : tCommon("search")}
             </button>
           </div>
           <div className="grid max-h-48 gap-1.5 overflow-y-auto sm:grid-cols-2">
@@ -591,7 +595,7 @@ export function MusicTrainingStudio({
       <div className="grid gap-1.5 sm:grid-cols-2">
         {loading && (
           <p className="text-sm text-[color:var(--muted)] sm:col-span-2">
-            Loading tracks...
+            {t("loadingTracks")}
           </p>
         )}
         {!loading &&

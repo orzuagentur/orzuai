@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ToastNotice";
 
 type VoiceItem = {
@@ -29,6 +30,8 @@ export function VoicePicker({
   hideSearch?: boolean;
   allowAuto?: boolean;
 }) {
+  const t = useTranslations("studio.voice");
+  const tc = useTranslations("studio.common");
   const { show: toast, notice } = useToast();
   const [voices, setVoices] = useState<VoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,19 +52,19 @@ export function VoicePicker({
         const res = await fetch(`/api/elevenlabs/voices?${params}`);
         const data = await res.json();
         if (!res.ok) {
-          toast(data.error || "Failed to load voices", "error");
+          toast(data.error || t("failedLoadVoices"), "error");
           setVoices([]);
           return;
         }
         setVoices((data.voices || []) as VoiceItem[]);
       } catch {
-        toast("Network error while loading voices", "error");
+        toast(tc("networkError"), "error");
         setVoices([]);
       } finally {
         setLoading(false);
       }
     },
-    [toast],
+    [toast, t, tc],
   );
 
   useEffect(() => {
@@ -117,7 +120,7 @@ export function VoicePicker({
         } else {
           const data = await res.json();
           if (!res.ok) {
-            toast(data.error || "Failed to preview", "error");
+            toast(data.error || t("playbackError"), "error");
             setLoadingId(null);
             return;
           }
@@ -129,12 +132,12 @@ export function VoicePicker({
       audio.onended = () => setPlayingId(null);
       audio.onerror = () => {
         setPlayingId(null);
-        toast("Playback error", "error");
+        toast(t("playbackError"), "error");
       };
       setPlayingId(voice.id);
       await audio.play();
     } catch {
-      toast("Failed to preview", "error");
+      toast(t("playbackError"), "error");
       setPlayingId(null);
     } finally {
       setLoadingId(null);
@@ -142,10 +145,10 @@ export function VoicePicker({
   }
 
   const filters: { id: GenderFilter; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "male", label: "Male" },
-    { id: "female", label: "Female" },
-    { id: "neutral", label: "Neutral" },
+    { id: "all", label: tc("all") },
+    { id: "male", label: tc("male") },
+    { id: "female", label: tc("female") },
+    { id: "neutral", label: tc("neutral") },
   ];
 
   const autoOn = allowAuto && !value;
@@ -157,7 +160,7 @@ export function VoicePicker({
         <>
           <input
             className="field w-full text-sm"
-            placeholder="Search voice"
+            placeholder={t("searchVoice")}
             value={q}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -186,10 +189,7 @@ export function VoicePicker({
       )}
 
       {!loading && voices.length === 0 && (
-        <p className="text-sm text-[color:var(--muted)]">
-          No voices found
-          {!hideSearch ? ". Change the filter or search." : "."}
-        </p>
+        <p className="text-sm text-[color:var(--muted)]">{t("noVoices")}</p>
       )}
 
       <div className="max-h-[280px] space-y-1.5 overflow-y-auto overflow-x-hidden rounded-xl border border-[color:var(--line)] p-1.5 sm:max-h-[320px] sm:p-2">
@@ -209,9 +209,11 @@ export function VoicePicker({
               ✦
             </span>
             <span className="min-w-0 flex-1 overflow-hidden">
-              <span className="block truncate text-sm font-medium">Auto</span>
+              <span className="block truncate text-sm font-medium">
+                {tc("auto")}
+              </span>
               <span className="block truncate text-[11px] text-[color:var(--muted)]">
-                AI picks a voice
+                {t("aiPicksVoice")}
               </span>
             </span>
             {autoOn && (
@@ -249,7 +251,7 @@ export function VoicePicker({
                   color: playing ? "#111" : "var(--fg)",
                 }}
                 disabled={busy}
-                aria-label={playing ? "Stop" : "Play"}
+                aria-label={playing ? tc("stop") : tc("play")}
                 onClick={(e) => {
                   e.stopPropagation();
                   void play(v);

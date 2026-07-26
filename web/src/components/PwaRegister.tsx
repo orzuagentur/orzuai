@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const DISMISS_KEY = "orzuai-pwa-install-dismissed";
 
 export function PwaRegister() {
+  const t = useTranslations("studio.pwa");
+  const tCommon = useTranslations("common");
   const [canInstall, setCanInstall] = useState(false);
   const [deferred, setDeferred] = useState<Event | null>(null);
   const [dismissed, setDismissed] = useState(true);
@@ -58,12 +61,12 @@ export function PwaRegister() {
           }
         }}
       >
-        Install OrzuAi
+        {t("install")}
       </button>
       <button
         type="button"
-        aria-label="Close"
-        title="Close"
+        aria-label={tCommon("close")}
+        title={tCommon("close")}
         onClick={dismiss}
         className="flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--muted)] transition hover:bg-white/10 hover:text-[color:var(--fg)]"
       >

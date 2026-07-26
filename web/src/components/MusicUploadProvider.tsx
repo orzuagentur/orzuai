@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import {
   checkExistingHashes,
@@ -64,6 +65,8 @@ type QueueItem = {
 };
 
 export function MusicUploadProvider({ children }: { children: ReactNode }) {
+  const tc = useTranslations("studio.common");
+  const tMusic = useTranslations("studio.music");
   const [jobs, setJobs] = useState<MusicUploadJob[]>([]);
   const runningRef = useRef(false);
   const queueRef = useRef<QueueItem[]>([]);
@@ -83,7 +86,7 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
         const {
           data: { user },
         } = await createClient().auth.getUser();
-        if (!user) throw new Error("Sign in required");
+        if (!user) throw new Error(tc("signInRequired"));
 
         const hashed: { file: File; hash: string }[] = [];
         let failed = 0;
@@ -153,7 +156,8 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
           } catch (e) {
             console.error(e);
             failed += 1;
-            lastError = e instanceof Error ? e.message : "Upload failed";
+            lastError =
+              e instanceof Error ? e.message : tMusic("uploadFailed");
           }
           patchJob(id, {
             processed: uploadIndex,
@@ -179,7 +183,7 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         patchJob(id, {
           status: "error",
-          error: e instanceof Error ? e.message : "Upload failed",
+          error: e instanceof Error ? e.message : tMusic("uploadFailed"),
         });
       }
       window.dispatchEvent(
@@ -188,7 +192,7 @@ export function MusicUploadProvider({ children }: { children: ReactNode }) {
         }),
       );
     },
-    [patchJob],
+    [patchJob, tc, tMusic],
   );
 
   const pump = useCallback(async () => {

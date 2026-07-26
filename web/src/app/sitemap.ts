@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { seoFeatureSlugs } from "@/lib/seo-features";
+import { routing } from "@/i18n/routing";
 
 const SITE = (
   process.env.NEXT_PUBLIC_APP_URL || "https://www.orzuai.com"
@@ -12,7 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: number;
     changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"];
   }[] = [
-    { path: "/", priority: 1, changeFrequency: "weekly" },
+    { path: "", priority: 1, changeFrequency: "weekly" },
     { path: "/features", priority: 0.95, changeFrequency: "weekly" },
     { path: "/about", priority: 0.9, changeFrequency: "monthly" },
     { path: "/signup", priority: 0.85, changeFrequency: "monthly" },
@@ -26,16 +27,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   ];
 
-  return pages.map((p) => ({
-    url: `${SITE}${p.path}`,
-    lastModified: now,
-    changeFrequency: p.changeFrequency,
-    priority: p.priority,
-    alternates: {
-      languages: {
-        en: `${SITE}${p.path}`,
-        "x-default": `${SITE}${p.path}`,
-      },
-    },
-  }));
+  return pages.flatMap((p) =>
+    routing.locales.map((locale) => {
+      const localPath = `/${locale}${p.path}`;
+      const languages: Record<string, string> = {
+        "x-default": `${SITE}/en${p.path}`,
+      };
+      for (const l of routing.locales) {
+        languages[l] = `${SITE}/${l}${p.path}`;
+      }
+      return {
+        url: `${SITE}${localPath}`,
+        lastModified: now,
+        changeFrequency: p.changeFrequency,
+        priority: p.priority,
+        alternates: { languages },
+      };
+    }),
+  );
 }

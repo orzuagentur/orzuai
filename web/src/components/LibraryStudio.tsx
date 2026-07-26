@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 import { useToast } from "@/components/ToastNotice";
 import { createClient } from "@/lib/supabase/client";
@@ -94,11 +95,12 @@ function FavHeart({
   active: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("studio.library");
   return (
     <button
       type="button"
       className="absolute left-2 top-2 z-[2] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 transition hover:bg-black/75"
-      aria-label={active ? "Remove from favorites" : "Add to favorites"}
+      aria-label={active ? t("removeFavorite") : t("addFavorite")}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -166,6 +168,9 @@ function LibraryMediaModal({
   media: OpenMedia;
   onClose: () => void;
 }) {
+  const t = useTranslations("studio.library");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -201,11 +206,11 @@ function LibraryMediaModal({
       >
         <div className="flex items-center justify-between gap-2 border-b border-[color:var(--line)] px-3 py-2.5">
           <p className="min-w-0 truncate text-sm font-semibold">
-            {media.title || "Untitled"}
+            {media.title || tc("untitled")}
           </p>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={tCommon("close")}
             className="flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--muted)] hover:bg-white/5 hover:text-[color:var(--fg)]"
             onClick={onClose}
           >
@@ -234,7 +239,7 @@ function LibraryMediaModal({
             />
           ) : (
             <p className="p-8 text-center text-sm text-[color:var(--muted)]">
-              Preview is not available yet.
+              {t("previewUnavailable")}
             </p>
           )}
         </div>
@@ -247,7 +252,7 @@ function LibraryMediaModal({
               disabled={busy}
               onClick={() => void onDownload()}
             >
-              {busy ? "Downloading…" : "Download"}
+              {busy ? "Downloading…" : tCommon("download")}
             </button>
           )}
           {media.studioHref && (
@@ -256,7 +261,7 @@ function LibraryMediaModal({
               className="btn btn-ghost flex-1 text-sm"
               onClick={onClose}
             >
-              Open studio
+              {t("openStudio")}
             </Link>
           )}
         </div>
@@ -278,6 +283,10 @@ function parseTab(raw: string | null): LibTab {
 }
 
 export function LibraryStudio() {
+  const t = useTranslations("studio.library");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+  const tFav = useTranslations("studio.favorites");
   const searchParams = useSearchParams();
   const router = useRouter();
   const tab = parseTab(searchParams.get("tab"));
@@ -311,18 +320,18 @@ export function LibraryStudio() {
       .order("created_at", { ascending: false })
       .limit(120);
     if (error) {
-      toast(error.message || "Failed to load library", "error");
+      toast(error.message || t("loadingLibrary"), "error");
       setJobs([]);
       return;
     }
     setJobs((data || []) as VideoJob[]);
-  }, [toast]);
+  }, [t, toast]);
 
   const loadFavs = useCallback(async () => {
     const res = await fetch("/api/favorites");
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      toast(data.error || "Failed to load favorites", "error");
+      toast(data.error || tFav("failedLoad"), "error");
       setFavs([]);
       setFavKeys(new Set());
       return;
@@ -330,7 +339,7 @@ export function LibraryStudio() {
     const items = (data.items || []) as FavoriteItem[];
     setFavs(items);
     setFavKeys(new Set(items.map((x) => `${x.kind}:${x.asset_id}`)));
-  }, [toast]);
+  }, [tFav, toast]);
 
   useEffect(() => {
     setLoading(true);
@@ -372,7 +381,7 @@ export function LibraryStudio() {
   async function removePresentation(id: string) {
     await deletePresentationLibraryItem(id);
     setPresentations(await fetchPresentationLibrary());
-    toast("Presentation removed", "ok");
+    toast(t("presentationRemoved"), "ok");
   }
 
   const clips = useMemo(
@@ -396,7 +405,7 @@ export function LibraryStudio() {
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast(data.error || "Failed to remove", "error");
+        toast(data.error || tFav("failedRemove"), "error");
         return;
       }
       setFavKeys((prev) => {
@@ -415,7 +424,7 @@ export function LibraryStudio() {
       body: JSON.stringify({
         kind,
         asset_id,
-        title: job.title || "Untitled",
+        title: job.title || tc("untitled"),
         thumb: job.thumbnail_url,
         preview_url: `/api/jobs/${job.id}/preview`,
         download_url: `/api/jobs/${job.id}/preview?download=1`,
@@ -424,7 +433,7 @@ export function LibraryStudio() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      toast(data.error || "Failed to favorite", "error");
+      toast(data.error || t("failedFavorite"), "error");
       return;
     }
     setFavKeys((prev) => new Set(prev).add(key));
@@ -438,7 +447,7 @@ export function LibraryStudio() {
     );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      toast(data.error || "Failed to remove", "error");
+      toast(data.error || tFav("failedRemove"), "error");
       return;
     }
     setFavs((prev) =>
@@ -469,7 +478,7 @@ export function LibraryStudio() {
   function openJob(job: VideoJob, studioHref: string) {
     const canPlay = Boolean(job.preview_url || job.storage_path);
     setOpenMedia({
-      title: job.title || "Untitled",
+      title: job.title || tc("untitled"),
       playUrl: canPlay ? `/api/jobs/${job.id}/preview` : null,
       downloadUrl: canPlay
         ? `/api/jobs/${job.id}/preview?download=1`
@@ -490,7 +499,7 @@ export function LibraryStudio() {
     if (jobMatch || (item.kind === "video" && item.preview_url?.startsWith("/api/jobs/"))) {
       const jobId = jobMatch?.[1] || item.asset_id;
       setOpenMedia({
-        title: item.title || "Untitled",
+        title: item.title || tc("untitled"),
         playUrl: `/api/jobs/${jobId}/preview`,
         downloadUrl: `/api/jobs/${jobId}/preview?download=1`,
         poster: item.thumb,
@@ -501,7 +510,7 @@ export function LibraryStudio() {
 
     const rawPlay = item.preview_url || item.download_url;
     if (!rawPlay) {
-      toast("Preview is not available", "error");
+      toast(t("previewUnavailable"), "error");
       return;
     }
 
@@ -520,7 +529,7 @@ export function LibraryStudio() {
         : `/api/media/download?url=${encodeURIComponent(rawDl)}&type=${mediaType}&filename=${encodeURIComponent(item.title || item.asset_id)}`;
 
     setOpenMedia({
-      title: item.title || "Untitled",
+      title: item.title || tc("untitled"),
       playUrl,
       downloadUrl,
       poster: item.thumb,
@@ -531,12 +540,12 @@ export function LibraryStudio() {
   const jobList = tab === "clips" ? clips : tab === "videos" ? videos : [];
   const heading =
     tab === "clips"
-      ? "My clips"
+      ? t("myClips")
       : tab === "videos"
-        ? "My videos"
+        ? t("myVideos")
         : tab === "presentations"
-          ? "My presentations"
-          : "Favorites";
+          ? t("myPresentations")
+          : tFav("title");
 
   return (
     <div className="flex w-full flex-col gap-4 pb-16">
@@ -549,12 +558,12 @@ export function LibraryStudio() {
       </h1>
 
       {loading ? (
-        <p className="text-sm text-[color:var(--muted)]">Loading…</p>
+        <p className="text-sm text-[color:var(--muted)]">{t("loadingLibrary")}</p>
       ) : tab === "presentations" ? (
         presentations.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center">
             <p className="text-sm text-[color:var(--muted)]">
-              No presentations yet. Create one in Classic or AI Presentation.
+              {t("noPresentations")}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Link
@@ -562,13 +571,13 @@ export function LibraryStudio() {
                 className="rounded-full px-4 py-2 text-sm font-semibold text-black"
                 style={{ background: "#E8A54B" }}
               >
-                Classic presentation
+                {t("classicPresentation")}
               </Link>
               <Link
                 href="/dashboard/creators/ai-presentation"
                 className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--fg)]"
               >
-                AI Presentation
+                {t("aiPresentation")}
               </Link>
             </div>
           </div>
@@ -582,14 +591,14 @@ export function LibraryStudio() {
                 <MediaCardHit
                   className="relative aspect-[16/10] w-full cursor-pointer bg-gradient-to-br from-[rgba(232,165,75,0.2)] to-black/40 text-left"
                   onClick={() => openPresentation(item)}
-                  label={item.title || "Open presentation"}
+                  label={item.title || tc("open")}
                 >
                   <div className="absolute inset-0 flex flex-col justify-end p-3">
                     <p className="line-clamp-2 text-sm font-semibold text-white">
-                      {item.title || "Untitled"}
+                      {item.title || tc("untitled")}
                     </p>
                     <p className="mt-1 text-[11px] text-white/70">
-                      {item.source === "ai" ? "AI" : "Classic"} ·{" "}
+                      {item.source === "ai" ? "AI" : tc("classic")} ·{" "}
                       {item.format.toUpperCase()} ·{" "}
                       {item.slideCount || item.doc.slides.length} slides
                     </p>
@@ -598,11 +607,11 @@ export function LibraryStudio() {
                     <CardMenu
                       items={[
                         {
-                          label: "Open",
+                          label: tc("open"),
                           onClick: () => openPresentation(item),
                         },
                         {
-                          label: "Delete",
+                          label: tCommon("delete"),
                           danger: true,
                           onClick: () => void removePresentation(item.id),
                         },
@@ -617,7 +626,7 @@ export function LibraryStudio() {
       ) : tab === "favorites" ? (
         favs.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
-            No favorites yet. Tap the heart on creators assets or your clips.
+            {tFav("empty")}
           </p>
         ) : (
           <ul className="grid w-full grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -658,13 +667,13 @@ export function LibraryStudio() {
                           ...(item.kind === "music" && item.preview_url
                             ? [
                                 {
-                                  label: playing ? "Stop" : "Play",
+                                  label: playing ? tc("stop") : tc("play"),
                                   onClick: () => togglePlay(item),
                                 },
                               ]
                             : [
                                 {
-                                  label: "Open",
+                                  label: tc("open"),
                                   onClick: () => openFavorite(item),
                                 },
                               ]),
@@ -672,7 +681,7 @@ export function LibraryStudio() {
                           item.preview_url?.startsWith("/api/jobs/")
                             ? [
                                 {
-                                  label: "Download",
+                                  label: tCommon("download"),
                                   onClick: () => {
                                     openFavorite(item);
                                   },
@@ -680,7 +689,7 @@ export function LibraryStudio() {
                               ]
                             : []),
                           {
-                            label: "Remove",
+                            label: tc("remove"),
                             danger: true,
                             onClick: () => void removeFav(item),
                           },
@@ -695,7 +704,7 @@ export function LibraryStudio() {
                   </MediaCardHit>
                   <div className="min-w-0 space-y-0.5 px-2.5 py-2">
                     <p className="truncate text-xs font-semibold">
-                      {item.title || "Untitled"}
+                      {item.title || tc("untitled")}
                     </p>
                     {item.author ? (
                       <p className="truncate text-[11px] text-[color:var(--muted)]">
@@ -710,9 +719,7 @@ export function LibraryStudio() {
         )
       ) : jobList.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-10 text-center text-sm text-[color:var(--muted)]">
-          {tab === "clips"
-            ? "No AI clips yet. Create one in AI Clipping."
-            : "No AI videos yet. Create one in AI Video."}
+          {tab === "clips" ? t("noClips") : t("noVideos")}
         </p>
       ) : (
         <ul className="grid w-full grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -731,7 +738,7 @@ export function LibraryStudio() {
                 <MediaCardHit
                   className="relative aspect-[9/16] w-full cursor-pointer bg-black/40 text-left"
                   onClick={() => openJob(job, studioHref)}
-                  label={job.title || "Open video"}
+                  label={job.title || tc("open")}
                 >
                   {job.thumbnail_url || canWatch ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -755,13 +762,13 @@ export function LibraryStudio() {
                     <CardMenu
                       items={[
                         {
-                          label: "Watch",
+                          label: tc("play"),
                           onClick: () => openJob(job, studioHref),
                         },
                         ...(canWatch
                           ? [
                               {
-                                label: "Download",
+                                label: tCommon("download"),
                                 onClick: () =>
                                   void downloadFromUrl(
                                     `/api/jobs/${job.id}/preview?download=1`,
@@ -771,8 +778,8 @@ export function LibraryStudio() {
                             ]
                           : []),
                         {
-                          label: "Open studio",
-                          href: studioHref,
+                          label: t("openStudio"),
+                          onClick: () => router.push(studioHref),
                         },
                       ]}
                     />
@@ -784,14 +791,14 @@ export function LibraryStudio() {
                   {canWatch && (
                     <span className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition hover:opacity-100">
                       <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-black">
-                        Play
+                        {tc("play")}
                       </span>
                     </span>
                   )}
                 </MediaCardHit>
                 <div className="min-w-0 space-y-0.5 px-2.5 py-2">
                   <p className="truncate text-xs font-semibold">
-                    {job.title || "Untitled"}
+                    {job.title || tc("untitled")}
                   </p>
                 </div>
               </li>

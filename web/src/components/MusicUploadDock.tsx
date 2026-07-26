@@ -1,11 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useMusicUpload } from "@/components/MusicUploadProvider";
 
 /**
  * Bottom-right music upload progress — survives navigating away from /music.
  */
 export function MusicUploadDock() {
+  const t = useTranslations("studio.music");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const { jobs, dismissJob } = useMusicUpload();
   const cards = jobs.slice(0, 3);
   if (!cards.length) return null;
@@ -23,7 +27,11 @@ export function MusicUploadDock() {
             <div className="flex items-start justify-between gap-2 px-3.5 pt-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">
-                  {running ? "Uploading music" : job.status === "error" ? "Upload failed" : "Upload complete"}
+                  {running
+                    ? tc("uploading")
+                    : job.status === "error"
+                      ? t("uploadFailed")
+                      : t("uploadComplete")}
                 </p>
                 <p className="truncate text-xs text-[color:var(--muted)]">
                   {job.genreName}
@@ -35,7 +43,7 @@ export function MusicUploadDock() {
                   onClick={() => dismissJob(job.id)}
                   className="text-xs text-[color:var(--muted)] hover:text-[color:var(--fg)]"
                 >
-                  Close
+                  {tCommon("close")}
                 </button>
               )}
             </div>

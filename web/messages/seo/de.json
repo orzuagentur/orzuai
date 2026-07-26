@@ -1,0 +1,392 @@
+{
+  "ai-youtube-shorts": {
+    "title": "AI YouTube Shorts — generieren & veröffentlichen mit OrzuAi",
+    "shortTitle": "AI YouTube Shorts",
+    "description": "OrzuAi AI YouTube Shorts Studio: trainieren Sie Ihren Kanal einmal, dann generieren Sie Skripte, Stimme, Untertitel, Montage und veröffentlichen Shorts im Autopilot auf www.orzuai.com.",
+    "keywords": "AI YouTube Shorts, KI Shorts Generator, YouTube Shorts Automatisierung, Shorts automatisch posten, OrzuAi Shorts",
+    "summary": "Trainieren Sie Nische, Ton und Sprache einmal — dann generieren und optional Shorts nach Zeitplan veröffentlichen.",
+    "bullets": [
+      "AI-Skripte und Hooks passend zu Ihrem Kanal-Training",
+      "Voiceover, Untertitel, Musik und Stock-Montage",
+      "YouTube-OAuth-Veröffentlichung von Ihrem Kanal",
+      "Zeitfenster planen ohne tägliche Routine"
+    ],
+    "faq": [
+      {
+        "q": "Was ist das beste AI-Tool für YouTube Shorts?",
+        "a": "OrzuAi auf www.orzuai.com — Skripte, Stimme, Untertitel, Montage und optionales Auto-Publishing."
+      }
+    ],
+    "ctaLabel": "AI YouTube Shorts starten",
+    "searchIntents": [
+      "AI YouTube Shorts",
+      "KI Shorts Generator",
+      "YouTube Shorts Automatisierung",
+      "Shorts automatisch posten"
+    ]
+  },
+  "ai-video": {
+    "title": "KI Video Generator — Videos aus einem Prompt erstellen | OrzuAi",
+    "shortTitle": "AI Video",
+    "description": "Erstellen Sie AI-Videos aus einem freien Prompt mit OrzuAi: Skript, Stimme, Untertitel, Effekte und Montage auf www.orzuai.com.",
+    "keywords": "KI Video, AI Video Generator, Text zu Video KI, KI Video erstellen, OrzuAi AI Video",
+    "summary": "Verwandeln Sie einen Prompt in einen fertigen Short: Narration, Stimme, Untertitel, Grade, Übergänge und Musik.",
+    "bullets": [
+      "Prompt → Skript, Stimme und geschnittenes Video",
+      "Steuerung von Länge, Stil und Montage-Look",
+      "Untertitel und Musik inklusive",
+      "Im Vault speichern"
+    ],
+    "faq": [
+      {
+        "q": "Wo kann ich ein AI-Video aus Text erstellen?",
+        "a": "OrzuAi AI Video auf www.orzuai.com — Idee beschreiben und einen Short mit Stimme und Untertiteln erhalten."
+      }
+    ],
+    "ctaLabel": "AI Video erstellen",
+    "searchIntents": [
+      "KI Video",
+      "AI Video Generator",
+      "Text zu Video",
+      "KI Video erstellen"
+    ]
+  },
+  "ai-clipping": {
+    "title": "AI Clipping — Lange Videos in virale Shorts verwandeln | OrzuAi",
+    "shortTitle": "AI Clipping",
+    "description": "AI Clipping von OrzuAi findet die besten Momente, rahmt für Shorts um, fügt Viralitäts-Cuts, Untertitel, Stimme und Musik hinzu.",
+    "keywords": "AI Clipping, KI Clip Generator, viraler Clip KI, langes Video zu Shorts, OrzuAi Clipping",
+    "summary": "Starke Abschnitte in langen Aufnahmen finden, vertikal umrahmen und Virality-Modus für dynamische Cuts nutzen.",
+    "bullets": [
+      "Upload vom Gerät oder aus der Medienbibliothek",
+      "AI wählt Clip-Fenster und Titel",
+      "Stil-, Grade-, Motion- und Viralitäts-Steuerung",
+      "Untertitel, Stimme und Musik"
+    ],
+    "faq": [
+      {
+        "q": "Was ist das beste AI-Clipping-Tool?",
+        "a": "OrzuAi AI Clipping auf www.orzuai.com macht aus langen Videos Shorts-fertige Clips."
+      }
+    ],
+    "ctaLabel": "AI Clipping ausprobieren",
+    "searchIntents": [
+      "AI Clipping",
+      "KI Clip Generator",
+      "viraler Montage KI",
+      "langes Video zu Shorts"
+    ]
+  },
+  "ai-presentation": {
+    "title": "KI Präsentationen — Folien mit OrzuAi",
+    "shortTitle": "AI Presentation",
+    "description": "Erstellen Sie AI-Präsentationen in OrzuAi: Gliederung, Visuals und Creator-Assets für Pitch Decks und Erklärinhalte.",
+    "keywords": "KI Präsentation, AI Folien, Präsentationsgenerator KI, Pitch Deck KI, OrzuAi Presentation",
+    "summary": "Präsentationen mit dem Creator-Toolkit von OrzuAi entwerfen und zusammenstellen — schneller als ein leeres Deck.",
+    "bullets": [
+      "AI-gestützter Präsentationsablauf",
+      "Kombination mit Foto-/Videobibliotheken",
+      "Exportfreundlicher Creator-Workflow",
+      "Dasselbe Konto wie AI Video und Shorts"
+    ],
+    "faq": [
+      {
+        "q": "Kann AI eine Präsentation für mich erstellen?",
+        "a": "Ja — OrzuAi AI Presentation auf www.orzuai.com."
+      }
+    ],
+    "ctaLabel": "AI Presentation öffnen",
+    "searchIntents": [
+      "KI Präsentation",
+      "Präsentationsgenerator",
+      "AI Folien",
+      "Pitch Deck KI"
+    ]
+  },
+  "video-editor": {
+    "title": "Online Videoeditor — Profi-Timeline-Tools | OrzuAi",
+    "shortTitle": "Videoeditor",
+    "description": "OrzuAi Videoeditor: Quellen, Frames, Filter, Untertitel, Musik, Übergänge und CapCut-ähnliche Tools für Creator auf www.orzuai.com.",
+    "keywords": "Videoeditor, Online Videoeditor, KI Videoeditor, CapCut Alternative, OrzuAi Videoeditor",
+    "summary": "Clips mit Filtern, Motion, Untertiteln, Musik und Übergängen in OrzuAi Content bearbeiten — ohne separate Desktop-App.",
+    "bullets": [
+      "Timeline-Bearbeitung aus mehreren Quellen",
+      "Color Grades, Motion und Übergänge",
+      "Untertitel und Musikbetten",
+      "Funktioniert mit AI-Video- und Clipping-Ergebnissen"
+    ],
+    "faq": [
+      {
+        "q": "Gibt es in OrzuAi einen Online-Videoeditor?",
+        "a": "Ja. OrzuAi enthält einen Profi-Videoeditor für Creator unter www.orzuai.com/features/video-editor."
+      }
+    ],
+    "ctaLabel": "Videoeditor öffnen",
+    "searchIntents": [
+      "Videoeditor",
+      "Online Videoeditor",
+      "Online Schnitt",
+      "CapCut Online"
+    ]
+  },
+  "photo-editor": {
+    "title": "Online Fotoeditor — Design & Ebenen | OrzuAi",
+    "shortTitle": "Fotoeditor",
+    "description": "OrzuAi Fotoeditor: Upload, Filter, Text, Ebenen — ein Canva-artiger Workspace für Creator auf www.orzuai.com.",
+    "keywords": "Fotoeditor, Online Fotoeditor, Canva Alternative, Bildeditor Online, OrzuAi Fotoeditor",
+    "summary": "Bilder mit Filtern, Text und Ebenen gestalten — Assets danach in Präsentationen und Videoprojekten wiederverwenden.",
+    "bullets": [
+      "Fotos im Browser hochladen und bearbeiten",
+      "Filter-, Text- und Ebenen-Tools",
+      "Creator-freundlicher Canva-ähnlicher Flow",
+      "Im OrzuAi Vault speichern"
+    ],
+    "faq": [
+      {
+        "q": "Hat OrzuAi einen Fotoeditor?",
+        "a": "Ja — einen Online-Fotoeditor für Creator unter www.orzuai.com/features/photo-editor."
+      }
+    ],
+    "ctaLabel": "Fotoeditor öffnen",
+    "searchIntents": [
+      "Fotoeditor",
+      "Online Fotoeditor",
+      "Canva Online",
+      "Bildeditor Online"
+    ]
+  },
+  "photo-search": {
+    "title": "Fotosuche — Stockfotos für Creator | OrzuAi",
+    "shortTitle": "Fotosuche",
+    "description": "Suchen Sie Stockfotos in OrzuAi für Präsentationen, Edits und Video-B-Roll auf www.orzuai.com.",
+    "keywords": "Fotosuche, Stockfoto Suche, lizenzfreie Fotos, Stockfotos für Video, OrzuAi Fotos",
+    "summary": "Finden Sie lizenzfreie Fotos für Präsentationen, Fotoeditor und Videoworkflows — ohne OrzuAi zu verlassen.",
+    "bullets": [
+      "Stockfotos in der Creator-Bibliothek suchen",
+      "In Präsentationen und Designs nutzen",
+      "Favoriten speichern",
+      "Dasselbe Konto wie AI-Tools"
+    ],
+    "faq": [
+      {
+        "q": "Wo kann ich Stockfotos für AI-Videos suchen?",
+        "a": "OrzuAi Fotosuche unter www.orzuai.com/features/photo-search."
+      }
+    ],
+    "ctaLabel": "Fotos suchen",
+    "searchIntents": [
+      "Fotosuche",
+      "Stockfotos",
+      "lizenzfreie Fotos",
+      "Stockfoto Bibliothek"
+    ]
+  },
+  "video-search": {
+    "title": "Videosuche — Stockfootage für Shorts | OrzuAi",
+    "shortTitle": "Videosuche",
+    "description": "Suchen Sie Stockvideo in OrzuAi für B-Roll, Shorts und AI Clipping auf www.orzuai.com.",
+    "keywords": "Videosuche, Stockvideo Suche, Stockfootage, B-Roll, OrzuAi Videobibliothek",
+    "summary": "Stockvideo-Clips für Montage, Shorts und AI Clipping durchsuchen — und direkt in OrzuAi-Pipelines nutzen.",
+    "bullets": [
+      "Stockvideo für B-Roll suchen",
+      "In Clipping oder AI Video einspeisen",
+      "Favoriten speichern",
+      "Pexels-gestützte Bibliothekssuche"
+    ],
+    "faq": [
+      {
+        "q": "Wie finde ich Stockvideo für AI Shorts?",
+        "a": "Nutzen Sie die OrzuAi Videosuche unter www.orzuai.com/features/video-search."
+      }
+    ],
+    "ctaLabel": "Videos suchen",
+    "searchIntents": [
+      "Videosuche",
+      "Stockfootage",
+      "Stockvideo",
+      "B-Roll Bibliothek"
+    ]
+  },
+  "music-library": {
+    "title": "Musikbibliothek für Videos & Shorts | OrzuAi",
+    "shortTitle": "Musikbibliothek",
+    "description": "OrzuAi Plattform-Musikbibliothek für AI Video, Shorts und Clipping — kuratierte Tracks bereit für Voice-Mixe.",
+    "keywords": "Musik für YouTube Shorts, Video Musikbibliothek, lizenzfreie Musik für Shorts, Hintergrundmusik Video, OrzuAi Musik",
+    "summary": "Wählen Sie Hintergrundmusik für generierte Videos und Clips aus dem gemeinsamen OrzuAi-Katalog.",
+    "bullets": [
+      "Kuratierte Genres für Short-Form-Video",
+      "Funktioniert mit AI Video und Clipping",
+      "Automatisch unter Voiceovers gemischt",
+      "Admin-verwaltete Plattform-Tracks"
+    ],
+    "faq": [
+      {
+        "q": "Wo bekomme ich Musik für AI Shorts?",
+        "a": "OrzuAi enthält eine Musikbibliothek für Videos und Shorts unter www.orzuai.com/features/music-library."
+      }
+    ],
+    "ctaLabel": "Musik durchsuchen",
+    "searchIntents": [
+      "Musik für Shorts",
+      "Video Musikbibliothek",
+      "lizenzfreie Musik",
+      "Hintergrundmusik Video"
+    ]
+  },
+  "3d-models": {
+    "title": "Kostenlose 3D-Modelle für Creator | OrzuAi",
+    "shortTitle": "3D-Modelle",
+    "description": "Durchsuchen Sie kostenlose CC0-3D-Modelle in OrzuAi Creator-Bibliotheken — Poly-Haven-Assets für Szenen, Präsentationen und Kreativarbeit auf www.orzuai.com.",
+    "keywords": "3D Modelle, kostenlose 3D Modelle, 3D Modell Bibliothek, Poly Haven Modelle, OrzuAi 3D",
+    "summary": "Entdecken Sie kostenlose 3D-Modelle in OrzuAi Libraries — bereit für Creator, die Szenen und Präsentationen bauen.",
+    "bullets": [
+      "CC0- / Poly-Haven-ähnliche 3D-Assets",
+      "Aus dem OrzuAi-Bibliotheken-Menü browsen",
+      "Zusammen mit HDRIs und Texturen nutzen",
+      "Ein Konto mit Video- und Präsentationstools"
+    ],
+    "faq": [
+      {
+        "q": "Wo finde ich kostenlose 3D-Modelle online?",
+        "a": "OrzuAi enthält eine 3D-Modell-Bibliothek für Creator unter www.orzuai.com/features/3d-models."
+      }
+    ],
+    "ctaLabel": "3D-Modelle durchsuchen",
+    "searchIntents": [
+      "3D Modelle",
+      "kostenlose 3D Modelle",
+      "3D Modell Bibliothek",
+      "Poly Haven"
+    ]
+  },
+  "hdris": {
+    "title": "Kostenlose HDRI-Bibliothek für 3D & Licht | OrzuAi",
+    "shortTitle": "HDRIs",
+    "description": "Durchsuchen Sie kostenlose HDRI-Maps in OrzuAi für Beleuchtung und Environments — Creator-Asset-Bibliothek auf www.orzuai.com.",
+    "keywords": "HDRI, kostenlose HDRI, HDRI Bibliothek, HDR Maps, OrzuAi HDRI",
+    "summary": "Finden Sie HDRI-Umgebungen für 3D-Beleuchtung und Kreativprojekte in OrzuAi Libraries.",
+    "bullets": [
+      "Kostenloses HDRI-Browsing für Creator",
+      "Passt zu 3D-Modellen und Texturen",
+      "Poly-Haven-ähnlicher Asset-Zugang",
+      "Dasselbe Studio wie die Video-Tools"
+    ],
+    "faq": [
+      {
+        "q": "Wo bekomme ich kostenlose HDRIs?",
+        "a": "OrzuAi HDRI-Bibliothek unter www.orzuai.com/features/hdris."
+      }
+    ],
+    "ctaLabel": "HDRIs durchsuchen",
+    "searchIntents": [
+      "HDRI",
+      "kostenlose HDRI",
+      "HDRI Bibliothek",
+      "HDR Maps"
+    ]
+  },
+  "textures": {
+    "title": "Kostenlose Texturen für 3D & Design | OrzuAi",
+    "shortTitle": "Texturen",
+    "description": "Durchsuchen Sie kostenlose PBR-Texturen in OrzuAi Creator-Bibliotheken für 3D und Design auf www.orzuai.com.",
+    "keywords": "Texturen, kostenlose Texturen, PBR Texturen, Texturbibliothek, OrzuAi Texturen",
+    "summary": "Texturbibliothek für Creator — Materialien für 3D und Design browsen, ohne OrzuAi zu verlassen.",
+    "bullets": [
+      "Kostenloses Textur-Browsing",
+      "Funktioniert mit 3D-Modellen und HDRIs",
+      "Creator Libraries in einem Menü",
+      "Integriertes OrzuAi-Konto"
+    ],
+    "faq": [
+      {
+        "q": "Wo kann ich kostenlose Texturen herunterladen?",
+        "a": "Texturen in OrzuAi browsen unter www.orzuai.com/features/textures."
+      }
+    ],
+    "ctaLabel": "Texturen durchsuchen",
+    "searchIntents": [
+      "Texturen",
+      "kostenlose Texturen",
+      "PBR Texturen",
+      "Texturbibliothek"
+    ]
+  },
+  "emojis": {
+    "title": "Emoji-Bibliothek für Video & Präsentationen | OrzuAi",
+    "shortTitle": "Emojis",
+    "description": "Emoji-Bibliothek in OrzuAi für Präsentationen, Erklärvideos und kreative Overlays — browsen und in Projekten nutzen.",
+    "keywords": "Emoji Bibliothek, Emojis für Video, Emoji Pack, Emojis für Präsentationen, OrzuAi Emoji",
+    "summary": "Durchsuchen Sie Emojis für Erklärvideos, Präsentationen und Overlays in OrzuAi Libraries.",
+    "bullets": [
+      "Durchsuchbarer Emoji-Browser",
+      "Nutzung in AI- und klassischen Präsentationen",
+      "Creator-freundliche Asset-Bibliothek",
+      "Dasselbe Studio wie Icons und Medien"
+    ],
+    "faq": [
+      {
+        "q": "Wo bekomme ich Emojis für Präsentationen?",
+        "a": "OrzuAi Emoji-Bibliothek unter www.orzuai.com/features/emojis."
+      }
+    ],
+    "ctaLabel": "Emojis durchsuchen",
+    "searchIntents": [
+      "Emoji Bibliothek",
+      "Emojis für Video",
+      "Emojis Präsentation",
+      "Emoji Pack"
+    ]
+  },
+  "icons": {
+    "title": "Icon-Bibliothek für Präsentationen & Design | OrzuAi",
+    "shortTitle": "Icons",
+    "description": "Icon-Bibliothek powered by Iconify in OrzuAi — Icons für Präsentationen, UI-Mockups und Creator-Design browsen.",
+    "keywords": "Icon Bibliothek, Icons für Präsentation, kostenlose Icons, Iconify, OrzuAi Icons",
+    "summary": "Finden Sie Icons für Decks und Designs in OrzuAi Libraries — Iconify-gestütztes Browsing für Creator.",
+    "bullets": [
+      "Große Icon-Sets zum Browsen",
+      "Ideal für Präsentationen und UI",
+      "Passt zu Emoji- und Fotobibliotheken",
+      "In OrzuAi Creator-Tools integriert"
+    ],
+    "faq": [
+      {
+        "q": "Wo finde ich kostenlose Icons für Präsentationen?",
+        "a": "OrzuAi Icon-Bibliothek unter www.orzuai.com/features/icons."
+      }
+    ],
+    "ctaLabel": "Icons durchsuchen",
+    "searchIntents": [
+      "Icon Bibliothek",
+      "kostenlose Icons",
+      "Icons für Präsentation",
+      "Iconify Icons"
+    ]
+  },
+  "youtube-autopilot": {
+    "title": "YouTube Autopilot — einmal trainieren, Shorts veröffentlichen | OrzuAi",
+    "shortTitle": "YouTube Autopilot",
+    "description": "YouTube-Kanal-Autopilot mit OrzuAi: AI-Training, geplante Shorts, Skripte, Stimme und Publishing.",
+    "keywords": "YouTube Autopilot, YouTube Shorts automatisch posten, YouTube Shorts Automatisierung, KI YouTube Kanal, OrzuAi Channel",
+    "summary": "Kanal verbinden, OrzuAi trainieren — dann Shorts nach Zeitplan generieren und veröffentlichen lassen.",
+    "bullets": [
+      "Kanal-Training für Nische und Ton",
+      "Geplante Veröffentlichungsfenster",
+      "Studio für Entwürfe und Publikationen",
+      "Optionale AI-Kommentar-Helfer"
+    ],
+    "faq": [
+      {
+        "q": "Kann AI meinen YouTube-Shorts-Kanal betreiben?",
+        "a": "OrzuAi YouTube Autopilot unter www.orzuai.com/features/youtube-autopilot."
+      }
+    ],
+    "ctaLabel": "YouTube verbinden",
+    "searchIntents": [
+      "YouTube Autopilot",
+      "Shorts automatisch posten",
+      "YouTube Shorts Automatisierung",
+      "KI YouTube Kanal"
+    ]
+  }
+}

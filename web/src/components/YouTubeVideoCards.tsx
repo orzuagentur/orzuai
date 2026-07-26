@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { VideoJob } from "@/lib/types";
-import { JOB_STATUS_LABEL, statusColor } from "@/lib/job-status";
+import { statusColor } from "@/lib/job-status";
+import { useJobStatusLabel } from "@/hooks/useJobStatusLabel";
 import { CardMenu, CardMenuSlot } from "@/components/CardMenu";
 
 type YtComment = {
@@ -51,18 +53,12 @@ function formatDurationLabel(sec: number | null | undefined) {
   return r > 0 ? `${m}:${String(r).padStart(2, "0")}` : `${m}m`;
 }
 
-function kindLabel(sec: number | null | undefined) {
-  const s = Number(sec ?? 0);
-  if (!Number.isFinite(s) || s <= 0) return null;
-  return s <= 60 ? "Short" : "Video";
-}
-
 export function YouTubeVideoCards({
   jobs,
   onDelete,
   onPublish,
   busyId,
-  emptyLabel = "No videos yet.",
+  emptyLabel,
 }: {
   jobs: VideoJob[];
   onDelete?: (youtubeVideoId: string) => void;
@@ -70,19 +66,28 @@ export function YouTubeVideoCards({
   busyId?: string | null;
   emptyLabel?: string;
 }) {
+  const t = useTranslations("studio.youtube");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+  const statusLabel = useJobStatusLabel();
   const [open, setOpen] = useState<VideoJob | null>(null);
   const [liveJobs, setLiveJobs] = useState(jobs);
+  const resolvedEmpty = emptyLabel ?? t("noVideosYet");
 
   useEffect(() => {
     setLiveJobs(jobs);
   }, [jobs]);
 
-  // Engagement counts come from DB / 24h channel sync — no per-mount YouTube API.
+  function kindLabel(sec: number | null | undefined) {
+    const s = Number(sec ?? 0);
+    if (!Number.isFinite(s) || s <= 0) return null;
+    return s <= 60 ? t("short") : t("video");
+  }
 
   if (liveJobs.length === 0) {
     return (
       <p className="rounded-xl border border-[color:var(--line)] p-8 text-center text-sm text-[color:var(--muted)]">
-        {emptyLabel}
+        {resolvedEmpty}
       </p>
     );
   }
@@ -95,12 +100,15 @@ export function YouTubeVideoCards({
           const canPlay = Boolean(job.youtube_video_id || job.preview_url);
           const menuItems = [
             ...(job.youtube_url
-              ? [{ label: "YouTube", href: job.youtube_url }]
+              ? [{ label: t("youtube"), href: job.youtube_url }]
               : []),
             ...(onDelete && job.youtube_video_id
               ? [
                   {
-                    label: busyId === job.youtube_video_id ? "Deleting..." : "Delete",
+                    label:
+                      busyId === job.youtube_video_id
+                        ? t("deleting")
+                        : tCommon("delete"),
                     danger: true as const,
                     disabled: busyId === job.youtube_video_id,
                     onClick: () => onDelete(job.youtube_video_id!),
@@ -145,13 +153,13 @@ export function YouTubeVideoCards({
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-[10px] text-[color:var(--muted)] sm:text-sm">
-                      {JOB_STATUS_LABEL[job.status] || job.status}
+                      {statusLabel(job.status)}
                     </div>
                   )}
                   {canPlay && (
                     <span className="absolute inset-0 hidden items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100 sm:flex">
                       <span className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-black">
-                        Play
+                        {tc("play")}
                       </span>
                     </span>
                   )}
@@ -162,7 +170,7 @@ export function YouTubeVideoCards({
                       background: "rgba(0,0,0,0.72)",
                     }}
                   >
-                    {JOB_STATUS_LABEL[job.status] || job.status}
+                    {statusLabel(job.status)}
                   </span>
                   {(kindLabel(job.duration_seconds) ||
                     formatDurationLabel(job.duration_seconds)) && (
@@ -178,26 +186,26 @@ export function YouTubeVideoCards({
                 </div>
                 <div className="space-y-1 p-1.5 sm:space-y-2 sm:p-3">
                   <h3 className="line-clamp-2 min-h-0 text-[10px] font-semibold leading-snug sm:min-h-[2.5rem] sm:text-sm">
-                    {job.title || "Untitled"}
+                    {job.title || tc("untitled")}
                   </h3>
                   <div className="hidden grid-cols-3 gap-1 text-center text-[11px] text-[color:var(--muted)] sm:grid">
                     <div className="rounded-md bg-black/20 px-1 py-1.5">
                       <p className="font-semibold text-[color:var(--fg)]">
                         {formatCount(job.view_count)}
                       </p>
-                      <p>views</p>
+                      <p>{t("views")}</p>
                     </div>
                     <div className="rounded-md bg-black/20 px-1 py-1.5">
                       <p className="font-semibold text-[color:var(--fg)]">
                         {formatCount(job.like_count)}
                       </p>
-                      <p>likes</p>
+                      <p>{t("likes")}</p>
                     </div>
                     <div className="rounded-md bg-black/20 px-1 py-1.5">
                       <p className="font-semibold text-[color:var(--fg)]">
                         {formatCount(job.comment_count)}
                       </p>
-                      <p>comments</p>
+                      <p>{t("commentsLabel")}</p>
                     </div>
                   </div>
                   <p className="hidden text-[11px] text-[color:var(--muted)] sm:block">
@@ -250,6 +258,10 @@ function VideoDetailModal({
   onPublish?: () => void;
   deleting?: boolean;
 }) {
+  const t = useTranslations("studio.youtube");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
+  const statusLabel = useJobStatusLabel();
   const [showComments, setShowComments] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [comments, setComments] = useState<YtComment[]>([]);
@@ -275,25 +287,25 @@ function VideoDetailModal({
       );
       const data = await res.json();
       if (!res.ok) {
-        setCommentError(data.error || "Could not load comments");
+        setCommentError(data.error || t("couldNotLoadComments"));
         setComments([]);
         return;
       }
       setComments(data.comments || []);
       setCommentsLoaded(true);
     } catch {
-      setCommentError("Could not load comments");
+      setCommentError(t("couldNotLoadComments"));
     } finally {
       setLoadingComments(false);
     }
-  }, [job.youtube_video_id]);
+  }, [job.youtube_video_id, t]);
 
   async function sendReply(c: YtComment, mode: "manual" | "ai") {
     const commentId = c.commentId || c.id;
     if (!job.youtube_video_id || !commentId) return;
     const text = (replyDraft[commentId] || "").trim();
     if (mode === "manual" && text.length < 1) {
-      setActionError("Write a reply first.");
+      setActionError(t("writeReplyFirst"));
       return;
     }
     setBusyComment(`${commentId}:${mode}`);
@@ -313,13 +325,13 @@ function VideoDetailModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setActionError(data.error || "Failed to reply");
+        setActionError(data.error || t("failedReply"));
         return;
       }
       setReplyDraft((prev) => ({ ...prev, [commentId]: "" }));
       await loadComments();
     } catch {
-      setActionError("Failed to reply");
+      setActionError(t("failedReply"));
     } finally {
       setBusyComment(null);
     }
@@ -354,7 +366,7 @@ function VideoDetailModal({
     ...(job.youtube_url
       ? [
           {
-            label: "Open on YouTube",
+            label: t("openOnYoutube"),
             href: job.youtube_url,
           },
         ]
@@ -362,7 +374,7 @@ function VideoDetailModal({
     ...(onPublish
       ? [
           {
-            label: "Publish to YouTube",
+            label: t("publishToYoutube"),
             onClick: () => {
               setMenuOpen(false);
               onPublish();
@@ -373,7 +385,7 @@ function VideoDetailModal({
     ...(onDelete
       ? [
           {
-            label: deleting ? "Deleting..." : "Delete",
+            label: deleting ? t("deleting") : tCommon("delete"),
             danger: true as const,
             disabled: deleting,
             onClick: () => {
@@ -396,15 +408,14 @@ function VideoDetailModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={job.title || "Video"}
+        aria-label={job.title || t("video")}
       >
-        {/* Top controls */}
         <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 p-2.5">
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              title="Comments"
-              aria-label="Comments"
+              title={t("comments")}
+              aria-label={t("comments")}
               aria-pressed={showComments}
               onClick={() => setShowComments((v) => !v)}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition hover:bg-black/85"
@@ -433,8 +444,8 @@ function VideoDetailModal({
               <div className="relative" ref={menuRef}>
                 <button
                   type="button"
-                  title="More"
-                  aria-label="More actions"
+                  title={tc("moreActions")}
+                  aria-label={tc("moreActions")}
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen((v) => !v)}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition hover:bg-black/85"
@@ -492,8 +503,8 @@ function VideoDetailModal({
 
           <button
             type="button"
-            title="Close"
-            aria-label="Close"
+            title={tCommon("close")}
+            aria-label={tCommon("close")}
             onClick={onClose}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition hover:bg-black/85"
           >
@@ -513,7 +524,6 @@ function VideoDetailModal({
           </button>
         </div>
 
-        {/* Video only */}
         <div
           className={`relative flex min-h-0 flex-1 items-center justify-center bg-black ${
             showComments ? "max-h-[42%]" : ""
@@ -522,7 +532,7 @@ function VideoDetailModal({
           {job.youtube_video_id ? (
             <div className="aspect-[9/16] h-full max-h-[min(78vh,720px)] w-full">
               <iframe
-                title={job.title || "preview"}
+                title={job.title || t("video")}
                 className="h-full w-full"
                 src={`https://www.youtube.com/embed/${job.youtube_video_id}?autoplay=0`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -540,21 +550,20 @@ function VideoDetailModal({
             </div>
           ) : (
             <div className="p-8 text-center text-sm text-[color:var(--muted)]">
-              Preview available after generation finishes.
+              {t("previewAfter")}
               <br />
-              Status: {JOB_STATUS_LABEL[job.status] || job.status}
+              {t("statusLine", { status: statusLabel(job.status) })}
             </div>
           )}
         </div>
 
-        {/* Comments panel inside the same card */}
         {showComments && (
           <div className="flex min-h-0 flex-1 flex-col border-t border-[color:var(--line)] bg-[color:var(--bg-elevated)]">
             <div className="flex items-center justify-between gap-2 border-b border-[color:var(--line)] px-3 py-2.5">
               <div className="min-w-0">
-                <h3 className="truncate text-sm font-semibold">Comments</h3>
+                <h3 className="truncate text-sm font-semibold">{t("comments")}</h3>
                 <p className="truncate text-[11px] text-[color:var(--muted)]">
-                  {job.title || "Untitled"}
+                  {job.title || tc("untitled")}
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -564,12 +573,12 @@ function VideoDetailModal({
                   onClick={() => void loadComments()}
                   disabled={loadingComments || !job.youtube_video_id}
                 >
-                  {loadingComments ? "…" : "Refresh"}
+                  {loadingComments ? "…" : tc("refresh")}
                 </button>
                 <button
                   type="button"
-                  title="Close comments"
-                  aria-label="Close comments"
+                  title={t("closeComments")}
+                  aria-label={t("closeComments")}
                   onClick={() => setShowComments(false)}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--muted)] transition hover:bg-white/5 hover:text-[color:var(--fg)]"
                 >
@@ -593,16 +602,16 @@ function VideoDetailModal({
             <div className="min-h-0 flex-1 overflow-auto p-3">
               {!job.youtube_video_id ? (
                 <p className="text-sm text-[color:var(--muted)]">
-                  Comments appear after the video is published.
+                  {t("commentsAfterPublish")}
                 </p>
               ) : commentError ? (
                 <p className="text-sm text-[color:var(--danger)]">{commentError}</p>
               ) : loadingComments && !commentsLoaded ? (
                 <p className="text-sm text-[color:var(--muted)]">
-                  Loading comments...
+                  {t("loadingComments")}
                 </p>
               ) : comments.length === 0 ? (
-                <p className="text-sm text-[color:var(--muted)]">No comments yet.</p>
+                <p className="text-sm text-[color:var(--muted)]">{t("noComments")}</p>
               ) : (
                 <ul className="space-y-4">
                   {actionError && (
@@ -636,21 +645,23 @@ function VideoDetailModal({
                               {c.publishedAt
                                 ? ` · ${formatFixedDate(c.publishedAt)}`
                                 : ""}
-                              {c.repliedByUs ? " · Replied" : ""}
+                              {c.repliedByUs ? ` · ${t("replied")}` : ""}
                             </p>
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-snug">
                               {c.text}
                             </p>
                             <p className="mt-1 text-[11px] text-[color:var(--muted)]">
-                              {c.likes} likes
-                              {c.replyCount ? ` · ${c.replyCount} replies` : ""}
+                              {t("nLikes", { n: c.likes })}
+                              {c.replyCount
+                                ? ` · ${t("nReplies", { n: c.replyCount })}`
+                                : ""}
                             </p>
                           </div>
 
                           {c.ourReply && (
                             <div className="rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-2">
                               <p className="text-[10px] uppercase tracking-wide text-[color:var(--muted)]">
-                                Your reply
+                                {t("yourReply")}
                               </p>
                               <p className="mt-0.5 whitespace-pre-wrap text-sm">
                                 {c.ourReply}
@@ -687,8 +698,8 @@ function VideoDetailModal({
                               className="field min-h-[56px] w-full text-sm"
                               placeholder={
                                 c.repliedByUs
-                                  ? "Reply again to this thread…"
-                                  : "Write a reply..."
+                                  ? t("replyAgain")
+                                  : t("writeReply")
                               }
                               value={replyDraft[cid] || ""}
                               disabled={Boolean(busy)}
@@ -707,8 +718,8 @@ function VideoDetailModal({
                                 onClick={() => void sendReply(c, "manual")}
                               >
                                 {busyComment === `${cid}:manual`
-                                  ? "Sending..."
-                                  : "Reply"}
+                                  ? t("sending")
+                                  : t("reply")}
                               </button>
                               <button
                                 type="button"
@@ -717,8 +728,8 @@ function VideoDetailModal({
                                 onClick={() => void sendReply(c, "ai")}
                               >
                                 {busyComment === `${cid}:ai`
-                                  ? "AI writing..."
-                                  : "AI reply"}
+                                  ? t("aiWriting")
+                                  : t("aiReply")}
                               </button>
                             </div>
                           </div>

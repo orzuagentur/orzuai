@@ -9,7 +9,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import type { AiTraining, PublishSchedule } from "@/lib/types";
 import {
   ScheduleStudio,
@@ -64,6 +66,9 @@ export function TrainingStudio({
   embeddedInChannel?: boolean;
   channelTitle?: string | null;
 }) {
+  const t = useTranslations("studio.training");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const enableAiFlow = searchParams.get("enableAi") === "1";
@@ -196,7 +201,7 @@ export function TrainingStudio({
     goToChannel?: boolean;
   }): Promise<boolean> {
     if (!requiredOk) {
-      toast("Fill in the required fields first (checklist at bottom right).", "error");
+      toast(t("fillRequired"), "error");
       setChecklistOpen(true);
       return false;
     }
@@ -209,19 +214,19 @@ export function TrainingStudio({
     });
     const unique = new Set(schedulePayload.times);
     if (unique.size !== schedulePayload.times.length) {
-      toast("Each publish time must be different.", "error");
+      toast(t("timesDifferent"), "error");
       setBusy(false);
       return false;
     }
     const sortedMins = [...schedulePayload.times]
-      .map((t) => {
-        const [h, m] = String(t).split(":");
+      .map((tm) => {
+        const [h, m] = String(tm).split(":");
         return Number(h) * 60 + Number(m || 0);
       })
       .sort((a, b) => a - b);
     for (let i = 1; i < sortedMins.length; i++) {
       if (sortedMins[i] - sortedMins[i - 1] < 15) {
-        toast("Keep at least 15 minutes between publish times.", "error");
+        toast(t("timesGap"), "error");
         setBusy(false);
         return false;
       }
@@ -268,11 +273,11 @@ export function TrainingStudio({
     setBusy(false);
 
     if (!trainRes.ok) {
-      toast(trainData.error || "Failed to save Training", "error");
+      toast(trainData.error || t("failedSave"), "error");
       return false;
     }
     if (!schedRes.ok) {
-      toast(schedData.error || "Failed to save schedule", "error");
+      toast(schedData.error || t("failedSchedule"), "error");
       return false;
     }
 
@@ -286,11 +291,7 @@ export function TrainingStudio({
     setForm((p) => ({ ...p, is_trained: true, learning_enabled: false }));
     setSchedule(savedSchedule);
     setDirty(false);
-    toast(
-      enableAiFlow
-        ? "Saved. AI content enabled."
-        : "Saved.",
-    );
+    toast(enableAiFlow ? t("savedAiOn") : t("saved"));
     if (options?.goToChannel || enableAiFlow) {
       allowLeaveRef.current = true;
       router.push("/dashboard/channel");
@@ -378,18 +379,18 @@ export function TrainingStudio({
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[color:var(--line)] bg-black/20 px-3 py-1.5 text-sm text-[color:var(--muted)] transition hover:border-[color:rgba(232,165,75,0.4)] hover:text-[color:var(--fg)]"
           >
             <span aria-hidden>←</span>
-            Back
+            {tCommon("back")}
           </button>
-          <h1 className="text-2xl font-semibold">AI Training</h1>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="mt-1 text-sm text-[color:var(--muted)]">
             {enableAiFlow
-              ? "Fill required fields and press Save - AI content will turn on."
+              ? t("fillAndSave")
               : channelTitle
                 ? `Settings for ${channelTitle}`
-                : "Schedule, style, voice, and comments."}
+                : t("scheduleStyle")}
             {dirty && (
               <span className="ml-2 text-[color:var(--accent)]">
-                Unsaved changes
+                {t("unsaved")}
               </span>
             )}
           </p>
@@ -400,7 +401,7 @@ export function TrainingStudio({
           disabled={busy || (!dirty && !enableAiFlow) || !requiredOk}
           onClick={() => void saveAll({ goToChannel: true })}
         >
-          {busy ? "Saving..." : "Save"}
+          {busy ? tc("saving") : tCommon("save")}
         </button>
       </header>
 
@@ -418,13 +419,13 @@ export function TrainingStudio({
       <div className="space-y-6">
         <section className="panel rise space-y-3 p-3 sm:space-y-4 sm:p-4">
           <SectionTitle
-            title="Content"
-            subtitle="Niche, language, format, subtitles, look, and prompt."
+            title={t("content")}
+            subtitle={t("nicheHint")}
             required
           />
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
             <PresetSelect
-              label="Niche"
+              label={t("niche")}
               value={form.niche}
               presets={ensurePreset(NICHE_PRESETS, form.niche)}
               onChange={(v) => setTraining("niche", v)}
@@ -432,7 +433,7 @@ export function TrainingStudio({
               compact
             />
             <PresetSelect
-              label="Language"
+              label={t("language")}
               value={form.language}
               presets={ensurePreset(LANGUAGE_PRESETS, form.language)}
               onChange={(v) => setTraining("language", v)}
@@ -440,7 +441,7 @@ export function TrainingStudio({
               compact
             />
             <PresetSelect
-              label="Format"
+              label={t("format")}
               value={form.video_format}
               presets={VIDEO_FORMAT_PRESETS}
               onChange={(v) => {
@@ -456,7 +457,7 @@ export function TrainingStudio({
               fixedOptions
             />
             <PresetSelect
-              label="Duration"
+              label={t("duration")}
               value={String(form.duration_seconds)}
               presets={ensurePreset(
                 durationPresetsForFormat(form.video_format),
@@ -467,7 +468,7 @@ export function TrainingStudio({
             />
             <div className="sm:col-span-2">
               <PresetSelect
-                label="CTA"
+                label={t("cta")}
                 value={form.cta}
                 presets={ensurePreset(CTA_PRESETS, form.cta)}
                 onChange={(v) => setTraining("cta", v)}
@@ -485,7 +486,7 @@ export function TrainingStudio({
 
           <div className="space-y-3 border-t border-[color:var(--line)] pt-3">
             <div>
-              <p className="text-sm font-semibold">Look & montage</p>
+              <p className="text-sm font-semibold">{t("lookMontage")}</p>
               <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
                 Applied on every AI Short from this channel — beats script
                 suggestions.
@@ -493,7 +494,7 @@ export function TrainingStudio({
             </div>
             <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
               <PresetSelect
-                label="Edit style"
+                label={t("editStyle")}
                 value={form.video_style || ""}
                 presets={ensurePreset(VIDEO_STYLE_PRESETS, form.video_style || "")}
                 onChange={(v) => {
@@ -519,7 +520,7 @@ export function TrainingStudio({
                 compact
               />
               <PresetSelect
-                label="Color grade"
+                label={t("colorGrade")}
                 value={form.visual_effect || "cinematic"}
                 presets={ensurePreset(
                   VISUAL_EFFECT_PRESETS,
@@ -552,7 +553,7 @@ export function TrainingStudio({
             </div>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--line)] bg-black/15 px-3 py-2.5">
               <div className="min-w-0">
-                <p className="text-sm font-medium">Flash cuts</p>
+                <p className="text-sm font-medium">{t("flashCuts")}</p>
                 <p className="text-[11px] text-[color:var(--muted)]">
                   Punchy xfade pool between clips (viral energy).
                 </p>
@@ -592,7 +593,7 @@ export function TrainingStudio({
                 className="field w-full resize-none text-sm"
                 value={form.style_prompt}
                 onChange={(v) => setTraining("style_prompt", v)}
-                placeholder="Extra info for AI — tone, topics, what to avoid…"
+                placeholder={t("extraInfo")}
                 maxLength={2000}
                 minRows={2}
               />
@@ -654,7 +655,7 @@ export function TrainingStudio({
         <section className="panel rise space-y-3 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold">Comments</p>
+              <p className="text-sm font-semibold">{t("comments")}</p>
               <p className="mt-0.5 text-[11px] text-[color:var(--muted)]">
                 When on, the worker reads new comments and AI-replies. You can also
                 reply from each video in Channel. YouTube API cannot like/heart
@@ -690,15 +691,15 @@ export function TrainingStudio({
           {form.reply_comments_enabled && (
             <div className="grid gap-4 border-t border-[color:var(--line)] pt-4 sm:grid-cols-2">
               <PresetSelect
-                label="Language"
+                label={t("language")}
                 value={form.reply_languages}
                 presets={ensurePreset(
                   [
-                    { value: "auto", label: "Auto-detect" },
-                    { value: "en", label: "English" },
-                    { value: "ru", label: "Russian" },
-                    { value: "de", label: "German" },
-                    { value: "uz", label: "Uzbek" },
+                    { value: "auto", label: t("autoDetect") },
+                    { value: "en", label: t("english") },
+                    { value: "ru", label: t("russian") },
+                    { value: "de", label: t("german") },
+                    { value: "uz", label: t("uzbek") },
                   ],
                   form.reply_languages,
                 )}
@@ -706,7 +707,7 @@ export function TrainingStudio({
               />
               <div className="sm:col-span-2">
                 <PresetSelect
-                  label="AI style"
+                  label={t("aiStyle")}
                   value={form.reply_style_prompt}
                   presets={ensurePreset(
                     REPLY_STYLE_PRESETS,
@@ -729,10 +730,10 @@ export function TrainingStudio({
             <div
               className="w-[min(100vw-2.5rem,280px)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]/95 p-4 shadow-2xl backdrop-blur-md"
               role="dialog"
-              aria-label="Required checklist"
+              aria-label={t("requiredChecklist")}
             >
               <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold">Required</p>
+                <p className="text-sm font-semibold">{t("requiredChecklist")}</p>
                 <span className="text-xs tabular-nums text-[color:var(--muted)]">
                   {checklistDone}/{checklist.length}
                 </span>
@@ -764,7 +765,11 @@ export function TrainingStudio({
                         color: item.done ? "var(--fg)" : "var(--muted)",
                       }}
                     >
-                      {item.label}
+                      {item.key === "niche"
+                        ? t("niche")
+                        : item.key === "language"
+                          ? t("language")
+                          : item.label}
                     </span>
                   </li>
                 ))}
@@ -773,7 +778,7 @@ export function TrainingStudio({
           )}
           <button
             type="button"
-            aria-label="Required checklist"
+            aria-label={t("requiredChecklist")}
             aria-expanded={checklistOpen}
             onClick={() => setChecklistOpen((v) => !v)}
             className="flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition hover:scale-105"
@@ -813,6 +818,9 @@ function UnsavedCard({
   onStay: () => void;
   onDiscard: () => void;
 }) {
+  const t = useTranslations("studio.training");
+  const tc = useTranslations("studio.common");
+  const tCommon = useTranslations("common");
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-4 sm:items-center"
@@ -826,7 +834,7 @@ function UnsavedCard({
       >
         <div>
           <h2 id="unsaved-title" className="text-lg font-semibold">
-            Save changes?
+            {t("unsaved")}
           </h2>
           <p className="mt-1 text-sm text-[color:var(--muted)]">
             You changed settings but have not saved yet.
@@ -856,7 +864,7 @@ function UnsavedCard({
             disabled={busy}
             onClick={onSave}
           >
-            {busy ? "Saving..." : "Save"}
+            {busy ? tc("saving") : tCommon("save")}
           </button>
         </div>
       </div>
@@ -959,6 +967,7 @@ function PresetSelect({
   compact?: boolean;
   fixedOptions?: boolean;
 }) {
+  const t = useTranslations("studio.training");
   const empty = !value;
   const inList = !empty && presets.some((p) => p.value === value);
   const [ownMode, setOwnMode] = useState(!fixedOptions && !empty && !inList);
@@ -978,7 +987,7 @@ function PresetSelect({
     : ownMode
       ? value || "+ Own"
       : selected?.label ||
-        (empty ? (required ? "Choose…" : "Not set") : value);
+        (empty ? (required ? t("choose") : t("notSet")) : value);
 
   useEffect(() => {
     if (fixedOptions) {
@@ -1054,7 +1063,7 @@ function PresetSelect({
     ? presets
     : [
         ...((optional || !required)
-          ? [{ value: "", label: "— Not set —" }]
+          ? [{ value: "", label: `— ${t("notSet")} —` }]
           : []),
         ...presets,
         { value: "__own__", label: "+ Own" },
@@ -1170,7 +1179,7 @@ function PresetSelect({
                         <textarea
                           className="field min-h-16 text-sm"
                           autoFocus
-                          placeholder="Your value"
+                          placeholder={t("yourValue")}
                           value={draftOwn}
                           onChange={(e) => setDraftOwn(e.target.value)}
                         />
@@ -1178,7 +1187,7 @@ function PresetSelect({
                         <input
                           className="field !py-1.5 text-sm"
                           autoFocus
-                          placeholder="Your value"
+                          placeholder={t("yourValue")}
                           value={draftOwn}
                           onChange={(e) => setDraftOwn(e.target.value)}
                           onKeyDown={(e) => {

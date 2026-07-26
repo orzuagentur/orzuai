@@ -1,24 +1,17 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { SlideElement } from "@/lib/presentation/types";
 
-const LABELS: Record<SlideElement["type"], string> = {
-  text: "Text",
-  shape: "Shape",
-  image: "Photo",
-  video: "Video",
-  icon: "Icon",
-  emoji: "Emoji",
-  qr: "QR code",
-  chart: "Diagram",
-};
-
-function preview(el: SlideElement): string {
+function preview(
+  el: SlideElement,
+  t: ReturnType<typeof useTranslations<"studio.presentation">>,
+): string {
   switch (el.type) {
     case "text":
-      return el.text.slice(0, 48) || "Empty text";
+      return el.text.slice(0, 48) || t("emptyText");
     case "image":
-      return el.alt || el.credit || "Photo";
+      return el.alt || el.credit || t("photo");
     case "icon":
       return el.iconId;
     case "emoji":
@@ -30,7 +23,7 @@ function preview(el: SlideElement): string {
     case "shape":
       return el.shape;
     case "video":
-      return el.credit || "Video";
+      return el.credit || t("video");
   }
 }
 
@@ -45,6 +38,31 @@ export function SlideResourcesPanel({
   elements: SlideElement[];
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslations("studio.presentation");
+
+  const typeLabel = (type: SlideElement["type"]): string => {
+    switch (type) {
+      case "image":
+        return t("photo");
+      case "video":
+        return t("video");
+      case "icon":
+        return t("icon");
+      case "emoji":
+        return t("emoji");
+      case "qr":
+        return t("qrCode");
+      default:
+        return type === "text"
+          ? "Text"
+          : type === "chart"
+            ? "Diagram"
+            : type === "shape"
+              ? "Shape"
+              : type;
+    }
+  };
+
   const counts = elements.reduce(
     (acc, el) => {
       acc[el.type] = (acc[el.type] || 0) + 1;
@@ -87,7 +105,7 @@ export function SlideResourcesPanel({
               className="rounded-lg border border-[var(--line)] bg-white/[0.03] px-2.5 py-2"
             >
               <div className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                {LABELS[type]}
+                {typeLabel(type)}
               </div>
               <div className="text-lg font-semibold text-[var(--fg)]">{n}</div>
             </div>
@@ -96,14 +114,12 @@ export function SlideResourcesPanel({
       </div>
 
       {!sorted.length && (
-        <p className="text-xs text-[var(--muted)]">
-          No objects on this slide yet. Add text, photos, icons…
-        </p>
+        <p className="text-xs text-[var(--muted)]">{t("noObjects")}</p>
       )}
 
       <div className="space-y-1.5">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-          On this slide
+          {t("onThisSlide")}
         </p>
         {sorted.map((el, i) => (
           <button
@@ -129,15 +145,15 @@ export function SlideResourcesPanel({
                   }}
                 />
               ) : (
-                LABELS[el.type].slice(0, 2)
+                typeLabel(el.type).slice(0, 2)
               )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[10px] text-[var(--muted)]">
-                #{i + 1} · {LABELS[el.type]}
+                #{i + 1} · {typeLabel(el.type)}
               </span>
               <span className="block truncate text-xs text-[var(--fg)]">
-                {preview(el)}
+                {preview(el, t)}
               </span>
             </span>
           </button>
