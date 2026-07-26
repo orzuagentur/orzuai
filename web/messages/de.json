@@ -27,6 +27,7 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "account": "Konto",
+    "billing": "Abrechnung",
     "signOut": "Abmelden",
     "channels": "Kanäle",
     "youtubeChannels": "YouTube-Kanäle",
@@ -355,5 +356,32 @@
   "seoCta": {
     "start": "Kostenlos starten",
     "allFeatures": "Alle Funktionen"
+  },
+  "billing": {
+    "eyebrow": "Konto",
+    "title": "Abrechnung",
+    "subtitle": "Wähle einen Plan für Tageslimits und Creators-Tools. Wechsel und Kündigung jederzeit möglich.",
+    "current": "Aktueller Plan",
+    "freeFallback": "Free",
+    "statusLabel": "Status: {status}",
+    "renewsOn": "Verlängert am {date}",
+    "endsOn": "Endet am {date}",
+    "videosPerDay": "{count} Videos / Tag",
+    "featCreators": "Creators-Studio",
+    "featPresentation": "Präsentationen",
+    "featLibraries": "Asset-Bibliotheken",
+    "featPriority": "Prioritäts-Rendering",
+    "currentBadge": "Dein Plan",
+    "subscribe": "Abonnieren",
+    "switchTo": "Plan wechseln",
+    "includedFree": "Im Free-Plan enthalten",
+    "unavailable": "Noch nicht verfügbar",
+    "manageBilling": "Abrechnung verwalten",
+    "loadError": "Abrechnung konnte nicht geladen werden.",
+    "checkoutError": "Checkout konnte nicht gestartet werden.",
+    "portalError": "Kundenportal konnte nicht geöffnet werden.",
+    "successNotice": "Zahlung erhalten. Dein Plan aktualisiert sich in Sekunden.",
+    "canceledNotice": "Checkout abgebrochen — keine Belastung.",
+    "stripeNotReady": "Abrechnung wird eingerichtet. Bezahlte Pläne erscheinen nach Stripe-Keys."
   }
 }

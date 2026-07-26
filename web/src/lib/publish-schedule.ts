@@ -1,5 +1,5 @@
 export const MIN_PUBLISH_GAP_MINUTES = 6 * 60;
-export const MAX_AUTOPUBLISH_VIDEOS_PER_DAY = 4;
+export const MAX_AUTOPUBLISH_VIDEOS_PER_DAY = 5;
 export const SCHEDULE_GENERATION_LEAD_MINUTES = 6 * 60;
 export const MAX_PUBLISH_DRIFT_MINUTES = 10;
 
@@ -8,13 +8,12 @@ const DEFAULT_TIMES_BY_COUNT: Record<number, string[]> = {
   2: ["09:00", "17:00"],
   3: ["09:00", "15:00", "21:00"],
   4: ["03:00", "09:00", "15:00", "21:00"],
+  5: ["03:00", "09:00", "13:00", "17:00", "21:00"],
 };
 
-export function clampVideosPerDay(value: unknown): number {
-  return Math.min(
-    MAX_AUTOPUBLISH_VIDEOS_PER_DAY,
-    Math.max(1, Number(value) || 2),
-  );
+export function clampVideosPerDay(value: unknown, max = MAX_AUTOPUBLISH_VIDEOS_PER_DAY): number {
+  const cap = Math.min(MAX_AUTOPUBLISH_VIDEOS_PER_DAY, Math.max(1, max));
+  return Math.min(cap, Math.max(1, Number(value) || 2));
 }
 
 export function defaultTimesForCount(count: number): string[] {

@@ -27,6 +27,7 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "account": "Account",
+    "billing": "Billing",
     "signOut": "Sign out",
     "channels": "Channels",
     "youtubeChannels": "YouTube Channels",
@@ -355,5 +356,32 @@
   "seoCta": {
     "start": "Start free",
     "allFeatures": "All features"
+  },
+  "billing": {
+    "eyebrow": "Account",
+    "title": "Billing",
+    "subtitle": "Choose a plan for daily video limits and Creators tools. Change or cancel anytime.",
+    "current": "Current plan",
+    "freeFallback": "Free",
+    "statusLabel": "Status: {status}",
+    "renewsOn": "Renews on {date}",
+    "endsOn": "Ends on {date}",
+    "videosPerDay": "{count} videos / day",
+    "featCreators": "Creators studio",
+    "featPresentation": "Presentations",
+    "featLibraries": "Asset libraries",
+    "featPriority": "Priority rendering",
+    "currentBadge": "Your plan",
+    "subscribe": "Subscribe",
+    "switchTo": "Switch plan",
+    "includedFree": "Included on Free",
+    "unavailable": "Not available yet",
+    "manageBilling": "Manage billing",
+    "loadError": "Could not load billing.",
+    "checkoutError": "Could not start checkout.",
+    "portalError": "Could not open billing portal.",
+    "successNotice": "Payment received. Your plan updates in a few seconds.",
+    "canceledNotice": "Checkout canceled — no charge was made.",
+    "stripeNotReady": "Billing is being configured. Paid upgrades will appear once Stripe keys are set."
   }
 }

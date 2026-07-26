@@ -22,4 +22,9 @@ export type AdminUser = {
   created_at: string | null;
   job_count: number;
   cost_usd_month: number;
+  plan_name?: string | null;
+  plan_slug?: string | null;
+  subscription_status?: string | null;
+  cancel_at_period_end?: boolean;
+  stripe_customer_id?: string | null;
 };

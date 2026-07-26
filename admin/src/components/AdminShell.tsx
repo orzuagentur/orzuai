@@ -8,6 +8,7 @@ import { MusicUploadDock } from "@/components/MusicUploadDock";
 
 const NAV = [
   { href: "/users", label: "Users" },
+  { href: "/plans", label: "Plans" },
   { href: "/media", label: "Media" },
   { href: "/music", label: "Music" },
   { href: "/email", label: "Email" },

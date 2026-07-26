@@ -35,6 +35,7 @@ Flow:
 
 Finished videos live in **Cloudflare R2** (not Supabase Storage). See [`STORAGE.md`](STORAGE.md).
 Domain / Google / Vercel checklist: [`DOMAIN.md`](DOMAIN.md) (`https://www.orzuai.com`).
+Stripe subscriptions / Billing: [`BILLING.md`](BILLING.md).
 
 | What | Where |
 |------|--------|

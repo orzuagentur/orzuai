@@ -27,6 +27,7 @@
     "openMenu": "Открыть меню",
     "closeMenu": "Закрыть меню",
     "account": "Аккаунт",
+    "billing": "Биллинг",
     "signOut": "Выйти",
     "channels": "Каналы",
     "youtubeChannels": "YouTube-каналы",
@@ -355,5 +356,32 @@
   "seoCta": {
     "start": "Начать бесплатно",
     "allFeatures": "Все возможности"
+  },
+  "billing": {
+    "eyebrow": "Аккаунт",
+    "title": "Биллинг",
+    "subtitle": "Выберите тариф для лимитов видео и инструментов Creators. Смена и отмена — в любой момент.",
+    "current": "Текущий план",
+    "freeFallback": "Free",
+    "statusLabel": "Статус: {status}",
+    "renewsOn": "Продление {date}",
+    "endsOn": "Заканчивается {date}",
+    "videosPerDay": "{count} видео / день",
+    "featCreators": "Creators studio",
+    "featPresentation": "Презентации",
+    "featLibraries": "Библиотеки ассетов",
+    "featPriority": "Приоритетный рендер",
+    "currentBadge": "Ваш план",
+    "subscribe": "Подписаться",
+    "switchTo": "Сменить план",
+    "includedFree": "Входит в Free",
+    "unavailable": "Пока недоступно",
+    "manageBilling": "Управление оплатой",
+    "loadError": "Не удалось загрузить биллинг.",
+    "checkoutError": "Не удалось открыть оплату.",
+    "portalError": "Не удалось открыть портал оплаты.",
+    "successNotice": "Оплата прошла. План обновится через несколько секунд.",
+    "canceledNotice": "Оплата отменена — списания не было.",
+    "stripeNotReady": "Биллинг настраивается. Платные тарифы появятся после ключей Stripe."
   }
 }

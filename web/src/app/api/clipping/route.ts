@@ -54,6 +54,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    const { getUserEntitlements } = await import("@/lib/billing/entitlements");
+    const { createServiceClient } = await import("@/lib/supabase/middleware");
+    const { entitlements } = await getUserEntitlements(
+      createServiceClient(),
+      user.id,
+    );
+    if (!entitlements.creators) {
+      return NextResponse.json(
+        { error: "AI Clipping requires Creator or Studio plan" },
+        { status: 403 },
+      );
+    }
+  } catch {
+    /* billing tables may be missing — allow until migration applied */
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;

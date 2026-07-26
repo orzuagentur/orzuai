@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/middleware";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import {
   clampVideosPerDay,
   defaultTimesForCount,
@@ -98,8 +100,19 @@ export async function POST(request: Request) {
   const times: string[] = Array.isArray(body.times)
     ? body.times.map((t: unknown) => String(t))
     : existing?.times || defaultTimesForCount(2);
+  let planMax = 5;
+  try {
+    const entitlements = await getUserEntitlements(
+      createServiceClient(),
+      user.id,
+    );
+    planMax = entitlements.entitlements.videos_per_day;
+  } catch {
+    /* billing tables may be missing — use default cap */
+  }
   const videos_per_day = clampVideosPerDay(
     body.videos_per_day ?? existing?.videos_per_day ?? 2,
+    planMax,
   );
   const normalizedTimes = padScheduleTimes(videos_per_day, times);
 

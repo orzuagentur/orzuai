@@ -1021,6 +1021,13 @@ function AppMenu({ email }: { email?: string | null }) {
                 <p className="truncate text-sm font-medium">
                   {email || tc("account")}
                 </p>
+                <Link
+                  href="/dashboard/billing"
+                  className="block rounded-lg py-2 text-sm text-[color:var(--muted)] transition hover:text-[color:var(--fg)]"
+                  onClick={() => setOpen(false)}
+                >
+                  {tc("billing")}
+                </Link>
                 <form action="/auth/signout" method="post" className="pt-1">
                   <button
                     type="submit"

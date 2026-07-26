@@ -26,6 +26,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    const { getUserEntitlements } = await import("@/lib/billing/entitlements");
+    const { createServiceClient } = await import("@/lib/supabase/middleware");
+    const { entitlements } = await getUserEntitlements(
+      createServiceClient(),
+      user.id,
+    );
+    if (!entitlements.presentation) {
+      return NextResponse.json(
+        { error: "Presentation requires Creator or Studio plan" },
+        { status: 403 },
+      );
+    }
+  } catch {
+    /* billing tables may be missing — allow until migration applied */
+  }
+
   const body = (await request.json().catch(() => ({}))) as Body;
   const prompt = String(body.prompt || "").trim();
   if (prompt.length < 8) {
