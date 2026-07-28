@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from openai import OpenAI
@@ -29,6 +30,9 @@ Rules:
 - Use ONLY the training fields provided. Do NOT invent niche/style/tone/content-type
   that the user did not set. Do NOT default to motivational/discipline content
   unless niche/style explicitly says so.
+- Pexels queries are part of the edit plan. They MUST be concrete English stock-video searches:
+  subject + action + environment, one visual beat per query, in script order.
+  Never use generic terms like "cinematic b-roll", "success", "motivation", or abstract single words.
 - Return STRICT JSON only, no markdown.
 JSON schema:
 {{
@@ -65,6 +69,9 @@ Rules:
 - Use ONLY the training fields provided. Do NOT invent niche/style/tone/content-type
   that the user did not set. Do NOT default to motivational/discipline content
   unless niche/style explicitly says so.
+- Pexels queries are part of the edit plan. They MUST be concrete English stock-video searches:
+  subject + action + environment, one visual beat per query, in script order.
+  Never use generic terms like "cinematic b-roll", "success", "motivation", or abstract single words.
 - Return STRICT JSON only, no markdown.
 JSON schema:
 {{
@@ -149,6 +156,8 @@ Rules:
 - "script" is the full spoken narration. Punchy, cinematic, no fluff — match the user's requested vibe.
 - First 3 seconds must hook attention. Put that opener in "hook" (4–12 words) and start the script with it.
 - For STANDARD videos: choose B-roll search queries in English for stock footage (pexels_queries).
+  Each query must be a concrete visual scene: subject + action + environment, in story order.
+  Never return generic phrases like "cinematic b-roll", "stock footage", "success", or one-word moods.
 - For EMOJI videos: do NOT use stock footage. Fill background_colors with solid hex colors and a rich asset_overlays plan.
 - Suggest a subtitle style hint in "subtitle_style", a look filter in "visual_effect",
   preferred_transition, and montage_pace from the AVAILABLE TOOLS block below.
@@ -232,6 +241,79 @@ def _filled(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+_GENERIC_STOCK_QUERIES = {
+    "b roll",
+    "b-roll",
+    "cinematic b roll",
+    "cinematic b-roll",
+    "stock footage",
+    "cinematic stock footage",
+    "success",
+    "motivation",
+    "inspiration",
+    "business",
+    "lifestyle",
+    "technology",
+    "money",
+    "happy",
+    "sad",
+    "people",
+}
+
+_FALLBACK_STOCK_QUERIES = [
+    "real people close up cinematic scene",
+    "hands working on laptop modern workspace",
+    "city life motion cinematic details",
+    "team discussion modern office",
+    "productivity desk close up natural light",
+]
+
+
+def _clean_stock_query(value: Any) -> str:
+    text = str(value or "").strip().strip("\"'")
+    text = re.sub(r"\s+", " ", text)
+    text = text.strip(" ,.;:-")
+    if not text:
+        return ""
+    low = text.lower().replace("-", " ")
+    words = re.findall(r"[a-z0-9]+", low)
+    if not words:
+        return ""
+    if low in _GENERIC_STOCK_QUERIES:
+        return ""
+    if len(words) < 2:
+        text = f"{text} real life cinematic scene"
+    return text[:90]
+
+
+def _sanitize_stock_queries(
+    raw: Any,
+    fallback: list[Any] | tuple[Any, ...] | None = None,
+    *,
+    limit: int = 8,
+) -> list[str]:
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, str):
+        items = re.split(r"[,;\n]+", raw)
+    else:
+        items = []
+
+    fallback_items = list(fallback or []) + _FALLBACK_STOCK_QUERIES
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in [*items, *fallback_items]:
+        query = _clean_stock_query(item)
+        key = query.lower()
+        if not query or key in seen:
+            continue
+        seen.add(key)
+        out.append(query)
+        if len(out) >= limit:
+            break
+    return out or _FALLBACK_STOCK_QUERIES[: min(limit, len(_FALLBACK_STOCK_QUERIES))]
 
 
 _OVERLAY_POSITIONS = {
@@ -324,8 +406,9 @@ def _sanitize_asset_overlays(raw: Any, *, enabled: bool) -> list[dict[str, Any]]
             role = "hero" if idx % 3 == 1 else "support"
         start = max(0.01, min(0.92, _as_float(item.get("start_pct"), 0.04 + idx * 0.045)))
         duration = max(1.8, min(6.0, _as_float(item.get("duration"), 3.2)))
-        default_size = 0.36 if role == "hero" else 0.24
-        size = max(0.18, min(0.46, _as_float(item.get("size_pct"), default_size)))
+        default_size = 0.44 if role == "hero" else 0.27
+        max_size = 0.56 if role == "hero" else 0.34
+        size = max(0.18, min(max_size, _as_float(item.get("size_pct"), default_size)))
         position = str(item.get("position") or "").strip().lower()
         if position not in _OVERLAY_POSITIONS or position in {
             "lower_center",
@@ -401,7 +484,7 @@ Hard rules:
   (examples: money bag, rocket, light bulb, chart increasing, briefcase, robot, globe, trophy, fire, red heart, lock, shopping cart).
 - NEVER use decorative fillers (sparkles/star) unless the script is literally about magic/stars.
 - Prefer kind "emoji" for objects/emotions; kind "icon" for abstract UI symbols (check, shield, trend) with color "#F8FAFC" or "#FBBF24".
-- role "hero" = main idea of the beat (size_pct 0.34-0.44); role "support" = flanking explainers (size_pct 0.20-0.30).
+- role "hero" = main idea of the beat (size_pct 0.40-0.54); role "support" = flanking explainers (size_pct 0.22-0.32).
 - Positions in a beat MUST differ (e.g. center_left + center + center_right, or top_left + top_right + center).
 - Avoid lower_center / bottom_center (captions live there). bottom_left/bottom_right ok if sparse.
 - duration 2.4-5.0 seconds so beats overlap slightly for flow.
@@ -545,7 +628,8 @@ Hard requirements:
 3) Title = original short name, never the raw prompt.
 4) If video_type is emoji: pexels_queries=[], fill background_colors (solid mood hex).
    Visual storyboard (emoji/icons denser than voice) is planned in a dedicated pass.
-   If standard: pexels_queries = English stock-search phrases; background_colors=[].
+   If standard: pexels_queries = concrete English stock-search scenes in story order; background_colors=[].
+   Use subject + action + environment. Never return "cinematic b-roll" or abstract one-word searches.
 5) Respect safety: no illegal / sexual-minors / real crime-howto content.
 6) Fill subtitle_style + visual_effect + preferred_transition + montage_pace + flash_cuts to match the mood of the prompt.
 7) video_type = {normalized_video_type}.
@@ -601,7 +685,11 @@ Hard requirements:
         "tags": data.get("tags") or ["shorts"],
         "pexels_queries": []
         if emoji_video
-        else (data.get("pexels_queries") or ["cinematic b-roll"]),
+        else _sanitize_stock_queries(
+            data.get("pexels_queries"),
+            [data.get("title"), data.get("hook")],
+            limit=8,
+        ),
         "background_colors": bg_colors,
         "subtitle_emphasis": data.get("subtitle_emphasis") or [],
         "subtitle_style": data.get("subtitle_style") or "classic",
@@ -722,7 +810,7 @@ Hard requirements:
                             "start_pct": start,
                             "duration": 3.4,
                             "position": positions[ji],
-                            "size_pct": 0.38 if ji == 1 else 0.26,
+                            "size_pct": 0.46 if ji == 1 else 0.28,
                             "role": "hero" if ji == 1 else "support",
                             "color": "#F8FAFC" if is_icon else None,
                         }
@@ -791,7 +879,9 @@ Language code (mandatory for all spoken/written output): {language}
 Write one unique YouTube script for format "{video_format}".
 Stay STRICTLY inside the AI Training niche / theme / content type.
 The opening must feel bold and unforgettable in {language}.
-Also return 5 varied pexels_queries (English stock-search phrases) for B-roll montage.
+Also return 5 varied pexels_queries for B-roll montage.
+They must be concrete English stock-search scenes in script order:
+subject + action + environment. Never return "cinematic b-roll" or abstract one-word searches.
 """
 
     prompt_kwargs = {
@@ -839,7 +929,13 @@ Also return 5 varied pexels_queries (English stock-search phrases) for B-roll mo
     elif not duration_auto:
         chosen_duration = duration
 
-    pexels_fallback = _filled(training.get("pexels_query")) or "cinematic b-roll"
+    pexels_fallback = (
+        _filled(training.get("pexels_query"))
+        or _filled(training.get("niche"))
+        or _filled(training.get("theme"))
+        or _filled(training.get("content_type"))
+        or "creator workspace cinematic"
+    )
     default_title = "Short" if profile["is_short"] else "Video"
     desc = data.get("description") or f"{script}{profile['hashtag_suffix']}"
     result: dict[str, Any] = {
@@ -848,7 +944,15 @@ Also return 5 varied pexels_queries (English stock-search phrases) for B-roll mo
         "title": (data.get("title") or default_title)[:90],
         "description": desc,
         "tags": data.get("tags") or list(profile["default_tags"]),
-        "pexels_queries": data.get("pexels_queries") or [pexels_fallback],
+        "pexels_queries": _sanitize_stock_queries(
+            data.get("pexels_queries"),
+            [
+                pexels_fallback,
+                training.get("style_prompt"),
+                training.get("content_type"),
+            ],
+            limit=8,
+        ),
         "subtitle_emphasis": data.get("subtitle_emphasis") or [],
         "aspect_ratio": profile["aspect"],
         "is_short": profile["is_short"],

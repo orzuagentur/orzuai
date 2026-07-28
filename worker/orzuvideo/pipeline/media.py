@@ -228,10 +228,49 @@ def write_ass_subtitles(
     style_id = normalize_subtitle_style(style_id)
     emphasis_set = {e.upper().strip(".,!") for e in (emphasis or [])}
     play_w, play_h = play_res or (1080, 1920)
-    margin_v = max(80, int(play_h * 0.27))
-    hook_margin_v = max(120, int(play_h * 0.4))
-    st = SUBTITLE_STYLES.get(style_id) or SUBTITLE_STYLES["classic"]
-    # Emphasis / hook: same family as selected style, slightly larger & punchier
+    st = dict(SUBTITLE_STYLES.get(style_id) or SUBTITLE_STYLES["classic"])
+
+    large_styles = {
+        "impact",
+        "ultra_bold",
+        "viral_white",
+        "hook_banner",
+        "fire_orange",
+        "street_graffiti",
+        "yellow_pop",
+    }
+    compact_styles = {
+        "minimal",
+        "lower_third",
+        "serif_clean",
+        "newspaper",
+        "typewriter",
+        "soft_white",
+    }
+    elegant_styles = {"elegant_gold", "serif_clean", "glass_frost", "newspaper"}
+    if style_id in large_styles:
+        chunk_size = 2
+        size_mult = 1.08
+        margin_ratio = 0.21
+    elif style_id in compact_styles:
+        chunk_size = 4
+        size_mult = 0.92
+        margin_ratio = 0.18
+    elif style_id in elegant_styles:
+        chunk_size = 3
+        size_mult = 0.96
+        margin_ratio = 0.20
+    else:
+        chunk_size = 3
+        size_mult = 1.0
+        margin_ratio = 0.22
+
+    base_size = int(st.get("size") or 72)
+    st["size"] = str(max(46, min(104, round(base_size * size_mult))))
+    margin_v = max(70, int(play_h * margin_ratio))
+    hook_margin_v = max(120, int(play_h * 0.38))
+
+    # Emphasis / hook: same family as selected style, slightly larger & punchier.
     emp = dict(st)
     emp["size"] = str(min(110, int(st.get("size") or 72) + 8))
     emp["outline_w"] = str(max(int(st.get("outline_w") or 4), 4))
@@ -245,6 +284,11 @@ def write_ass_subtitles(
     align = st.get("align", "2")
     # ASS primary for emphasis punch — keep style colour, bump scale in tags
     emp_primary = emp["primary"]
+
+    def ass_text(value: object, *, limit: int = 120) -> str:
+        text = re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+        # Braces start ASS override blocks; strip them from user/model text.
+        return text.replace("\\", "\\\\").replace("{", "").replace("}", "")
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -277,14 +321,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     lines = [header]
 
     if hook_text:
-        clean_hook = re.sub(r"\s+", " ", hook_text).strip()[:72]
+        clean_hook = ass_text(hook_text, limit=72)
         lines.append(
             f"Dialogue: 1,{ts(0.05)},{ts(2.95)},Hook,,0,0,0,,{{\\fad(120,180)\\fscx108\\fscy108}}{clean_hook}\n"
         )
 
     i = 0
     while i < len(words):
-        chunk = words[i : i + 3]
+        chunk = words[i : i + chunk_size]
         if not chunk:
             break
         start = chunk[0].start
@@ -297,13 +341,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 r"{\fscx118\fscy118\bord5}" if clean.upper() in emphasis_set else ""
             )
             reset = r"{\r}" if style_tag else ""
+            rel_start = max(0, int((w.start - start) * 1000))
+            rel_end = max(rel_start + 80, int((w.end - start) * 1000))
             parts.append(
-                rf"{{\t({int(w.start*1000)},{int(w.end*1000)},\fscx120\fscy120)}}"
-                f"{style_tag}{w.word}{reset}"
+                rf"{{\t({rel_start},{rel_end},\fscx120\fscy120)}}"
+                f"{style_tag}{ass_text(w.word, limit=36)}{reset}"
             )
         text = " ".join(parts)
-        lines.append(f"Dialogue: 0,{ts(start)},{ts(end)},Default,,0,0,0,,{text}\n")
-        i += 3
+        lines.append(
+            f"Dialogue: 0,{ts(start)},{ts(end)},Default,,0,0,0,,{{\\fad(45,70)}}{text}\n"
+        )
+        i += chunk_size
 
     ass_path.write_text("".join(lines), encoding="utf-8")
     return ass_path

@@ -271,9 +271,9 @@ def apply_visual_overlays(
         fade_out = max(start + 0.3, end - 0.28)
         role = str(ov.get("role") or "").strip().lower()
         default_pct = 0.36 if role == "hero" else 0.24
-        size_pct = max(0.18, min(0.48, float(ov.get("size_pct") or default_pct)))
+        size_pct = max(0.18, min(0.56, float(ov.get("size_pct") or default_pct)))
         # Big, readable glyphs — hero can own ~half frame width on mobile.
-        width_px = max(140, min(int(w * size_pct), int(min(w, h) * 0.52)))
+        width_px = max(150, min(int(w * size_pct), int(min(w, h) * 0.62)))
         x, y = _overlay_anim_xy(
             str(ov.get("position") or "center"),
             start,
@@ -282,11 +282,24 @@ def apply_visual_overlays(
         filters.append(
             f"[{idx + 1}:v]setpts=PTS-STARTPTS,"
             f"scale={width_px}:-1:flags=lanczos,format=rgba,"
+            f"split=2[ovraw{idx}][ovglowraw{idx}]"
+        )
+        filters.append(
+            f"[ovglowraw{idx}]gblur=sigma={18 if role == 'hero' else 12},"
+            f"colorchannelmixer=aa={0.38 if role == 'hero' else 0.26},"
             f"fade=t=in:st={start:.3f}:d=0.22:alpha=1,"
+            f"fade=t=out:st={fade_out:.3f}:d=0.28:alpha=1[glow{idx}]"
+        )
+        filters.append(
+            f"[ovraw{idx}]fade=t=in:st={start:.3f}:d=0.18:alpha=1,"
             f"fade=t=out:st={fade_out:.3f}:d=0.28:alpha=1[ov{idx}]"
         )
         filters.append(
-            f"{prev}[ov{idx}]overlay=x='{x}':y='{y}':"
+            f"{prev}[glow{idx}]overlay=x='{x}':y='{y}':"
+            f"enable='between(t,{start:.3f},{end:.3f})'[glowbase{idx}]"
+        )
+        filters.append(
+            f"[glowbase{idx}][ov{idx}]overlay=x='{x}':y='{y}':"
             f"enable='between(t,{start:.3f},{end:.3f})'[base{idx + 1}]"
         )
         prev = f"[base{idx + 1}]"
@@ -301,6 +314,78 @@ def apply_visual_overlays(
             "[vout]",
             "-t",
             f"{duration:.3f}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "19",
+            "-pix_fmt",
+            "yuv420p",
+            str(out),
+        ]
+    )
+    return out
+
+
+def _style_accent(style_id: str | None, effect_id: str | None) -> str:
+    key = f"{style_id or ''} {effect_id or ''}".lower()
+    if any(x in key for x in ("gold", "orange", "fire", "warm", "amber", "sunset")):
+        return "0xE8A54B"
+    if any(x in key for x in ("cyan", "teal", "mint", "ice", "blue", "techno")):
+        return "0x66FFE0"
+    if any(x in key for x in ("pink", "purple", "violet", "neon")):
+        return "0xFF66CC"
+    if any(x in key for x in ("lime", "green", "jade")):
+        return "0x9DFF66"
+    return "0xFFFFFF"
+
+
+def apply_editorial_frame(
+    video: Path,
+    out: Path,
+    *,
+    duration: float,
+    size: tuple[int, int],
+    subtitle_style: str | None,
+    visual_effect: str | None,
+    montage_pace: str | None,
+    has_overlays: bool,
+) -> Path:
+    """Final creator polish: subtle frame, safe caption bed, and premium vignette."""
+    w, h = size
+    accent = _style_accent(subtitle_style, visual_effect)
+    pace = (montage_pace or "medium").strip().lower()
+    strong = pace in {"viral", "fast"} or has_overlays
+    pad_outer = max(18, int(min(w, h) * 0.025))
+    pad_inner = max(34, int(min(w, h) * 0.045))
+    top_h = max(78, int(h * (0.105 if h > w else 0.075)))
+    lower_y = int(h * (0.72 if h > w else 0.76))
+    lower_h = h - lower_y
+    noise = "noise=alls=4:allf=t," if strong else ""
+    vf = (
+        "format=rgba,"
+        "vignette=PI/5.2,"
+        f"{noise}"
+        f"drawbox=x=0:y=0:w={w}:h={top_h}:color=black@0.13:t=fill,"
+        f"drawbox=x=0:y={lower_y}:w={w}:h={lower_h}:color=black@0.18:t=fill,"
+        f"drawbox=x={pad_outer}:y={pad_outer}:"
+        f"w={w - pad_outer * 2}:h={h - pad_outer * 2}:"
+        f"color={accent}@{0.30 if strong else 0.18}:t={5 if strong else 3},"
+        f"drawbox=x={pad_inner}:y={pad_inner}:"
+        f"w={w - pad_inner * 2}:h={h - pad_inner * 2}:"
+        "color=white@0.08:t=2,"
+        "format=yuv420p"
+    )
+    run_ffmpeg(
+        [
+            "-i",
+            str(video),
+            "-t",
+            f"{duration:.3f}",
+            "-vf",
+            vf,
             "-an",
             "-c:v",
             "libx264",
@@ -449,6 +534,21 @@ def build_short(
             )
         except Exception as exc:
             print(f"[OVERLAY] visual overlays skipped: {exc}")
+
+    framed = work_dir / "timeline_framed.mp4"
+    try:
+        timeline = apply_editorial_frame(
+            timeline,
+            framed,
+            duration=voice_dur,
+            size=frame,
+            subtitle_style=subtitle_style,
+            visual_effect=visual_effect,
+            montage_pace=montage_pace,
+            has_overlays=bool(visual_overlays),
+        )
+    except Exception as exc:
+        print(f"[FRAME] editorial frame skipped: {exc}")
 
     mixed = work_dir / "mixed.m4a"
     mix_audio(

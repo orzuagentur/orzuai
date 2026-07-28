@@ -67,6 +67,26 @@ def _shift_hex(hex_c: str, *, lightness_delta: float = 0.08) -> str:
     return f"{int(rr * 255):02X}{int(gg * 255):02X}{int(bb * 255):02X}"
 
 
+def _plate_filter(*, width: int, height: int, hex_c: str) -> str:
+    pad = max(22, int(min(width, height) * 0.03))
+    inner = max(42, int(min(width, height) * 0.055))
+    top = max(70, int(height * 0.1))
+    low_y = int(height * 0.72)
+    accent = _shift_hex(hex_c, lightness_delta=0.18)
+    return (
+        "format=rgba,"
+        "vignette=PI/4.6,"
+        "noise=alls=3:allf=t,"
+        f"drawbox=x=0:y=0:w={width}:h={top}:color=black@0.12:t=fill,"
+        f"drawbox=x=0:y={low_y}:w={width}:h={height - low_y}:color=black@0.16:t=fill,"
+        f"drawbox=x={pad}:y={pad}:w={width - pad * 2}:h={height - pad * 2}:"
+        f"color=0x{accent}@0.16:t=4,"
+        f"drawbox=x={inner}:y={inner}:w={width - inner * 2}:h={height - inner * 2}:"
+        "color=white@0.07:t=2,"
+        "format=yuv420p"
+    )
+
+
 def _make_solid_clip(
     *,
     hex_c: str,
@@ -95,6 +115,8 @@ def _make_solid_clip(
                     lavfi,
                     "-t",
                     f"{dur:.3f}",
+                    "-vf",
+                    _plate_filter(width=w, height=h, hex_c=hex_c),
                     "-c:v",
                     "libx264",
                     "-preset",
@@ -119,6 +141,8 @@ def _make_solid_clip(
             f"color=c=0x{hex_c}:s={w}x{h}:d={dur:.3f}",
             "-t",
             f"{dur:.3f}",
+            "-vf",
+            _plate_filter(width=w, height=h, hex_c=hex_c),
             "-c:v",
             "libx264",
             "-preset",

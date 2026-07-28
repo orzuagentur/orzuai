@@ -405,8 +405,9 @@ def prepare_visual_overlays(
         position = str(raw.get("position") or "center").strip().lower()
         if position not in _POSITIONS:
             position = "center"
-        default_size = 0.36 if role == "hero" else 0.24
-        size_pct = max(0.18, min(0.46, _as_float(raw.get("size_pct"), default_size)))
+        default_size = 0.44 if role == "hero" else 0.27
+        max_size = 0.56 if role == "hero" else 0.34
+        size_pct = max(0.18, min(max_size, _as_float(raw.get("size_pct"), default_size)))
 
         try:
             db.record_media_usage(

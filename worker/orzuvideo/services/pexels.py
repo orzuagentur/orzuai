@@ -38,22 +38,55 @@ def search_videos(
         return resp.json().get("videos") or []
 
 
+def _target_ratio(orientation: str) -> float:
+    if orientation == "landscape":
+        return 16 / 9
+    if orientation == "square":
+        return 1.0
+    return 9 / 16
+
+
+def _file_score(file_row: dict, *, orientation: str) -> float:
+    width = float(file_row.get("width") or 0)
+    height = float(file_row.get("height") or 0)
+    if width <= 0 or height <= 0:
+        return 0.0
+    ratio = width / height
+    target = _target_ratio(orientation)
+    ratio_score = max(0.0, 1.0 - min(1.0, abs(ratio - target) / target))
+    pixels = width * height
+    resolution_score = min(1.0, pixels / (1280 * 720))
+    hd_bonus = 0.2 if (width >= 720 and height >= 720) else 0.0
+    return ratio_score * 70 + resolution_score * 35 + hd_bonus * 20
+
+
 def _best_file(video: dict, *, orientation: str = "portrait") -> str | None:
     files = video.get("video_files") or []
-    target_w, target_h = (1920, 1080) if orientation == "landscape" else (1080, 1920)
     ranked = sorted(
         files,
-        key=lambda f: (
-            0 if (f.get("width") or 0) >= 720 else 1,
-            abs((f.get("width") or 0) - target_w),
-            abs((f.get("height") or 0) - target_h),
-        ),
+        key=lambda f: _file_score(f, orientation=orientation),
+        reverse=True,
     )
     for f in ranked:
         link = f.get("link")
         if link:
             return link
     return None
+
+
+def _video_score(video: dict, *, orientation: str) -> float:
+    best = max(
+        (_file_score(f, orientation=orientation) for f in (video.get("video_files") or [])),
+        default=0.0,
+    )
+    try:
+        dur = float(video.get("duration") or 0)
+    except (TypeError, ValueError):
+        dur = 0.0
+    # B-roll clips around 6-28s cut best; very tiny clips often loop badly.
+    dur_score = 25.0 if 6 <= dur <= 28 else 12.0 if 3 <= dur < 45 else 0.0
+    has_thumb = 8.0 if video.get("image") or video.get("video_pictures") else 0.0
+    return best + dur_score + has_thumb + random.random() * 8.0
 
 
 def download_stock_clips(
@@ -107,8 +140,13 @@ def download_stock_clips(
                 continue
             if not videos:
                 break
-            random.shuffle(videos)
-            for video in videos:
+            ranked_videos = sorted(
+                videos,
+                key=lambda v: _video_score(v, orientation=orientation),
+                reverse=True,
+            )
+            top_band = ranked_videos[: min(18, len(ranked_videos))]
+            for video in top_band:
                 vid = str(video.get("id") or "")
                 if not vid or vid in seen_ids:
                     continue
