@@ -12,10 +12,9 @@ import {
   type ReactNode,
 } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
-import { ChannelTransferModal } from "@/components/ChannelTransferModal";
-import { NoYoutubeChannelModal } from "@/components/NoYoutubeChannelModal";
 import { ChannelsMenu } from "@/components/ChannelsMenu";
 import { ClippingProgressDock } from "@/components/ClippingProgressDock";
+import { CreativityProgressDock } from "@/components/CreativityProgressDock";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { MusicUploadProvider } from "@/components/MusicUploadProvider";
 import { MusicUploadDock } from "@/components/MusicUploadDock";
@@ -43,29 +42,14 @@ type NavItem = {
 /** Primary tabs — bottom bar + desktop center */
 const PRIMARY_NAV: NavItem[] = [
   {
-    href: "/dashboard",
-    labelKey: "autopilot",
-    exact: true,
-    icon: "home",
-  },
-  {
     href: "/dashboard/content",
     labelKey: "createVideo",
     icon: "creativity",
   },
   {
-    href: "/dashboard/channel",
-    labelKey: "youtube",
-    icon: "youtube",
-  },
-];
-
-/** Items moved into the top hamburger menu — flat fallback for title lookup */
-const MENU_NAV: NavItem[] = [
-  {
-    href: "/dashboard/channel",
-    labelKey: "videos",
-    icon: "videos",
+    href: "/dashboard/clipping",
+    labelKey: "aiClipping",
+    icon: "clipping",
   },
   {
     href: "/dashboard/favorites",
@@ -73,6 +57,9 @@ const MENU_NAV: NavItem[] = [
     icon: "library",
   },
 ];
+
+/** Items moved into the top hamburger menu — flat fallback for title lookup */
+const MENU_NAV: NavItem[] = [];
 
 type MenuItemIcon =
   | "ai-video"
@@ -190,11 +177,6 @@ const LIBRARY_TABS = [
 const CLIPPING_TABS = [
   { id: "create", labelKey: "create", shortKey: "create" },
   { id: "clips", labelKey: "myClips", shortKey: "clipsShort" },
-] as const;
-
-const CREATIVITY_TABS = [
-  { id: "create", labelKey: "create", shortKey: "create" },
-  { id: "library", labelKey: "myCreations", shortKey: "mineShort" },
 ] as const;
 
 const AI_PRESENTATION_TABS = [
@@ -350,20 +332,6 @@ function MenuIcon({ open }: { open?: boolean }) {
           <path d="M4 17h16" />
         </>
       )}
-    </svg>
-  );
-}
-
-/** Official YouTube play-mark (red badge). */
-function YouTubeMenuMark({ size = 18 }: { size?: number }) {
-  const h = Math.round(size * 0.72);
-  return (
-    <svg width={size} height={h} viewBox="0 0 28 20" aria-hidden>
-      <path
-        fill="#fff"
-        d="M27.43 3.13A3.52 3.52 0 0 0 24.95.64C22.74 0 14 0 14 0S5.26 0 3.05.64A3.52 3.52 0 0 0 .57 3.13 36.8 36.8 0 0 0 0 10a36.8 36.8 0 0 0 .57 6.87 3.52 3.52 0 0 0 2.48 2.49C5.26 20 14 20 14 20s8.74 0 10.95-.64a3.52 3.52 0 0 0 2.48-2.49A36.8 36.8 0 0 0 28 10a36.8 36.8 0 0 0-.57-6.87Z"
-      />
-      <path fill="#FF0000" d="M11.2 14.29V5.71L18.4 10l-7.2 4.29Z" />
     </svg>
   );
 }
@@ -669,37 +637,6 @@ function ClippingHeaderTabs() {
   );
 }
 
-function CreativityHeaderTabs() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const t = useTranslations("nav");
-  const raw = searchParams.get("tab");
-  const tab = raw === "library" || raw === "create" ? raw : "create";
-
-  return (
-    <nav
-      className="mx-auto flex w-full max-w-2xl gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-1 sm:rounded-xl"
-      aria-label={t("aiVideo")}
-    >
-      {CREATIVITY_TABS.map((item) => (
-        <SectionTabButton
-          key={item.id}
-          on={tab === item.id}
-          label={t(item.labelKey)}
-          short={t(item.shortKey)}
-          onClick={() => {
-            const next = new URLSearchParams(searchParams.toString());
-            next.set("tab", item.id);
-            router.replace(`/dashboard/content?${next.toString()}`, {
-              scroll: false,
-            });
-          }}
-        />
-      ))}
-    </nav>
-  );
-}
-
 function AiPresentationHeaderTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -870,9 +807,6 @@ function AppMenu({ email }: { email?: string | null }) {
     };
   }, [open]);
 
-  const youtubeActive =
-    pathname === "/dashboard/channel" ||
-    pathname.startsWith("/dashboard/channel/");
   const visibleMenuGroups = MENU_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
@@ -908,24 +842,6 @@ function AppMenu({ email }: { email?: string | null }) {
           aria-label={ts("mainMenu")}
         >
           <div className="p-2">
-            <Link
-              href="/dashboard/channel"
-              onClick={() => setOpen(false)}
-              aria-current={youtubeActive ? "page" : undefined}
-              className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:brightness-110"
-              style={{
-                background: "#FF0000",
-                boxShadow: youtubeActive
-                  ? "0 0 0 2px rgba(255,255,255,0.35)"
-                  : "0 8px 20px rgba(255,0,0,0.28)",
-              }}
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/15">
-                <YouTubeMenuMark size={20} />
-              </span>
-              <span className="flex-1">{t("youtube")}</span>
-            </Link>
-
             {visibleMenuGroups.map((group) => {
               const expanded = !isMobile || openGroup === group.id;
               return (
@@ -1045,23 +961,6 @@ function AppMenu({ email }: { email?: string | null }) {
   );
 }
 
-function ChannelsQueryOpener() {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const router = useRouter();
-  const { setMenuOpen } = useChannelsMenu();
-
-  useEffect(() => {
-    const channels = searchParams.get("channels");
-    if (channels === "add" || channels === "1") {
-      setMenuOpen(true);
-      router.replace(pathname);
-    }
-  }, [searchParams, pathname, router, setMenuOpen]);
-
-  return null;
-}
-
 export function AppShell({
   email,
   children,
@@ -1144,12 +1043,6 @@ export function AppShell({
     <ChannelsContext.Provider value={ctx}>
       <MusicUploadProvider>
         <div className="flex min-h-screen w-full flex-col bg-[color:var(--bg)]">
-          <Suspense fallback={null}>
-            <ChannelsQueryOpener />
-            <ChannelTransferModal />
-            <NoYoutubeChannelModal />
-          </Suspense>
-
           <header
             ref={headerRef}
             className="fixed inset-x-0 top-0 z-[80] border-b border-[color:var(--line)] bg-[color:var(--bg)]"
@@ -1213,10 +1106,10 @@ export function AppShell({
               </div>
             </div>
 
-            {(isLibrary || isClipping || isCreativity || isAiPresentation) && (
+            {(isLibrary || isClipping || isAiPresentation) && (
               <div
                 className={`flex flex-col items-center px-3 pb-2.5 sm:px-4 sm:pb-3 md:px-6 ${
-                  isClipping || isCreativity || isLibrary || isAiPresentation
+                  isClipping || isLibrary || isAiPresentation
                     ? "w-full"
                     : "gap-3"
                 }`}
@@ -1231,7 +1124,7 @@ export function AppShell({
                 )}
                 <div
                   className={`flex w-full items-center ${
-                    isClipping || isCreativity || isLibrary || isAiPresentation
+                    isClipping || isLibrary || isAiPresentation
                       ? "justify-center"
                       : "gap-3"
                   }`}
@@ -1260,15 +1153,7 @@ export function AppShell({
                   >
                     <AiPresentationHeaderTabs />
                   </Suspense>
-                ) : (
-                  <Suspense
-                    fallback={
-                      <div className="h-10 w-full max-w-2xl rounded-full border border-[color:var(--line)] bg-[color:var(--bg-elevated)] sm:rounded-xl" />
-                    }
-                  >
-                    <CreativityHeaderTabs />
-                  </Suspense>
-                )}
+                ) : null}
                 </div>
               </div>
             )}
@@ -1284,6 +1169,7 @@ export function AppShell({
           <MobileBottomNav />
           <MusicUploadDock />
           <ClippingProgressDock />
+          <CreativityProgressDock />
         </div>
       </MusicUploadProvider>
     </ChannelsContext.Provider>

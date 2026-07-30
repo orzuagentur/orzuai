@@ -91,7 +91,7 @@ export function FeaturesStudio() {
           Deferred tools
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--muted)]">
-          Keep the public app focused on YouTube Autopilot. Hidden tools stay in
+          Keep the public app focused on content creation. Hidden tools stay in
           the codebase and can be restored instantly with Show.
         </p>
         <p className="mt-3 text-xs text-[color:var(--muted)]">

@@ -162,7 +162,16 @@ Rules:
 - Suggest a subtitle style hint in "subtitle_style", a look filter in "visual_effect",
   preferred_transition, and montage_pace from the AVAILABLE TOOLS block below.
   Prefer ids that match the prompt mood. Never invent ids outside that list.
+- Choose a montage SCENARIO for the whole video in "video_style" from the SCENARIO
+  LIBRARY below (this drives the overall editing energy). Match it to the prompt mood.
+- Choose a decorative "video_frame" id from AVAILABLE TOOLS that fits the theme
+  (or "" for none). Only pick a frame when it genuinely suits the vibe.
+- For LONGER videos (roughly > 75s) return "montage_sequence": an ORDERED list of
+  scenario ids so the edit changes energy across sections (hook → build → payoff).
+  Use as many DISTINCT scenarios as the length reasonably supports. For short videos
+  return a single-item list (just the chosen video_style).
 {tools_block}
+{scenario_block}
 - Set flash_cuts true for high-energy / hype / sales prompts; false for calm / luxury / storytelling.
 - Do NOT invent motivational-coach / gym / discipline themes unless the prompt asks for them.
 - Match EVERY creative choice (tone, colors, subtitle look, motion energy) to the user's prompt theme.
@@ -182,6 +191,9 @@ JSON schema:
   "subtitle_emphasis": ["WORD1", "WORD2"],
   "subtitle_style": "classic",
   "visual_effect": "cinematic",
+  "video_style": "cinematic_mixer",
+  "montage_sequence": ["cinematic_mixer"],
+  "video_frame": "",
   "preferred_transition": "smoothleft",
   "montage_pace": "medium",
   "flash_cuts": false,
@@ -537,6 +549,113 @@ def _montage_tools_block() -> str:
         return ""
 
 
+def _scenario_catalog_block() -> str:
+    """Human-readable montage scenario library for the LLM to choose from."""
+    try:
+        from orzuvideo.pipeline.fx_library import VIDEO_STYLE_MONTAGE
+
+        lines = ["MONTAGE SCENARIO LIBRARY (pick video_style ids from here):"]
+        for key, spec in VIDEO_STYLE_MONTAGE.items():
+            eff = spec.get("visual_effect", "")
+            pace = spec.get("montage_pace", "")
+            flash = "flash-cuts" if spec.get("flash_cuts") else "smooth"
+            lines.append(f"- {key}: {eff} look, {pace} pace, {flash}")
+        return "\n".join(lines)
+    except Exception as exc:
+        print(f"[scriptgen] scenario catalog skipped: {exc}")
+        return ""
+
+
+def analyze_creativity_intent(
+    client: "OpenAI",
+    prompt: str,
+    *,
+    video_type: str,
+    user_id: str | None = None,
+    job_id: str | None = None,
+) -> dict[str, Any]:
+    """Step 1 — deeply understand the user's intent before writing anything.
+
+    Returns a structured brief the main generation pass consumes. Never raises;
+    on any failure it returns an empty dict and the pipeline falls back to the
+    single-pass behaviour.
+    """
+    try:
+        system = (
+            "You are a senior short-form creative strategist. Read the user's raw "
+            "video idea and extract a precise creative brief. Do NOT write the script. "
+            "Detect the language from the prompt text itself. Return STRICT JSON only:\n"
+            "{\n"
+            '  "language": "ru",\n'
+            '  "topic": "one concise sentence describing exactly what the user wants",\n'
+            '  "audience": "who this is for",\n'
+            '  "tone": "e.g. cinematic, hype, calm, funny, luxury, dramatic",\n'
+            '  "emotional_arc": "how the feeling should evolve start→end",\n'
+            '  "energy": "low | medium | high",\n'
+            '  "key_beats": ["beat 1", "beat 2", "beat 3"],\n'
+            '  "recommended_scenarios": ["scenario_id", "..."],\n'
+            '  "subtitle_hint": "one subtitle mood word",\n'
+            '  "frame_hint": "a video_frame id or empty string"\n'
+            "}\n"
+            "recommended_scenarios MUST be ids from the scenario library. "
+            "For longer / multi-part ideas, list SEVERAL scenarios in the order they "
+            "should appear so the video can change its energy across sections."
+        )
+        user = (
+            f"{_scenario_catalog_block()}\n\n"
+            f"{_montage_tools_block()}\n\n"
+            f"VIDEO TYPE: {video_type}\n"
+            f'USER IDEA (only source of truth):\n"""{prompt}"""'
+        )
+        response = client.chat.completions.create(
+            model=settings.openai_model,
+            temperature=0.4,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        _log_openai_usage(
+            user_id=user_id,
+            job_id=job_id,
+            response=response,
+            kind="creativity_intent",
+        )
+        data = json.loads(response.choices[0].message.content or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        print(f"[scriptgen] intent analysis skipped: {exc}")
+        return {}
+
+
+def _intent_brief_block(intent: dict[str, Any]) -> str:
+    """Render the intent brief into a compact block for the main prompt."""
+    if not intent:
+        return ""
+    beats = intent.get("key_beats")
+    beats_s = "; ".join(str(b) for b in beats) if isinstance(beats, list) else ""
+    scenarios = intent.get("recommended_scenarios")
+    scen_s = ", ".join(str(s) for s in scenarios) if isinstance(scenarios, list) else ""
+    fields = [
+        ("Topic", intent.get("topic")),
+        ("Audience", intent.get("audience")),
+        ("Tone", intent.get("tone")),
+        ("Emotional arc", intent.get("emotional_arc")),
+        ("Energy", intent.get("energy")),
+        ("Key beats", beats_s),
+        ("Recommended scenarios (in order)", scen_s),
+        ("Subtitle hint", intent.get("subtitle_hint")),
+        ("Frame hint", intent.get("frame_hint")),
+    ]
+    lines = [f"- {label}: {value}" for label, value in fields if _filled(value)]
+    if not lines:
+        return ""
+    return "CREATIVE BRIEF (from a dedicated intent-analysis pass — honor it):\n" + "\n".join(
+        lines
+    )
+
+
 def _training_lines(training: dict[str, Any]) -> str:
     """Build prompt lines only from non-empty training fields."""
     mapping = [
@@ -616,9 +735,23 @@ def generate_creativity_script(
         duration_rule=duration_rule,
         video_type_rule=video_type_rule.strip(),
         tools_block=_montage_tools_block(),
+        scenario_block=_scenario_catalog_block(),
     )
+
+    # Step 1 — understand the user's intent in detail before writing.
+    intent = analyze_creativity_intent(
+        client,
+        prompt,
+        video_type=normalized_video_type,
+        user_id=user_id,
+        job_id=job_id,
+    )
+    intent_block = _intent_brief_block(intent)
+
     user_msg = f"""USER PROMPT (ONLY source of truth — ignore any YouTube/channel training):
 \"\"\"{prompt}\"\"\"
+
+{intent_block}
 
 {target_note}
 
@@ -677,6 +810,51 @@ Hard requirements:
             ["0F172A", "1E293B", "312E81", "0F766E", "7C2D12", "164E63"],
             limit=8,
         )
+
+    # Validate montage scenario(s) + decorative frame against the real catalog.
+    try:
+        from orzuvideo.pipeline.fx_library import (
+            VIDEO_FRAMES,
+            VIDEO_STYLE_MONTAGE,
+            normalize_frame_style,
+        )
+
+        valid_scenarios = set(VIDEO_STYLE_MONTAGE.keys())
+    except Exception:
+        VIDEO_FRAMES = {}  # type: ignore[assignment]
+        valid_scenarios = set()
+
+        def normalize_frame_style(v):  # type: ignore[misc]
+            return None
+
+    def _scn(v: Any) -> str | None:
+        s = str(v or "").strip().lower().replace(" ", "_")
+        return s if s in valid_scenarios else None
+
+    video_style = _scn(data.get("video_style")) or _scn(
+        (intent.get("recommended_scenarios") or [None])[0]
+        if isinstance(intent.get("recommended_scenarios"), list)
+        else None
+    )
+
+    seq_raw = data.get("montage_sequence")
+    if not isinstance(seq_raw, list) or not seq_raw:
+        seq_raw = intent.get("recommended_scenarios")
+    montage_sequence: list[str] = []
+    if isinstance(seq_raw, list):
+        for item in seq_raw:
+            sid = _scn(item)
+            if sid and sid not in montage_sequence:
+                montage_sequence.append(sid)
+    if video_style and video_style not in montage_sequence:
+        montage_sequence.insert(0, video_style)
+    if not video_style and montage_sequence:
+        video_style = montage_sequence[0]
+
+    video_frame = normalize_frame_style(
+        data.get("video_frame") or intent.get("frame_hint")
+    )
+
     result: dict[str, Any] = {
         "hook": data.get("hook") or script.split(".")[0],
         "script": script,
@@ -694,6 +872,10 @@ Hard requirements:
         "subtitle_emphasis": data.get("subtitle_emphasis") or [],
         "subtitle_style": data.get("subtitle_style") or "classic",
         "visual_effect": data.get("visual_effect") or "cinematic",
+        "video_style": video_style,
+        "montage_sequence": montage_sequence,
+        "video_frame": video_frame,
+        "intent": intent or None,
         "preferred_transition": str(
             data.get("preferred_transition") or "smoothleft"
         ).strip()

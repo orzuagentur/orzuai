@@ -16,6 +16,7 @@ from orzuvideo.pipeline.editor import build_short, mix_audio
 from orzuvideo.pipeline.media import (
     ffprobe_duration,
     has_audio_stream,
+    run_ffmpeg,
     synthesize_with_timestamps,
 )
 from orzuvideo.services import db
@@ -615,6 +616,25 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
     else:
         final.write_bytes(muxed.read_bytes())
 
+    # Optional decorative frame ("рамка") — AI-chosen or user-selected.
+    frame_style_final = None
+    try:
+        from orzuvideo.pipeline.fx_library import normalize_frame_style
+
+        frame_style_final = normalize_frame_style(meta0.get("frame_style"))
+    except Exception:
+        frame_style_final = None
+    if frame_style_final:
+        try:
+            from orzuvideo.pipeline import reedit as _reedit_pipe
+
+            framed_final = work / "framed_final.mp4"
+            res = _reedit_pipe.burn_frame_overlay(final, framed_final, frame_style_final)
+            if res != final and framed_final.exists():
+                final.write_bytes(framed_final.read_bytes())
+        except Exception as exc:
+            print(f"[RENDER] frame overlay skipped: {exc}")
+
     db.update_job(sb, job_id, status="uploading")
     stored = upload_preview(sb, user_id=user_id, job_id=job_id, video_path=final)
 
@@ -646,6 +666,7 @@ def _process_clipping_job(job: dict, *, sb, work: Path) -> None:
         "add_transitions": True,
         "virality_mode": virality_mode,
         "video_style": str(meta0.get("video_style") or "") or None,
+        "frame_style": frame_style_final,
         "visual_effect": visual_effect,
         "preferred_transition": preferred_transition,
         "montage_pace": look.get("montage_pace"),
@@ -744,12 +765,25 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
     outro_fade = str(meta0.get("outro_fade") or "none").strip()
     overlay_text = str(meta0.get("overlay_text") or "").strip()
     caption_text = str(meta0.get("caption_text") or "").strip()
+    captions_visible = meta0.get("captions_visible") is not False
+    selected_element = (
+        meta0.get("selected_element")
+        if isinstance(meta0.get("selected_element"), dict)
+        else None
+    )
     text_style = str(meta0.get("text_style") or "bold_center").strip()
     subtitle_style = str(meta0.get("subtitle_style") or "classic").strip()
     try:
         from orzuvideo.pipeline.fx_library import normalize_subtitle_style
 
         subtitle_style = normalize_subtitle_style(subtitle_style)
+    except Exception:
+        pass
+    frame_style: str | None = str(meta0.get("frame_style") or "").strip() or None
+    try:
+        from orzuvideo.pipeline.fx_library import normalize_frame_style
+
+        frame_style = normalize_frame_style(frame_style)
     except Exception:
         pass
     preferred_transition = str(meta0.get("preferred_transition") or "fade").strip()
@@ -786,6 +820,15 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
         voice_volume = float(meta0.get("voice_volume") or 1.05)
     except (TypeError, ValueError):
         voice_volume = 1.05
+    voice_id = str(meta0.get("voice_id") or "").strip()
+    voice_text = str(
+        meta0.get("voice_text")
+        or job.get("script_text")
+        or caption_text
+        or overlay_text
+        or job.get("title")
+        or ""
+    ).strip()
 
     print(
         f"[REEDIT] job={job_id} effect={effect} motion={motion} "
@@ -797,6 +840,66 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
 
     trimmed = work / "trimmed.mp4"
     reedit_pipe.trim_clip(source, trimmed, start=trim_start, end=trim_end_f)
+
+    scene_durations: list[float] = []
+    scene_indexes: list[int] = []
+    scene_replacements: list[dict | None] = []
+    selected_media_by_scene: dict[str, dict] = {}
+    selected_media_by_original: dict[int, dict] = {}
+    raw_selected_media = meta0.get("selected_media")
+    if isinstance(raw_selected_media, list):
+        for raw in raw_selected_media:
+            if not isinstance(raw, dict):
+                continue
+            scene_id = str(raw.get("scene_id") or "").strip()
+            if scene_id:
+                selected_media_by_scene[scene_id] = raw
+            try:
+                original_idx = int(raw.get("original_index"))
+                selected_media_by_original[original_idx] = raw
+            except (TypeError, ValueError):
+                pass
+    raw_scene_durations = meta0.get("scene_durations")
+    if isinstance(raw_scene_durations, list):
+        for fallback_index, item in enumerate(raw_scene_durations):
+            raw_value = item.get("duration") if isinstance(item, dict) else item
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                scene_durations.append(value)
+                scene_id = str(item.get("id") or "") if isinstance(item, dict) else ""
+                raw_index = (
+                    item.get("original_index")
+                    if isinstance(item, dict)
+                    else fallback_index
+                )
+                try:
+                    original_index = max(0, int(raw_index))
+                except (TypeError, ValueError):
+                    original_index = fallback_index
+                scene_indexes.append(original_index)
+                scene_replacements.append(
+                    selected_media_by_scene.get(scene_id)
+                    or selected_media_by_original.get(original_index)
+                )
+    try:
+        source_scene_count = int(meta0.get("source_scene_count") or 0)
+    except (TypeError, ValueError):
+        source_scene_count = 0
+    if len(scene_durations) >= 2:
+        retimed = work / "scene_retime.mp4"
+        reedit_pipe.retime_scenes(
+            trimmed,
+            retimed,
+            durations=scene_durations,
+            scene_indexes=scene_indexes,
+            source_scene_count=source_scene_count or None,
+            replacements=scene_replacements,
+            work_dir=work / "scene_retime_parts",
+        )
+        trimmed = retimed
 
     sped = work / "speed.mp4"
     reedit_pipe.apply_speed(trimmed, sped, speed=playback_speed)
@@ -824,7 +927,7 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
         burn_text_overlay(looked, titled, overlay_text, style_id=text_style)
         looked = titled
 
-    if caption_text:
+    if caption_text and captions_visible:
         from orzuvideo.pipeline.montage import burn_caption_overlay
 
         capped = work / "captioned.mp4"
@@ -837,11 +940,61 @@ def _process_reedit_job(job: dict, *, sb, work: Path) -> None:
         )
         looked = capped
 
+    if selected_element:
+        try:
+            elemented = work / "elemented.mp4"
+            reedit_pipe.burn_element_overlay(
+                looked,
+                elemented,
+                selected_element,
+                work_dir=work / "element_assets",
+            )
+            looked = elemented
+        except Exception as exc:
+            print(f"[REEDIT] selected element overlay skipped: {exc}")
+
+    if frame_style:
+        try:
+            framed = work / "framed.mp4"
+            result = reedit_pipe.burn_frame_overlay(looked, framed, frame_style)
+            looked = result
+        except Exception as exc:
+            print(f"[REEDIT] frame overlay skipped: {exc}")
+
     clip_len = ffprobe_duration(looked)
     voice_a = work / "voice.aac"
-    if keep_original:
+    if voice_id and voice_text:
+        try:
+            db.update_job(sb, job_id, status="generating_voice")
+            tts_mp3 = work / "selected_voice.mp3"
+            synthesize_with_timestamps(voice_text[:4500], tts_mp3, voice_id=voice_id)
+            selected_voice = work / "selected_voice.aac"
+            run_ffmpeg(
+                [
+                    "-i",
+                    str(tts_mp3),
+                    "-af",
+                    (
+                        f"apad=whole_dur={clip_len:.3f},"
+                        f"atrim=0:{clip_len:.3f},"
+                        "loudnorm=I=-14:TP=-1.5:LRA=11"
+                    ),
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
+                    str(selected_voice),
+                ]
+            )
+            voice_a = selected_voice
+            keep_original = False
+            print(f"[REEDIT] ElevenLabs replacement voice ok ({len(voice_text)} chars)")
+        except Exception as exc:
+            print(f"[REEDIT] ElevenLabs replacement voice skipped: {exc}")
+
+    if not voice_a.exists() and keep_original:
         reedit_pipe.extract_or_silence(looked, voice_a)
-    else:
+    elif not voice_a.exists():
         from orzuvideo.pipeline.media import make_silent_audio
 
         make_silent_audio(voice_a, clip_len)
@@ -1029,8 +1182,19 @@ def _process_job(job: dict) -> None:
                     "duration_seconds": fixed_dur or 30,
                     "music_mood": "cinematic emotional",
                     "pexels_query": "cinematic lifestyle",
+                    "subtitle_style": "classic",
                 },
             )
+            if str(meta0.get("voice_id") or "").strip():
+                training["voice_id"] = str(meta0.get("voice_id") or "").strip()
+            if str(meta0.get("subtitle_style") or "").strip():
+                training["subtitle_style"] = str(
+                    meta0.get("subtitle_style") or ""
+                ).strip()
+            if str(meta0.get("music_track_id") or "").strip():
+                training["music_track_id"] = str(
+                    meta0.get("music_track_id") or ""
+                ).strip()
             meta0 = {
                 **meta0,
                 "source": "creativity",
@@ -1249,7 +1413,8 @@ def _process_job(job: dict) -> None:
                 user_id=user_id,
                 job_id=job_id,
             )
-            # Apply AI-chosen language / mood back onto runtime training bag
+            # Apply AI-chosen language / mood / montage scenario back onto the
+            # runtime training bag so the render honors the AI's creative brief.
             training = {
                 **training,
                 "language": script_data.get("language") or "en",
@@ -1259,6 +1424,12 @@ def _process_job(job: dict) -> None:
                 or training.get("duration_seconds"),
                 "duration_auto": False,
             }
+            if script_data.get("video_style"):
+                training["video_style"] = script_data["video_style"]
+            # AI-chosen decorative frame (used by the render + pre-selected in the
+            # editor). A frame the user set later in the editor always wins.
+            if script_data.get("video_frame") and not meta0.get("frame_style"):
+                meta0 = {**meta0, "frame_style": script_data["video_frame"]}
         else:
             avoid_topics = db.recent_video_topics(
                 sb,
@@ -1286,8 +1457,27 @@ def _process_job(job: dict) -> None:
                 "music_mood": script_data.get("music_mood"),
                 "video_type": script_data.get("video_type") or video_type,
                 "asset_overlays": script_data.get("asset_overlays") or [],
+                "video_style": script_data.get("video_style")
+                or meta0.get("video_style"),
+                "montage_sequence": script_data.get("montage_sequence") or [],
+                "frame_style": meta0.get("frame_style"),
             },
         }
+
+        # Respect the user's explicit subtitle choice end-to-end. The AI may
+        # *suggest* a look, but a style the user actually picked in the studio
+        # always wins and is normalized to a canonical catalog id (never
+        # silently downgraded to a single system default).
+        try:
+            from orzuvideo.pipeline.fx_library import normalize_subtitle_style
+
+            user_sub = str(meta0.get("subtitle_style") or "").strip()
+            resolved_sub = normalize_subtitle_style(
+                user_sub or script_data.get("subtitle_style") or "classic"
+            )
+            script_update["metadata"]["subtitle_style"] = resolved_sub
+        except Exception:
+            pass
         if script_data.get("duration_seconds") is not None:
             try:
                 raw_dur = int(script_data["duration_seconds"])
@@ -1503,20 +1693,42 @@ def _process_job(job: dict) -> None:
         except (TypeError, ValueError):
             voice_vol = 1.05
 
-        library_track, credit = fetch_background_music(
-            sb,
-            user_id,
-            job_id,
-            work / "music.mp3",
-            training,
-            script_mood=str(script_data.get("music_mood") or "").strip() or None,
-        )
-        if not library_track or library_track.path is None or not library_track.path.exists():
-            raise RuntimeError(
-                "No platform music yet. An admin must upload tracks in the admin Music library."
+        music_path = None
+        library_track = None
+        credit = None
+        if meta0.get("add_music") is not False:
+            library_track, credit = fetch_background_music(
+                sb,
+                user_id,
+                job_id,
+                work / "music.mp3",
+                training,
+                music_track_id=(
+                    str(
+                        meta0.get("music_track_id")
+                        or training.get("music_track_id")
+                        or ""
+                    ).strip()
+                    or None
+                ),
+                script_mood=str(script_data.get("music_mood") or "").strip()
+                or None,
             )
-        music_path = library_track.path
-        print(f"Background music ready: {music_path} ({music_path.stat().st_size} bytes)")
+            if (
+                not library_track
+                or library_track.path is None
+                or not library_track.path.exists()
+            ):
+                raise RuntimeError(
+                    "No platform music yet. An admin must upload tracks in the admin Music library."
+                )
+            music_path = library_track.path
+            print(
+                f"Background music ready: {music_path} "
+                f"({music_path.stat().st_size} bytes)"
+            )
+        else:
+            print("[MEDIA] background music disabled by job metadata")
         visual_overlays = []
         resolved_visual_overlays = []
         if is_emoji_video:
@@ -1572,9 +1784,11 @@ def _process_job(job: dict) -> None:
                 "name": library_track.name,
                 "artist": library_track.artist,
                 "genre": library_track.genre,
-            },
-            "music_attached": True,
-            "music_bytes": music_path.stat().st_size,
+            }
+            if library_track
+            else None,
+            "music_attached": bool(music_path),
+            "music_bytes": music_path.stat().st_size if music_path else 0,
             "publish": publish,
             "user_brief": user_brief,
             "clip_count": len(clips),

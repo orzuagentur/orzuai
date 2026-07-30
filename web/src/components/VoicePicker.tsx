@@ -24,11 +24,15 @@ export function VoicePicker({
   onChange,
   hideSearch = false,
   allowAuto = false,
+  compactList = false,
+  fillHeight = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   hideSearch?: boolean;
   allowAuto?: boolean;
+  compactList?: boolean;
+  fillHeight?: boolean;
 }) {
   const t = useTranslations("studio.voice");
   const tc = useTranslations("studio.common");
@@ -154,7 +158,9 @@ export function VoicePicker({
   const autoOn = allowAuto && !value;
 
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden">
+    <div
+      className={`min-w-0 overflow-hidden ${fillHeight ? "flex h-full min-h-0 flex-col space-y-2" : compactList ? "space-y-2" : "space-y-3"}`}
+    >
       {notice}
       {!hideSearch && (
         <>
@@ -192,7 +198,15 @@ export function VoicePicker({
         <p className="text-sm text-[color:var(--muted)]">{t("noVoices")}</p>
       )}
 
-      <div className="max-h-[280px] space-y-1.5 overflow-y-auto overflow-x-hidden rounded-xl border border-[color:var(--line)] p-1.5 sm:max-h-[320px] sm:p-2">
+      <div
+        className={`space-y-1.5 overflow-y-auto overflow-x-hidden rounded-xl border border-[color:var(--line)] p-1.5 sm:p-2 ${
+          fillHeight
+            ? "min-h-0 flex-1"
+            : compactList
+              ? "max-h-[148px]"
+              : "max-h-[280px] sm:max-h-[320px]"
+        }`}
+      >
         {allowAuto && (
           <button
             type="button"

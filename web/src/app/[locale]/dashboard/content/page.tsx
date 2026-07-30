@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
-import { CreativityStudio } from "@/components/CreativityStudio";
+import { CreativityStudioFromUrl } from "@/components/CreativityStudio";
 import type { VideoJob } from "@/lib/types";
 
 export default async function CreativityPage() {
@@ -38,7 +38,7 @@ export default async function CreativityPage() {
         <p className="text-sm text-[color:var(--muted)]">{tCommon("loading")}</p>
       }
     >
-      <CreativityStudio initialJobs={list} />
+      <CreativityStudioFromUrl initialJobs={list} />
     </Suspense>
   );
 }

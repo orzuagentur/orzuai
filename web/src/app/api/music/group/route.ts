@@ -47,8 +47,13 @@ export async function GET(request: Request) {
       "id,title,artist,mood,duration_sec,public_url,genre_id,music_genres(name,slug)",
     )
     .eq("is_platform", true)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .order("created_at", { ascending: false });
+
+  const limit = Math.min(
+    500,
+    Math.max(1, Number(searchParams.get("limit") || 200)),
+  );
+  query = query.limit(limit);
 
   if (genreId) query = query.eq("genre_id", genreId);
   if (q) {

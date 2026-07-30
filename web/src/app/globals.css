@@ -189,6 +189,64 @@ select.field option {
   }
 }
 
+@keyframes creativity-create-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 22px rgba(180, 120, 40, 0.45);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 12px 28px rgba(180, 120, 40, 0.55);
+  }
+}
+
+.creativity-create-pill {
+  min-height: 44px;
+  height: 44px;
+  min-width: 11.5rem;
+  padding: 0 2rem;
+  border-radius: 9999px;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--btn-on-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  opacity: 1;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.creativity-create-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+
+.creativity-create-pill:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.creativity-create-float:not(:disabled) {
+  animation: creativity-create-breathe 2.1s ease-in-out infinite;
+}
+
+.creativity-create-float:not(:disabled):active {
+  animation: none;
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creativity-create-float:not(:disabled) {
+    animation: none;
+  }
+}
+
 .rise {
   animation: rise 0.7s ease both;
 }

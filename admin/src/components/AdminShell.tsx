@@ -11,6 +11,7 @@ const NAV = [
   { href: "/plans", label: "Plans" },
   { href: "/media", label: "Media" },
   { href: "/music", label: "Music" },
+  { href: "/youtube", label: "YouTube" },
   { href: "/email", label: "Email" },
   { href: "/features", label: "Deferred" },
   { href: "/sources", label: "Sources" },

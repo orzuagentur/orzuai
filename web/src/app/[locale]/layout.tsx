@@ -145,7 +145,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <link rel="alternate" type="text/plain" href="/ai.txt" title="ai.txt" />
       </head>
       <body className="min-h-full antialiased">
-        <NextIntlClientProvider messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

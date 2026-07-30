@@ -1358,6 +1358,392 @@ SUBTITLE_STYLES: dict[str, dict[str, str]] = {
         "shadow": "0",
         "bold": "-1",
     },
+    # --- Expansion pack: 37 additional distinct caption looks ---
+    "crimson_pop": {
+        "name": "Crimson Pop",
+        "font": "Impact",
+        "size": "84",
+        "primary": "&H003C14DC",
+        "outline": "&H00000000",
+        "outline_w": "6",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "aqua_flash": {
+        "name": "Aqua Flash",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H00FFE500",
+        "outline": "&H00403000",
+        "outline_w": "4",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "sunset_glow": {
+        "name": "Sunset Glow",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H004370FF",
+        "outline": "&H00001840",
+        "outline_w": "5",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "midnight_gold": {
+        "name": "Midnight Gold",
+        "font": "Georgia",
+        "size": "72",
+        "primary": "&H0060C8E8",
+        "outline": "&H00001020",
+        "outline_w": "3",
+        "shadow": "2",
+        "bold": "0",
+    },
+    "bubblegum": {
+        "name": "Bubblegum",
+        "font": "Arial",
+        "size": "72",
+        "primary": "&H00FFFFFF",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "-1",
+        "border_style": "3",
+        "back": "&HAACC66FF",
+    },
+    "forest_mint": {
+        "name": "Forest Mint",
+        "font": "Arial Black",
+        "size": "74",
+        "primary": "&H00A0E08C",
+        "outline": "&H001A3010",
+        "outline_w": "3",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "steel_blue": {
+        "name": "Steel Blue",
+        "font": "Arial",
+        "size": "70",
+        "primary": "&H00D0A87F",
+        "outline": "&H00000000",
+        "outline_w": "3",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "molten": {
+        "name": "Molten",
+        "font": "Impact",
+        "size": "86",
+        "primary": "&H002255FF",
+        "outline": "&H00000820",
+        "outline_w": "6",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "paper_note": {
+        "name": "Paper Note",
+        "font": "Georgia",
+        "size": "62",
+        "primary": "&H001A1A1A",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "0",
+        "border_style": "3",
+        "back": "&HE6D8EFF5",
+    },
+    "holographic": {
+        "name": "Holographic",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H00EEFF66",
+        "outline": "&H00AA00FF",
+        "outline_w": "4",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "amber_bold": {
+        "name": "Amber Bold",
+        "font": "Impact",
+        "size": "84",
+        "primary": "&H0000BFFF",
+        "outline": "&H00000000",
+        "outline_w": "6",
+        "shadow": "0",
+        "bold": "-1",
+    },
+    "glacier": {
+        "name": "Glacier",
+        "font": "Arial",
+        "size": "72",
+        "primary": "&H00FFF6DF",
+        "outline": "&H00A08055",
+        "outline_w": "3",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "graphite": {
+        "name": "Graphite",
+        "font": "Arial Black",
+        "size": "76",
+        "primary": "&H00D0CCC8",
+        "outline": "&H00000000",
+        "outline_w": "4",
+        "shadow": "3",
+        "bold": "-1",
+    },
+    "candy_red": {
+        "name": "Candy Red",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H005533FF",
+        "outline": "&H00000000",
+        "outline_w": "5",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "lime_shock": {
+        "name": "Lime Shock",
+        "font": "Arial Black",
+        "size": "82",
+        "primary": "&H0000FFB6",
+        "outline": "&H00000000",
+        "outline_w": "5",
+        "shadow": "0",
+        "bold": "-1",
+    },
+    "deep_purple": {
+        "name": "Deep Purple",
+        "font": "Arial Black",
+        "size": "78",
+        "primary": "&H00FF80B0",
+        "outline": "&H00500030",
+        "outline_w": "4",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "sunrise": {
+        "name": "Sunrise",
+        "font": "Georgia",
+        "size": "72",
+        "primary": "&H0080D0FF",
+        "outline": "&H00002040",
+        "outline_w": "3",
+        "shadow": "2",
+        "bold": "0",
+    },
+    "mono_type": {
+        "name": "Mono Type",
+        "font": "Courier New",
+        "size": "64",
+        "primary": "&H00E8E8E8",
+        "outline": "&H00000000",
+        "outline_w": "3",
+        "shadow": "0",
+        "bold": "0",
+    },
+    "tv_caption": {
+        "name": "TV Caption",
+        "font": "Arial",
+        "size": "58",
+        "primary": "&H00FFFFFF",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "-1",
+        "border_style": "3",
+        "back": "&HD0000000",
+        "align": "2",
+    },
+    "gold_bar": {
+        "name": "Gold Bar",
+        "font": "Arial",
+        "size": "60",
+        "primary": "&H004AD2FF",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "-1",
+        "border_style": "3",
+        "back": "&HC0000000",
+        "align": "2",
+    },
+    "electric_blue": {
+        "name": "Electric Blue",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H00FF9933",
+        "outline": "&H00301000",
+        "outline_w": "4",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "peach_soft": {
+        "name": "Peach Soft",
+        "font": "Arial",
+        "size": "70",
+        "primary": "&H00A4CBFF",
+        "outline": "&H000F2040",
+        "outline_w": "2",
+        "shadow": "1",
+        "bold": "0",
+    },
+    "jade": {
+        "name": "Jade",
+        "font": "Arial Black",
+        "size": "76",
+        "primary": "&H008CC800",
+        "outline": "&H00000000",
+        "outline_w": "4",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "ruby_glow": {
+        "name": "Ruby Glow",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H006622FF",
+        "outline": "&H00200050",
+        "outline_w": "4",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "cobalt": {
+        "name": "Cobalt",
+        "font": "Impact",
+        "size": "82",
+        "primary": "&H00DD5522",
+        "outline": "&H00000000",
+        "outline_w": "6",
+        "shadow": "0",
+        "bold": "-1",
+    },
+    "tangerine": {
+        "name": "Tangerine",
+        "font": "Impact",
+        "size": "82",
+        "primary": "&H002295FF",
+        "outline": "&H00000000",
+        "outline_w": "6",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "blush": {
+        "name": "Blush",
+        "font": "Arial",
+        "size": "70",
+        "primary": "&H00CCAAFF",
+        "outline": "&H003A2040",
+        "outline_w": "2",
+        "shadow": "1",
+        "bold": "0",
+    },
+    "onyx": {
+        "name": "Onyx",
+        "font": "Arial Black",
+        "size": "78",
+        "primary": "&H00FFFFFF",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "-1",
+        "border_style": "3",
+        "back": "&HCC000000",
+    },
+    "seafoam": {
+        "name": "Seafoam",
+        "font": "Arial",
+        "size": "72",
+        "primary": "&H00D8F09F",
+        "outline": "&H00405020",
+        "outline_w": "3",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "flare_yellow": {
+        "name": "Flare Yellow",
+        "font": "Impact",
+        "size": "84",
+        "primary": "&H0000F2FF",
+        "outline": "&H00000000",
+        "outline_w": "6",
+        "shadow": "1",
+        "bold": "-1",
+    },
+    "violet_pop": {
+        "name": "Violet Pop",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H00FF66C2",
+        "outline": "&H00000000",
+        "outline_w": "5",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "copper": {
+        "name": "Copper",
+        "font": "Georgia",
+        "size": "72",
+        "primary": "&H003878C8",
+        "outline": "&H00051020",
+        "outline_w": "3",
+        "shadow": "2",
+        "bold": "0",
+    },
+    "arctic": {
+        "name": "Arctic",
+        "font": "Arial Black",
+        "size": "74",
+        "primary": "&H00FFF6EA",
+        "outline": "&H00A08860",
+        "outline_w": "3",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "magenta_pop": {
+        "name": "Magenta Pop",
+        "font": "Arial Black",
+        "size": "80",
+        "primary": "&H00AA33FF",
+        "outline": "&H00000000",
+        "outline_w": "5",
+        "shadow": "0",
+        "bold": "-1",
+    },
+    "slate_caption": {
+        "name": "Slate Caption",
+        "font": "Arial",
+        "size": "60",
+        "primary": "&H00ECE6E0",
+        "outline": "&H00000000",
+        "outline_w": "0",
+        "shadow": "0",
+        "bold": "-1",
+        "border_style": "3",
+        "back": "&HA0383028",
+        "align": "2",
+    },
+    "neon_lime": {
+        "name": "Neon Lime",
+        "font": "Arial Black",
+        "size": "82",
+        "primary": "&H0000FFA8",
+        "outline": "&H00001500",
+        "outline_w": "5",
+        "shadow": "2",
+        "bold": "-1",
+    },
+    "cream_serif": {
+        "name": "Cream Serif",
+        "font": "Georgia",
+        "size": "70",
+        "primary": "&H00D8F4FF",
+        "outline": "&H00001E2A",
+        "outline_w": "2",
+        "shadow": "1",
+        "bold": "0",
+    },
 }
 
 # Legacy / UI aliases → canonical SUBTITLE_STYLES keys
@@ -1504,6 +1890,62 @@ VIDEO_STYLE_MONTAGE: dict[str, dict[str, str | bool | list[str]]] = {
         "montage_pace": "viral",
         "flash_cuts": True,
         "preferred_motions": ["glitch_jitter", "slam_zoom", "whip_zoom", "snap_in"],
+    },
+    "epic_trailer": {
+        "visual_effect": "blockbuster",
+        "preferred_transition": "fadeblack",
+        "montage_pace": "cinematic",
+        "flash_cuts": False,
+        "preferred_motions": ["slow_push", "crash_zoom", "impact_shake", "slow_dolly"],
+    },
+    "warm_vlog": {
+        "visual_effect": "golden_hour",
+        "preferred_transition": "smoothleft",
+        "montage_pace": "medium",
+        "flash_cuts": False,
+        "preferred_motions": ["handheld", "drift_left", "breathe", "sway"],
+    },
+    "product_showcase": {
+        "visual_effect": "vivid",
+        "preferred_transition": "smoothup",
+        "montage_pace": "medium",
+        "flash_cuts": False,
+        "preferred_motions": ["orbit_soft", "slow_push", "rack_focus", "float_rise"],
+    },
+    "news_brief": {
+        "visual_effect": "soft_film",
+        "preferred_transition": "slideleft",
+        "montage_pace": "fast",
+        "flash_cuts": False,
+        "preferred_motions": ["micro_push", "slow_dolly", "tilt_up", "rise"],
+    },
+    "retro_vhs": {
+        "visual_effect": "heatwave",
+        "preferred_transition": "pixelize",
+        "montage_pace": "medium",
+        "flash_cuts": True,
+        "preferred_motions": ["glitch_jitter", "handheld", "dutch_roll", "shake_hit"],
+    },
+    "dreamy_aesthetic": {
+        "visual_effect": "pastel_dream",
+        "preferred_transition": "dissolve",
+        "montage_pace": "cinematic",
+        "flash_cuts": False,
+        "preferred_motions": ["float_rise", "sway", "orbit_soft", "breathe"],
+    },
+    "sport_energy": {
+        "visual_effect": "punch",
+        "preferred_transition": "zoomin",
+        "montage_pace": "viral",
+        "flash_cuts": True,
+        "preferred_motions": ["crash_zoom", "impact_shake", "whip_zoom", "snap_zoom"],
+    },
+    "mystery_dark": {
+        "visual_effect": "drama",
+        "preferred_transition": "fadeblack",
+        "montage_pace": "cinematic",
+        "flash_cuts": False,
+        "preferred_motions": ["slow_push", "rack_focus", "micro_push", "breathe"],
     },
 }
 
@@ -2076,13 +2518,123 @@ def catalog_prompt_block() -> str:
     motions = [m["id"] for m in MOTION_PRESETS]
     subs = list(SUBTITLE_STYLES.keys())
     texts = list(TEXT_STYLES.keys())
+    frames = [k for k in VIDEO_FRAMES.keys()]
     return (
         "AVAILABLE TOOLS (pick only these ids):\n"
         f"- visual_effect ({len(effects)}): {', '.join(effects)}\n"
         f"- subtitle_style ({len(subs)}): {', '.join(subs)}\n"
+        f"- video_frame ({len(frames)}): {', '.join(frames)}\n"
         f"- motion ({len(motions)}): {', '.join(motions)}\n"
         f"- text_style ({len(texts)}): {', '.join(texts)}\n"
         f"- preferred_transition: {', '.join(TRANSITION_LIBRARY)}\n"
         "- montage_pace: viral, fast, medium, cinematic\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# Decorative video frames ("рамки") — an outer border / cinematic treatment
+# drawn on top of the finished picture. `kind` drives both the web CSS preview
+# and the ffmpeg render below, so previews match the exported video.
+#   weight  = border/bar thickness as a fraction of output height
+#   color   = 6-digit RGB hex (no #)
+#   radius  = corner radius fraction (preview only; ffmpeg draws square)
+# ---------------------------------------------------------------------------
+VIDEO_FRAMES: dict[str, dict[str, object]] = {
+    "frame_white": {"name": "White", "kind": "solid", "color": "FFFFFF", "weight": 0.014},
+    "frame_white_bold": {"name": "White Bold", "kind": "solid", "color": "FFFFFF", "weight": 0.028},
+    "frame_black": {"name": "Black", "kind": "solid", "color": "000000", "weight": 0.02},
+    "frame_gold": {"name": "Gold", "kind": "solid", "color": "E8C15A", "weight": 0.016},
+    "frame_gold_bold": {"name": "Gold Bold", "kind": "solid", "color": "E8C15A", "weight": 0.03},
+    "frame_red": {"name": "Red", "kind": "solid", "color": "E23B3B", "weight": 0.02},
+    "frame_cyan": {"name": "Cyan", "kind": "solid", "color": "00E5FF", "weight": 0.016},
+    "frame_pink": {"name": "Pink", "kind": "solid", "color": "FF4FA3", "weight": 0.016},
+    "frame_lime": {"name": "Lime", "kind": "solid", "color": "A8FF00", "weight": 0.016},
+    "frame_purple": {"name": "Purple", "kind": "solid", "color": "9B5CFF", "weight": 0.016},
+    "frame_orange": {"name": "Orange", "kind": "solid", "color": "FF7A1A", "weight": 0.016},
+    "frame_teal": {"name": "Teal", "kind": "solid", "color": "14B8A6", "weight": 0.016},
+    "frame_navy": {"name": "Navy", "kind": "solid", "color": "1E3A8A", "weight": 0.02},
+    "frame_mint": {"name": "Mint", "kind": "solid", "color": "7CF0C8", "weight": 0.016},
+    "frame_round_white": {"name": "Round White", "kind": "rounded", "color": "FFFFFF", "weight": 0.014, "radius": 0.06},
+    "frame_round_black": {"name": "Round Black", "kind": "rounded", "color": "000000", "weight": 0.02, "radius": 0.06},
+    "frame_round_gold": {"name": "Round Gold", "kind": "rounded", "color": "E8C15A", "weight": 0.016, "radius": 0.06},
+    "frame_pill": {"name": "Pill", "kind": "rounded", "color": "FFFFFF", "weight": 0.012, "radius": 0.12},
+    "frame_double_white": {"name": "Double White", "kind": "double", "color": "FFFFFF", "weight": 0.01},
+    "frame_double_gold": {"name": "Double Gold", "kind": "double", "color": "E8C15A", "weight": 0.01},
+    "frame_double_black": {"name": "Double Black", "kind": "double", "color": "000000", "weight": 0.012},
+    "frame_dashed_white": {"name": "Dashed White", "kind": "dashed", "color": "FFFFFF", "weight": 0.014},
+    "frame_dashed_black": {"name": "Dashed Black", "kind": "dashed", "color": "000000", "weight": 0.016},
+    "frame_dotted_white": {"name": "Dotted White", "kind": "dotted", "color": "FFFFFF", "weight": 0.016},
+    "frame_dotted_gold": {"name": "Dotted Gold", "kind": "dotted", "color": "E8C15A", "weight": 0.016},
+    "frame_glow_cyan": {"name": "Glow Cyan", "kind": "glow", "color": "00E5FF", "weight": 0.014},
+    "frame_glow_pink": {"name": "Glow Pink", "kind": "glow", "color": "FF4FA3", "weight": 0.014},
+    "frame_glow_lime": {"name": "Glow Lime", "kind": "glow", "color": "A8FF00", "weight": 0.014},
+    "frame_glow_purple": {"name": "Glow Purple", "kind": "glow", "color": "9B5CFF", "weight": 0.014},
+    "frame_glow_gold": {"name": "Glow Gold", "kind": "glow", "color": "E8C15A", "weight": 0.014},
+    "frame_vignette": {"name": "Vignette", "kind": "vignette", "color": "000000", "weight": 0.0},
+    "frame_vignette_soft": {"name": "Vignette Soft", "kind": "vignette_soft", "color": "000000", "weight": 0.0},
+    "frame_spotlight": {"name": "Spotlight", "kind": "vignette_soft", "color": "000000", "weight": 0.0},
+    "frame_grunge": {"name": "Grunge", "kind": "vignette", "color": "000000", "weight": 0.0},
+    "frame_cinematic": {"name": "Cinematic", "kind": "letterbox", "color": "000000", "weight": 0.11},
+    "frame_cinematic_thin": {"name": "Cinematic Thin", "kind": "letterbox", "color": "000000", "weight": 0.06},
+    "frame_film_gold": {"name": "Film Gold", "kind": "letterbox", "color": "16110A", "weight": 0.1},
+    "frame_polaroid": {"name": "Polaroid", "kind": "polaroid", "color": "FFFFFF", "weight": 0.16},
+    "frame_polaroid_black": {"name": "Polaroid Black", "kind": "polaroid", "color": "111111", "weight": 0.16},
+}
+
+
+def normalize_frame_style(frame_id: str | None) -> str | None:
+    """Map a UI frame id to a canonical VIDEO_FRAMES key (or None for 'no frame')."""
+    raw = (frame_id or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if not raw or raw in ("none", "off", "no_frame"):
+        return None
+    return raw if raw in VIDEO_FRAMES else None
+
+
+def frame_filter(frame_id: str | None, w: int, h: int) -> str | None:
+    """Build an ffmpeg -vf fragment that draws the decorative frame on top.
+
+    Best-effort: rounded / dashed / dotted corners are approximated as solid
+    borders of the same colour (ffmpeg cannot draw rounded/dashed rectangles),
+    while vignette / letterbox / polaroid are reproduced faithfully.
+    """
+    key = normalize_frame_style(frame_id)
+    if not key:
+        return None
+    spec = VIDEO_FRAMES.get(key) or {}
+    kind = str(spec.get("kind") or "solid")
+    color = str(spec.get("color") or "FFFFFF")
+    weight = float(spec.get("weight") or 0.016)
+    t = max(2, round(weight * h))
+
+    def box(c: str, thick: int, alpha: float = 1.0) -> str:
+        return f"drawbox=x=0:y=0:w=iw:h=ih:t={thick}:color=0x{c}@{alpha:.2f}"
+
+    if kind == "vignette":
+        return "vignette=angle=PI/3.6"
+    if kind == "vignette_soft":
+        return "vignette=angle=PI/4.5"
+    if kind == "letterbox":
+        bar = max(8, round(weight * h))
+        return (
+            f"drawbox=x=0:y=0:w=iw:h={bar}:t=fill:color=0x{color}@1.00,"
+            f"drawbox=x=0:y=ih-{bar}:w=iw:h={bar}:t=fill:color=0x{color}@1.00"
+        )
+    if kind == "polaroid":
+        bar = max(8, round(weight * h))
+        border = max(2, round(0.012 * h))
+        return (
+            box(color, border)
+            + f",drawbox=x=0:y=ih-{bar}:w=iw:h={bar}:t=fill:color=0x{color}@1.00"
+        )
+    if kind == "double":
+        gap = max(2, t)
+        off = t + gap
+        return (
+            box(color, t)
+            + f",drawbox=x={off}:y={off}:w={max(2, w - 2 * off)}:h={max(2, h - 2 * off)}:t={t}:color=0x{color}@1.00"
+        )
+    if kind == "glow":
+        return box(color, t + max(2, round(t * 1.6)), 0.30) + "," + box(color, t)
+    # solid / rounded / dashed / dotted → solid border of same colour
+    return box(color, t)
 

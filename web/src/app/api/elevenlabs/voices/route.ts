@@ -33,7 +33,7 @@ function normalizeGender(raw: string | null | undefined): string | null {
 
 /**
  * List ElevenLabs voices: account voices + shared library (paginated).
- * Query: ?q=&gender=male|female|neutral|all
+ * Query: ?q=&gender=male|female|neutral|all&page=1&limit=80
  */
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -55,10 +55,17 @@ export async function GET(request: Request) {
   const genderFilter = String(searchParams.get("gender") || "all")
     .trim()
     .toLowerCase();
+  const page = Math.max(1, Number(searchParams.get("page") || 1) || 1);
+  const limit = Math.max(
+    20,
+    Math.min(100, Number(searchParams.get("limit") || 80) || 80),
+  );
 
   try {
     const headers = { "xi-api-key": apiKey };
 
+    let accountVoices: VoiceItem[] = [];
+    if (page === 1) {
     const accountRes = await fetch("https://api.elevenlabs.io/v1/voices", {
       headers,
       next: { revalidate: 120 },
@@ -77,7 +84,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const accountVoices: VoiceItem[] = (accountData.voices || []).map(
+    accountVoices = (accountData.voices || []).map(
       (v: {
         voice_id: string;
         name?: string;
@@ -102,11 +109,12 @@ export async function GET(request: Request) {
         };
       },
     );
+    }
 
     // Shared / library voices (broader catalog)
     const sharedParams = new URLSearchParams({
-      page_size: "100",
-      page: "0",
+      page_size: String(limit),
+      page: String(page - 1),
     });
     if (q) sharedParams.set("search", q);
     if (genderFilter === "male" || genderFilter === "female") {
@@ -193,6 +201,9 @@ export async function GET(request: Request) {
       total: voices.length,
       account: accountVoices.length,
       shared: sharedVoices.length,
+      page,
+      limit,
+      hasMore: sharedVoices.length >= limit,
     });
   } catch (e) {
     return NextResponse.json(

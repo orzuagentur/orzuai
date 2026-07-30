@@ -8,6 +8,7 @@ import {
   TEXT_STYLE_IDS,
   TRANSITION_IDS,
 } from "@/lib/editor-catalog";
+import { isVideoFrameId } from "@/lib/video-frames";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   const { data: parent, error: parentErr } = await supabase
     .from("video_jobs")
     .select(
-      "id,user_id,status,title,preview_url,storage_path,storage_bucket,duration_seconds,metadata",
+      "id,user_id,status,title,script_text,description,preview_url,storage_path,storage_bucket,duration_seconds,metadata",
     )
     .eq("id", source_job_id)
     .eq("user_id", user.id)
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
   const preferred_transition = String(body.preferred_transition || "fade").trim();
   const subtitle_style = String(body.subtitle_style || "classic").trim();
   const text_style = String(body.text_style || "bold_center").trim();
+  const frame_style_raw = String(body.frame_style || "").trim();
+  const frame_style = isVideoFrameId(frame_style_raw) ? frame_style_raw : null;
   const overlay_text = String(body.overlay_text || "").trim().slice(0, 120);
   const caption_text = String(body.caption_text || "").trim().slice(0, 120);
 
@@ -115,6 +118,16 @@ export async function POST(request: Request) {
     music_volume = 0.45;
   }
   const keep_original_audio = body.keep_original_audio !== false;
+  const voice_id = String(body.voice_id || "").trim().slice(0, 120) || null;
+  const voice_text = String(
+    body.voice_text || parent.script_text || parent.title || "",
+  )
+    .trim()
+    .slice(0, 5000);
+  const selected_element =
+    body.selected_element && typeof body.selected_element === "object"
+      ? body.selected_element
+      : null;
 
   let playback_speed = 1;
   try {
@@ -154,6 +167,12 @@ export async function POST(request: Request) {
   } catch {
     voice_volume = 1.05;
   }
+  let caption_scale = 1;
+  try {
+    caption_scale = Math.max(0.5, Math.min(1.75, Number(body.caption_scale ?? 1)));
+  } catch {
+    caption_scale = 1;
+  }
 
   let trim_start = 0;
   let trim_end: number | null = null;
@@ -169,8 +188,114 @@ export async function POST(request: Request) {
       trim_end = null;
     }
   }
-
   const parentMeta = (parent.metadata || {}) as Record<string, unknown>;
+  const source_clips = Array.isArray(body.source_clips)
+    ? (body.source_clips as unknown[])
+        .filter((item): item is Record<string, unknown> => {
+          return Boolean(item && typeof item === "object");
+        })
+        .slice(0, 80)
+    : [];
+  const scene_durations = Array.isArray(body.scene_durations)
+    ? (body.scene_durations as unknown[])
+        .map((item, index) => {
+          if (item && typeof item === "object") {
+            const row = item as Record<string, unknown>;
+            const originalRaw = Number(row.original_index ?? row.source_index ?? index);
+            const original_index = Number.isFinite(originalRaw)
+              ? Math.max(0, Math.min(79, Math.floor(originalRaw)))
+              : index;
+            const duration = Math.max(
+              0.5,
+              Math.min(120, Number(row.duration) || 0),
+            );
+            return {
+              id: String(row.id || `scene-${index + 1}`),
+              index,
+              original_index,
+              label: String(row.label || `Scene ${index + 1}`).slice(0, 80),
+              duration,
+            };
+          }
+          return {
+            id: `scene-${index + 1}`,
+            index,
+            original_index: index,
+            label: `Scene ${index + 1}`,
+            duration: Math.max(0.5, Math.min(120, Number(item) || 0)),
+          };
+        })
+        .filter((item) => item.duration > 0)
+        .slice(0, 80)
+    : [];
+  const parentSceneCount = Array.isArray(parentMeta.source_clips)
+    ? parentMeta.source_clips.length
+    : 0;
+  const source_scene_count = Math.max(
+    0,
+    Math.min(
+      80,
+      Math.floor(
+        Number(body.source_scene_count) ||
+          parentSceneCount ||
+          source_clips.length ||
+          scene_durations.length,
+      ),
+    ),
+  );
+  const selected_media = Array.isArray(body.selected_media)
+    ? (body.selected_media as unknown[])
+        .filter((item): item is Record<string, unknown> => {
+          return Boolean(item && typeof item === "object");
+        })
+        .map((row, index) => ({
+          scene_id: String(row.scene_id || `scene-${index + 1}`).slice(0, 120),
+          index: Math.max(0, Math.min(79, Number(row.index) || index)),
+          original_index: Math.max(
+            0,
+            Math.min(79, Number(row.original_index ?? row.index ?? index) || 0),
+          ),
+          kind: ["video", "photo"].includes(String(row.kind || ""))
+            ? String(row.kind)
+            : "video",
+          provider: String(row.provider || "media").slice(0, 60),
+          title: String(row.title || "Media").slice(0, 160),
+          thumb: row.thumb ? String(row.thumb).slice(0, 2000) : null,
+          preview_url: row.preview_url
+            ? String(row.preview_url).slice(0, 2000)
+            : null,
+          download_url: row.download_url
+            ? String(row.download_url).slice(0, 2000)
+            : null,
+          duration: Math.max(0.5, Math.min(120, Number(row.duration) || 0)),
+          width: row.width != null ? Number(row.width) || null : null,
+          height: row.height != null ? Number(row.height) || null : null,
+        }))
+        .filter((item) => item.preview_url || item.download_url)
+        .slice(0, 80)
+    : [];
+  const scene_motions = Array.isArray(body.scene_motions)
+    ? (body.scene_motions as unknown[])
+        .filter((item): item is Record<string, unknown> => {
+          return Boolean(item && typeof item === "object");
+        })
+        .map((row, index) => ({
+          id: String(row.id || `scene-${index + 1}`).slice(0, 120),
+          index: Math.max(0, Math.min(79, Number(row.index) || index)),
+          original_index: Math.max(
+            0,
+            Math.min(79, Number(row.original_index ?? row.index ?? index) || 0),
+          ),
+          motion: String(row.motion || motion || "none").slice(0, 60),
+        }))
+        .slice(0, 80)
+    : [];
+  const aspect_ratio = ["9:16", "16:9", "1:1"].includes(
+    String(body.aspect_ratio || ""),
+  )
+    ? String(body.aspect_ratio)
+    : String(parentMeta.aspect_ratio || "9:16");
+
   const library = parentLibrary(parentMeta);
   const baseTitle = String(parent.title || "Video").trim() || "Video";
   const title = baseTitle.endsWith("(edit)")
@@ -191,12 +316,17 @@ export async function POST(request: Request) {
     preferred_transition,
     subtitle_style,
     text_style,
+    frame_style,
     overlay_text: overlay_text || null,
     caption_text: caption_text || null,
+    captions_visible: body.captions_visible !== false,
+    caption_scale,
     music_mode,
     music_track_id,
     music_volume,
     keep_original_audio,
+    voice_id,
+    voice_text: voice_text || null,
     playback_speed,
     flip_h,
     flip_v,
@@ -205,6 +335,7 @@ export async function POST(request: Request) {
     contrast,
     saturation,
     voice_volume,
+    selected_element,
     trim_start,
     trim_end,
     excluded_source_ids: Array.isArray(body.excluded_source_ids)
@@ -216,7 +347,12 @@ export async function POST(request: Request) {
     source_storage_path: parent.storage_path,
     source_storage_bucket: parent.storage_bucket || "short-previews",
     source_preview_url: parent.preview_url,
-    aspect_ratio: parentMeta.aspect_ratio || "9:16",
+    aspect_ratio,
+    source_scene_count,
+    source_clips,
+    selected_media,
+    scene_motions,
+    scene_durations,
   };
 
   const { data: job, error } = await supabase
@@ -225,8 +361,8 @@ export async function POST(request: Request) {
       user_id: user.id,
       status: "queued",
       title,
-      script_text: null,
-      description: null,
+      script_text: parent.script_text || voice_text || null,
+      description: parent.description || null,
       scheduled_for: new Date().toISOString(),
       duration_seconds:
         trim_end != null

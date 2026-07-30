@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { SUBTITLE_STYLE_IDS } from "@/lib/editor-catalog";
 import { getActiveYoutubeChannel } from "@/lib/youtube-channels";
 
 const ASPECTS = new Set(["9:16", "16:9", "1:1"]);
 const CREATIVITY_VIDEO_TYPES = new Set(["standard", "emoji"]);
+const OUTPUT_RESOLUTIONS = new Set(["720p", "1080p", "4k"]);
 /** Shorts / clipping */
 const SHORT_DURATIONS = new Set([15, 30, 45, 60]);
 /** Creativity — personal longer videos */
@@ -27,6 +29,13 @@ export async function POST(request: Request) {
     duration_auto?: boolean;
     aspect_ratio?: string;
     video_type?: string;
+    output_resolution?: string;
+    use_voice?: boolean;
+    voice_id?: string | null;
+    add_music?: boolean;
+    music_track_id?: string | null;
+    add_subtitles?: boolean;
+    subtitle_style?: string | null;
     source?: string;
     pipeline?: string;
     mode?: "ai_auto" | "ai_prompt" | string;
@@ -82,6 +91,25 @@ export async function POST(request: Request) {
     isCreativity && CREATIVITY_VIDEO_TYPES.has(requestedVideoType)
       ? requestedVideoType
       : "standard";
+  const outputResolutionRaw = String(body.output_resolution || "1080p")
+    .trim()
+    .toLowerCase();
+  const output_resolution = OUTPUT_RESOLUTIONS.has(outputResolutionRaw)
+    ? outputResolutionRaw
+    : "1080p";
+  const use_voice = body.use_voice !== false;
+  const voice_id = use_voice
+    ? String(body.voice_id || "").trim().slice(0, 120) || null
+    : null;
+  const add_music = body.add_music !== false;
+  const music_track_id = add_music
+    ? String(body.music_track_id || "").trim().slice(0, 120) || null
+    : null;
+  const add_subtitles = body.add_subtitles !== false;
+  const subtitleStyleRaw = String(body.subtitle_style || "classic").trim();
+  const subtitle_style = SUBTITLE_STYLE_IDS.has(subtitleStyleRaw)
+    ? subtitleStyleRaw
+    : "classic";
 
   if (isCreativity || isYoutubePrompt) {
     if (!brief) {
@@ -159,6 +187,13 @@ export async function POST(request: Request) {
     duration_seconds: durationAuto ? null : duration_seconds,
     aspect_ratio,
     video_type,
+    output_resolution,
+    use_voice,
+    voice_id,
+    add_music,
+    music_track_id,
+    add_subtitles,
+    subtitle_style,
     used_ai_training: !isCreativity,
   };
   if (!isCreativity) {
