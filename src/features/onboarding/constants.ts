@@ -6,9 +6,11 @@ export const ONBOARDING_MESSAGES = {
   stepBusinessTitle: "Create your business",
   stepBusinessDescription:
     "Add your business name and contact details. This powers AI replies and customer context.",
-  stepChannelTitle: "Connect a channel",
+  stepChannelTitle: "Connect a channel (optional)",
   stepChannelDescription:
-    "Start with WhatsApp to receive and reply to customer messages.",
+    "Connect a customer channel — WhatsApp, Telegram, Instagram, email, or website — to receive and reply to messages. This is optional: you can connect channels anytime from Integrations.",
+  stepChannelOptionalHint:
+    "You don't need to connect a channel now. Skip this step and add one later from Integrations.",
   stepKnowledgeTitle: "Add knowledge (optional)",
   stepKnowledgeDescription:
     "Optional: add FAQs, pricing, or hours so the AI can answer accurately. You can do this anytime from Knowledge Base.",
@@ -26,6 +28,8 @@ export const ONBOARDING_MESSAGES = {
   stepFinish: "Go to dashboard",
   back: "Back",
   continue: "Continue",
+  skip: "Skip for now",
+  skipSetup: "Skip setup",
   checklistTitle: "Setup progress",
   checklistDescription: "Complete required steps to launch your AI inbox.",
 } as const;

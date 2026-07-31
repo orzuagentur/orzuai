@@ -112,14 +112,22 @@ export function OnboardingWizard({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-      <div className="flex items-center gap-4">
-        <OnboardingProgressRing percent={progress.percentComplete} />
-        <div className="space-y-1">
-          <p className="text-sm font-medium">{ONBOARDING_MESSAGES.progressLabel}</p>
-          <p className="text-sm text-muted-foreground">
-            Step {activeStep} of {ONBOARDING_STEPS.length}
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <OnboardingProgressRing percent={progress.percentComplete} />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{ONBOARDING_MESSAGES.progressLabel}</p>
+            <p className="text-sm text-muted-foreground">
+              Step {activeStep} of {ONBOARDING_STEPS.length}
+            </p>
+          </div>
         </div>
+        <Button type="button" variant="ghost" size="sm" asChild>
+          <Link href={DASHBOARD_ROUTES.overview}>
+            {ONBOARDING_MESSAGES.skipSetup}
+            <ArrowRightIcon className="size-4" />
+          </Link>
+        </Button>
       </div>
 
       <nav className="flex flex-wrap gap-2">
@@ -188,6 +196,9 @@ export function OnboardingWizard({
                 goToStep(router, 3);
               }}
             />
+            <p className="text-xs text-muted-foreground">
+              {ONBOARDING_MESSAGES.stepChannelOptionalHint}
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => goToStep(router, 1)}>
                 {ONBOARDING_MESSAGES.back}
@@ -196,7 +207,15 @@ export function OnboardingWizard({
                 <Button type="button" onClick={() => goToStep(router, 3)}>
                   {ONBOARDING_MESSAGES.continue}
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => goToStep(router, 3)}
+                >
+                  {ONBOARDING_MESSAGES.skip}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -282,13 +301,13 @@ export function OnboardingWizard({
               <Button type="button" variant="outline" onClick={() => goToStep(router, 2)}>
                 {ONBOARDING_MESSAGES.back}
               </Button>
-              {progress.hasAiEnabled ? (
-                <Button asChild>
-                  <Link href={DASHBOARD_ROUTES.overview}>
-                    {ONBOARDING_MESSAGES.stepFinish}
-                  </Link>
-                </Button>
-              ) : null}
+              <Button asChild variant={progress.hasAiEnabled ? "default" : "secondary"}>
+                <Link href={DASHBOARD_ROUTES.overview}>
+                  {progress.hasAiEnabled
+                    ? ONBOARDING_MESSAGES.stepFinish
+                    : ONBOARDING_MESSAGES.skip}
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
