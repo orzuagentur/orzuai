@@ -18,7 +18,7 @@ export type LandingChannelId =
   | "email"
   | "google_calendar";
 
-export type { LandingLiveEvent } from "@/features/landing/demo/types";
+export type { LandingLiveEvent } from "./demo/types";
 
 export type LandingIconKey =
   | "ai"

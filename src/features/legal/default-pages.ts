@@ -5,7 +5,7 @@ import type { LegalPageRecord, LegalSection } from "./types";
 export const LEGAL_COMPANY = {
   name: "OrzuX",
   contactEmail: SUPPORT_EMAIL,
-  lastUpdated: "June 24, 2026",
+  lastUpdated: "July 31, 2026",
 } as const;
 
 function withCompany(text: string): string {
@@ -76,6 +76,16 @@ const PRIVACY_SECTIONS = buildSections([
     paragraphs: [
       "When AI features are enabled, message content and relevant business context may be sent to configured AI providers to generate replies, classify intent, update CRM records, or perform calendar actions. AI output is generated automatically based on your assistant settings, permissions, and knowledge base.",
       "You control whether AI replies are enabled per channel and which actions the assistant may perform. You remain responsible for reviewing AI-generated content and ensuring it is appropriate for your customers.",
+      "AI features are provided through enterprise API tiers of our AI providers (currently Google Gemini API, OpenAI API, and Anthropic API). These providers do not use data submitted through their APIs to train or improve their generalized or foundational AI/ML models. {company} does not use, transfer, or sell user data — including raw, aggregated, or derived data — to create, train, or improve any generalized or foundational AI/ML models.",
+    ],
+  },
+  {
+    title: "Google User Data and Limited Use",
+    paragraphs: [
+      "{company}'s use and transfer of information received from Google APIs, including Gmail and Google Calendar, adheres to the Google API Services User Data Policy, including its Limited Use requirements.",
+      "We request the minimum Google scopes required to operate the features you enable: Gmail read access (gmail.readonly) to display incoming customer emails in your inbox; Gmail send access (gmail.send) to send your email replies; Google Calendar read access (calendar.readonly) to check real availability for booking; and Google Calendar events access (calendar.events) to create, update, and cancel appointment events you book through {company}. We also use your basic account email (userinfo.email) to identify the connected account.",
+      "Google Workspace data (Gmail and Calendar content) is used only to provide these user-facing features. It is never used to train, fine-tune, or improve generalized or foundational AI/ML models, and it is never sold or transferred to third parties for advertising or model-training purposes. When AI generates an email reply, the relevant message content is processed transiently through enterprise AI provider APIs that do not retain or train on that data, and the result is returned to your workspace.",
+      "You can disconnect Gmail and Google Calendar at any time from Dashboard → Integrations, which revokes {company}'s stored access tokens. You can also revoke access directly from your Google Account security settings.",
     ],
   },
   {

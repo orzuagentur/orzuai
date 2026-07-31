@@ -73,8 +73,9 @@ export function applyLandingContentOverrides(
   const hero = findDoc(docs, "landing", "hero");
   if (hero) {
     if (hero.title.trim()) next.hero.title = hero.title;
+    // Supporting text comes from the summary field. Body is intentionally not
+    // mapped to the subtitle so the long-form editor field cannot clobber it.
     if (hero.summary.trim()) next.hero.subtitle = hero.summary;
-    if (hero.body.trim()) next.hero.subtitle = hero.body;
   }
 
   const architecture = findDoc(docs, "landing", "architecture");

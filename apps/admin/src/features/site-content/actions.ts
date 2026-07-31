@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { SITE_CONTENT_CATALOG } from "@/features/site-content/catalog";
+import { getSiteDocDefaults } from "@/features/site-content/defaults";
 import type {
   SaveSiteDocumentInput,
   SiteDocumentRecord,
@@ -61,6 +62,34 @@ function mapRow(row: Row): SiteDocumentRecord {
   };
 }
 
+/**
+ * Ensure the editor always opens with the real current copy. If a stored field
+ * is empty or still holds the admin catalog placeholder (label/description),
+ * fall back to the live landing default so opening the editor never wipes the
+ * current text and the operator edits the actual content.
+ */
+function withDefaultContent(doc: SiteDocumentRecord): SiteDocumentRecord {
+  const defaults = getSiteDocDefaults(doc.collection, doc.docKey, doc.locale);
+  if (!defaults) {
+    return doc;
+  }
+
+  const catalogItem = SITE_CONTENT_CATALOG.find(
+    (item) => item.collection === doc.collection && item.docKey === doc.docKey,
+  );
+
+  const titleIsPlaceholder =
+    !doc.title.trim() || doc.title === catalogItem?.title;
+  const summaryIsPlaceholder =
+    !doc.summary.trim() || doc.summary === catalogItem?.description;
+
+  return {
+    ...doc,
+    title: titleIsPlaceholder ? defaults.title : doc.title,
+    summary: summaryIsPlaceholder ? defaults.summary : doc.summary,
+  };
+}
+
 export async function listSiteDocumentsAction(locale?: string): Promise<{
   documents: SiteDocumentRecord[];
   error?: string;
@@ -108,7 +137,9 @@ export async function getSiteDocumentAction(
       return { document: null, error: error.message };
     }
 
-    return { document: data ? mapRow(data as Row) : null };
+    return {
+      document: data ? withDefaultContent(mapRow(data as Row)) : null,
+    };
   } catch (error) {
     return {
       document: null,
@@ -214,17 +245,22 @@ export async function ensureSiteContentCatalogAction(
 
     const toInsert = SITE_CONTENT_CATALOG.filter(
       (item) => !existingKeys.has(`${item.collection}:${item.docKey}`),
-    ).map((item, index) => ({
-      collection: item.collection,
-      doc_key: item.docKey,
-      locale,
-      title: item.title,
-      summary: item.description,
-      body: "",
-      payload: {},
-      sort_order: (index + 1) * 10,
-      published: true,
-    }));
+    ).map((item, index) => {
+      const defaults = getSiteDocDefaults(item.collection, item.docKey, locale);
+      return {
+        collection: item.collection,
+        doc_key: item.docKey,
+        locale,
+        // Seed with the real welcome-page copy so the site keeps its current
+        // text and the editor opens pre-filled — never the catalog placeholders.
+        title: defaults?.title ?? item.title,
+        summary: defaults?.summary ?? item.description,
+        body: "",
+        payload: {},
+        sort_order: (index + 1) * 10,
+        published: true,
+      };
+    });
 
     if (toInsert.length === 0) {
       return { created: 0 };
