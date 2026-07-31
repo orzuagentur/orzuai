@@ -14,7 +14,10 @@ import {
 } from "@/lib/telegram/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
+import {
+  enableChannelAiIfAgentActive,
+  purgeChannelConversations,
+} from "@/services/channel-workspace.service";
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -160,6 +163,9 @@ export async function disconnectTelegram(): Promise<{
     deleteIntegrationSecret(admin, connection?.bot_token_secret_key_name),
     deleteIntegrationSecret(admin, connection?.webhook_secret_secret_key_name),
   ]);
+
+  // Remove all Telegram conversations/messages from our DB (not Telegram).
+  await purgeChannelConversations(businessId, "telegram", admin);
 
   revalidateTelegramPaths();
   return { success: true };

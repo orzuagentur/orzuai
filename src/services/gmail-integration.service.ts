@@ -35,7 +35,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { enableAiForChannels } from "@/services/channel-workspace.service";
+import { purgeChannelConversations } from "@/services/channel-workspace.service";
 import {
   insertInboundChannelMessage,
   resolveInboundMessageContext,
@@ -346,8 +346,8 @@ export async function completeGmailOAuth(
       return { success: false, message: error.message };
     }
 
-    await enableAiForChannels(businessId, ["email"]);
-
+    // Do NOT auto-enable the AI when a mailbox is connected. The assistant stays
+    // off until the user explicitly turns it on in AI settings.
     await syncGmailInboxForBusiness(admin, businessId, { initial: true });
 
     if (hasGmailPushEnv()) {
@@ -434,6 +434,9 @@ export async function disconnectGmail(): Promise<{
       deleteIntegrationSecret(admin, connection?.refresh_token_secret_key_name),
     ]);
 
+    // Remove all imported email conversations/messages from our DB (not Gmail).
+    await purgeChannelConversations(businessId, "email", admin);
+
     revalidateGmailPaths();
     return { success: true };
   } catch (error) {
@@ -443,35 +446,36 @@ export async function disconnectGmail(): Promise<{
   }
 }
 
+type GmailIngestResult = {
+  imported: boolean;
+  conversationId?: string;
+};
+
 async function ingestGmailMessage(
   admin: ReturnType<typeof createAdminClient>,
   businessId: string,
   connection: EmailConnection,
   messageId: string,
-): Promise<boolean> {
-  const accessToken = await getValidAccessToken(connection);
-
-  if (!accessToken) {
-    return false;
-  }
-
+  accessToken: string,
+  options: { skipAutoReply?: boolean } = {},
+): Promise<GmailIngestResult> {
   const existing = await findMessageByExternalId(admin, "email", messageId);
 
   if (existing) {
-    return false;
+    return { imported: false };
   }
 
   const parsed = await getGmailMessage(accessToken, messageId);
 
   if (!parsed?.fromEmail) {
-    return false;
+    return { imported: false };
   }
 
   if (
     connection.gmail_address &&
     parsed.fromEmail.toLowerCase() === connection.gmail_address.toLowerCase()
   ) {
-    return false;
+    return { imported: false };
   }
 
   const context = await resolveInboundMessageContext(admin, {
@@ -484,7 +488,7 @@ async function ingestGmailMessage(
   });
 
   if (!context) {
-    return false;
+    return { imported: false };
   }
 
   await admin
@@ -503,16 +507,22 @@ async function ingestGmailMessage(
   });
 
   if (!inserted || inserted.isDuplicate) {
-    return false;
+    return { imported: false, conversationId: context.conversationId };
   }
 
-  await scheduleInboundMessageProcessing({
-    admin,
-    businessId,
-    channel: "email",
-    conversationId: context.conversationId,
-    clientMessage: parsed.body,
-  });
+  // The AI must read first and only reply to genuine business mail. Automated,
+  // no-reply, notification and bulk messages are imported so the user can see
+  // them, but never trigger an auto-reply. Backfill (initial sync) also skips
+  // auto-reply so connecting a mailbox never blasts replies to old threads.
+  if (!parsed.isAutomated && !options.skipAutoReply) {
+    await scheduleInboundMessageProcessing({
+      admin,
+      businessId,
+      channel: "email",
+      conversationId: context.conversationId,
+      clientMessage: parsed.body,
+    });
+  }
 
   scheduleInboundMessagePush({
     businessId,
@@ -524,7 +534,7 @@ async function ingestGmailMessage(
     isNewContact: context.createdContact,
   });
 
-  return true;
+  return { imported: true, conversationId: context.conversationId };
 }
 
 export async function syncGmailInboxForBusiness(
@@ -543,6 +553,9 @@ export async function syncGmailInboxForBusiness(
     return { imported: 0, scanned: 0, error: "Gmail is not connected." };
   }
 
+  // Pin the non-null connection so narrowing survives inside the worker closure.
+  const activeConnection = connection;
+
   const accessToken = await getValidAccessToken(connection);
 
   if (!accessToken) {
@@ -552,6 +565,9 @@ export async function syncGmailInboxForBusiness(
       error: "Gmail access expired. Reconnect Gmail in Integrations.",
     };
   }
+
+  // Pin the non-null token so narrowing survives inside the worker closure.
+  const activeAccessToken = accessToken;
 
   const inbox = await listRecentInboxMessageIds(accessToken);
   const messageIdSet = new Set(inbox.messageIds);
@@ -589,18 +605,57 @@ export async function syncGmailInboxForBusiness(
 
   const messageIds = [...messageIdSet];
   let imported = 0;
+  const importedConversationIds = new Set<string>();
 
-  for (const messageId of messageIds) {
-    const didImport = await ingestGmailMessage(
-      admin,
-      businessId,
-      connection,
-      messageId,
-    );
+  // Fetch/ingest messages with bounded concurrency so connecting a mailbox
+  // (up to 50 messages) is fast instead of a slow sequential round-trip loop.
+  const CONCURRENCY = 5;
+  let cursor = 0;
 
-    if (didImport) {
-      imported += 1;
+  async function worker(): Promise<void> {
+    while (cursor < messageIds.length) {
+      const messageId = messageIds[cursor];
+      cursor += 1;
+
+      if (!messageId) {
+        continue;
+      }
+
+      const result = await ingestGmailMessage(
+        admin,
+        businessId,
+        activeConnection,
+        messageId,
+        activeAccessToken,
+        { skipAutoReply: options.initial },
+      );
+
+      if (result.imported) {
+        imported += 1;
+      }
+
+      if (options.initial && result.conversationId) {
+        importedConversationIds.add(result.conversationId);
+      }
     }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, messageIds.length) }, () =>
+      worker(),
+    ),
+  );
+
+  // Initial backfill: emails already existed in Gmail, so mark them read to
+  // preserve their real dates without flagging every old thread as "new".
+  if (options.initial && importedConversationIds.size > 0) {
+    await admin
+      .from("conversations")
+      .update({
+        last_read_at: new Date().toISOString(),
+        unread_count: 0,
+      })
+      .in("id", [...importedConversationIds]);
   }
 
   await admin

@@ -29,7 +29,10 @@ import {
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
 import { createClient } from "@/lib/supabase/server";
-import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
+import {
+  enableChannelAiIfAgentActive,
+  purgeChannelConversations,
+} from "@/services/channel-workspace.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { assertCanConnectIntegration } from "@/services/entitlement.service";
@@ -194,6 +197,9 @@ export async function disconnectWhatsApp(): Promise<{
   }
 
   await deleteIntegrationSecret(admin, existing?.meta_access_token_secret_key_name);
+
+  // Remove all WhatsApp conversations/messages from our DB (not Meta/WhatsApp).
+  await purgeChannelConversations(businessId, "whatsapp", admin);
 
   revalidateWhatsAppPaths();
   return { success: true };

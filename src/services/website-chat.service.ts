@@ -17,7 +17,10 @@ import { createClient } from "@/lib/supabase/server";
 import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
-import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
+import {
+  enableChannelAiIfAgentActive,
+  purgeChannelConversations,
+} from "@/services/channel-workspace.service";
 import {
   insertInboundChannelMessage,
   resolveInboundMessageContext,
@@ -343,6 +346,9 @@ export async function disconnectWebsiteChat(): Promise<{
   if (error) {
     return { success: false, message: error.message };
   }
+
+  // Remove all website chat conversations/messages from our DB.
+  await purgeChannelConversations(businessId, "website_chat");
 
   revalidateWebsiteChatPaths();
   return { success: true };

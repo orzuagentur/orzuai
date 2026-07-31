@@ -35,7 +35,7 @@ import { getWebsiteChatConnection } from "@/services/website-chat.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { getVoiceAgentSettings, getVoiceConnection } from "@/services/voice-agent.service";
 import { getWhatsAppConnection } from "@/services/whatsapp.service";
-import type { Database } from "@/types/database.types";
+import type { Database, MessagingChannel } from "@/types/database.types";
 import type {
   ChannelAiSettingsData,
   ChannelAnalyticsData,
@@ -71,8 +71,11 @@ export async function isAgentReplyEnabled(
     .eq("business_id", businessId)
     .maybeSingle();
 
+  // No assistant profile yet = the user hasn't set up / turned on the AI.
+  // Default OFF so connecting a channel never auto-enables auto-reply; the AI
+  // only starts replying once the user explicitly enables it.
   if (!data) {
-    return true;
+    return false;
   }
 
   return data.can_reply;
@@ -100,17 +103,54 @@ export async function enableAiForChannels(
     .in("channel", channels);
 }
 
-/** Turn on channel auto-reply when the single agent is active (canReply). */
+/**
+ * No-op by product decision: AI auto-reply is strictly manual per channel.
+ * Connecting a channel must NEVER auto-enable the assistant — the user turns AI
+ * on explicitly in AI settings (which calls {@link enableAiForChannels}).
+ * Kept as a stable call site so connect flows don't need to change.
+ */
 export async function enableChannelAiIfAgentActive(
+  _businessId: string,
+  _channel: MessagingIntegrationChannelId,
+  _db?: SupabaseClient<Database>,
+): Promise<void> {
+  // Intentionally does nothing.
+}
+
+/**
+ * Permanently delete every conversation + message for a channel when it is
+ * disconnected, so nothing lingers on the platform after disconnect. This only
+ * touches OrzuX data (never the external Gmail/WhatsApp/Telegram account).
+ *
+ * Deleting the conversations cascades (via FK ON DELETE CASCADE) to messages,
+ * attachments, deliveries, reads, AI jobs and conversation-scoped notifications.
+ * Contacts and CRM records (deals/tasks) are intentionally kept.
+ */
+export async function purgeChannelConversations(
   businessId: string,
-  channel: MessagingIntegrationChannelId,
+  channel: MessagingChannel,
   db?: SupabaseClient<Database>,
 ): Promise<void> {
-  if (!(await isAgentReplyEnabled(businessId, db))) {
+  if (!hasSupabaseEnv()) {
     return;
   }
 
-  await enableAiForChannels(businessId, [channel], db);
+  // Always use an admin (service-role) client so the cascade delete is not
+  // blocked by RLS, regardless of which caller invokes this.
+  const client = db ?? createAdminClient();
+
+  const { error } = await client
+    .from("conversations")
+    .delete()
+    .eq("business_id", businessId)
+    .eq("channel", channel);
+
+  if (error) {
+    console.error(
+      "[channel-workspace] purge channel conversations failed",
+      JSON.stringify({ businessId, channel, message: error.message }),
+    );
+  }
 }
 
 export async function disableAiForAllChannels(

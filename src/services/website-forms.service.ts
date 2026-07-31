@@ -22,7 +22,10 @@ import { sendWhatsAppTextMessage } from "@/lib/whatsapp/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCachedWhatsAppDeliveryConnection } from "@/services/channels/connection-cache";
 import { createClient } from "@/lib/supabase/server";
-import { enableChannelAiIfAgentActive } from "@/services/channel-workspace.service";
+import {
+  enableChannelAiIfAgentActive,
+  purgeChannelConversations,
+} from "@/services/channel-workspace.service";
 import { assertCanConnectIntegration } from "@/services/entitlement.service";
 import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
@@ -375,6 +378,9 @@ export async function disconnectWebsiteForms(): Promise<{ success: boolean }> {
     .from("website_form_connections")
     .update({ connection_status: "disconnected" })
     .eq("business_id", businessId);
+
+  // Remove all website form conversations/messages from our DB.
+  await purgeChannelConversations(businessId, "website_forms");
 
   revalidateWebsiteFormsPaths();
   return { success: true };
