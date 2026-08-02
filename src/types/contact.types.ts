@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { additionalContactsSchema } from "@/utils/contact-additional-contacts";
 import type { AdditionalContactEntry } from "@/utils/contact-additional-contacts";
+import { contactProfileFieldsSchema } from "@/utils/contact-profile-fields";
+import type { ContactProfileFieldEntry } from "@/utils/contact-profile-fields";
 import type { CrmDealItem } from "./crm-deal.types";
 import type { CrmTaskItem } from "./crm-task.types";
 import type { MessageSenderType, MessagingChannel } from "./database.types";
@@ -11,8 +13,15 @@ export type ContactCustomFields = {
   notes?: string;
   location?: string;
   additionalContacts?: AdditionalContactEntry[];
+  /** User-defined fields on the contact info card. */
+  profileFields?: ContactProfileFieldEntry[];
   /** AI data-collection answers (namespaced). */
   collection?: Record<string, string>;
+};
+
+export type ContactFieldIconOption = {
+  key: string;
+  label: string;
 };
 
 export const PIPELINE_STAGES = [
@@ -68,6 +77,7 @@ export const updateContactSchema = z.object({
     notes: z.string().trim().max(2000).optional(),
     location: z.string().trim().max(200).optional(),
     additionalContacts: additionalContactsSchema.optional(),
+    profileFields: contactProfileFieldsSchema.optional(),
   }),
   pipelineStage: z.enum(PIPELINE_STAGES).optional(),
   dealValue: z.number().min(0).max(999999999).optional().nullable(),

@@ -23,11 +23,16 @@ import {
   parseAdditionalContacts,
   type AdditionalContactEntry,
 } from "@/utils/contact-additional-contacts";
+import {
+  parseContactProfileFields,
+  type ContactProfileFieldEntry,
+} from "@/utils/contact-profile-fields";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
 import { parseAgentRunAction } from "@/lib/ai/agent-run-actions";
 import type {
   ContactActionResult,
   ContactCustomFields,
+  ContactFieldIconOption,
   ContactProfileData,
   ContactTimelineEntry,
   DeleteContactInput,
@@ -80,6 +85,29 @@ type ContactRow = {
   created_at?: string | null;
 };
 
+function parseCollectionFields(
+  value: unknown,
+): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>).filter(
+    (entry): entry is [string, string] =>
+      typeof entry[0] === "string" &&
+      typeof entry[1] === "string" &&
+      entry[1].trim().length > 0,
+  );
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    entries.map(([key, fieldValue]) => [key, fieldValue.trim()]),
+  );
+}
+
 function parseCustomFields(
   value: ContactRow["custom_fields"],
 ): ContactCustomFields {
@@ -89,6 +117,12 @@ function parseCustomFields(
 
   const additionalContacts = parseAdditionalContacts(
     "additionalContacts" in value ? value.additionalContacts : undefined,
+  );
+  const profileFields = parseContactProfileFields(
+    "profileFields" in value ? value.profileFields : undefined,
+  );
+  const collection = parseCollectionFields(
+    "collection" in value ? value.collection : undefined,
   );
 
   return {
@@ -106,7 +140,30 @@ function parseCustomFields(
         : undefined,
     additionalContacts:
       additionalContacts.length > 0 ? additionalContacts : undefined,
+    profileFields: profileFields.length > 0 ? profileFields : undefined,
+    collection,
   };
+}
+
+export async function listContactFieldIcons(): Promise<ContactFieldIconOption[]> {
+  if (!hasSupabaseEnv()) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("contact_field_icons")
+    .select("key, label")
+    .order("sort_order", { ascending: true });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map((row) => ({
+    key: row.key,
+    label: row.label,
+  }));
 }
 
 function parsePipelineStage(value: string | null | undefined): PipelineStage {
@@ -1203,6 +1260,10 @@ export async function updateContact(
       parsed.data.customFields.additionalContacts;
   }
 
+  if (parsed.data.customFields.profileFields) {
+    customFields.profileFields = parsed.data.customFields.profileFields;
+  }
+
   const supabase = await createClient();
   const { data: existingContact } = await supabase
     .from("contacts")
@@ -1224,6 +1285,10 @@ export async function updateContact(
   if (!parsed.data.customFields.additionalContacts) {
     mergedCustomFields.additionalContacts =
       existingCustomFields.additionalContacts;
+  }
+
+  if (!parsed.data.customFields.profileFields) {
+    mergedCustomFields.profileFields = existingCustomFields.profileFields;
   }
 
   const { error } = await supabase
@@ -1459,6 +1524,112 @@ export async function updateContactClientDescription(input: {
   }
 
   revalidateContactPaths();
+  return { success: true };
+}
+
+export async function updateContactProfileFields(
+  contactId: string,
+  profileFields: ContactProfileFieldEntry[],
+): Promise<ContactActionResult> {
+  if (!hasSupabaseEnv()) {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_CONFIG",
+        message: CONTACTS_MESSAGES.customFieldSaveFailed,
+      },
+    };
+  }
+
+  const businessId = await getOwnedBusinessId();
+
+  if (!businessId) {
+    return {
+      success: false,
+      error: {
+        code: "NO_BUSINESS",
+        message: CONTACTS_MESSAGES.customFieldSaveFailed,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const iconKeys = [...new Set(profileFields.map((field) => field.iconKey))];
+
+  if (iconKeys.length > 0) {
+    const { data: icons, error: iconsError } = await supabase
+      .from("contact_field_icons")
+      .select("key")
+      .in("key", iconKeys);
+
+    if (iconsError) {
+      return {
+        success: false,
+        error: {
+          code: "UPDATE_FAILED",
+          message: CONTACTS_MESSAGES.customFieldSaveFailed,
+        },
+      };
+    }
+
+    const allowed = new Set((icons ?? []).map((row) => row.key));
+    if (iconKeys.some((key) => !allowed.has(key))) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: CONTACTS_MESSAGES.customFieldInvalidIcon,
+        },
+      };
+    }
+  }
+
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("custom_fields")
+    .eq("id", contactId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (!existingContact) {
+    return {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: CONTACTS_MESSAGES.customFieldSaveFailed,
+      },
+    };
+  }
+
+  const existingCustomFields = parseCustomFields(
+    existingContact.custom_fields as ContactRow["custom_fields"],
+  );
+  const mergedCustomFields: ContactCustomFields = {
+    ...existingCustomFields,
+    profileFields: profileFields.length > 0 ? profileFields : undefined,
+  };
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      custom_fields: mergedCustomFields as unknown as Record<string, string>,
+    })
+    .eq("id", contactId)
+    .eq("business_id", businessId);
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: "UPDATE_FAILED",
+        message: CONTACTS_MESSAGES.customFieldSaveFailed,
+      },
+    };
+  }
+
+  revalidatePath(DASHBOARD_ROUTES.contacts);
+  revalidatePath(DASHBOARD_ROUTES.chats);
+
   return { success: true };
 }
 

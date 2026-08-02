@@ -221,12 +221,20 @@ export async function ingestWhatsAppWebMessages(
       continue;
     }
 
-    const digits = phoneDigitsOnly(message.from);
-    if (!digits) {
+    const from = message.from.trim();
+    const isJid = from.includes("@");
+    const digits = isJid ? "" : phoneDigitsOnly(from);
+
+    // Phone digits for normal contacts; full JID (e.g. @lid) when WhatsApp
+    // only exposes a Linked ID and no phone mapping yet.
+    if (!isJid && !digits) {
       continue;
     }
 
-    const contactPhone = canonicalPhoneNumber(message.from) || `+${digits}`;
+    const identifier = isJid ? from : digits;
+    const contactPhone = isJid
+      ? from
+      : canonicalPhoneNumber(from) || `+${digits}`;
     const contactName = message.senderName?.trim() || contactPhone;
 
     const context = await resolveInboundMessageContext(admin, {
@@ -234,7 +242,7 @@ export async function ingestWhatsAppWebMessages(
       channel: "whatsapp_web",
       contactName,
       contactPhone,
-      identifier: digits,
+      identifier,
       displayLabel: contactName,
     });
 

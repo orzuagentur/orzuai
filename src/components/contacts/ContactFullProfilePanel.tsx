@@ -16,6 +16,7 @@ import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { ContactAdditionalContactsSection } from "@/components/contacts/ContactAdditionalContactsSection";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
 import { ContactCrmFieldsForm } from "@/components/contacts/ContactCrmFieldsForm";
+import { ContactProfileCustomFieldsSection } from "@/components/contacts/ContactProfileCustomFieldsSection";
 import { ContactProfileInfoTable } from "@/components/contacts/ContactProfileInfoTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -444,6 +445,13 @@ export function ContactFullProfilePanel({
                   {CONTACTS_MESSAGES.contactInfoTitle}
                 </h3>
                 <ContactProfileInfoTable rows={infoRows} />
+                <ContactProfileCustomFieldsSection
+                  contactId={contact.id}
+                  profileFields={contact.customFields.profileFields ?? []}
+                  onFieldsChange={() => {
+                    void onRefresh();
+                  }}
+                />
               </div>
 
               {contact.sentiment ? (

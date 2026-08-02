@@ -589,6 +589,27 @@ export type Database = {
           },
         ];
       };
+      contact_field_icons: {
+        Row: {
+          key: string;
+          label: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          key: string;
+          label: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          key?: string;
+          label?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       whatsapp_web_connections: {
         Row: {
           id: string;

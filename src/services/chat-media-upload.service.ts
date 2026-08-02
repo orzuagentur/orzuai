@@ -120,6 +120,16 @@ async function isChannelConnected(
     return data?.whatsapp_status === "connected";
   }
 
+  if (channel === "whatsapp_web") {
+    const { data } = await supabase
+      .from("whatsapp_web_connections")
+      .select("status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.status === "connected";
+  }
+
   if (channel === "telegram") {
     const { data } = await supabase
       .from("telegram_connections")
@@ -130,6 +140,16 @@ async function isChannelConnected(
       .maybeSingle();
 
     return data?.telegram_status === "connected";
+  }
+
+  if (channel === "telegram_user") {
+    const { data } = await supabase
+      .from("telegram_user_connections")
+      .select("status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.status === "connected";
   }
 
   if (channel === "instagram") {
@@ -160,7 +180,7 @@ function channelNotConnectedMessage(channel: MessagingChannel): string {
     return CHAT_MESSAGES.instagramNotConnected;
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return CHAT_MESSAGES.telegramNotConnected;
   }
 

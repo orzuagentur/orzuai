@@ -6,6 +6,10 @@ import { createClient } from "@supabase/supabase-js";
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  isLidUser,
+  jidDecode,
+  jidNormalizedUser,
+  type WAMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
@@ -57,11 +61,72 @@ function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
 
-function toJid(recipient: string): string {
-  if (recipient.includes("@")) {
-    return recipient;
+/**
+ * Extract real phone digits from a PN JID / raw phone. Returns null for LIDs —
+ * Linked IDs look numeric but are not phone numbers.
+ */
+function phoneDigitsFromAddress(value: string | null | undefined): string | null {
+  if (!value?.trim()) {
+    return null;
   }
-  return `${digitsOnly(recipient)}@s.whatsapp.net`;
+
+  const trimmed = value.trim();
+  if (trimmed.includes("@")) {
+    if (isLidUser(trimmed)) {
+      return null;
+    }
+
+    const decoded = jidDecode(trimmed);
+    if (!decoded?.user) {
+      return null;
+    }
+
+    if (decoded.server !== "s.whatsapp.net" && decoded.server !== "c.us") {
+      return null;
+    }
+
+    const digits = digitsOnly(decoded.user);
+    return digits || null;
+  }
+
+  const digits = digitsOnly(trimmed);
+  return digits || null;
+}
+
+function resolveInboundFrom(message: WAMessage): string | null {
+  const phone =
+    phoneDigitsFromAddress(message.key.senderPn) ||
+    phoneDigitsFromAddress(message.key.participantPn) ||
+    phoneDigitsFromAddress(message.key.remoteJid);
+
+  if (phone) {
+    return phone;
+  }
+
+  const remoteJid = message.key.remoteJid ?? "";
+  if (remoteJid && isLidUser(remoteJid)) {
+    // Keep the LID JID so replies can still be routed; never treat LID as a phone.
+    return jidNormalizedUser(remoteJid);
+  }
+
+  return null;
+}
+
+function connectedAccountPhone(sock: WASocket): string | null {
+  const me = sock.user;
+  return (
+    phoneDigitsFromAddress(me?.jid) ||
+    phoneDigitsFromAddress(me?.id) ||
+    null
+  );
+}
+
+function toJid(recipient: string): string {
+  const trimmed = recipient.trim();
+  if (trimmed.includes("@")) {
+    return jidNormalizedUser(trimmed) || trimmed;
+  }
+  return `${digitsOnly(trimmed)}@s.whatsapp.net`;
 }
 
 async function updateRow(
@@ -224,8 +289,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
 
       if (connection === "open") {
         entry.starting = false;
-        const rawId = sock.user?.id ?? "";
-        const phone = digitsOnly(rawId.split(":")[0] ?? "");
+        const phone = connectedAccountPhone(sock);
         await updateRow(businessId, {
           status: "connected",
           qr_code: null,
@@ -235,7 +299,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
           last_synced_at: new Date().toISOString(),
         });
         await persistCreds(businessId);
-        log("connected", businessId);
+        log("connected", businessId, phone ? `+${phone}` : "unknown-phone");
       }
 
       if (connection === "close") {
@@ -282,6 +346,12 @@ async function startSocket(row: ConnectionRow): Promise<void> {
           continue;
         }
 
+        const from = resolveInboundFrom(message);
+        if (!from) {
+          log("skip inbound without resolvable sender", businessId, remoteJid);
+          continue;
+        }
+
         const text = extractText(
           message.message as Record<string, unknown> | null,
         ).trim();
@@ -292,7 +362,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
         const timestamp = Number(message.messageTimestamp ?? 0);
 
         await forwardInbound(businessId, {
-          from: digitsOnly(remoteJid.split("@")[0] ?? ""),
+          from,
           externalMessageId: message.key.id ?? `${remoteJid}:${timestamp}`,
           senderName: message.pushName ?? null,
           text,

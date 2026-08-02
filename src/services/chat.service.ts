@@ -306,6 +306,17 @@ async function isWhatsAppConnected(businessId: string): Promise<boolean> {
   return data?.whatsapp_status === "connected";
 }
 
+async function isWhatsAppWebConnected(businessId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("whatsapp_web_connections")
+    .select("status")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data?.status === "connected";
+}
+
 async function isInstagramConnected(_businessId: string): Promise<boolean> {
   return false;
 }
@@ -321,6 +332,17 @@ async function isTelegramConnected(businessId: string): Promise<boolean> {
     .maybeSingle();
 
   return data?.telegram_status === "connected";
+}
+
+async function isTelegramUserConnected(businessId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("telegram_user_connections")
+    .select("status")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  return data?.status === "connected";
 }
 
 async function isWebsiteFormsConnected(businessId: string): Promise<boolean> {
@@ -342,6 +364,10 @@ export async function isChatChannelConnected(
     return isWhatsAppConnected(businessId);
   }
 
+  if (channel === "whatsapp_web") {
+    return isWhatsAppWebConnected(businessId);
+  }
+
   if (channel === "instagram") {
     return isInstagramConnected(businessId);
   }
@@ -350,11 +376,19 @@ export async function isChatChannelConnected(
     return isTelegramConnected(businessId);
   }
 
+  if (channel === "telegram_user") {
+    return isTelegramUserConnected(businessId);
+  }
+
   if (channel === "email") {
     return isGmailConnected(businessId);
   }
 
-  return isWebsiteFormsConnected(businessId);
+  if (channel === "website_forms" || channel === "website_chat") {
+    return isWebsiteFormsConnected(businessId);
+  }
+
+  return false;
 }
 
 export type ActiveConversationContext = {
@@ -905,6 +939,77 @@ export async function sendChatMessage(
         message: buildPendingOutboundChatMessage(sendResult.message),
       },
     };
+  } else if (
+    conversation.channel === "whatsapp" ||
+    conversation.channel === "whatsapp_web" ||
+    conversation.channel === "telegram_user"
+  ) {
+    const connected = await isChatChannelConnected(
+      businessId,
+      conversation.channel,
+    );
+
+    if (!connected) {
+      return {
+        success: false,
+        error: {
+          code: "WHATSAPP_NOT_CONNECTED",
+          message:
+            conversation.channel === "telegram_user"
+              ? CHAT_MESSAGES.telegramNotConnected
+              : CHAT_MESSAGES.whatsappNotConnected,
+        },
+      };
+    }
+
+    const contact = resolveContactFromRow(conversation.contact);
+
+    if (!contact) {
+      return {
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: CHAT_MESSAGES.genericError,
+        },
+      };
+    }
+
+    const insertedMessage = await insertChannelMessage(supabase, {
+      conversationId: parsed.data.conversationId,
+      channel: conversation.channel,
+      senderType: "user",
+      content: parsed.data.content,
+    });
+
+    await createOutboundMessageDelivery(supabase, {
+      messageId: insertedMessage.id,
+      businessId,
+      channel: conversation.channel,
+    });
+
+    const now = new Date().toISOString();
+    const contactUpdates = contact.id
+      ? [
+          supabase
+            .from("contacts")
+            .update({ last_message_at: now })
+            .eq("id", contact.id),
+        ]
+      : [];
+
+    await Promise.all([
+      conversationRepo.touchUpdatedAt(parsed.data.conversationId, now),
+      ...contactUpdates,
+    ]);
+
+    scheduleOutboundMessageDelivery(insertedMessage.id);
+
+    return {
+      success: true,
+      data: {
+        message: buildPendingOutboundChatMessage(insertedMessage),
+      },
+    };
   } else if (conversation.channel === "website_forms") {
     const connected = await isWebsiteFormsConnected(businessId);
 
@@ -992,64 +1097,11 @@ export async function sendChatMessage(
       },
     };
   } else {
-    const connected = await isWhatsAppConnected(businessId);
-
-    if (!connected) {
-      return {
-        success: false,
-        error: {
-          code: "WHATSAPP_NOT_CONNECTED",
-          message: CHAT_MESSAGES.whatsappNotConnected,
-        },
-      };
-    }
-
-    const contact = resolveContactFromRow(conversation.contact);
-
-    if (!contact) {
-      return {
-        success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: CHAT_MESSAGES.genericError,
-        },
-      };
-    }
-
-    const insertedMessage = await insertChannelMessage(supabase, {
-      conversationId: parsed.data.conversationId,
-      channel: conversation.channel,
-      senderType: "user",
-      content: parsed.data.content,
-    });
-
-    await createOutboundMessageDelivery(supabase, {
-      messageId: insertedMessage.id,
-      businessId,
-      channel: conversation.channel,
-    });
-
-    const now = new Date().toISOString();
-    const contactUpdates = contact.id
-      ? [
-          supabase
-            .from("contacts")
-            .update({ last_message_at: now })
-            .eq("id", contact.id),
-        ]
-      : [];
-
-    await Promise.all([
-      conversationRepo.touchUpdatedAt(parsed.data.conversationId, now),
-      ...contactUpdates,
-    ]);
-
-    scheduleOutboundMessageDelivery(insertedMessage.id);
-
     return {
-      success: true,
-      data: {
-        message: buildPendingOutboundChatMessage(insertedMessage),
+      success: false,
+      error: {
+        code: "SEND_FAILED",
+        message: CHAT_MESSAGES.genericError,
       },
     };
   }

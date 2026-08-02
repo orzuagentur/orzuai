@@ -8,6 +8,11 @@ export function toChannelExternalId(
   const trimmed = identifier.trim();
 
   if (channel === "whatsapp" || channel === "whatsapp_web") {
+    // Preserve WhatsApp JIDs (including @lid) so outbound can reply correctly.
+    if (trimmed.includes("@")) {
+      return trimmed;
+    }
+
     return canonicalPhoneNumber(trimmed) || phoneDigitsOnly(trimmed) || trimmed;
   }
 

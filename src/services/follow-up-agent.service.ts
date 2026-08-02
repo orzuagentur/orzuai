@@ -60,6 +60,16 @@ async function isChannelConnected(
     return data?.whatsapp_status === "connected";
   }
 
+  if (channel === "whatsapp_web") {
+    const { data } = await admin
+      .from("whatsapp_web_connections")
+      .select("status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.status === "connected";
+  }
+
   if (channel === "instagram") {
     return false;
   }
@@ -74,6 +84,16 @@ async function isChannelConnected(
       .maybeSingle();
 
     return data?.telegram_status === "connected";
+  }
+
+  if (channel === "telegram_user") {
+    const { data } = await admin
+      .from("telegram_user_connections")
+      .select("status")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    return data?.status === "connected";
   }
 
   return channel === "website_forms";

@@ -11,6 +11,7 @@ import {
 
 import { ContactAdditionalContactsSection } from "@/components/contacts/ContactAdditionalContactsSection";
 import { ContactAvatar } from "@/components/contacts/ContactAvatar";
+import { ContactProfileCustomFieldsSection } from "@/components/contacts/ContactProfileCustomFieldsSection";
 import { ContactProfileInfoTable } from "@/components/contacts/ContactProfileInfoTable";
 import { ChannelBrandIcon } from "@/components/icons/channel-brand-icons";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import {
 import type { InboxDetailsPanelData } from "@/services/inbox-details.service";
 import { cn } from "@/lib/utils";
 import type { ConversationDetail } from "@/types/chat.types";
+import type { ContactProfileFieldEntry } from "@/utils/contact-profile-fields";
 import { buildContactProfileInfoRows } from "@/utils/contact-profile-info";
 import { formatRelativeTime } from "@/utils/dashboard";
 import {
@@ -172,9 +174,41 @@ export function InboxDetailsPanel({
     ? buildContactProfileInfoRows(details.profileForInfoRows)
     : [];
   const additionalContacts = contact?.customFields.additionalContacts ?? [];
+  const profileFields = contact?.customFields.profileFields ?? [];
   const crmHref = details?.contactId
     ? `${DASHBOARD_ROUTES.contacts}?contact=${details.contactId}`
     : DASHBOARD_ROUTES.contacts;
+
+  function handleProfileFieldsChange(nextFields: ContactProfileFieldEntry[]) {
+    setDetails((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextContact = {
+        ...current.contact,
+        customFields: {
+          ...current.contact.customFields,
+          profileFields: nextFields.length > 0 ? nextFields : undefined,
+        },
+      };
+
+      const nextDetails: InboxDetailsPanelData = {
+        ...current,
+        contact: nextContact,
+        profileForInfoRows: {
+          ...current.profileForInfoRows,
+          contact: nextContact,
+        },
+      };
+
+      if (conversationId) {
+        setCachedCrmDetails(conversationId, nextDetails);
+      }
+
+      return nextDetails;
+    });
+  }
 
   return (
     <aside
@@ -252,6 +286,11 @@ export function InboxDetailsPanel({
                   {CONTACTS_MESSAGES.contactInfoTitle}
                 </h4>
                 <ContactProfileInfoTable rows={infoRows} />
+                <ContactProfileCustomFieldsSection
+                  contactId={contact.id}
+                  profileFields={profileFields}
+                  onFieldsChange={handleProfileFieldsChange}
+                />
               </div>
 
               {contact.tags.length > 0 ? (
