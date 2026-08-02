@@ -1,5 +1,4 @@
 const LEAD_SOUND_PATH = "/sounds/new-lead.wav";
-const MANAGER_CALLOUT_SOUND_PATH = "/sounds/manager-callout.wav";
 const MANAGER_VIBRATE_PATTERN = [300, 120, 300, 120, 300, 120, 400];
 
 self.addEventListener("install", () => {

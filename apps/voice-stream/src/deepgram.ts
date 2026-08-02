@@ -97,7 +97,6 @@ export function startDeepgramLive(input: {
   let keepAliveTimer: NodeJS.Timeout | null = null;
   let flushTimer: NodeJS.Timeout | null = null;
   let outboundFrames: Buffer[] = [];
-  let outboundFrameBytes = 0;
 
   const trimPendingAudio = () => {
     while (
@@ -122,7 +121,6 @@ export function startDeepgramLive(input: {
         frame[index] = value;
       });
       outboundFrames.push(frame);
-      outboundFrameBytes += frame.byteLength;
     }
 
     scheduleOutboundFlush();
@@ -145,7 +143,6 @@ export function startDeepgramLive(input: {
         return;
       }
 
-      outboundFrameBytes -= frame.byteLength;
       socket.send(frame);
       flushTimer = setTimeout(sendNextFrame, AUDIO_FRAME_INTERVAL_MS);
     };
@@ -318,7 +315,6 @@ export function startDeepgramLive(input: {
       pendingAudio.length = 0;
       pendingAudioBytes = 0;
       outboundFrames = [];
-      outboundFrameBytes = 0;
 
       if (!socket) {
         return;
