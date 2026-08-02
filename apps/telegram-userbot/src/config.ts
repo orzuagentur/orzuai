@@ -14,6 +14,7 @@ export type WorkerConfig = {
   apiHash: string;
   ingestUrl: string;
   ingestSecret: string;
+  port: number;
   refreshIntervalMs: number;
 };
 
@@ -35,6 +36,8 @@ export function loadConfig(): WorkerConfig {
 
   const rawInterval = process.env.TELEGRAM_USERBOT_REFRESH_MS?.trim();
   const refreshIntervalMs = rawInterval ? Number.parseInt(rawInterval, 10) : 30_000;
+  const rawPort = process.env.PORT?.trim();
+  const port = rawPort ? Number.parseInt(rawPort, 10) : 8080;
 
   return {
     supabaseUrl: required("SUPABASE_URL"),
@@ -44,6 +47,7 @@ export function loadConfig(): WorkerConfig {
     apiHash: required("TELEGRAM_API_HASH"),
     ingestUrl: required("TELEGRAM_USERBOT_INGEST_URL"),
     ingestSecret: required("TELEGRAM_USERBOT_SECRET"),
+    port: Number.isFinite(port) && port > 0 ? port : 8080,
     refreshIntervalMs:
       Number.isFinite(refreshIntervalMs) && refreshIntervalMs >= 5_000
         ? refreshIntervalMs

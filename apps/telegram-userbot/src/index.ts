@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+
 import { getSecret } from "@orzu/secrets/server";
 import { createClient } from "@supabase/supabase-js";
 import { Api, TelegramClient } from "telegram";
@@ -226,8 +228,34 @@ async function reconcile(): Promise<void> {
   }
 }
 
+function startHttpServer(): void {
+  const server = createServer((request, response) => {
+    const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+
+    if (request.method === "GET" && (pathname === "/health" || pathname === "/")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          ok: true,
+          service: "telegram-userbot",
+          sessions: active.size,
+        }),
+      );
+      return;
+    }
+
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: "Not found" }));
+  });
+
+  server.listen(config.port, () => {
+    log("http server listening on", config.port);
+  });
+}
+
 async function main(): Promise<void> {
   log("starting worker; api_id", config.apiId);
+  startHttpServer();
 
   await reconcile();
 
