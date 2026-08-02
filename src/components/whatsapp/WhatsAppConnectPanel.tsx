@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Loader2Icon, MessageCircleIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { DASHBOARD_ROUTES } from "@/constants/routes";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WHATSAPP_MESSAGES } from "@/features/whatsapp/constants";
@@ -129,6 +131,17 @@ export function WhatsAppConnectPanel({
         )}
         {isLoading ? WHATSAPP_MESSAGES.connectWaiting : WHATSAPP_MESSAGES.connectButton}
       </Button>
+
+      <p className="text-xs text-muted-foreground">
+        No Cloud API access?{" "}
+        <Link
+          href={`${DASHBOARD_ROUTES.integrations}/whatsapp-web`}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Connect your personal WhatsApp via QR
+        </Link>
+        .
+      </p>
     </div>
   );
 }

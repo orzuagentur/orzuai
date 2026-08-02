@@ -22,6 +22,8 @@ export type TelegramUserStatus =
   | "pending_password"
   | "connected";
 
+export type WhatsAppWebStatus = "disconnected" | "pending_qr" | "connected";
+
 export type EmailConnectionStatus = "connected" | "disconnected" | "pending";
 
 export type GoogleCalendarStatus = "connected" | "disconnected" | "pending";
@@ -52,6 +54,7 @@ export type WebsiteKnowledgeSyncStatus = "idle" | "syncing" | "ready" | "error";
 
 export type MessagingChannel =
   | "whatsapp"
+  | "whatsapp_web"
   | "instagram"
   | "telegram"
   | "website_forms"
@@ -578,6 +581,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "telegram_user_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_web_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          status: WhatsAppWebStatus;
+          phone_number: string | null;
+          qr_code: string | null;
+          qr_expires_at: string | null;
+          creds_secret_key_name: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          status?: WhatsAppWebStatus;
+          phone_number?: string | null;
+          qr_code?: string | null;
+          qr_expires_at?: string | null;
+          creds_secret_key_name?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          status?: WhatsAppWebStatus;
+          phone_number?: string | null;
+          qr_code?: string | null;
+          qr_expires_at?: string | null;
+          creds_secret_key_name?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_web_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
             referencedRelation: "businesses";
@@ -4911,6 +4964,7 @@ export type Database = {
       instagram_status: InstagramStatus;
       telegram_status: TelegramStatus;
       telegram_user_status: TelegramUserStatus;
+      whatsapp_web_status: WhatsAppWebStatus;
       email_connection_status: EmailConnectionStatus;
       google_calendar_status: GoogleCalendarStatus;
       twilio_connection_status: TwilioConnectionStatus;

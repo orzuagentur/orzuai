@@ -1,0 +1,24 @@
+{
+  "name": "@orzu/whatsapp-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@orzu/secrets": "*",
+    "@supabase/supabase-js": "^2.106.2",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.22.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5"
+  }
+}

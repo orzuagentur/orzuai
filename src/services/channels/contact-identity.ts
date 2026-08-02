@@ -7,7 +7,7 @@ export function toChannelExternalId(
 ): string {
   const trimmed = identifier.trim();
 
-  if (channel === "whatsapp") {
+  if (channel === "whatsapp" || channel === "whatsapp_web") {
     return canonicalPhoneNumber(trimmed) || phoneDigitsOnly(trimmed) || trimmed;
   }
 

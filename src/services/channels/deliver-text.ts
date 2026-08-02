@@ -15,6 +15,7 @@ import {
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
 import { sendTelegramUserMessage } from "@/services/telegram-user.service";
+import { sendWhatsAppWebMessage } from "@/lib/whatsapp-web/worker-client";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -98,6 +99,23 @@ export async function deliverChannelTextMessage(input: {
       providerMessageId:
         userResult.messageId != null ? String(userResult.messageId) : undefined,
     };
+  }
+
+  if (input.channel === "whatsapp_web") {
+    const result = await sendWhatsAppWebMessage({
+      businessId: input.businessId,
+      to: input.recipientId,
+      text: input.content,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error ?? "WhatsApp Web is not connected.",
+      };
+    }
+
+    return { success: true, providerMessageId: result.providerMessageId };
   }
 
   if (input.channel === "instagram") {

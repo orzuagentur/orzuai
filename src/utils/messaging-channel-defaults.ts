@@ -3,6 +3,7 @@ import type { MessagingChannel } from "@/types/database.types";
 export function createEmptyUnreadByChannel(): Record<MessagingChannel, number> {
   return {
     whatsapp: 0,
+    whatsapp_web: 0,
     telegram: 0,
     instagram: 0,
     website_forms: 0,
@@ -17,6 +18,7 @@ export function createEmptyUnreadByChannel(): Record<MessagingChannel, number> {
 export function createEmptyChannelConnectionMap(): Record<MessagingChannel, boolean> {
   return {
     whatsapp: false,
+    whatsapp_web: false,
     telegram: false,
     instagram: false,
     website_forms: false,

@@ -4,7 +4,7 @@ import type { MessagingChannel } from "@/types/database.types";
 export function getChannelIconContainerClassName(
   channel: MessagingChannel | IntegrationChannelId,
 ): string {
-  if (channel === "whatsapp") {
+  if (channel === "whatsapp" || channel === "whatsapp_web") {
     return "bg-emerald-50 dark:bg-emerald-950/50";
   }
 
@@ -48,6 +48,10 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
     return "WhatsApp";
   }
 
+  if (channel === "whatsapp_web") {
+    return "WhatsApp Web";
+  }
+
   if (channel === "instagram") {
     return "Instagram";
   }
@@ -84,7 +88,7 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
 }
 
 export function getChannelBadgeClassName(channel: MessagingChannel): string {
-  if (channel === "whatsapp") {
+  if (channel === "whatsapp" || channel === "whatsapp_web") {
     return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200";
   }
 
@@ -112,7 +116,7 @@ export function getChannelBadgeClassName(channel: MessagingChannel): string {
 }
 
 export function getChannelIconClassName(channel: MessagingChannel): string {
-  if (channel === "whatsapp") {
+  if (channel === "whatsapp" || channel === "whatsapp_web") {
     return "text-emerald-600 dark:text-emerald-400";
   }
 
@@ -130,7 +134,7 @@ export function getChannelIconClassName(channel: MessagingChannel): string {
 export function getChannelBadgeVariant(
   channel: MessagingChannel,
 ): "default" | "secondary" | "outline" {
-  if (channel === "whatsapp") {
+  if (channel === "whatsapp" || channel === "whatsapp_web") {
     return "default";
   }
 

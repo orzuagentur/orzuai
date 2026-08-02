@@ -11,6 +11,7 @@ import {
   uploadWhatsAppMedia,
 } from "@/lib/whatsapp/client";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
+import { sendWhatsAppWebMessage } from "@/lib/whatsapp-web/worker-client";
 import { transcodeRemoteVoiceNoteToOggOpus } from "@/services/voice-note-transcode.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -199,6 +200,29 @@ export async function deliverChannelMediaMessage(
     }
 
     return { success: true };
+  }
+
+  if (input.channel === "whatsapp_web") {
+    const result = await sendWhatsAppWebMessage({
+      businessId: input.businessId,
+      to: input.recipientId,
+      text: caption,
+      media: {
+        url: input.mediaUrl,
+        mimeType: input.mimeType,
+        fileName: input.fileName,
+        kind: input.mediaKind,
+      },
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error ?? "WhatsApp Web is not connected.",
+      };
+    }
+
+    return { success: true, providerMessageId: result.providerMessageId };
   }
 
   if (input.channel === "instagram") {

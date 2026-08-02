@@ -27,7 +27,9 @@
     "voice-stream": "npm run start --workspace=@orzu/voice-stream",
     "dev:voice-stream": "npm run dev --workspace=@orzu/voice-stream",
     "telegram-userbot": "npm run start --workspace=@orzu/telegram-userbot",
-    "dev:telegram-userbot": "npm run dev --workspace=@orzu/telegram-userbot"
+    "dev:telegram-userbot": "npm run dev --workspace=@orzu/telegram-userbot",
+    "whatsapp-web": "npm run start --workspace=@orzu/whatsapp-web",
+    "dev:whatsapp-web": "npm run dev --workspace=@orzu/whatsapp-web"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
