@@ -14,6 +14,7 @@ import {
   getTwilioConnection,
   resolveTwilioCredentialsForBusiness,
 } from "@/services/twilio-integration.service";
+import { sendTelegramUserMessage } from "@/services/telegram-user.service";
 import { getVoiceAgentSettings } from "@/services/voice-config.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -62,21 +63,41 @@ export async function deliverChannelTextMessage(input: {
       input.businessId,
     );
 
-    if (!connection?.bot_token) {
-      return { success: false, error: "Telegram is not connected." };
+    if (connection?.bot_token) {
+      const sendResult = await sendTelegramTextMessage(
+        connection.bot_token,
+        input.recipientId,
+        input.content,
+      );
+
+      if (!sendResult.success) {
+        return { success: false, error: sendResult.message };
+      }
+
+      return { success: true, providerMessageId: sendResult.messageId };
     }
 
-    const sendResult = await sendTelegramTextMessage(
-      connection.bot_token,
-      input.recipientId,
-      input.content,
-    );
+    // No bot connected: fall back to the personal (MTProto) account when linked.
+    // Recipient ids are stored as `tg:<chatId>`; the peer is the raw chat id.
+    const peer = input.recipientId.replace(/^tg:/, "");
+    const userResult = await sendTelegramUserMessage({
+      businessId: input.businessId,
+      peer,
+      message: input.content,
+    });
 
-    if (!sendResult.success) {
-      return { success: false, error: sendResult.message };
+    if (!userResult.success) {
+      return {
+        success: false,
+        error: userResult.message ?? "Telegram is not connected.",
+      };
     }
 
-    return { success: true, providerMessageId: sendResult.messageId };
+    return {
+      success: true,
+      providerMessageId:
+        userResult.messageId != null ? String(userResult.messageId) : undefined,
+    };
   }
 
   if (input.channel === "instagram") {

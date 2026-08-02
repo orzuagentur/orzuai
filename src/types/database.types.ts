@@ -16,6 +16,12 @@ export type InstagramStatus = "connected" | "disconnected" | "pending";
 
 export type TelegramStatus = "connected" | "disconnected" | "pending";
 
+export type TelegramUserStatus =
+  | "disconnected"
+  | "pending_code"
+  | "pending_password"
+  | "connected";
+
 export type EmailConnectionStatus = "connected" | "disconnected" | "pending";
 
 export type GoogleCalendarStatus = "connected" | "disconnected" | "pending";
@@ -516,6 +522,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "telegram_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      telegram_user_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          status: TelegramUserStatus;
+          phone_number: string | null;
+          phone_code_hash: string | null;
+          telegram_user_id: string | null;
+          username: string | null;
+          first_name: string | null;
+          session_secret_key_name: string | null;
+          connected_at: string | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          status?: TelegramUserStatus;
+          phone_number?: string | null;
+          phone_code_hash?: string | null;
+          telegram_user_id?: string | null;
+          username?: string | null;
+          first_name?: string | null;
+          session_secret_key_name?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          status?: TelegramUserStatus;
+          phone_number?: string | null;
+          phone_code_hash?: string | null;
+          telegram_user_id?: string | null;
+          username?: string | null;
+          first_name?: string | null;
+          session_secret_key_name?: string | null;
+          connected_at?: string | null;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "telegram_user_connections_business_id_fkey";
             columns: ["business_id"];
             isOneToOne: true;
             referencedRelation: "businesses";
@@ -4848,6 +4910,7 @@ export type Database = {
       whatsapp_status: WhatsappStatus;
       instagram_status: InstagramStatus;
       telegram_status: TelegramStatus;
+      telegram_user_status: TelegramUserStatus;
       email_connection_status: EmailConnectionStatus;
       google_calendar_status: GoogleCalendarStatus;
       twilio_connection_status: TwilioConnectionStatus;
