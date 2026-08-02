@@ -154,15 +154,16 @@ export async function getCmsDocsArticle(
 
   const sectionsRaw = doc.payload.sections;
   if (!Array.isArray(sectionsRaw) || sectionsRaw.length === 0) {
-    if (!doc.body.trim() && !doc.title.trim()) return null;
+    // A CMS row with only a title (empty body and no sections) must NOT override
+    // the rich static docs content — otherwise every page renders title-only.
+    // Fall back to the static article whenever there is no real body text.
+    if (!doc.body.trim()) return null;
     return {
       slug,
       title: doc.title || slug,
       summary: doc.summary,
       updatedLabel: "Updated from Content Studio",
-      sections: doc.body.trim()
-        ? [{ heading: "Overview", body: [doc.body] }]
-        : [],
+      sections: [{ heading: "Overview", body: [doc.body] }],
     };
   }
 
@@ -184,6 +185,13 @@ export async function getCmsDocsArticle(
       bullets: bullets.length > 0 ? bullets : undefined,
     };
   });
+
+  // Guard against a sections array that carries no actual content (e.g. only
+  // empty headings). If nothing meaningful is present, defer to static content.
+  const hasContent = sections.some(
+    (section) => section.body.length > 0 || (section.bullets?.length ?? 0) > 0,
+  );
+  if (!hasContent && !doc.body.trim()) return null;
 
   return {
     slug,
