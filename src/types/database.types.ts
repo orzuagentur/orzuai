@@ -57,6 +57,7 @@ export type MessagingChannel =
   | "whatsapp_web"
   | "instagram"
   | "telegram"
+  | "telegram_user"
   | "website_forms"
   | "facebook_messenger"
   | "email"

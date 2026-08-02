@@ -420,9 +420,8 @@ export type TelegramUserInboundMessage = {
 
 /**
  * Persists inbound messages received by the personal Telegram account (from the
- * worker) into the inbox. Reuses the shared `telegram` channel pipeline so
- * contacts, dedup, push, analytics and AI auto-reply all behave identically to
- * the bot integration. Identifier space is `tg:<chatId>`.
+ * worker) into the dedicated `telegram_user` inbox channel — separate from the
+ * Bot API `telegram` channel. Identifier space is `tg:<chatId>`.
  */
 export async function ingestTelegramUserMessages(
   businessId: string,
@@ -452,7 +451,7 @@ export async function ingestTelegramUserMessages(
 
     const context = await resolveInboundMessageContext(admin, {
       businessId,
-      channel: "telegram",
+      channel: "telegram_user",
       contactName,
       contactPhone: identifier,
       identifier,
@@ -467,7 +466,7 @@ export async function ingestTelegramUserMessages(
 
     const insertResult = await insertInboundChannelMessage(admin, {
       conversationId,
-      channel: "telegram",
+      channel: "telegram_user",
       content,
       externalMessageId: message.externalMessageId,
       sentAt: message.sentAt ?? undefined,
@@ -482,12 +481,12 @@ export async function ingestTelegramUserMessages(
       contactId,
       contactName,
       conversationId,
-      channel: "telegram",
+      channel: "telegram_user",
       preview: getMessagePlainText(content),
       isNewContact: createdContact,
     });
 
-    await incrementMessagingAnalytics(admin, businessId, "telegram", {
+    await incrementMessagingAnalytics(admin, businessId, "telegram_user", {
       totalMessages: 1,
       totalContacts: createdContact ? 1 : 0,
     });
@@ -495,7 +494,7 @@ export async function ingestTelegramUserMessages(
     await scheduleInboundMessageProcessing({
       admin,
       businessId,
-      channel: "telegram",
+      channel: "telegram_user",
       conversationId,
       clientMessage: getMessagePlainText(content),
     });

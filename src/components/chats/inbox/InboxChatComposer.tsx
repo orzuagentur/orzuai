@@ -91,7 +91,9 @@ type InboxChatComposerProps = {
 function supportsMediaChannel(channel: MessagingChannel): boolean {
   return (
     channel === "whatsapp" ||
+    channel === "whatsapp_web" ||
     channel === "telegram" ||
+    channel === "telegram_user" ||
     channel === "instagram" ||
     channel === "website_forms"
   );

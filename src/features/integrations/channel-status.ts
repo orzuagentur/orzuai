@@ -2,10 +2,12 @@ import type { VoiceConnectionData } from "@/types/voice-agent.types";
 import type { GmailConnectionData } from "@/types/gmail-integration.types";
 import type { GoogleCalendarConnectionData } from "@/types/google-calendar.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
+import type { TelegramUserConnection } from "@/services/telegram-user.service";
 import type { WebsiteFormConnectionData } from "@/types/website-forms.types";
 import type { WebsiteChatConnectionData } from "@/types/website-chat.types";
 import type { WebsiteKnowledgeSyncData } from "@/types/website-knowledge.types";
 import type { WhatsAppConnectionData } from "@/types/whatsapp.types";
+import type { WhatsAppWebConnection } from "@/services/whatsapp-web.service";
 
 import {
   MESSAGING_INTEGRATION_CHANNELS,
@@ -30,7 +32,9 @@ export type IntegrationChannelStatusMap = Partial<
 
 type BuildChannelStatusesInput = {
   whatsappConnection: WhatsAppConnectionData | null;
+  whatsappWebConnection?: WhatsAppWebConnection | null;
   telegramConnection: TelegramConnectionData | null;
+  telegramUserConnection?: TelegramUserConnection | null;
   websiteFormConnection: WebsiteFormConnectionData | null;
   websiteChatConnection?: WebsiteChatConnectionData | null;
   websiteKnowledgeSync: WebsiteKnowledgeSyncData | null;
@@ -42,7 +46,9 @@ type BuildChannelStatusesInput = {
 
 export function buildIntegrationChannelStatuses({
   whatsappConnection,
+  whatsappWebConnection,
   telegramConnection,
+  telegramUserConnection,
   websiteFormConnection,
   websiteChatConnection,
   websiteKnowledgeSync,
@@ -61,6 +67,16 @@ export function buildIntegrationChannelStatuses({
     whatsappStatus = "pending";
   }
 
+  let whatsappWebStatus: IntegrationChannelStatus = "disconnected";
+  let whatsappWebDetail: string | undefined;
+
+  if (whatsappWebConnection?.status === "connected") {
+    whatsappWebStatus = "connected";
+    whatsappWebDetail = whatsappWebConnection.phoneNumber ?? undefined;
+  } else if (whatsappWebConnection?.status === "pending_qr") {
+    whatsappWebStatus = "pending";
+  }
+
   let telegramStatus: IntegrationChannelStatus = "disconnected";
   let telegramDetail: string | undefined;
 
@@ -71,6 +87,22 @@ export function buildIntegrationChannelStatuses({
       : undefined;
   } else if (telegramConnection?.status === "pending") {
     telegramStatus = "pending";
+  }
+
+  let telegramUserStatus: IntegrationChannelStatus = "disconnected";
+  let telegramUserDetail: string | undefined;
+
+  if (telegramUserConnection?.status === "connected") {
+    telegramUserStatus = "connected";
+    telegramUserDetail =
+      telegramUserConnection.username
+        ? `@${telegramUserConnection.username}`
+        : telegramUserConnection.phoneNumber ?? undefined;
+  } else if (
+    telegramUserConnection?.status === "pending_code" ||
+    telegramUserConnection?.status === "pending_password"
+  ) {
+    telegramUserStatus = "pending";
   }
 
   let websiteFormsStatus: IntegrationChannelStatus = "disconnected";
@@ -163,9 +195,17 @@ export function buildIntegrationChannelStatuses({
       status: whatsappStatus,
       detail: whatsappDetail,
     },
+    whatsapp_web: {
+      status: whatsappWebStatus,
+      detail: whatsappWebDetail,
+    },
     telegram: {
       status: telegramStatus,
       detail: telegramDetail,
+    },
+    telegram_user: {
+      status: telegramUserStatus,
+      detail: telegramUserDetail,
     },
     website_forms: {
       status: websiteFormsStatus,

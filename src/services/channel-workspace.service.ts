@@ -30,11 +30,13 @@ import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.servi
 import { getGmailConnection } from "@/services/gmail-integration.service";
 import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 import { getTelegramConnection } from "@/services/telegram.service";
+import { getTelegramUserConnection } from "@/services/telegram-user.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getWebsiteChatConnection } from "@/services/website-chat.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
 import { getVoiceAgentSettings, getVoiceConnection } from "@/services/voice-agent.service";
 import { getWhatsAppConnection } from "@/services/whatsapp.service";
+import { getWhatsAppWebConnection } from "@/services/whatsapp-web.service";
 import type { Database, MessagingChannel } from "@/types/database.types";
 import type {
   ChannelAiSettingsData,
@@ -381,7 +383,9 @@ export async function syncChannelAnalytics(
 export async function getChannelConnectionStatuses(businessId: string) {
   const [
     whatsapp,
+    whatsappWeb,
     telegram,
+    telegramUser,
     websiteForms,
     websiteChat,
     websiteKnowledge,
@@ -391,7 +395,9 @@ export async function getChannelConnectionStatuses(businessId: string) {
     gmail,
   ] = await Promise.all([
     getWhatsAppConnection(businessId),
+    getWhatsAppWebConnection(businessId),
     getTelegramConnection(businessId),
+    getTelegramUserConnection(businessId),
     getWebsiteFormConnection(businessId),
     getWebsiteChatConnection(businessId),
     getWebsiteKnowledgeSync(businessId),
@@ -403,7 +409,9 @@ export async function getChannelConnectionStatuses(businessId: string) {
 
   return buildIntegrationChannelStatuses({
     whatsappConnection: whatsapp,
+    whatsappWebConnection: whatsappWeb,
     telegramConnection: telegram,
+    telegramUserConnection: telegramUser,
     websiteFormConnection: websiteForms,
     websiteChatConnection: websiteChat,
     websiteKnowledgeSync: websiteKnowledge,

@@ -30,20 +30,38 @@ export const INTEGRATION_CHANNEL_HELP: Partial<
     ],
   },
   whatsapp: {
-    title: "WhatsApp",
-    summary: "Connect WhatsApp Business via 360dialog.",
+    title: "WhatsApp Business",
+    summary: "Official WhatsApp Business Cloud API.",
     body: [
       "You need a WhatsApp Business account approved for API access.",
-      "After connecting, inbound WhatsApp messages sync to Inbox.",
+      "After connecting, inbound WhatsApp messages sync to Inbox under WhatsApp Business.",
       "Turn on AI Assistant per channel when you are ready for auto-replies.",
     ],
   },
+  whatsapp_web: {
+    title: "WhatsApp",
+    summary: "Personal WhatsApp via QR (WhatsApp Web).",
+    body: [
+      "Scan a QR code with your phone to link WhatsApp like WhatsApp Web.",
+      "Chats appear in Inbox under WhatsApp — separate from WhatsApp Business API.",
+      "Unofficial client — Meta may limit or ban numbers. Prefer Cloud API for production.",
+    ],
+  },
   telegram: {
-    title: "Telegram",
+    title: "Telegram Bot",
     summary: "Connect a Telegram bot.",
     body: [
       "Create a bot with @BotFather and paste the token in OrzuX.",
-      "Customers message your bot; chats appear in Inbox.",
+      "Customers message your bot; chats appear in Inbox under Telegram Bot.",
+    ],
+  },
+  telegram_user: {
+    title: "Telegram",
+    summary: "Personal Telegram account via phone login.",
+    body: [
+      "Sign in with your phone number, login code, and 2FA if enabled.",
+      "Direct messages appear in Inbox under Telegram — separate from Telegram Bot.",
+      "Automating a personal account can violate Telegram ToS.",
     ],
   },
   email: {

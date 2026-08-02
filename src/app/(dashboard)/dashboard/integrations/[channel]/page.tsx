@@ -13,6 +13,8 @@ import {
   getTelegramConnection,
   getTelegramConnectConfig,
 } from "@/services/telegram.service";
+import { getTelegramUserConnection } from "@/services/telegram-user.service";
+import { getWhatsAppWebConnection } from "@/services/whatsapp-web.service";
 import {
   getWebsiteFormConnection,
   getWebsiteFormConnectConfig,
@@ -78,6 +80,10 @@ export default async function IntegrationsChannelPage({
     redirect(`${DASHBOARD_ROUTES.integrations}/google_calendar?section=activate`);
   }
 
+  if (channelParam === "telegram-personal") {
+    redirect(`${DASHBOARD_ROUTES.integrations}/telegram_user?section=activate`);
+  }
+
   if (!isIntegrationChannelId(channelParam)) {
     notFound();
   }
@@ -98,8 +104,10 @@ export default async function IntegrationsChannelPage({
   const [
     whatsappConnection,
     whatsappConnectConfig,
+    whatsappWebConnection,
     telegramConnection,
     telegramConfig,
+    telegramUserConnection,
     websiteFormConnection,
     websiteFormConfig,
     websiteChatConnection,
@@ -118,8 +126,10 @@ export default async function IntegrationsChannelPage({
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWhatsAppConnectConfig()),
+    business ? getWhatsAppWebConnection(business.id) : Promise.resolve(null),
     business ? getTelegramConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getTelegramConnectConfig()),
+    business ? getTelegramUserConnection(business.id) : Promise.resolve(null),
     business ? getWebsiteFormConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWebsiteFormConnectConfig()),
     business ? getWebsiteChatConnection(business.id) : Promise.resolve(null),
@@ -145,7 +155,9 @@ export default async function IntegrationsChannelPage({
 
   const channelStatuses = buildIntegrationChannelStatuses({
     whatsappConnection,
+    whatsappWebConnection,
     telegramConnection,
+    telegramUserConnection,
     websiteFormConnection,
     websiteChatConnection,
     websiteKnowledgeSync,
@@ -194,9 +206,16 @@ export default async function IntegrationsChannelPage({
             connection: whatsappConnection,
             connectConfig: whatsappConnectConfig,
           }}
+          whatsappWeb={{
+            connection: whatsappWebConnection,
+            businessId: business?.id ?? null,
+          }}
           telegram={{
             connection: telegramConnection,
             connectConfig: telegramConfig,
+          }}
+          telegramUser={{
+            connection: telegramUserConnection,
           }}
           websiteForms={{
             connection: websiteFormConnection,

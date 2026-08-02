@@ -64,21 +64,24 @@ export async function deliverChannelTextMessage(input: {
       input.businessId,
     );
 
-    if (connection?.bot_token) {
-      const sendResult = await sendTelegramTextMessage(
-        connection.bot_token,
-        input.recipientId,
-        input.content,
-      );
-
-      if (!sendResult.success) {
-        return { success: false, error: sendResult.message };
-      }
-
-      return { success: true, providerMessageId: sendResult.messageId };
+    if (!connection?.bot_token) {
+      return { success: false, error: "Telegram Bot is not connected." };
     }
 
-    // No bot connected: fall back to the personal (MTProto) account when linked.
+    const sendResult = await sendTelegramTextMessage(
+      connection.bot_token,
+      input.recipientId,
+      input.content,
+    );
+
+    if (!sendResult.success) {
+      return { success: false, error: sendResult.message };
+    }
+
+    return { success: true, providerMessageId: sendResult.messageId };
+  }
+
+  if (input.channel === "telegram_user") {
     // Recipient ids are stored as `tg:<chatId>`; the peer is the raw chat id.
     const peer = input.recipientId.replace(/^tg:/, "");
     const userResult = await sendTelegramUserMessage({
@@ -90,7 +93,7 @@ export async function deliverChannelTextMessage(input: {
     if (!userResult.success) {
       return {
         success: false,
-        error: userResult.message ?? "Telegram is not connected.",
+        error: userResult.message ?? "Personal Telegram is not connected.",
       };
     }
 

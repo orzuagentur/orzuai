@@ -107,7 +107,6 @@ export function TelegramActivatePanel({
               </p>
             ) : null}
           </div>
-          <PersonalAccountLink />
           <IntegrationDangerZone
             resourceLabel={`@${connection.botUsername || "telegram bot"}`}
             onDisconnect={disconnectTelegramAction}
@@ -190,25 +189,8 @@ export function TelegramActivatePanel({
             TELEGRAM_MESSAGES.connectButton
           )}
         </Button>
-
-        <PersonalAccountLink />
       </CardContent>
     </Card>
-  );
-}
-
-function PersonalAccountLink() {
-  return (
-    <p className="text-xs text-muted-foreground">
-      Prefer using your own account?{" "}
-      <Link
-        href={`${DASHBOARD_ROUTES.integrations}/telegram-personal`}
-        className="font-medium text-primary underline-offset-4 hover:underline"
-      >
-        Connect a personal Telegram account
-      </Link>
-      .
-    </p>
   );
 }
 

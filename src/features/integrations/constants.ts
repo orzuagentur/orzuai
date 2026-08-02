@@ -9,6 +9,7 @@ import {
   VoiceIcon,
   WebsiteChatIcon,
   WebsiteFormsIcon,
+  WhatsAppBusinessIcon,
   WhatsAppIcon,
 } from "@/components/icons/channel-brand-icons";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -19,7 +20,9 @@ export type ChannelIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 export const MESSAGING_INTEGRATION_CHANNELS = [
   "whatsapp",
+  "whatsapp_web",
   "telegram",
+  "telegram_user",
   "website_forms",
   "website_chat",
   "email",
@@ -28,7 +31,9 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
 /** Channels shown in Chats inbox (website forms go to Orders, not Chats). */
 export const INBOX_MESSAGING_CHANNELS = [
   "whatsapp",
+  "whatsapp_web",
   "telegram",
+  "telegram_user",
   "website_chat",
   "email",
 ] as const;
@@ -115,19 +120,37 @@ export type IntegrationChannelConfig = {
 export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   {
     id: "whatsapp",
+    label: "WhatsApp Business",
+    category: "WhatsApp",
+    marketplaceCategory: "messengers",
+    description: "Official WhatsApp Business Cloud API (Meta / 360dialog)",
+    icon: WhatsAppBusinessIcon,
+    available: true,
+  },
+  {
+    id: "whatsapp_web",
     label: "WhatsApp",
     category: "WhatsApp",
     marketplaceCategory: "messengers",
-    description: "WhatsApp Business via 360dialog",
+    description: "Personal WhatsApp via QR code (WhatsApp Web)",
     icon: WhatsAppIcon,
     available: true,
   },
   {
     id: "telegram",
-    label: "Telegram",
+    label: "Telegram Bot",
     category: "Telegram",
     marketplaceCategory: "messengers",
     description: "Telegram Bot API for customer conversations",
+    icon: TelegramIcon,
+    available: true,
+  },
+  {
+    id: "telegram_user",
+    label: "Telegram",
+    category: "Telegram",
+    marketplaceCategory: "messengers",
+    description: "Personal Telegram account via phone login (MTProto)",
     icon: TelegramIcon,
     available: true,
   },

@@ -4,10 +4,15 @@ import { GoogleCalendarConnectPanelClient } from "@/components/google-calendar/G
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
 import { SmsActivatePanel } from "@/components/sms/SmsActivatePanel";
 import { TelegramActivatePanel } from "@/components/telegram/TelegramActivatePanel";
+import { TelegramUserPanel } from "@/components/telegram/TelegramUserPanel";
 import { VoiceActivatePanel } from "@/components/voice/VoiceActivatePanel";
 import { WebsiteChatActivatePanel } from "@/components/website-chat/WebsiteChatActivatePanel";
 import { WebsiteFormsActivatePanel } from "@/components/website-forms/WebsiteFormsActivatePanel";
 import { WhatsAppIntegrationPanel } from "@/components/whatsapp/WhatsAppIntegrationPanel";
+import { WhatsAppWebPanel } from "@/components/whatsapp/WhatsAppWebPanel";
+import { isTelegramMtprotoConfigured } from "@/lib/telegram/mtproto";
+import type { TelegramUserConnection } from "@/services/telegram-user.service";
+import type { WhatsAppWebConnection } from "@/services/whatsapp-web.service";
 
 import {
   Card,
@@ -72,9 +77,16 @@ type IntegrationSectionPanelsProps = {
     connection: WhatsAppConnectionData | null;
     connectConfig: WhatsAppConnectConfig;
   };
+  whatsappWeb?: {
+    connection: WhatsAppWebConnection | null;
+    businessId: string | null;
+  };
   telegram?: {
     connection: TelegramConnectionData | null;
     connectConfig: TelegramConnectConfig;
+  };
+  telegramUser?: {
+    connection: TelegramUserConnection | null;
   };
   websiteForms?: {
     connection: WebsiteFormConnectionData | null;
@@ -114,7 +126,9 @@ export function IntegrationSectionPanels({
   hasBusiness,
   channelStatuses,
   whatsapp,
+  whatsappWeb,
   telegram,
+  telegramUser,
   websiteForms,
   websiteChat,
   voice,
@@ -133,7 +147,9 @@ export function IntegrationSectionPanels({
           channel={channel}
           hasBusiness={hasBusiness}
           whatsapp={whatsapp}
+          whatsappWeb={whatsappWeb}
           telegram={telegram}
+          telegramUser={telegramUser}
           websiteForms={websiteForms}
           websiteChat={websiteChat}
           voice={voice}
@@ -166,7 +182,9 @@ function ActivateSection({
   channel,
   hasBusiness,
   whatsapp,
+  whatsappWeb,
   telegram,
+  telegramUser,
   websiteForms,
   websiteChat,
   voice,
@@ -177,7 +195,9 @@ function ActivateSection({
   channel: IntegrationChannelId;
   hasBusiness: boolean;
   whatsapp?: IntegrationSectionPanelsProps["whatsapp"];
+  whatsappWeb?: IntegrationSectionPanelsProps["whatsappWeb"];
   telegram?: IntegrationSectionPanelsProps["telegram"];
+  telegramUser?: IntegrationSectionPanelsProps["telegramUser"];
   websiteForms?: IntegrationSectionPanelsProps["websiteForms"];
   websiteChat?: IntegrationSectionPanelsProps["websiteChat"];
   voice?: IntegrationSectionPanelsProps["voice"];
@@ -196,6 +216,16 @@ function ActivateSection({
     );
   }
 
+  if (channel === "whatsapp_web" && whatsappWeb) {
+    return (
+      <WhatsAppWebPanel
+        connection={whatsappWeb.connection}
+        businessId={whatsappWeb.businessId}
+        hasBusiness={hasBusiness}
+      />
+    );
+  }
+
   if (channel === "telegram" && telegram) {
     return (
       <TelegramActivatePanel
@@ -203,6 +233,16 @@ function ActivateSection({
         hasBusiness={hasBusiness}
         config={telegram.connectConfig}
         embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "telegram_user") {
+    return (
+      <TelegramUserPanel
+        connection={telegramUser?.connection ?? null}
+        hasBusiness={hasBusiness}
+        isConfigured={isTelegramMtprotoConfigured()}
       />
     );
   }

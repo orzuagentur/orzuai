@@ -12,7 +12,7 @@ export function getChannelIconContainerClassName(
     return "bg-gradient-to-br from-orange-50 via-pink-50 to-purple-50 dark:from-orange-950/40 dark:via-pink-950/40 dark:to-purple-950/40";
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return "bg-sky-50 dark:bg-sky-950/50";
   }
 
@@ -45,11 +45,11 @@ export function getChannelIconContainerClassName(
 
 export function getChannelBadgeLabel(channel: MessagingChannel): string {
   if (channel === "whatsapp") {
-    return "WhatsApp";
+    return "WhatsApp Business";
   }
 
   if (channel === "whatsapp_web") {
-    return "WhatsApp Web";
+    return "WhatsApp";
   }
 
   if (channel === "instagram") {
@@ -57,6 +57,10 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
   }
 
   if (channel === "telegram") {
+    return "Telegram Bot";
+  }
+
+  if (channel === "telegram_user") {
     return "Telegram";
   }
 
@@ -96,7 +100,7 @@ export function getChannelBadgeClassName(channel: MessagingChannel): string {
     return "border-fuchsia-200 bg-gradient-to-r from-orange-50 via-pink-50 to-purple-50 text-fuchsia-900 dark:border-fuchsia-900 dark:from-orange-950 dark:via-pink-950 dark:to-purple-950 dark:text-fuchsia-100";
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200";
   }
 
@@ -124,7 +128,7 @@ export function getChannelIconClassName(channel: MessagingChannel): string {
     return "text-fuchsia-600 dark:text-fuchsia-400";
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return "text-sky-600 dark:text-sky-400";
   }
 
@@ -136,6 +140,10 @@ export function getChannelBadgeVariant(
 ): "default" | "secondary" | "outline" {
   if (channel === "whatsapp" || channel === "whatsapp_web") {
     return "default";
+  }
+
+  if (channel === "telegram" || channel === "telegram_user") {
+    return "outline";
   }
 
   if (channel === "instagram") {

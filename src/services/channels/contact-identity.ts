@@ -11,7 +11,7 @@ export function toChannelExternalId(
     return canonicalPhoneNumber(trimmed) || phoneDigitsOnly(trimmed) || trimmed;
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return trimmed.replace(/^tg:/, "");
   }
 
@@ -34,7 +34,7 @@ export function toLegacyContactPhoneNumber(
   channel: MessagingChannel,
   externalId: string,
 ): string {
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return externalId.startsWith("tg:") ? externalId : `tg:${externalId}`;
   }
 

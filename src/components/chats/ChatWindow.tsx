@@ -99,7 +99,7 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
     return CHAT_MESSAGES.instagramNotConnected;
   }
 
-  if (channel === "telegram") {
+  if (channel === "telegram" || channel === "telegram_user") {
     return CHAT_MESSAGES.telegramNotConnected;
   }
 
