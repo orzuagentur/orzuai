@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { extractWebsiteFormApiKey } from "@/lib/website-forms/auth";
 import {
   getWebsiteChatConfigByToken,
@@ -39,6 +40,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   const { token } = await context.params;
   const apiKey = extractWebsiteFormApiKey(request);
+
+  // Distributed rate limit (fails open without Upstash) — protects the public
+  // widget message endpoint from spam/abuse per visitor IP + widget.
+  const limit = await checkRateLimit({
+    key: `widget-chat:${token}:${getClientIp(request)}`,
+    limit: 30,
+    windowSeconds: 60,
+  });
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { success: false, message: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: { ...CORS_HEADERS, "Retry-After": String(limit.resetSeconds) },
+      },
+    );
+  }
 
   let body: unknown;
 

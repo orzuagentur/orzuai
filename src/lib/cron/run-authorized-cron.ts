@@ -1,9 +1,23 @@
 import "server-only";
 
+import { timingSafeEqual } from "crypto";
+
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ENV_KEYS } from "@/constants/env-keys";
 import { schedulePlatformErrorReport } from "@/services/error-intelligence.service";
+
+/** Constant-time string comparison to avoid timing side-channels on secrets. */
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return timingSafeEqual(left, right);
+}
 
 export function isCronAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env[ENV_KEYS.CRON_SECRET]?.trim();
@@ -11,7 +25,11 @@ export function isCronAuthorized(request: NextRequest): boolean {
   const provided =
     authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
 
-  return Boolean(cronSecret && provided === cronSecret);
+  if (!cronSecret || !provided) {
+    return false;
+  }
+
+  return timingSafeStringEqual(provided, cronSecret);
 }
 
 export async function runAuthorizedCron(

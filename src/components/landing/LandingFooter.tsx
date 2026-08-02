@@ -12,8 +12,17 @@ type LandingFooterProps = {
   legalFooterLinks: LegalFooterLink[];
 };
 
+const SOLUTIONS_LABEL: Record<string, string> = {
+  en: "Solutions",
+  ru: "Решения",
+  uz: "Yechimlar",
+};
+
 export function LandingFooter({ legalFooterLinks }: LandingFooterProps) {
-  const { copy } = useLandingLocale();
+  const { copy, locale } = useLandingLocale();
+  const solutionsHref =
+    locale === "en" ? "/solutions" : `/solutions?lang=${locale}`;
+  const solutionsLabel = SOLUTIONS_LABEL[locale] ?? SOLUTIONS_LABEL.en;
 
   return (
     <footer
@@ -55,6 +64,9 @@ export function LandingFooter({ legalFooterLinks }: LandingFooterProps) {
         <div className="flex flex-wrap items-center gap-4">
           <Link href={AUTH_ROUTES.login} className="transition hover:text-white">
             {copy.header.login}
+          </Link>
+          <Link href={solutionsHref} className="transition hover:text-white">
+            {solutionsLabel}
           </Link>
           <LegalFooterLinks links={legalFooterLinks} />
         </div>

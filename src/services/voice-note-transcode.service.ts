@@ -5,8 +5,11 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import ffmpegStaticPath from "ffmpeg-static";
 
-import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  deleteMediaObject,
+  downloadMediaObject,
+  putMediaObject,
+} from "@/lib/storage/media-storage";
 import {
   buildVoiceNoteOggFileName,
   buildVoiceNoteOggStoragePath,
@@ -123,34 +126,30 @@ export async function transcodeVoiceNoteToOggOpus(
   });
 }
 
-async function downloadStorageObject(path: string): Promise<Buffer> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .download(path);
+async function downloadStorageObject(ref: string): Promise<Buffer> {
+  const buffer = await downloadMediaObject(ref);
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Unable to download voice note from storage.");
+  if (!buffer) {
+    throw new Error("Unable to download voice note from storage.");
   }
 
-  return Buffer.from(await data.arrayBuffer());
+  return buffer;
 }
 
 async function uploadStorageObject(
-  path: string,
+  ref: string,
   buffer: Buffer,
   contentType: string,
 ): Promise<void> {
-  const admin = createAdminClient();
-  const { error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .upload(path, buffer, {
-      contentType,
-      upsert: true,
-    });
+  const ok = await putMediaObject({
+    ref,
+    body: buffer,
+    contentType,
+    upsert: true,
+  });
 
-  if (error) {
-    throw new Error(error.message);
+  if (!ok) {
+    throw new Error("Unable to store transcoded voice note.");
   }
 }
 
@@ -187,8 +186,7 @@ export async function normalizeStoredVoiceNoteAsset(input: {
   await uploadStorageObject(oggPath, oggBuffer, OUTPUT_MIME_TYPE);
 
   if (oggPath !== input.path) {
-    const admin = createAdminClient();
-    await admin.storage.from(CHAT_ATTACHMENTS_BUCKET).remove([input.path]);
+    await deleteMediaObject(input.path);
   }
 
   return {

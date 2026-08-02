@@ -16,11 +16,18 @@ export function useMagicLinkLogin(nextPath?: string) {
   const [isLoading, setIsLoading] = useState(false);
 
   const sendMagicLink = useCallback(
-    async (input: SignInWithMagicLinkInput): Promise<MagicLinkResult> => {
+    async (
+      input: SignInWithMagicLinkInput,
+      turnstileToken?: string,
+    ): Promise<MagicLinkResult> => {
       setIsLoading(true);
 
       try {
-        const result = await signInWithMagicLinkAction(input, nextPath);
+        const result = await signInWithMagicLinkAction(
+          input,
+          nextPath,
+          turnstileToken,
+        );
 
         if (!result.success) {
           toast.error(result.error.message);

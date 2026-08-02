@@ -1,7 +1,10 @@
 import "server-only";
 
-import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getMediaSignedUrl,
+  newMediaObjectRef,
+  putMediaObject,
+} from "@/lib/storage/media-storage";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
 
@@ -39,26 +42,26 @@ export async function uploadContactAvatarBuffer(input: {
   buffer: Buffer;
   mimeType: string;
 }): Promise<string | null> {
-  const admin = createAdminClient();
-  const path = buildContactAvatarPath(
+  const logicalKey = buildContactAvatarPath(
     input.businessId,
     input.contactId,
     extensionFromMimeType(input.mimeType),
   );
+  const ref = newMediaObjectRef(logicalKey);
 
-  const { error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .upload(path, input.buffer, {
-      contentType: input.mimeType || "image/jpeg",
-      upsert: true,
-    });
+  const ok = await putMediaObject({
+    ref,
+    body: input.buffer,
+    contentType: input.mimeType || "image/jpeg",
+    upsert: true,
+  });
 
-  if (error) {
-    console.error("[contact-avatar] upload failed:", error.message);
+  if (!ok) {
+    console.error("[contact-avatar] upload failed for ref:", ref);
     return null;
   }
 
-  return path;
+  return ref;
 }
 
 export async function getContactAvatarSignedUrl(
@@ -73,17 +76,7 @@ export async function getContactAvatarSignedUrl(
     return path;
   }
 
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, expiresIn);
-
-  if (error) {
-    console.error("[contact-avatar] signed URL failed:", error.message);
-    return null;
-  }
-
-  return data.signedUrl;
+  return getMediaSignedUrl(path, expiresIn);
 }
 
 export async function resolveContactAvatarSignedUrls(

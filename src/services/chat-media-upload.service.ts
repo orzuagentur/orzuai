@@ -6,7 +6,11 @@ import {
   MAX_CHAT_ATTACHMENT_BYTES,
 } from "@/features/chats/chat-attachments";
 import { hasSupabaseEnv } from "@/lib/env";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  createMediaUploadUrl,
+  mediaObjectExists,
+  newMediaObjectRef,
+} from "@/lib/storage/media-storage";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessibleBusiness } from "@/services/business-access.service";
 import { requireUser } from "@/services/auth.service";
@@ -28,6 +32,7 @@ import {
   buildThumbnailStoragePath,
   isValidChatAttachmentStoragePath,
 } from "@/utils/chat-attachment-path";
+import { isR2StorageRef } from "@/utils/storage-ref";
 import {
   buildMediaPayloadFromUpload,
   encodeMediaMessage,
@@ -41,12 +46,23 @@ type MediaSendContext = {
   contactId: string | null;
 };
 
+export type ChatMediaUploadProvider = "r2" | "supabase";
+
 export type PrepareChatMediaUploadResult =
   | {
       success: true;
       data: {
+        /** Provider-aware storage ref (R2 `r2::` prefix or legacy Supabase path). */
         path: string;
+        /** Supabase bucket (used only for the legacy authenticated client upload). */
         bucket: string;
+        provider: ChatMediaUploadProvider;
+        /** Presigned PUT URL for direct R2 upload (present only for `provider: "r2"`). */
+        uploadUrl?: string;
+        /** Presigned PUT URL for the R2 thumbnail (images only). */
+        thumbUploadUrl?: string;
+        /** Exact Content-Type the client must send with the presigned PUT. */
+        uploadContentType?: string;
       };
     }
   | {
@@ -235,12 +251,7 @@ async function resolveMediaSendContext(
 }
 
 async function storageObjectExists(path: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, 60);
-
-  return !error && Boolean(data?.signedUrl);
+  return mediaObjectExists(path);
 }
 
 export async function prepareChatMediaUpload(input: {
@@ -282,17 +293,52 @@ export async function prepareChatMediaUpload(input: {
     return { success: false, error: resolved.error };
   }
 
-  const path = buildChatAttachmentStoragePath(
+  const logicalKey = buildChatAttachmentStoragePath(
     resolved.context.businessId,
     resolved.context.conversationId,
     fileName,
   );
+  const ref = newMediaObjectRef(logicalKey);
+  const uploadContentType = input.mimeType?.trim() || "application/octet-stream";
+
+  if (!isR2StorageRef(ref)) {
+    // Legacy path: browser uploads through the authenticated Supabase client.
+    return {
+      success: true,
+      data: {
+        path: ref,
+        bucket: CHAT_ATTACHMENTS_BUCKET,
+        provider: "supabase",
+      },
+    };
+  }
+
+  // R2 path: browser uploads directly to R2 via short-lived presigned PUT URLs.
+  const uploadUrl = await createMediaUploadUrl({
+    ref,
+    contentType: uploadContentType,
+  });
+
+  if (!uploadUrl) {
+    return { success: false, error: missingConfigActionError() };
+  }
+
+  const thumbUploadUrl = uploadContentType.startsWith("image/")
+    ? await createMediaUploadUrl({
+        ref: buildThumbnailStoragePath(ref),
+        contentType: "image/jpeg",
+      })
+    : null;
 
   return {
     success: true,
     data: {
-      path,
+      path: ref,
       bucket: CHAT_ATTACHMENTS_BUCKET,
+      provider: "r2",
+      uploadUrl,
+      thumbUploadUrl: thumbUploadUrl ?? undefined,
+      uploadContentType,
     },
   };
 }

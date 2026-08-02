@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Loader2Icon } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
+import { TurnstileWidget } from "@/components/security/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +47,10 @@ export function EmailRegistrationForm({
   const router = useRouter();
   const [errors, setErrors] = useState<FormErrors>({});
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const turnstileEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  const turnstileMissing = turnstileEnabled && !turnstileToken;
   const { register, isLoading } = useEmailRegistration({
     onSuccess: (email) => {
       const confirmationUrl = new URL(
@@ -74,15 +81,28 @@ export function EmailRegistrationForm({
       return;
     }
 
+    if (turnstileMissing) {
+      toast.error("Please complete the verification.");
+      return;
+    }
+
     const businessName = String(formData.get("businessName") ?? "").trim();
 
-    const result = await register({
-      email,
-      password: nextPassword,
-      confirmPassword,
-      acceptedTerms: true,
-      businessName: businessName || undefined,
-    });
+    const result = await register(
+      {
+        email,
+        password: nextPassword,
+        confirmPassword,
+        acceptedTerms: true,
+        businessName: businessName || undefined,
+      },
+      turnstileToken ?? undefined,
+    );
+
+    if (turnstileEnabled) {
+      setTurnstileToken(null);
+      setTurnstileResetKey((key) => key + 1);
+    }
 
     if (!result.success && result.error.code === "VALIDATION_ERROR") {
       const message = result.error.message.toLowerCase();
@@ -223,7 +243,20 @@ export function EmailRegistrationForm({
         <p className="text-sm text-destructive">{errors.acceptedTerms}</p>
       ) : null}
 
-      <Button type="submit" size="lg" className="h-11 w-full" disabled={isLoading}>
+      {turnstileEnabled ? (
+        <TurnstileWidget
+          onToken={setTurnstileToken}
+          resetKey={turnstileResetKey}
+          className="flex justify-center"
+        />
+      ) : null}
+
+      <Button
+        type="submit"
+        size="lg"
+        className="h-11 w-full"
+        disabled={isLoading || turnstileMissing}
+      >
         {isLoading ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isKnownTelegramWebhookSecret } from "@/services/telegram.service";
 import {
   buildWebhookIdempotencyKey,
   receiveInboundWebhook,
@@ -11,6 +12,12 @@ export async function POST(request: NextRequest) {
   const secretToken = request.headers.get("x-telegram-bot-api-secret-token");
 
   if (!secretToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Reject spoofed requests at the edge: only accept secret tokens that map to a
+  // real Telegram connection before we parse/queue/process anything.
+  if (!(await isKnownTelegramWebhookSecret(secretToken))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

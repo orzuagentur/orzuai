@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  decryptSecretValue,
+  decryptSecretValueWithRotation,
   encryptSecretValue,
   getEncryptionKeyFromEnv,
 } from "./crypto";
@@ -36,16 +36,26 @@ type AuditRow = {
   created_at: string;
 };
 
+/**
+ * Prefix for per-business integration tokens (Gmail/Calendar/WhatsApp/etc.).
+ * These are user OAuth tokens: they are always resolved on-demand server-side
+ * via `getSecret` (which caches individually with a TTL), and are never read
+ * from the global warm cache by edge/runtime code. Keeping them out of the warm
+ * cache drastically reduces how many decrypted user secrets sit in process
+ * memory at once.
+ */
+const PER_BUSINESS_SECRET_PREFIX = "INTEGRATION_SECRET_";
+
 export async function warmSecretCache(admin: SupabaseClient): Promise<number> {
   const { data, error } = await admin
     .from("app_secrets")
-    .select("key_name, encrypted_value, is_active");
+    .select("key_name, encrypted_value, is_active")
+    .not("key_name", "like", `${PER_BUSINESS_SECRET_PREFIX}%`);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const encryptionKey = getEncryptionKeyFromEnv();
   const nextCache = new Map<string, string>();
 
   for (const row of (data ?? []) as Array<{
@@ -57,10 +67,16 @@ export async function warmSecretCache(admin: SupabaseClient): Promise<number> {
       continue;
     }
 
+    // Defense-in-depth: never warm per-business tokens even if the query filter
+    // is ever relaxed or bypassed.
+    if (row.key_name.startsWith(PER_BUSINESS_SECRET_PREFIX)) {
+      continue;
+    }
+
     try {
       nextCache.set(
         row.key_name,
-        decryptSecretValue(row.encrypted_value, encryptionKey),
+        decryptSecretValueWithRotation(row.encrypted_value),
       );
     } catch {
       // Skip invalid ciphertext rows during cache warm.
@@ -112,7 +128,6 @@ function mapSecretRow(row: SecretRow, decrypted?: string): AppSecretRecord {
 }
 
 export async function listSecrets(admin: SupabaseClient): Promise<AppSecretRecord[]> {
-  const encryptionKey = getEncryptionKeyFromEnv();
   const { data, error } = await admin
     .from("app_secrets")
     .select(
@@ -128,7 +143,7 @@ export async function listSecrets(admin: SupabaseClient): Promise<AppSecretRecor
     let decrypted = "";
 
     try {
-      decrypted = decryptSecretValue(row.encrypted_value, encryptionKey);
+      decrypted = decryptSecretValueWithRotation(row.encrypted_value);
     } catch {
       decrypted = "********";
     }
@@ -166,7 +181,7 @@ export async function getSecret(
     return null;
   }
 
-  const value = decryptSecretValue(row.encrypted_value, getEncryptionKeyFromEnv());
+  const value = decryptSecretValueWithRotation(row.encrypted_value);
 
   setCachedSecret(keyName, value);
 
@@ -384,4 +399,61 @@ export async function isPlatformAdmin(
   }
 
   return Boolean(data);
+}
+
+/**
+ * Re-encrypts every stored secret with the current primary `ENCRYPTION_KEY`.
+ *
+ * Used during key rotation: each row is decrypted (trying the primary key, then
+ * `ENCRYPTION_KEY_PREVIOUS`) and written back encrypted with the primary key.
+ * Idempotent — safe to run multiple times. After it completes for all rows you
+ * can remove `ENCRYPTION_KEY_PREVIOUS`.
+ */
+export async function reEncryptAllSecrets(
+  admin: SupabaseClient,
+): Promise<{ total: number; reEncrypted: number; failed: number }> {
+  const { data, error } = await admin
+    .from("app_secrets")
+    .select("id, key_name, encrypted_value");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    key_name: string;
+    encrypted_value: string;
+  }>;
+
+  const primary = getEncryptionKeyFromEnv();
+  let reEncrypted = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    let plaintext: string;
+
+    try {
+      plaintext = decryptSecretValueWithRotation(row.encrypted_value);
+    } catch {
+      console.warn(`[rotate] could not decrypt ${row.key_name}, skipping`);
+      failed += 1;
+      continue;
+    }
+
+    const { error: updateError } = await admin
+      .from("app_secrets")
+      .update({ encrypted_value: encryptSecretValue(plaintext, primary) })
+      .eq("id", row.id);
+
+    if (updateError) {
+      console.warn(`[rotate] failed to update ${row.key_name}: ${updateError.message}`);
+      failed += 1;
+      continue;
+    }
+
+    reEncrypted += 1;
+  }
+
+  return { total: rows.length, reEncrypted, failed };
 }

@@ -145,6 +145,7 @@ export const ORZUX_CALENDAR_MESSAGES = {
   publicBookEmail: "Email",
   publicBookNotes: "Notes (optional)",
   publicBookConfirm: "Confirm booking",
+  publicBookVerifyRequired: "Please complete the verification.",
   publicBookSuccess: "Booking confirmed",
   publicBookSuccessHint: "You will receive a confirmation shortly.",
   publicBookNoSlots: "No available times in the next few weeks.",

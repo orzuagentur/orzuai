@@ -20,6 +20,7 @@ import {
   refreshGoogleCalendarAccessToken,
 } from "@/lib/google-calendar/oauth";
 import { hasGoogleOAuthEnv, hasSupabaseEnv } from "@/lib/env";
+import { revokeGoogleToken } from "@/lib/google/revoke";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -290,12 +291,23 @@ export async function disconnectGoogleCalendar(): Promise<{
     const { data: connection } = await admin
       .from("google_calendar_connections")
       .select(
-        "id, access_token_secret_key_name, refresh_token_secret_key_name",
+        "id, access_token_secret_key_name, refresh_token_secret_key_name, refresh_token",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // Best-effort: revoke the grant on Google's side before we drop our tokens.
+    if (connection) {
+      const refreshToken = await resolveIntegrationSecret(admin, {
+        businessId,
+        kind: "GOOGLE_CALENDAR_REFRESH_TOKEN",
+        secretKeyName: connection.refresh_token_secret_key_name,
+        legacyValue: connection.refresh_token,
+      });
+      await revokeGoogleToken(refreshToken);
+    }
 
     const now = new Date().toISOString();
     const { data: updated, error } = await admin

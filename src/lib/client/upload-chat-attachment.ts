@@ -101,6 +101,75 @@ function uploadViaXhr(
   });
 }
 
+/**
+ * Uploads a file/blob directly to a presigned URL (Cloudflare R2) via HTTP PUT,
+ * reporting upload progress. The `contentType` MUST match the one the URL was
+ * signed with, otherwise the signature check fails.
+ */
+export function uploadToPresignedUrl(
+  body: File | Blob,
+  url: string,
+  contentType: string,
+  options: {
+    onProgress?: (update: ChatUploadProgressUpdate) => void;
+  } = {},
+): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    let lastLoaded = 0;
+    let lastTime = performance.now();
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable || !options.onProgress) {
+        return;
+      }
+
+      const now = performance.now();
+      const elapsedSeconds = (now - lastTime) / 1000;
+      const loadedDelta = event.loaded - lastLoaded;
+      const bytesPerSecond =
+        elapsedSeconds > 0 ? loadedDelta / elapsedSeconds : 0;
+
+      lastLoaded = event.loaded;
+      lastTime = now;
+
+      options.onProgress({
+        percent: Math.min(100, (event.loaded / event.total) * 100),
+        loaded: event.loaded,
+        total: event.total,
+        bytesPerSecond,
+        phase: "uploading",
+      });
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({ success: true });
+        return;
+      }
+
+      resolve({
+        success: false,
+        error:
+          xhr.responseText?.trim() ||
+          `Upload failed with status ${xhr.status}.`,
+      });
+    });
+
+    xhr.addEventListener("error", () => {
+      resolve({ success: false, error: "Network error during upload." });
+    });
+
+    xhr.addEventListener("abort", () => {
+      resolve({ success: false, error: "Upload cancelled." });
+    });
+
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.send(body);
+  });
+}
+
 async function uploadViaSupabaseClient(
   body: File | Blob,
   path: string,
@@ -191,26 +260,4 @@ export async function uploadChatAttachmentBlob(
     ...options,
     upsert: options.upsert ?? true,
   });
-}
-
-export async function getChatAttachmentSignedUrlClient(
-  path: string,
-  bucket = CHAT_ATTACHMENTS_BUCKET,
-  expiresIn = 60 * 60,
-): Promise<string | null> {
-  const supabase = createClientIfConfigured();
-
-  if (!supabase) {
-    return null;
-  }
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, expiresIn);
-
-  if (error || !data?.signedUrl) {
-    return null;
-  }
-
-  return data.signedUrl;
 }

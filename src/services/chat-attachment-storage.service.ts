@@ -2,19 +2,22 @@ import "server-only";
 
 import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { newMediaObjectRef, putMediaObject } from "@/lib/storage/media-storage";
 import {
   buildChatAttachmentStoragePath,
   buildInboundAttachmentStoragePath,
 } from "@/utils/chat-attachment-path";
+import { isR2StorageRef } from "@/utils/storage-ref";
 
 export type ChatAttachmentUploadResult = {
+  /** Provider-aware storage ref (R2 `r2::` prefix or legacy Supabase path). */
   path: string;
   sizeBytes: number;
   thumbnailPath?: string;
   thumbWidth?: number;
   thumbHeight?: number;
-  /** @deprecated Legacy public URL; prefer signed URLs via getChatAttachmentSignedUrl */
-  url: string;
+  /** @deprecated Legacy public URL (Supabase only); prefer signed URLs via getChatAttachmentSignedUrl */
+  url?: string;
 };
 
 export {
@@ -22,47 +25,53 @@ export {
   getChatAttachmentSignedUrl,
 } from "@/services/chat-attachment-signed-url.service";
 
+function resolveLegacyPublicUrl(ref: string): string | undefined {
+  if (isR2StorageRef(ref)) {
+    return undefined;
+  }
+
+  const admin = createAdminClient();
+  const { data } = admin.storage.from(CHAT_ATTACHMENTS_BUCKET).getPublicUrl(ref);
+  return data.publicUrl;
+}
+
 async function uploadBuffer(
-  path: string,
+  ref: string,
   buffer: Buffer,
   mimeType: string,
   options?: { upsert?: boolean },
 ): Promise<ChatAttachmentUploadResult | null> {
-  const admin = createAdminClient();
+  const upsert = options?.upsert ?? false;
+  let ok = await putMediaObject({
+    ref,
+    body: buffer,
+    contentType: mimeType || "application/octet-stream",
+    upsert,
+  });
 
-  const attempt = async (contentType: string) => {
-    const { error } = await admin.storage
-      .from(CHAT_ATTACHMENTS_BUCKET)
-      .upload(path, buffer, {
-        contentType,
-        upsert: options?.upsert ?? false,
-      });
-
-    return error;
-  };
-
-  let error = await attempt(mimeType || "application/octet-stream");
-
-  if (error && mimeType !== "application/octet-stream") {
-    error = await attempt("application/octet-stream");
+  if (!ok && mimeType !== "application/octet-stream") {
+    ok = await putMediaObject({
+      ref,
+      body: buffer,
+      contentType: "application/octet-stream",
+      upsert,
+    });
   }
 
-  if (error) {
-    console.error("[chat-attachments] upload failed:", error.message);
+  if (!ok) {
+    console.error("[chat-attachments] upload failed for ref:", ref);
     return null;
   }
 
-  const { data } = admin.storage.from(CHAT_ATTACHMENTS_BUCKET).getPublicUrl(path);
-
   return {
-    path,
+    path: ref,
     sizeBytes: buffer.byteLength,
-    url: data.publicUrl,
+    url: resolveLegacyPublicUrl(ref),
   };
 }
 
 async function uploadImageThumbnail(
-  storagePath: string,
+  storageRef: string,
   sourceBuffer: Buffer,
 ): Promise<Pick<ChatAttachmentUploadResult, "thumbnailPath" | "thumbWidth" | "thumbHeight"> | null> {
   const { buildThumbnailStoragePath, generateImageThumbnailBuffer } = await import(
@@ -75,7 +84,9 @@ async function uploadImageThumbnail(
     return null;
   }
 
-  const thumbnailPath = buildThumbnailStoragePath(storagePath);
+  // buildThumbnailStoragePath keeps the provider prefix at the front, so the
+  // thumbnail inherits the same provider as its parent object.
+  const thumbnailPath = buildThumbnailStoragePath(storageRef);
   const uploaded = await uploadBuffer(
     thumbnailPath,
     thumbnail.buffer,
@@ -103,7 +114,7 @@ export async function uploadChatAttachmentBuffer(
     messageId?: string;
   },
 ): Promise<ChatAttachmentUploadResult | null> {
-  const path = options.messageId
+  const logicalKey = options.messageId
     ? buildInboundAttachmentStoragePath(
         businessId,
         conversationId,
@@ -115,8 +126,9 @@ export async function uploadChatAttachmentBuffer(
         conversationId,
         options.fileName,
       );
+  const ref = newMediaObjectRef(logicalKey);
 
-  const uploaded = await uploadBuffer(path, buffer, options.mimeType, {
+  const uploaded = await uploadBuffer(ref, buffer, options.mimeType, {
     upsert: Boolean(options.messageId),
   });
 
@@ -125,7 +137,7 @@ export async function uploadChatAttachmentBuffer(
   }
 
   if (options.mimeType.startsWith("image/")) {
-    const thumbnail = await uploadImageThumbnail(path, buffer);
+    const thumbnail = await uploadImageThumbnail(ref, buffer);
 
     if (thumbnail) {
       return { ...uploaded, ...thumbnail };

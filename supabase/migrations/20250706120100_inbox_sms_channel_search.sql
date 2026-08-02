@@ -1,30 +1,51 @@
 -- Reclassify legacy SMS threads + smarter inbox full-text search
 
-UPDATE public.conversations AS c
-SET channel = 'sms'::public.messaging_channel
-WHERE c.channel = 'voice'::public.messaging_channel
-  AND EXISTS (
+-- The 'voice' channel value is only added by a later migration
+-- (20260629120000_messaging_channel_voice.sql). On a clean database there is no
+-- data to reclassify and the enum value does not exist yet, so this block must
+-- not fail. Guard it and run via dynamic SQL so the 'voice' literal is only
+-- parsed when it is a valid enum label (i.e. on existing databases).
+DO $reclassify$
+BEGIN
+  IF EXISTS (
     SELECT 1
-    FROM public.messages AS m
-    WHERE m.conversation_id = c.id
-      AND m.hidden_for_business = false
-      AND m.external_message_id IS NOT NULL
-      AND m.external_message_id NOT LIKE 'voice:%'
-  )
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.messages AS m
-    WHERE m.conversation_id = c.id
-      AND m.hidden_for_business = false
-      AND m.external_message_id LIKE 'voice:%'
-  );
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'messaging_channel'
+      AND e.enumlabel = 'voice'
+  ) THEN
+    EXECUTE $sql$
+      UPDATE public.conversations AS c
+      SET channel = 'sms'::public.messaging_channel
+      WHERE c.channel = 'voice'::public.messaging_channel
+        AND EXISTS (
+          SELECT 1
+          FROM public.messages AS m
+          WHERE m.conversation_id = c.id
+            AND m.hidden_for_business = false
+            AND m.external_message_id IS NOT NULL
+            AND m.external_message_id NOT LIKE 'voice:%'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.messages AS m
+          WHERE m.conversation_id = c.id
+            AND m.hidden_for_business = false
+            AND m.external_message_id LIKE 'voice:%'
+        );
+    $sql$;
 
-UPDATE public.contacts AS ct
-SET channel = 'sms'::public.messaging_channel
-FROM public.conversations AS c
-WHERE c.contact_id = ct.id
-  AND c.channel = 'sms'::public.messaging_channel
-  AND ct.channel = 'voice'::public.messaging_channel;
+    EXECUTE $sql$
+      UPDATE public.contacts AS ct
+      SET channel = 'sms'::public.messaging_channel
+      FROM public.conversations AS c
+      WHERE c.contact_id = ct.id
+        AND c.channel = 'sms'::public.messaging_channel
+        AND ct.channel = 'voice'::public.messaging_channel;
+    $sql$;
+  END IF;
+END
+$reclassify$;
 
 CREATE OR REPLACE FUNCTION public.inbox_search_tsquery(p_search TEXT)
 RETURNS tsquery

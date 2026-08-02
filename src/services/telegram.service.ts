@@ -92,6 +92,45 @@ function hashTelegramWebhookSecret(secret: string): string {
   return createHash("sha256").update(secret).digest("hex");
 }
 
+/**
+ * Fast existence check for the Telegram webhook secret, used to reject spoofed
+ * requests at the edge (in the route) before any payload is queued/processed.
+ * Matches both the hashed column and the legacy plaintext column so existing
+ * connections keep working during migration.
+ */
+export async function isKnownTelegramWebhookSecret(
+  secretToken: string,
+): Promise<boolean> {
+  const token = secretToken?.trim();
+
+  if (!hasSupabaseEnv() || !token) {
+    return false;
+  }
+
+  const admin = createAdminClient();
+  const secretHash = hashTelegramWebhookSecret(token);
+
+  const { data: hashed } = await admin
+    .from("telegram_connections")
+    .select("id")
+    .eq("webhook_secret_hash", secretHash)
+    .limit(1)
+    .maybeSingle();
+
+  if (hashed?.id) {
+    return true;
+  }
+
+  const { data: legacy } = await admin
+    .from("telegram_connections")
+    .select("id")
+    .eq("webhook_secret", token)
+    .limit(1)
+    .maybeSingle();
+
+  return Boolean(legacy?.id);
+}
+
 export async function disconnectTelegram(): Promise<{
   success: boolean;
   message?: string;

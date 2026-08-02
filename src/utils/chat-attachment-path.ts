@@ -1,3 +1,5 @@
+import { getStorageObjectKey } from "@/utils/storage-ref";
+
 export function buildChatAttachmentStoragePath(
   businessId: string,
   conversationId: string,
@@ -33,9 +35,10 @@ export function isValidChatAttachmentStoragePath(
     return false;
   }
 
+  const key = getStorageObjectKey(path);
   const prefix = `${businessId}/${conversationId}/`;
 
-  return path.startsWith(prefix) && path.length > prefix.length;
+  return key.startsWith(prefix) && key.length > prefix.length;
 }
 
 export function buildThumbnailStoragePath(storagePath: string): string {

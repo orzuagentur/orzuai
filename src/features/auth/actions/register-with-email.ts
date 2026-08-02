@@ -1,5 +1,6 @@
 "use server";
 
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { registerWithEmail } from "@/services/auth.service";
 import type {
   RegisterWithEmailInput,
@@ -9,7 +10,20 @@ import { registerWithEmailSchema } from "@/types/auth.types";
 
 export async function registerWithEmailAction(
   input: RegisterWithEmailInput,
+  turnstileToken?: string,
 ): Promise<RegistrationResult> {
+  const turnstile = await verifyTurnstileToken(turnstileToken);
+
+  if (!turnstile.allowed) {
+    return {
+      success: false,
+      error: {
+        code: "REGISTRATION_FAILED",
+        message: "Verification failed. Please try again.",
+      },
+    };
+  }
+
   const parsed = registerWithEmailSchema.safeParse(input);
 
   if (!parsed.success) {

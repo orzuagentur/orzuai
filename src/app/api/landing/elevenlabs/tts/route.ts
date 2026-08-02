@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { resolveElevenLabsLanguageCode } from "@/lib/voice/language";
 import { hasElevenLabsConfiguredAsync } from "@/lib/ai/platform-api-keys";
 import { synthesizeElevenLabsSpeech } from "@/services/elevenlabs.service";
@@ -7,30 +8,6 @@ import { synthesizeElevenLabsSpeech } from "@/services/elevenlabs.service";
 /** Warm, natural default — ElevenLabs “Sarah”. Override with LANDING_ELEVENLABS_VOICE_ID. */
 const DEFAULT_LANDING_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 const MAX_CHARS = 320;
-const WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_WINDOW = 24;
-
-const rateBuckets = new Map<string, number[]>();
-
-function clientKey(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "anon"
-  );
-}
-
-function allowRequest(key: string): boolean {
-  const now = Date.now();
-  const recent = (rateBuckets.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (recent.length >= MAX_REQUESTS_PER_WINDOW) {
-    rateBuckets.set(key, recent);
-    return false;
-  }
-  recent.push(now);
-  rateBuckets.set(key, recent);
-  return true;
-}
 
 export async function POST(request: Request) {
   if (!(await hasElevenLabsConfiguredAsync())) {
@@ -40,10 +17,18 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!allowRequest(clientKey(request))) {
+  // Distributed rate limit (fails open without Upstash) — protects a public,
+  // paid TTS endpoint from cost-abuse across all serverless instances.
+  const limit = await checkRateLimit({
+    key: `landing-tts:${getClientIp(request)}`,
+    limit: 24,
+    windowSeconds: 60,
+  });
+
+  if (!limit.allowed) {
     return NextResponse.json(
       { success: false, message: "Too many requests." },
-      { status: 429 },
+      { status: 429, headers: { "Retry-After": String(limit.resetSeconds) } },
     );
   }
 

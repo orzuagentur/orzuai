@@ -35,7 +35,7 @@ export async function persistInboundMediaMessage(
     },
   );
 
-  if (!stored?.url) {
+  if (!stored?.path) {
     return null;
   }
 

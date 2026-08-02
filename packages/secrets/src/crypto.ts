@@ -72,3 +72,36 @@ export function getEncryptionKeyFromEnv(): string {
 
   return value;
 }
+
+/**
+ * Optional previous key, used only during key rotation. When set, values that
+ * fail to decrypt with the primary `ENCRYPTION_KEY` are retried with this key.
+ */
+export function getPreviousEncryptionKeyFromEnv(): string | null {
+  return process.env.ENCRYPTION_KEY_PREVIOUS?.trim() || null;
+}
+
+/**
+ * Decrypts a secret trying the primary key first, then the previous key (if
+ * `ENCRYPTION_KEY_PREVIOUS` is set). This enables zero-downtime rotation:
+ *
+ *   1. Set `ENCRYPTION_KEY_PREVIOUS` = old key, `ENCRYPTION_KEY` = new key.
+ *   2. Deploy — new writes use the new key, old rows still decrypt via previous.
+ *   3. Run `npm run rotate:secrets` to re-encrypt every row with the new key.
+ *   4. Remove `ENCRYPTION_KEY_PREVIOUS` and redeploy.
+ */
+export function decryptSecretValueWithRotation(payload: string): string {
+  const primary = getEncryptionKeyFromEnv();
+
+  try {
+    return decryptSecretValue(payload, primary);
+  } catch (error) {
+    const previous = getPreviousEncryptionKeyFromEnv();
+
+    if (previous && previous !== primary) {
+      return decryptSecretValue(payload, previous);
+    }
+
+    throw error;
+  }
+}

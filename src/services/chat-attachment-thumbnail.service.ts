@@ -1,7 +1,7 @@
 import "server-only";
 
-import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { putMediaObject } from "@/lib/storage/media-storage";
 import {
   dispatchOutboundThumbnailWorker,
   getOutboundThumbnailRetryDelaySeconds,
@@ -145,15 +145,15 @@ async function generateAndAttachChatThumbnail(input: {
   }
 
   const thumbnailPath = buildThumbnailStoragePath(input.storagePath);
-  const { error: thumbError } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .upload(thumbnailPath, thumbnail.buffer, {
-      contentType: "image/jpeg",
-      upsert: true,
-    });
+  const thumbUploaded = await putMediaObject({
+    ref: thumbnailPath,
+    body: thumbnail.buffer,
+    contentType: "image/jpeg",
+    upsert: true,
+  });
 
-  if (thumbError) {
-    throw new Error(thumbError.message);
+  if (!thumbUploaded) {
+    throw new Error("Unable to store attachment thumbnail.");
   }
 
   const { data: messageRow } = await admin

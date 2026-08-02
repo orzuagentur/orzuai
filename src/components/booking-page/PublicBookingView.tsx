@@ -5,6 +5,7 @@ import { CalendarIcon, CheckCircle2Icon, ClockIcon, Loader2Icon } from "lucide-r
 import { toast } from "sonner";
 
 import { PublicBookingCalendar } from "@/components/booking-page/PublicBookingCalendar";
+import { TurnstileWidget } from "@/components/security/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,6 +76,7 @@ export function PublicBookingView({
   const [selectedSlot, setSelectedSlot] = useState<PublicBookingSlot | null>(null);
   const [selectedResourceId, setSelectedResourceId] = useState(resources[0]?.id ?? "");
   const [formAnswers, setFormAnswers] = useState<Record<string, string>>({});
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
   const [isLoadingSlots, startLoadingSlots] = useTransition();
   const [isSubmitting, startSubmitting] = useTransition();
@@ -83,6 +85,8 @@ export function PublicBookingView({
   const [isCheckingSlot, setIsCheckingSlot] = useState(false);
 
   const hasSlotError = Boolean(slotResourceError || slotTimeError);
+  const turnstileEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  const turnstileMissing = turnstileEnabled && !turnstileToken;
 
   const selectedDayLabel = useMemo(
     () => formatSelectedDayLabel(selectedDate, page.bookingTimezone),
@@ -223,6 +227,11 @@ export function PublicBookingView({
       }
     }
 
+    if (turnstileMissing) {
+      toast.error(ORZUX_CALENDAR_MESSAGES.publicBookVerifyRequired);
+      return;
+    }
+
     startSubmitting(async () => {
       try {
         const response = await fetch(`/api/public/book/${page.slug}`, {
@@ -233,6 +242,7 @@ export function PublicBookingView({
             endDateTime: selectedSlot.end,
             resourceId: selectedResourceId || undefined,
             formAnswers,
+            turnstileToken,
           }),
         });
 
@@ -442,6 +452,13 @@ export function PublicBookingView({
                 </p>
               )}
 
+              {turnstileEnabled ? (
+                <TurnstileWidget
+                  onToken={setTurnstileToken}
+                  className="flex justify-center"
+                />
+              ) : null}
+
               <Button
                 className="w-full"
                 size="lg"
@@ -450,7 +467,8 @@ export function PublicBookingView({
                   isLoadingSlots ||
                   isCheckingSlot ||
                   hasSlotError ||
-                  !selectedSlot
+                  !selectedSlot ||
+                  turnstileMissing
                 }
                 onClick={handleSubmit}
               >

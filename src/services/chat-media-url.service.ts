@@ -9,6 +9,7 @@ import {
   extractStoragePathFromUrl,
   type ChatMediaPayload,
 } from "@/utils/chat-media";
+import { getStorageObjectKey } from "@/utils/storage-ref";
 
 export type ChatMediaUrlResult =
   | { success: true; url: string }
@@ -53,7 +54,7 @@ export async function resolveChatMediaUrl(input: {
     };
   }
 
-  const businessId = path.split("/")[0];
+  const businessId = getStorageObjectKey(path).split("/")[0];
 
   if (!businessId) {
     return {
@@ -100,9 +101,14 @@ export async function resolveChatMediaUrlsBatch(
     return { success: true, urls: {} };
   }
 
-  const businessId = uniquePaths[0]!.split("/")[0];
+  const businessId = getStorageObjectKey(uniquePaths[0]!).split("/")[0];
 
-  if (!businessId || uniquePaths.some((path) => path.split("/")[0] !== businessId)) {
+  if (
+    !businessId ||
+    uniquePaths.some(
+      (path) => getStorageObjectKey(path).split("/")[0] !== businessId,
+    )
+  ) {
     return {
       success: false,
       error: { code: "FORBIDDEN", message: CHAT_MESSAGES.genericError },

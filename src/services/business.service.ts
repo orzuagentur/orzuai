@@ -13,6 +13,13 @@ import {
 import { DEFAULT_COMMUNICATION_STYLE } from "@/features/ai-assistant/communication-styles";
 import { getDefaultGeminiModel } from "@/lib/env.schema";
 import { hasSupabaseEnv } from "@/lib/env";
+import {
+  getR2PublicMediaBaseUrl,
+  getR2PublicUrl,
+  isR2Configured,
+  r2DeleteObject,
+  r2PutObject,
+} from "@/lib/storage/r2";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
 import { getTrialEndsAt } from "@/services/trial.service";
@@ -335,27 +342,53 @@ export async function uploadBusinessLogo(
   const supabase = await createClient();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUSINESS_LOGOS_BUCKET)
-    .upload(storagePath, fileBuffer, {
+  // Public assets (logos) go to Cloudflare R2 via a public domain when configured;
+  // otherwise fall back to Supabase Storage (backward compatible).
+  const r2PublicBase = getR2PublicMediaBaseUrl();
+  const useR2Logo = isR2Configured() && Boolean(r2PublicBase);
+  const r2LogoKey = `business-logos/${storagePath}`;
+
+  if (useR2Logo) {
+    const ok = await r2PutObject({
+      bucket: "media",
+      key: r2LogoKey,
+      body: fileBuffer,
       contentType: file.type,
-      upsert: true,
-      cacheControl: "3600",
     });
 
-  if (uploadError) {
-    return {
-      success: false,
-      error: {
-        code: "LOGO_UPLOAD_FAILED",
-        message: uploadError.message || BUSINESS_MESSAGES.logoGenericError,
-      },
-    };
+    if (!ok) {
+      return {
+        success: false,
+        error: {
+          code: "LOGO_UPLOAD_FAILED",
+          message: BUSINESS_MESSAGES.logoGenericError,
+        },
+      };
+    }
+  } else {
+    const { error: uploadError } = await supabase.storage
+      .from(BUSINESS_LOGOS_BUCKET)
+      .upload(storagePath, fileBuffer, {
+        contentType: file.type,
+        upsert: true,
+        cacheControl: "3600",
+      });
+
+    if (uploadError) {
+      return {
+        success: false,
+        error: {
+          code: "LOGO_UPLOAD_FAILED",
+          message: uploadError.message || BUSINESS_MESSAGES.logoGenericError,
+        },
+      };
+    }
   }
 
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(BUSINESS_LOGOS_BUCKET).getPublicUrl(storagePath);
+  const publicUrl = useR2Logo
+    ? getR2PublicUrl(r2LogoKey)!
+    : supabase.storage.from(BUSINESS_LOGOS_BUCKET).getPublicUrl(storagePath).data
+        .publicUrl;
 
   const logoUrl = `${publicUrl}?v=${Date.now()}`;
 
@@ -368,7 +401,11 @@ export async function uploadBusinessLogo(
     .single();
 
   if (updateError || !data?.logo_url) {
-    await removeExistingLogo(storagePath);
+    if (useR2Logo) {
+      await r2DeleteObject({ bucket: "media", key: r2LogoKey });
+    } else {
+      await removeExistingLogo(storagePath);
+    }
 
     return {
       success: false,

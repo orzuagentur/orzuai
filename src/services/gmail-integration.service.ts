@@ -31,6 +31,7 @@ import {
   refreshGmailAccessToken,
 } from "@/lib/gmail/oauth";
 import { hasGoogleOAuthEnv, hasSupabaseEnv } from "@/lib/env";
+import { revokeGoogleToken } from "@/lib/google/revoke";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/services/auth.service";
@@ -395,6 +396,18 @@ export async function disconnectGmail(): Promise<{
 
     if (connection?.email_status === "connected") {
       await stopGmailWatchForConnection(connection);
+    }
+
+    // Best-effort: revoke the grant on Google's side before we drop our tokens,
+    // so a disconnect fully severs access instead of just deleting our copy.
+    if (connection) {
+      const refreshToken = await resolveIntegrationSecret(admin, {
+        businessId,
+        kind: "GMAIL_REFRESH_TOKEN",
+        secretKeyName: connection.refresh_token_secret_key_name,
+        legacyValue: connection.refresh_token,
+      });
+      await revokeGoogleToken(refreshToken);
     }
 
     const now = new Date().toISOString();

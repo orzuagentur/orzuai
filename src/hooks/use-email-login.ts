@@ -19,11 +19,14 @@ export function useEmailLogin(options: UseEmailLoginOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
 
   const signIn = useCallback(
-    async (input: SignInWithEmailInput): Promise<LoginResult> => {
+    async (
+      input: SignInWithEmailInput,
+      turnstileToken?: string,
+    ): Promise<LoginResult> => {
       setIsLoading(true);
 
       try {
-        const result = await signInWithEmailAction(input);
+        const result = await signInWithEmailAction(input, turnstileToken);
 
         if (result.success) {
           router.push(getSafeRedirectPath(nextPath));

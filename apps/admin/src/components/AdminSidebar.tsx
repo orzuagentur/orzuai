@@ -19,6 +19,7 @@ import {
   TriangleAlertIcon,
   Settings2Icon,
   ShieldIcon,
+  ShieldCheckIcon,
   UsersIcon,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ const NAV_SECTIONS = [
     items: [
       { href: "/ai-management", label: "Управление AI", icon: Settings2Icon },
       { href: "/settings/secrets", label: "API ключи", icon: KeyRoundIcon },
+      { href: "/security", label: "Безопасность", icon: ShieldCheckIcon },
     ],
   },
   {

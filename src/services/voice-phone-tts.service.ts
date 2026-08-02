@@ -2,10 +2,9 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 
-import { CHAT_ATTACHMENTS_BUCKET } from "@/features/chats/chat-attachments";
 import { hasSupabaseEnv } from "@/lib/env";
 import { resolveElevenLabsLanguageCode } from "@/lib/voice/language";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { newMediaObjectRef, putMediaObject } from "@/lib/storage/media-storage";
 import { getChatAttachmentSignedUrl } from "@/services/chat-attachment-signed-url.service";
 import {
   hasElevenLabsConfigured,
@@ -66,22 +65,22 @@ async function uploadPhoneTtsAudio(input: {
     return null;
   }
 
-  const path = `voice-phone-tts/${input.businessId}/${input.callSid}/${input.fileName}`;
-  const admin = createAdminClient();
+  const logicalKey = `voice-phone-tts/${input.businessId}/${input.callSid}/${input.fileName}`;
+  const ref = newMediaObjectRef(logicalKey);
 
-  const { error } = await admin.storage
-    .from(CHAT_ATTACHMENTS_BUCKET)
-    .upload(path, input.buffer, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+  const ok = await putMediaObject({
+    ref,
+    body: input.buffer,
+    contentType: "audio/mpeg",
+    upsert: true,
+  });
 
-  if (error) {
-    console.error("[voice-phone-tts] upload failed", error.message);
+  if (!ok) {
+    console.error("[voice-phone-tts] upload failed for ref:", ref);
     return null;
   }
 
-  return getChatAttachmentSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  return getChatAttachmentSignedUrl(ref, SIGNED_URL_TTL_SECONDS);
 }
 
 export async function synthesizePhoneSpeechAudio(input: {

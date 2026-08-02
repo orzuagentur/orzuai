@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { ResendVerificationEmailField } from "@/components/auth/ResendVerificationForm";
+import { TurnstileWidget } from "@/components/security/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +40,10 @@ export function EmailLoginForm({
   const [errors, setErrors] = useState<FormErrors>({});
   const [showResendVerification, setShowResendVerification] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const turnstileEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  const turnstileMissing = turnstileEnabled && !turnstileToken;
   const { signIn, isLoading: isPasswordLoading } = useEmailLogin({
     nextPath,
     onEmailNotVerified: (email) => {
@@ -56,8 +63,18 @@ export function EmailLoginForm({
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "");
 
+    if (turnstileMissing) {
+      toast.error("Please complete the verification.");
+      return;
+    }
+
     if (mode === "magiclink") {
-      const result = await sendMagicLink({ email });
+      const result = await sendMagicLink({ email }, turnstileToken ?? undefined);
+
+      if (turnstileEnabled) {
+        setTurnstileToken(null);
+        setTurnstileResetKey((key) => key + 1);
+      }
 
       if (!result.success && result.error.code === "VALIDATION_ERROR") {
         setErrors((current) => ({ ...current, email: result.error.message }));
@@ -67,7 +84,12 @@ export function EmailLoginForm({
     }
 
     const password = String(formData.get("password") ?? "");
-    const result = await signIn({ email, password });
+    const result = await signIn({ email, password }, turnstileToken ?? undefined);
+
+    if (turnstileEnabled) {
+      setTurnstileToken(null);
+      setTurnstileResetKey((key) => key + 1);
+    }
 
     if (!result.success && result.error.code === "VALIDATION_ERROR") {
       const message = result.error.message.toLowerCase();
@@ -140,7 +162,20 @@ export function EmailLoginForm({
           </p>
         )}
 
-        <Button type="submit" size="lg" className="h-11 w-full" disabled={isLoading}>
+        {turnstileEnabled ? (
+          <TurnstileWidget
+            onToken={setTurnstileToken}
+            resetKey={turnstileResetKey}
+            className="flex justify-center"
+          />
+        ) : null}
+
+        <Button
+          type="submit"
+          size="lg"
+          className="h-11 w-full"
+          disabled={isLoading || turnstileMissing}
+        >
           {isLoading ? (
             <>
               <Loader2Icon className="size-4 animate-spin" />

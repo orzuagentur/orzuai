@@ -227,5 +227,17 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.list_inbox_conversations TO authenticated;
+-- Explicit signature required: a 10-arg overload (with p_include_total_count)
+-- also exists at this point on a clean rebuild, so a bare GRANT is ambiguous.
+GRANT EXECUTE ON FUNCTION public.list_inbox_conversations(
+  UUID,
+  UUID,
+  public.messaging_channel,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  INTEGER,
+  INTEGER
+) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.inbox_search_tsquery TO authenticated;

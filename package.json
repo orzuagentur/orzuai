@@ -14,8 +14,11 @@
     "build:admin": "npm run build --workspace=@orzu/admin",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "migrate:secrets": "tsx --env-file=.env.local scripts/migrate-vercel-secrets.ts",
     "cleanup:secrets": "tsx --env-file=.env.local scripts/cleanup-invalid-app-secrets.ts",
+    "rotate:secrets": "tsx --env-file=.env.local scripts/rotate-secrets.ts",
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
     "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",
@@ -25,6 +28,8 @@
     "dev:voice-stream": "npm run dev --workspace=@orzu/voice-stream"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/s3-request-presigner": "^3.1101.0",
     "@google/generative-ai": "^0.24.1",
     "@orzu/platform-ai": "*",
     "@orzu/secrets": "*",
@@ -70,11 +75,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "dotenv": "^16.4.7",
     "eslint": "^9",
     "eslint-config-next": "^15.5.18",
     "patch-package": "^8.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

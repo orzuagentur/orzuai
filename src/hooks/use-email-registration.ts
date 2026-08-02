@@ -19,11 +19,14 @@ export function useEmailRegistration(options: UseEmailRegistrationOptions = {}) 
   const [isLoading, setIsLoading] = useState(false);
 
   const register = useCallback(
-    async (input: RegisterWithEmailInput): Promise<RegistrationResult> => {
+    async (
+      input: RegisterWithEmailInput,
+      turnstileToken?: string,
+    ): Promise<RegistrationResult> => {
       setIsLoading(true);
 
       try {
-        const result = await registerWithEmailAction(input);
+        const result = await registerWithEmailAction(input, turnstileToken);
 
         if (result.success) {
           onSuccess?.(result.data.email);

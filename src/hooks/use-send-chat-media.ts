@@ -7,12 +7,13 @@ import {
   completeChatMediaUploadAction,
   prepareChatMediaUploadAction,
 } from "@/features/chats/actions/send-chat-media";
+import { getChatMediaUrlAction } from "@/features/chats/actions/get-chat-media-url";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { generateClientImageThumbnail } from "@/lib/client/generate-image-thumbnail";
 import {
-  getChatAttachmentSignedUrlClient,
   uploadChatAttachmentBlob,
   uploadChatAttachmentDirect,
+  uploadToPresignedUrl,
 } from "@/lib/client/upload-chat-attachment";
 import type { ChatMessageData } from "@/types/chat.types";
 import type { SendChatMessageResult } from "@/types/chat.types";
@@ -107,20 +108,30 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
             ? generateClientImageThumbnail(file)
             : Promise.resolve(null);
 
-        const uploaded = await uploadChatAttachmentDirect(
-          file,
-          prepared.data.path,
-          {
-            bucket: prepared.data.bucket,
-            onProgress: (update) => {
-              reportProgress({
-                percent: update.percent,
-                bytesPerSecond: update.bytesPerSecond,
-                phase: "uploading",
+        const onUploadProgress = (update: {
+          percent: number;
+          bytesPerSecond: number;
+        }) => {
+          reportProgress({
+            percent: update.percent,
+            bytesPerSecond: update.bytesPerSecond,
+            phase: "uploading",
+          });
+        };
+
+        // R2 uses direct presigned PUT; Supabase uses the authenticated client.
+        const uploaded =
+          prepared.data.provider === "r2" && prepared.data.uploadUrl
+            ? await uploadToPresignedUrl(
+                file,
+                prepared.data.uploadUrl,
+                prepared.data.uploadContentType ?? mimeType,
+                { onProgress: onUploadProgress },
+              )
+            : await uploadChatAttachmentDirect(file, prepared.data.path, {
+                bucket: prepared.data.bucket,
+                onProgress: onUploadProgress,
               });
-            },
-          },
-        );
 
         if (!uploaded.success) {
           const message = uploaded.error ?? CHAT_MESSAGES.mediaSendFailed;
@@ -141,11 +152,16 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
 
         if (thumbnail) {
           thumbPath = buildThumbnailStoragePath(prepared.data.path);
-          const thumbUploaded = await uploadChatAttachmentBlob(
-            thumbnail.blob,
-            thumbPath,
-            { bucket: prepared.data.bucket },
-          );
+          const thumbUploaded =
+            prepared.data.provider === "r2" && prepared.data.thumbUploadUrl
+              ? await uploadToPresignedUrl(
+                  thumbnail.blob,
+                  prepared.data.thumbUploadUrl,
+                  "image/jpeg",
+                )
+              : await uploadChatAttachmentBlob(thumbnail.blob, thumbPath, {
+                  bucket: prepared.data.bucket,
+                });
 
           if (thumbUploaded.success) {
             thumbWidth = thumbnail.width;
@@ -174,10 +190,12 @@ export function useSendChatMedia({ onSuccess }: UseSendChatMediaOptions = {}) {
         );
 
         if (result.success) {
-          const mediaSignedUrl = await getChatAttachmentSignedUrlClient(
-            prepared.data.path,
-            prepared.data.bucket,
-          );
+          const mediaUrlResult = await getChatMediaUrlAction({
+            path: prepared.data.path,
+          });
+          const mediaSignedUrl = mediaUrlResult.success
+            ? mediaUrlResult.url
+            : null;
 
           const enrichedResult: SendChatMessageResult = mediaSignedUrl
             ? {

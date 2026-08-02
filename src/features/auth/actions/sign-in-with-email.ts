@@ -1,5 +1,6 @@
 "use server";
 
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { signInWithEmail } from "@/services/auth.service";
 import { handlePostLoginSecurityNotify } from "@/services/auth-security-email.service";
 import type { LoginResult, SignInWithEmailInput } from "@/types/auth.types";
@@ -8,7 +9,20 @@ import { getRequestLoginContext } from "@/utils/request-login-context";
 
 export async function signInWithEmailAction(
   input: SignInWithEmailInput,
+  turnstileToken?: string,
 ): Promise<LoginResult> {
+  const turnstile = await verifyTurnstileToken(turnstileToken);
+
+  if (!turnstile.allowed) {
+    return {
+      success: false,
+      error: {
+        code: "LOGIN_FAILED",
+        message: "Verification failed. Please try again.",
+      },
+    };
+  }
+
   const parsed = signInWithEmailSchema.safeParse(input);
 
   if (!parsed.success) {
