@@ -50,8 +50,10 @@ type ActiveSocket = {
   open: boolean;
   /** True once this socket (or a prior one for the business) reached open. */
   everConnected: boolean;
-  /** phone digits / raw recipient → preferred WhatsApp chat JID (often @lid). */
+  /** phone digits / raw recipient → inbound chat JID (often @lid), for debugging. */
   chatJidByRecipient: Map<string, string>;
+  /** inbound chat JID → phone digits, so outbound can use PN addressing. */
+  phoneByChatJid: Map<string, string>;
   /** Recent outbound/inbound messages for Baileys retry/decrypt (getMessage). */
   recentMessages: Map<string, proto.IMessage>;
   processedInboundIds: Set<string>;
@@ -65,6 +67,7 @@ const sessionMemory = new Map<
     everConnected: boolean;
     failedPairingAttempts: number;
     chatJidByRecipient: Map<string, string>;
+    phoneByChatJid: Map<string, string>;
     recentMessages: Map<string, proto.IMessage>;
     processedInboundIds: Set<string>;
   }
@@ -87,6 +90,7 @@ function memoryFor(businessId: string) {
     everConnected: false,
     failedPairingAttempts: 0,
     chatJidByRecipient: new Map<string, string>(),
+    phoneByChatJid: new Map<string, string>(),
     recentMessages: new Map<string, proto.IMessage>(),
     processedInboundIds: new Set<string>(),
   };
@@ -210,43 +214,39 @@ function rememberChatJid(
   if (phone) {
     entry.chatJidByRecipient.set(phone, normalized);
     entry.chatJidByRecipient.set(`+${phone}`, normalized);
+    entry.phoneByChatJid.set(normalized, phone);
   }
 }
 
+/**
+ * Prefer phone-number JIDs for outbound. Baileys 6.7 routes 1:1 chats more
+ * reliably via `@s.whatsapp.net` than raw `@lid` wire addresses.
+ */
 async function resolveOutboundJid(
   entry: ActiveSocket,
   recipient: string,
 ): Promise<string> {
   const trimmed = recipient.trim();
-  const cached =
-    entry.chatJidByRecipient.get(trimmed) ||
-    entry.chatJidByRecipient.get(digitsOnly(trimmed)) ||
-    entry.chatJidByRecipient.get(`+${digitsOnly(trimmed)}`);
 
-  if (cached) {
-    return cached;
+  if (isLidUser(trimmed)) {
+    const normalized = jidNormalizedUser(trimmed) || trimmed;
+    const phone = entry.phoneByChatJid.get(normalized);
+    if (phone) {
+      return `${phone}@s.whatsapp.net`;
+    }
+    return normalized;
+  }
+
+  const digits = digitsOnly(trimmed);
+  if (digits) {
+    return `${digits}@s.whatsapp.net`;
   }
 
   if (trimmed.includes("@")) {
     return toJid(trimmed);
   }
 
-  const phoneJid = toJid(trimmed);
-
-  try {
-    const results = await entry.sock.onWhatsApp(digitsOnly(trimmed));
-    const match = results?.[0];
-    if (match?.exists && match.jid) {
-      const resolved = jidNormalizedUser(match.jid) || match.jid;
-      entry.chatJidByRecipient.set(digitsOnly(trimmed), resolved);
-      entry.chatJidByRecipient.set(`+${digitsOnly(trimmed)}`, resolved);
-      return resolved;
-    }
-  } catch (error) {
-    log("onWhatsApp lookup failed", describe(error));
-  }
-
-  return phoneJid;
+  return toJid(trimmed);
 }
 
 async function updateRow(
@@ -529,6 +529,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
     open: false,
     everConnected: memory.everConnected,
     chatJidByRecipient: memory.chatJidByRecipient,
+    phoneByChatJid: memory.phoneByChatJid,
     recentMessages: memory.recentMessages,
     processedInboundIds: memory.processedInboundIds,
   };
@@ -757,6 +758,26 @@ async function reconcile(): Promise<void> {
     }
 
     const entry = active.get(row.business_id);
+    const memory = memoryFor(row.business_id);
+
+    if (
+      row.status === "pending_qr" &&
+      memory.failedPairingAttempts >= MAX_FAILED_PAIRING_ATTEMPTS
+    ) {
+      await updateRow(row.business_id, {
+        status: "disconnected",
+        qr_code: null,
+        qr_expires_at: null,
+      });
+      await stopSocket(row.business_id);
+      log("pending_qr force-disconnected", row.business_id);
+      continue;
+    }
+
+    // A reconnect is already scheduled — don't fight it with reconcile.
+    if (reconnectTimers.has(row.business_id)) {
+      continue;
+    }
 
     if (entry?.open || entry?.starting) {
       // Refresh creds key name if the DB row caught up after first persist.
@@ -810,6 +831,18 @@ async function handleSend(
   log("send", businessId, "to", to, "jid", jid);
 
   try {
+    try {
+      await entry.sock.assertSessions([jid], false);
+    } catch (error) {
+      log("assertSessions warning", businessId, jid, describe(error));
+    }
+
+    try {
+      await entry.sock.presenceSubscribe(jid);
+    } catch {
+      // optional; ignore
+    }
+
     let sent;
     if (media?.url) {
       const kind = media.kind ?? "document";

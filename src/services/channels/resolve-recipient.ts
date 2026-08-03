@@ -47,23 +47,8 @@ export async function resolveChannelRecipient(
     return contact.phone_number;
   }
 
-  if (input.channel === "whatsapp_web") {
-    const customFields =
-      contact.custom_fields &&
-      typeof contact.custom_fields === "object" &&
-      !Array.isArray(contact.custom_fields)
-        ? (contact.custom_fields as Record<string, unknown>)
-        : {};
-    const chatJid =
-      typeof customFields.whatsappChatJid === "string"
-        ? customFields.whatsappChatJid.trim()
-        : "";
-
-    if (chatJid.includes("@")) {
-      return chatJid;
-    }
-  }
-
+  // For WhatsApp Web, prefer the phone number. Baileys routes PN JIDs more
+  // reliably than raw @lid addresses from inbound packets.
   const externalId = toChannelExternalId(input.channel, contact.phone_number);
 
   if (conversation?.contact_id) {
