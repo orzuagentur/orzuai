@@ -28,6 +28,10 @@ export function getChannelIconContainerClassName(
     return "bg-red-50 dark:bg-red-950/40";
   }
 
+  if (channel === "outlook") {
+    return "bg-sky-50 dark:bg-sky-950/40";
+  }
+
   if (channel === "google_calendar") {
     return "bg-blue-50 dark:bg-blue-950/50";
   }
@@ -65,7 +69,11 @@ export function getChannelBadgeLabel(channel: MessagingChannel): string {
   }
 
   if (channel === "email") {
-    return "Email";
+    return "Gmail";
+  }
+
+  if (channel === "outlook") {
+    return "Outlook";
   }
 
   if (channel === "voice") {

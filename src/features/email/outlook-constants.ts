@@ -1,11 +1,11 @@
 import { DASHBOARD_ROUTES } from "@/constants/routes";
 
-export const OUTLOOK_INTEGRATION_HREF = `${DASHBOARD_ROUTES.integrations}/email`;
+export const OUTLOOK_INTEGRATION_HREF = `${DASHBOARD_ROUTES.integrations}/outlook`;
 
 export const OUTLOOK_MESSAGES = {
   connectTitle: "Microsoft Outlook",
   connectDescription:
-    "Connect Outlook or Microsoft 365 to receive and reply to customer emails with AI in your inbox.",
+    "Connect Outlook or Microsoft 365 to receive and reply to customer emails with AI in a dedicated Outlook inbox.",
   connectButton: "Connect Outlook",
   reconnectButton: "Reconnect Outlook",
   connectedAs: "Connected as",
@@ -17,7 +17,7 @@ export const OUTLOOK_MESSAGES = {
   oauthError: "Could not connect Outlook. Please try again.",
   oauthSuccess: "Outlook connected successfully.",
   syncHint:
-    "Outlook inbox syncs every ~3 minutes in production. Use Sync now for an immediate refresh.",
+    "Outlook inbox syncs about every minute in production. New messages appear in Chats in realtime after sync. Use Sync now for an immediate refresh.",
   syncNow: "Sync Outlook now",
   syncSuccess: (count: number, scanned: number) =>
     count > 0

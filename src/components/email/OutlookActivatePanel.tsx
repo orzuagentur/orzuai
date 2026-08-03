@@ -47,11 +47,17 @@ export function OutlookActivatePanel({
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("outlook_connected") === "1") {
+    if (
+      searchParams.get("connected") === "1" ||
+      searchParams.get("outlook_connected") === "1"
+    ) {
       clearConversationDetailCache();
       toast.success(OUTLOOK_MESSAGES.oauthSuccess);
       router.replace(OUTLOOK_INTEGRATION_HREF);
-    } else if (searchParams.get("outlook_error")) {
+    } else if (
+      searchParams.get("error") ||
+      searchParams.get("outlook_error")
+    ) {
       toast.error(OUTLOOK_MESSAGES.oauthError);
     }
   }, [router, searchParams]);

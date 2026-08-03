@@ -21,6 +21,7 @@ import {
 } from "@/lib/outlook/oauth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { purgeChannelConversations } from "@/services/channel-workspace.service";
 import {
   insertInboundChannelMessage,
   resolveInboundMessageContext,
@@ -328,7 +329,10 @@ export async function disconnectOutlook(
     })
     .eq("id", connection.id);
 
+  await purgeChannelConversations(businessId, "outlook", admin);
+
   revalidatePath(DASHBOARD_ROUTES.integrations);
+  revalidatePath(DASHBOARD_ROUTES.chats);
   return { success: true };
 }
 
@@ -348,7 +352,7 @@ async function ingestOutlookMessage(
 
   const context = await resolveInboundMessageContext(admin, {
     businessId,
-    channel: "email",
+    channel: "outlook",
     contactName: message.fromName || message.fromEmail,
     contactPhone: message.fromEmail,
     identifier: message.fromEmail,
@@ -367,7 +371,7 @@ async function ingestOutlookMessage(
 
   const inserted = await insertInboundChannelMessage(admin, {
     conversationId: context.conversationId,
-    channel: "email",
+    channel: "outlook",
     content: message.body,
     emailSubject: message.subject,
     externalMessageId: message.id,
@@ -382,7 +386,7 @@ async function ingestOutlookMessage(
     await scheduleInboundMessageProcessing({
       admin,
       businessId,
-      channel: "email",
+      channel: "outlook",
       conversationId: context.conversationId,
       clientMessage: message.body,
     });
@@ -393,7 +397,7 @@ async function ingestOutlookMessage(
     contactId: context.contactId,
     contactName: message.fromName || message.fromEmail,
     conversationId: context.conversationId,
-    channel: "email",
+    channel: "outlook",
     preview: message.snippet,
     isNewContact: context.createdContact,
   });

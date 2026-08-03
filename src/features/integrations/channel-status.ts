@@ -165,25 +165,18 @@ export function buildIntegrationChannelStatuses({
   if (gmailConnection?.status === "connected") {
     emailStatus = "connected";
     emailDetail = gmailConnection.gmailAddress ?? undefined;
-  } else if (outlookConnection?.status === "connected") {
-    emailStatus = "connected";
-    emailDetail = outlookConnection.outlookAddress ?? undefined;
-  } else if (
-    gmailConnection?.status === "pending" ||
-    outlookConnection?.status === "pending"
-  ) {
+  } else if (gmailConnection?.status === "pending") {
     emailStatus = "pending";
   }
 
-  if (
-    gmailConnection?.status === "connected" &&
-    outlookConnection?.status === "connected"
-  ) {
-    const gmailAddress = gmailConnection.gmailAddress?.trim();
-    const outlookAddress = outlookConnection.outlookAddress?.trim();
-    if (gmailAddress && outlookAddress) {
-      emailDetail = `${gmailAddress} · ${outlookAddress}`;
-    }
+  let outlookStatus: IntegrationChannelStatus = "disconnected";
+  let outlookDetail: string | undefined;
+
+  if (outlookConnection?.status === "connected") {
+    outlookStatus = "connected";
+    outlookDetail = outlookConnection.outlookAddress ?? undefined;
+  } else if (outlookConnection?.status === "pending") {
+    outlookStatus = "pending";
   }
 
   let websiteChatStatus: IntegrationChannelStatus = "disconnected";
@@ -246,6 +239,10 @@ export function buildIntegrationChannelStatuses({
     email: {
       status: emailStatus,
       detail: emailDetail,
+    },
+    outlook: {
+      status: outlookStatus,
+      detail: outlookDetail,
     },
     website_chat: {
       status: websiteChatStatus,

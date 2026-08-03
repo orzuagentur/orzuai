@@ -308,26 +308,25 @@ function ActivateSection({
     );
   }
 
-  if (channel === "email" && (gmail || outlook)) {
+  if (channel === "email" && gmail) {
     return (
-      <div className="flex w-full flex-col gap-8">
-        {gmail ? (
-          <EmailActivatePanelClient
-            connection={gmail.connection}
-            hasBusiness={hasBusiness}
-            config={gmail.connectConfig}
-            embeddedInHub
-          />
-        ) : null}
-        {outlook ? (
-          <OutlookActivatePanelClient
-            connection={outlook.connection}
-            hasBusiness={hasBusiness}
-            config={outlook.connectConfig}
-            embeddedInHub
-          />
-        ) : null}
-      </div>
+      <EmailActivatePanelClient
+        connection={gmail.connection}
+        hasBusiness={hasBusiness}
+        config={gmail.connectConfig}
+        embeddedInHub
+      />
+    );
+  }
+
+  if (channel === "outlook" && outlook) {
+    return (
+      <OutlookActivatePanelClient
+        connection={outlook.connection}
+        hasBusiness={hasBusiness}
+        config={outlook.connectConfig}
+        embeddedInHub
+      />
     );
   }
 

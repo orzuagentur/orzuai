@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`${OUTLOOK_INTEGRATION_HREF}?outlook_error=${error}`, request.url),
+      new URL(`${OUTLOOK_INTEGRATION_HREF}?error=${error}`, request.url),
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL(`${OUTLOOK_INTEGRATION_HREF}?outlook_error=missing_code`, request.url),
+      new URL(`${OUTLOOK_INTEGRATION_HREF}?error=missing_code`, request.url),
     );
   }
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   if (!parsedState) {
     return NextResponse.redirect(
-      new URL(`${OUTLOOK_INTEGRATION_HREF}?outlook_error=invalid_state`, request.url),
+      new URL(`${OUTLOOK_INTEGRATION_HREF}?error=invalid_state`, request.url),
     );
   }
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   if (!business || business.id !== parsedState.businessId) {
     return NextResponse.redirect(
-      new URL(`${OUTLOOK_INTEGRATION_HREF}?outlook_error=unauthorized`, request.url),
+      new URL(`${OUTLOOK_INTEGRATION_HREF}?error=unauthorized`, request.url),
     );
   }
 
@@ -53,14 +53,11 @@ export async function GET(request: NextRequest) {
 
   if (!result.success) {
     return NextResponse.redirect(
-      new URL(
-        `${OUTLOOK_INTEGRATION_HREF}?outlook_error=connect_failed`,
-        request.url,
-      ),
+      new URL(`${OUTLOOK_INTEGRATION_HREF}?error=connect_failed`, request.url),
     );
   }
 
   return NextResponse.redirect(
-    new URL(`${OUTLOOK_INTEGRATION_HREF}?outlook_connected=1`, request.url),
+    new URL(`${OUTLOOK_INTEGRATION_HREF}?connected=1`, request.url),
   );
 }

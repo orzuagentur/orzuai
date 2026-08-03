@@ -57,7 +57,6 @@ import {
   resolveContactFromRow,
 } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
-import { isEmailMailboxConnected } from "@/services/outlook-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
 import { isSmsInboxVisible, isVoiceInboxVisible } from "@/services/voice-inbox.service";
 import { getConversationRepository } from "@/repositories/conversation.repository";
@@ -381,7 +380,17 @@ export async function isChatChannelConnected(
   }
 
   if (channel === "email") {
-    return isEmailMailboxConnected(businessId);
+    const { isGmailConnected } = await import(
+      "@/services/gmail-integration.service"
+    );
+    return isGmailConnected(businessId);
+  }
+
+  if (channel === "outlook") {
+    const { isOutlookConnected } = await import(
+      "@/services/outlook-integration.service"
+    );
+    return isOutlookConnected(businessId);
   }
 
   if (channel === "website_forms" || channel === "website_chat") {
@@ -1022,15 +1031,24 @@ export async function sendChatMessage(
         },
       };
     }
-  } else if (conversation.channel === "email") {
-    const emailConnected = await isEmailMailboxConnected(businessId);
+  } else if (
+    conversation.channel === "email" ||
+    conversation.channel === "outlook"
+  ) {
+    const mailboxConnected = await isChatChannelConnected(
+      businessId,
+      conversation.channel,
+    );
 
-    if (!emailConnected) {
+    if (!mailboxConnected) {
       return {
         success: false,
         error: {
           code: "WHATSAPP_NOT_CONNECTED",
-          message: CHAT_MESSAGES.emailNotConnected,
+          message:
+            conversation.channel === "outlook"
+              ? CHAT_MESSAGES.outlookNotConnected
+              : CHAT_MESSAGES.emailNotConnected,
         },
       };
     }

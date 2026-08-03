@@ -317,11 +317,15 @@ async function filterContactsBySegment(
 function isMessagingChannel(value: string): value is MessagingChannel {
   return (
     value === "whatsapp" ||
+    value === "whatsapp_web" ||
     value === "instagram" ||
     value === "telegram" ||
+    value === "telegram_user" ||
     value === "website_forms" ||
+    value === "website_chat" ||
     value === "facebook_messenger" ||
     value === "email" ||
+    value === "outlook" ||
     value === "voice" ||
     value === "sms"
   );

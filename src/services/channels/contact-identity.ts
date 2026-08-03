@@ -24,7 +24,7 @@ export function toChannelExternalId(
     return trimmed.replace(/^ig:/, "");
   }
 
-  if (channel === "email") {
+  if (channel === "email" || channel === "outlook") {
     return trimmed.toLowerCase();
   }
 
@@ -47,7 +47,7 @@ export function toLegacyContactPhoneNumber(
     return externalId.startsWith("ig:") ? externalId : `ig:${externalId}`;
   }
 
-  if (channel === "email") {
+  if (channel === "email" || channel === "outlook") {
     return externalId;
   }
 

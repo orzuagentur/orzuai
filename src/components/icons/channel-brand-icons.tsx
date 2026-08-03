@@ -25,25 +25,27 @@ export function WhatsAppIcon({ className, ...props }: IconProps) {
 }
 
 /**
- * WhatsApp Business mark — same green glyph with a briefcase badge so it is
- * visually distinct from the consumer WhatsApp / WhatsApp Web icon.
+ * Official WhatsApp Business app mark: green tile, white WhatsApp glyph,
+ * briefcase badge (Meta / WhatsApp Business brand).
  */
 export function WhatsAppBusinessIcon({ className, ...props }: IconProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 48 48"
       className={className}
       aria-hidden="true"
       {...props}
     >
-      <path
-        fill="#25D366"
-        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.881 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
-      />
-      <circle cx="18.6" cy="5.4" r="4.2" fill="#128C7E" />
+      <rect width="48" height="48" rx="12" fill="#25D366" />
       <path
         fill="#fff"
-        d="M17.1 3.85h3v.7h.55c.3 0 .55.25.55.55v2.5c0 .3-.25.55-.55.55h-4.1c-.3 0-.55-.25-.55-.55v-2.5c0-.3.25-.55.55-.55H17.1v-.7zm.55.7v.7h1.9v-.7h-1.9z"
+        d="M24.05 10.2c-7.18 0-13.02 5.84-13.02 13.02 0 2.3.61 4.54 1.77 6.52L11 37.8l8.3-2.18a13 13 0 0 0 4.75.89h.01c7.18 0 13.02-5.84 13.02-13.02S31.23 10.2 24.05 10.2zm7.6 18.36c-.32.9-1.86 1.65-2.6 1.76-.7.1-1.58.14-2.55-.16-.59-.18-1.34-.44-2.31-.86-4.07-1.76-6.72-5.87-6.92-6.14-.2-.27-1.62-2.16-1.62-4.12s1.02-2.92 1.39-3.32c.36-.4.79-.5 1.05-.5h.76c.24 0 .57-.09.89.68.32.79 1.1 2.73 1.2 2.93.1.2.16.43.03.69-.13.27-.2.43-.39.66-.2.23-.41.51-.59.69-.2.2-.4.41-.17.8.23.4 1.02 1.68 2.19 2.72 1.5 1.34 2.77 1.76 3.16 1.96.4.2.63.16.86-.1.23-.25.99-1.15 1.25-1.55.27-.4.53-.33.89-.2.36.13 2.3 1.08 2.69 1.28.4.2.66.3.76.46.1.17.1.96-.22 1.86z"
+      />
+      <circle cx="36.2" cy="36.2" r="9.2" fill="#128C7E" />
+      <circle cx="36.2" cy="36.2" r="8.2" fill="#075E54" />
+      <path
+        fill="#fff"
+        d="M32.7 33.1h7c.5 0 .9.4.9.9v4.2c0 .5-.4.9-.9.9h-7c-.5 0-.9-.4-.9-.9v-4.2c0-.5.4-.9.9-.9zm.9-1.2h5.2v1h-5.2v-1zm1.1.3v.7h3v-.7h-3z"
       />
     </svg>
   );
@@ -227,6 +229,54 @@ export function GmailIcon({ className, ...props }: IconProps) {
   );
 }
 
+/**
+ * Official Microsoft Outlook mark (Fluent-style app icon):
+ * blue tile + white envelope + signature “O” panel.
+ */
+export function OutlookIcon({ className, ...props }: IconProps) {
+  const gradientId = useId();
+
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="8"
+          y1="4"
+          x2="40"
+          y2="44"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#0B5CAB" />
+          <stop offset="1" stopColor="#0078D4" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="10" fill={`url(#${gradientId})`} />
+      <path
+        fill="#fff"
+        d="M20.5 14h18A3.5 3.5 0 0 1 42 17.5v13A3.5 3.5 0 0 1 38.5 34h-18A3.5 3.5 0 0 1 17 30.5v-13A3.5 3.5 0 0 1 20.5 14z"
+      />
+      <path
+        fill="#0078D4"
+        d="M20.8 15.6 29.2 22l8.5-6.4v1.5l-8.5 6.5-8.4-6.5v-1.6z"
+      />
+      <path
+        fill="#28A8EA"
+        d="M6 12.5A4.5 4.5 0 0 1 10.5 8h11A4.5 4.5 0 0 1 26 12.5v23A4.5 4.5 0 0 1 21.5 40h-11A4.5 4.5 0 0 1 6 35.5v-23z"
+      />
+      <path
+        fill="#fff"
+        d="M16.1 18.2c-2.7 0-4.7 2.1-4.7 5.1s2 5.1 4.7 5.1 4.7-2.1 4.7-5.1-2-5.1-4.7-5.1zm0 1.8c1.6 0 2.7 1.4 2.7 3.3s-1.1 3.3-2.7 3.3-2.7-1.4-2.7-3.3 1.1-3.3 2.7-3.3z"
+      />
+    </svg>
+  );
+}
+
 /** Official Google Calendar mark. */
 export function GoogleCalendarIcon({ className }: IconProps) {
   return (
@@ -251,6 +301,7 @@ const CHANNEL_ICON_MAP = {
   voice: VoiceIcon,
   sms: SmsIcon,
   email: GmailIcon,
+  outlook: OutlookIcon,
   google_calendar: GoogleCalendarIcon,
   facebook_messenger: MessengerIcon,
 } as const;

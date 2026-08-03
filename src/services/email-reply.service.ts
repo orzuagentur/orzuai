@@ -10,12 +10,13 @@ type MessagingDbClient = SupabaseClient<Database>;
 export async function resolveEmailReplySubjectForConversation(
   admin: MessagingDbClient,
   conversationId: string,
+  channel: "email" | "outlook" = "email",
 ): Promise<string> {
   const { data } = await admin
     .from("messages")
     .select("content, email_subject, channel")
     .eq("conversation_id", conversationId)
-    .eq("channel", "email")
+    .eq("channel", channel)
     .eq("hidden_for_business", false)
     .order("created_at", { ascending: false })
     .limit(20);

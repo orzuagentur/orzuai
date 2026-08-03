@@ -28,7 +28,7 @@ export const MARKETPLACE_CATEGORIES: MarketplaceCategory[] = [
   {
     id: "email",
     label: "Email",
-    description: "Gmail inbox with AI replies.",
+    description: "Gmail and Outlook inboxes with AI replies.",
   },
   {
     id: "sms",

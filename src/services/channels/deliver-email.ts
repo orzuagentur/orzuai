@@ -13,6 +13,41 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
+export async function deliverOutlookTextMessage(input: {
+  businessId: string;
+  recipientEmail: string;
+  subject: string;
+  content: string;
+}): Promise<ChannelTextDeliveryResult> {
+  const recipient = input.recipientEmail.trim().toLowerCase();
+
+  if (!recipient.includes("@")) {
+    return { success: false, error: "Recipient email is invalid." };
+  }
+
+  const outlook = await getOutlookAccessTokenForBusiness(input.businessId);
+
+  if (!outlook) {
+    return { success: false, error: "Outlook is not connected." };
+  }
+
+  const sendResult = await sendOutlookMessage({
+    accessToken: outlook.accessToken,
+    toEmail: recipient,
+    subject: input.subject,
+    body: input.content,
+  });
+
+  if (!sendResult.success) {
+    return {
+      success: false,
+      error: sendResult.error ?? "Outlook send failed.",
+    };
+  }
+
+  return { success: true, providerMessageId: sendResult.messageId };
+}
+
 export async function deliverEmailTextMessage(input: {
   admin: MessagingDbClient;
   businessId: string;
@@ -44,31 +79,11 @@ export async function deliverEmailTextMessage(input: {
     return { success: true, providerMessageId: sendResult.messageId };
   }
 
-  const outlook = await getOutlookAccessTokenForBusiness(input.businessId);
-
-  if (outlook) {
-    const sendResult = await sendOutlookMessage({
-      accessToken: outlook.accessToken,
-      toEmail: recipient,
-      subject: input.subject,
-      body: input.content,
-    });
-
-    if (!sendResult.success) {
-      return {
-        success: false,
-        error: sendResult.error ?? "Outlook send failed.",
-      };
-    }
-
-    return { success: true, providerMessageId: sendResult.messageId };
-  }
-
   if (!hasResendEnv()) {
     return {
       success: false,
       error:
-        "Email mailbox is not connected and email delivery is not configured.",
+        "Gmail is not connected and email delivery is not configured.",
     };
   }
 

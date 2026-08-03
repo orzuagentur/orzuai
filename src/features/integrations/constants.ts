@@ -4,6 +4,7 @@ import {
   GmailIcon,
   GoogleCalendarIcon,
   MessengerIcon,
+  OutlookIcon,
   SmsIcon,
   TelegramIcon,
   VoiceIcon,
@@ -26,6 +27,7 @@ export const MESSAGING_INTEGRATION_CHANNELS = [
   "website_forms",
   "website_chat",
   "email",
+  "outlook",
 ] as const;
 
 /** Channels shown in Chats inbox (website forms go to Orders, not Chats). */
@@ -36,6 +38,7 @@ export const INBOX_MESSAGING_CHANNELS = [
   "telegram_user",
   "website_chat",
   "email",
+  "outlook",
 ] as const;
 
 /** All channels the AI Agent can be enabled on (messaging + SMS + voice calls). */
@@ -183,11 +186,20 @@ export const INTEGRATION_CHANNEL_LIST: IntegrationChannelConfig[] = [
   },
   {
     id: "email",
-    label: "Email",
+    label: "Gmail",
     category: "Email",
     marketplaceCategory: "email",
     description: "Gmail inbox and AI replies",
     icon: GmailIcon,
+    available: true,
+  },
+  {
+    id: "outlook",
+    label: "Outlook",
+    category: "Email",
+    marketplaceCategory: "email",
+    description: "Microsoft Outlook / Microsoft 365 inbox and AI replies",
+    icon: OutlookIcon,
     available: true,
   },
   {

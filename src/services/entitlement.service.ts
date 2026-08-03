@@ -275,6 +275,13 @@ export async function assertCanConnectIntegration(
     };
   }
 
+  if (channel === "outlook" && !entitlements.gmailIntegration) {
+    return {
+      allowed: false,
+      message: `Outlook integration is available on Pro and Agency plans. Current plan: ${planLabel}.`,
+    };
+  }
+
   if (channel === "voice") {
     return assertVoiceAiAllowed(businessId);
   }

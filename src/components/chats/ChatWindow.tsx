@@ -32,7 +32,11 @@ import { Button } from "@/components/ui/button";
 import { toggleContactFavoriteAction } from "@/features/chats/actions/toggle-contact-favorite";
 import { CHAT_MESSAGES } from "@/features/chats/constants";
 import { DASHBOARD_ROUTES } from "@/constants/routes";
-import { getChatHeaderActionButtonClassName, getChatHeaderClassName } from "@/features/chats/chat-theme";
+import {
+  getChatHeaderActionButtonClassName,
+  getChatHeaderClassName,
+  isEmailChatChannel,
+} from "@/features/chats/chat-theme";
 import {
   getChannelBadgeClassName,
   getChannelBadgeLabel,
@@ -111,6 +115,10 @@ function getChannelNotConnectedMessage(channel: MessagingChannel): string {
     return CHAT_MESSAGES.emailNotConnected;
   }
 
+  if (channel === "outlook") {
+    return CHAT_MESSAGES.outlookNotConnected;
+  }
+
   return CHAT_MESSAGES.whatsappNotConnected;
 }
 
@@ -178,7 +186,7 @@ export function ChatWindow({
   }, [conversation?.contactId, conversation?.contactIsFavorite]);
 
   useEffect(() => {
-    if (conversation?.channel === "email") {
+    if (conversation && isEmailChatChannel(conversation.channel)) {
       setEmailSubject(deriveDefaultEmailReplySubject(conversation.messages));
       return;
     }
@@ -469,10 +477,10 @@ export function ChatWindow({
     }
 
     const content = draft.trim();
-    const subject = conversation.channel === "email" ? emailSubject.trim() : "";
+    const subject = isEmailChatChannel(conversation.channel) ? emailSubject.trim() : "";
     const pendingId = createOptimisticMessageId();
 
-    if (conversation.channel === "email" && !subject) {
+    if (isEmailChatChannel(conversation.channel) && !subject) {
       toast.error(`${CHAT_MESSAGES.emailSubjectLabel} is required.`);
       return;
     }
@@ -483,11 +491,11 @@ export function ChatWindow({
         conversationId: conversation.id,
         channel: conversation.channel,
         content,
-        emailSubject: conversation.channel === "email" ? subject : null,
+        emailSubject: isEmailChatChannel(conversation.channel) ? subject : null,
       }),
     );
     setDraft("");
-    if (conversation.channel === "email") {
+    if (isEmailChatChannel(conversation.channel)) {
       setEmailComposeOpen(false);
     }
     scrollToLatestMessage();
@@ -497,7 +505,7 @@ export function ChatWindow({
       const result = await sendMessage({
         conversationId: conversation.id,
         content,
-        ...(conversation.channel === "email" ? { emailSubject: subject } : {}),
+        ...(isEmailChatChannel(conversation.channel) ? { emailSubject: subject } : {}),
       });
 
       if (result.success && result.data?.message) {
@@ -507,7 +515,7 @@ export function ChatWindow({
 
       onSendFailed?.(pendingId);
       setDraft(content);
-      if (conversation.channel === "email") {
+      if (isEmailChatChannel(conversation.channel)) {
         setEmailSubject(subject);
         setEmailComposeOpen(true);
       }
@@ -691,7 +699,7 @@ export function ChatWindow({
               contactName={conversation.contactName}
               contactAvatarUrl={conversation.contactAvatarUrl}
               onEmailReply={
-                conversation.channel === "email"
+                isEmailChatChannel(conversation.channel)
                   ? () => setEmailComposeOpen(true)
                   : undefined
               }
@@ -746,7 +754,7 @@ export function ChatWindow({
               </div>
             ) : null}
 
-            {conversation.channel === "email" ? (
+            {isEmailChatChannel(conversation.channel) ? (
               <EmailChatComposer
                 conversationId={conversation.id}
                 contactId={conversation.contactId}

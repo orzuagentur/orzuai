@@ -105,14 +105,17 @@ export async function listConnectedAddContactChannels(): Promise<
     getOutlookConnection(businessId),
   ]);
 
-  if (
-    (gmail?.status === "connected" && gmail.gmailAddress) ||
-    (outlook?.status === "connected" && outlook.outlookAddress)
-  ) {
-    return ["email"];
+  const channels: OutboundAddContactChannel[] = [];
+
+  if (gmail?.status === "connected" && gmail.gmailAddress) {
+    channels.push("email");
   }
 
-  return [];
+  if (outlook?.status === "connected" && outlook.outlookAddress) {
+    channels.push("outlook");
+  }
+
+  return channels;
 }
 
 export async function verifyOutboundContact(input: {
@@ -161,15 +164,25 @@ export async function verifyOutboundContact(input: {
   ]);
   const gmailAddress = gmail?.gmailAddress?.toLowerCase() ?? null;
   const outlookAddress = outlook?.outlookAddress?.toLowerCase() ?? null;
-  const emailConnected =
-    (gmail?.status === "connected" && Boolean(gmailAddress)) ||
-    (outlook?.status === "connected" && Boolean(outlookAddress));
+  const mailboxConnected =
+    channel === "outlook"
+      ? outlook?.status === "connected" && Boolean(outlookAddress)
+      : gmail?.status === "connected" && Boolean(gmailAddress);
 
-  if (!emailConnected) {
-    return { success: false, message: CHAT_MESSAGES.emailNotConnected };
+  if (!mailboxConnected) {
+    return {
+      success: false,
+      message:
+        channel === "outlook"
+          ? CHAT_MESSAGES.outlookNotConnected
+          : CHAT_MESSAGES.emailNotConnected,
+    };
   }
 
-  if (email === gmailAddress || email === outlookAddress) {
+  if (
+    (channel === "email" && email === gmailAddress) ||
+    (channel === "outlook" && email === outlookAddress)
+  ) {
     return { success: false, message: CHAT_MESSAGES.addContactOwnEmail };
   }
 

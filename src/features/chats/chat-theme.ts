@@ -5,8 +5,8 @@ import type { MessagingChannel } from "@/types/database.types";
 type ChatThemeId = "whatsapp" | "telegram" | "website_chat" | "email";
 
 function resolveThemeId(channel?: MessagingChannel | null): ChatThemeId {
-  if (channel === "email") return "email";
-  if (channel === "telegram") return "telegram";
+  if (channel === "email" || channel === "outlook") return "email";
+  if (channel === "telegram" || channel === "telegram_user") return "telegram";
   if (channel === "website_chat") return "website_chat";
   return "whatsapp";
 }
@@ -329,5 +329,5 @@ export const chatMicIconShellClassName =
 export function isEmailChatChannel(
   channel?: MessagingChannel | null,
 ): boolean {
-  return channel === "email";
+  return channel === "email" || channel === "outlook";
 }

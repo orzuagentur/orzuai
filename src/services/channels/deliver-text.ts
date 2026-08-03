@@ -7,7 +7,11 @@ import {
   getCachedTelegramDeliveryConnection,
   getCachedWhatsAppDeliveryConnection,
 } from "@/services/channels/connection-cache";
-import { deliverEmailTextMessage, deliverFacebookMessengerTextMessage } from "@/services/channels/deliver-email";
+import {
+  deliverEmailTextMessage,
+  deliverFacebookMessengerTextMessage,
+  deliverOutlookTextMessage,
+} from "@/services/channels/deliver-email";
 import type { ChannelTextDeliveryResult } from "@/services/channels/types";
 import { isPlatformFeatureAllowed } from "@/services/platform-business-controls.service";
 import {
@@ -128,6 +132,15 @@ export async function deliverChannelTextMessage(input: {
   if (input.channel === "email") {
     return deliverEmailTextMessage({
       admin: input.admin,
+      businessId: input.businessId,
+      recipientEmail: input.recipientId,
+      subject: input.emailSubject?.trim() || "Message from your business",
+      content: input.content,
+    });
+  }
+
+  if (input.channel === "outlook") {
+    return deliverOutlookTextMessage({
       businessId: input.businessId,
       recipientEmail: input.recipientId,
       subject: input.emailSubject?.trim() || "Message from your business",

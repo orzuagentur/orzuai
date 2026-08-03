@@ -20,9 +20,48 @@ export type WhatsAppWebWorkerSendResult = {
   error?: string;
 };
 
+function defaultProtocolForWorkerUrl(value: string): "http" | "https" {
+  const host = value.split(/[/?#]/, 1)[0]?.toLowerCase() ?? "";
+
+  if (
+    host === "localhost" ||
+    host.startsWith("localhost:") ||
+    host.startsWith("127.") ||
+    host.startsWith("0.0.0.0") ||
+    host.startsWith("[::1]")
+  ) {
+    return "http";
+  }
+
+  return "https";
+}
+
+export function normalizeWhatsAppWebWorkerUrl(
+  rawUrl: string | null | undefined,
+): string | null {
+  const trimmed = rawUrl?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const withProtocol = /^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `${defaultProtocolForWorkerUrl(trimmed)}://${trimmed}`;
+
+  try {
+    const url = new URL(withProtocol);
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export function isWhatsAppWebWorkerConfigured(): boolean {
   return Boolean(
-    process.env[ENV_KEYS.WHATSAPP_WEB_WORKER_URL]?.trim() &&
+    normalizeWhatsAppWebWorkerUrl(
+      process.env[ENV_KEYS.WHATSAPP_WEB_WORKER_URL],
+    ) &&
       process.env[ENV_KEYS.WHATSAPP_WEB_SECRET]?.trim(),
   );
 }
@@ -35,15 +74,20 @@ export function isWhatsAppWebWorkerConfigured(): boolean {
 export async function sendWhatsAppWebMessage(
   input: WhatsAppWebWorkerSendInput,
 ): Promise<WhatsAppWebWorkerSendResult> {
-  const base = process.env[ENV_KEYS.WHATSAPP_WEB_WORKER_URL]?.trim();
+  const rawBase = process.env[ENV_KEYS.WHATSAPP_WEB_WORKER_URL]?.trim();
+  const base = normalizeWhatsAppWebWorkerUrl(rawBase);
   const secret = process.env[ENV_KEYS.WHATSAPP_WEB_SECRET]?.trim();
 
-  if (!base || !secret) {
+  if (!rawBase || !secret) {
     return { success: false, error: "WhatsApp Web is not connected." };
   }
 
+  if (!base) {
+    return { success: false, error: "WhatsApp Web worker URL is invalid." };
+  }
+
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}/send`, {
+    const response = await fetch(`${base}/send`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

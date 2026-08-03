@@ -20,7 +20,7 @@ export function buildConversationLastMessageUpdate(input: {
   previousLastClientMessageAt?: string | null;
 }): ConversationLastMessageFields & { updated_at: string } {
   const preview =
-    input.channel === "email"
+    input.channel === "email" || input.channel === "outlook"
       ? formatEmailListPreview(input.emailSubject ?? null, input.content)
       : getMessagePreviewText(input.content);
 

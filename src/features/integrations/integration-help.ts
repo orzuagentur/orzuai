@@ -65,11 +65,19 @@ export const INTEGRATION_CHANNEL_HELP: Partial<
     ],
   },
   email: {
-    title: "Email",
+    title: "Gmail",
     summary: "Gmail inbox integration.",
     body: [
       "Authorize Gmail with OAuth. OrzuX syncs threads to Inbox.",
       "AI replies use your assistant profile and knowledge base.",
+    ],
+  },
+  outlook: {
+    title: "Outlook",
+    summary: "Microsoft Outlook / Microsoft 365 inbox integration.",
+    body: [
+      "Authorize Outlook with Microsoft OAuth. Threads sync to a separate Inbox channel.",
+      "AI replies use your assistant profile and knowledge base for Outlook only.",
     ],
   },
   sms: {

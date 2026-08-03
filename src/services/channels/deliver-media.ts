@@ -40,7 +40,11 @@ export async function deliverChannelMediaMessage(
 ): Promise<ChannelTextDeliveryResult> {
   const { text: caption } = parseMediaMessage(input.content);
 
-  if (input.channel === "website_forms" || input.channel === "email") {
+  if (
+    input.channel === "website_forms" ||
+    input.channel === "email" ||
+    input.channel === "outlook"
+  ) {
     return { success: true };
   }
 

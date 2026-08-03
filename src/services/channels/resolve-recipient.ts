@@ -6,6 +6,23 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
+function getWhatsAppWebChatJid(
+  customFields: unknown,
+): string | null {
+  if (
+    !customFields ||
+    typeof customFields !== "object" ||
+    Array.isArray(customFields)
+  ) {
+    return null;
+  }
+
+  const value = (customFields as Record<string, unknown>).whatsappChatJid;
+  return typeof value === "string" && value.includes("@")
+    ? value.trim()
+    : null;
+}
+
 export async function resolveChannelRecipient(
   admin: MessagingDbClient,
   input: {
@@ -25,7 +42,7 @@ export async function resolveChannelRecipient(
     ? conversation.contact[0]
     : conversation?.contact;
 
-  if (input.channel === "email") {
+  if (input.channel === "email" || input.channel === "outlook") {
     const email = contact?.email?.trim().toLowerCase();
 
     if (email) {
@@ -33,10 +50,18 @@ export async function resolveChannelRecipient(
     }
 
     if (contact?.phone_number?.includes("@")) {
-      return toChannelExternalId("email", contact.phone_number);
+      return toChannelExternalId(input.channel, contact.phone_number);
     }
 
     return null;
+  }
+
+  if (input.channel === "whatsapp_web") {
+    const chatJid = getWhatsAppWebChatJid(contact?.custom_fields);
+
+    if (chatJid) {
+      return chatJid;
+    }
   }
 
   if (!contact?.phone_number) {
@@ -47,8 +72,9 @@ export async function resolveChannelRecipient(
     return contact.phone_number;
   }
 
-  // For WhatsApp Web, prefer the phone number. Baileys routes PN JIDs more
-  // reliably than raw @lid addresses from inbound packets.
+  // For WhatsApp Web, reply to the exact chat JID when available. Some linked
+  // device chats use @lid addresses, and sending to the phone JID can be
+  // accepted by Baileys without appearing in the customer's visible chat.
   const externalId = toChannelExternalId(input.channel, contact.phone_number);
 
   if (conversation?.contact_id) {

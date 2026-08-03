@@ -61,6 +61,7 @@ export type MessagingChannel =
   | "website_forms"
   | "facebook_messenger"
   | "email"
+  | "outlook"
   | "voice"
   | "sms"
   | "website_chat";

@@ -46,7 +46,7 @@
     },
     {
       "path": "/api/cron/outlook-sync",
-      "schedule": "*/3 * * * *"
+      "schedule": "*/1 * * * *"
     },
     {
       "path": "/api/cron/gmail-watch-renew",

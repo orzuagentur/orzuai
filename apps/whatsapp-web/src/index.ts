@@ -218,10 +218,7 @@ function rememberChatJid(
   }
 }
 
-/**
- * Prefer phone-number JIDs for outbound. Baileys 6.7 routes 1:1 chats more
- * reliably via `@s.whatsapp.net` than raw `@lid` wire addresses.
- */
+/** Resolve outbound replies to the same chat JID observed on inbound messages. */
 async function resolveOutboundJid(
   entry: ActiveSocket,
   recipient: string,
@@ -229,16 +226,20 @@ async function resolveOutboundJid(
   const trimmed = recipient.trim();
 
   if (isLidUser(trimmed)) {
-    const normalized = jidNormalizedUser(trimmed) || trimmed;
-    const phone = entry.phoneByChatJid.get(normalized);
-    if (phone) {
-      return `${phone}@s.whatsapp.net`;
-    }
-    return normalized;
+    return jidNormalizedUser(trimmed) || trimmed;
   }
 
   const digits = digitsOnly(trimmed);
   if (digits) {
+    const remembered =
+      entry.chatJidByRecipient.get(trimmed) ||
+      entry.chatJidByRecipient.get(digits) ||
+      entry.chatJidByRecipient.get(`+${digits}`);
+
+    if (remembered) {
+      return remembered;
+    }
+
     return `${digits}@s.whatsapp.net`;
   }
 

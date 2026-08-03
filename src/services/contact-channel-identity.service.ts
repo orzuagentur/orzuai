@@ -98,7 +98,7 @@ export async function findContactForChannelWithIdentities(
     return null;
   }
 
-  if (channel === "email") {
+  if (channel === "email" || channel === "outlook") {
     const email = toChannelExternalId(channel, identifier);
 
     const { data } = await admin

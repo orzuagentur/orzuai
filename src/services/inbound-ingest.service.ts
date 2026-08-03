@@ -81,7 +81,7 @@ export async function insertInboundChannelMessage(
   input: InsertInboundChannelMessageInput,
 ): Promise<InsertInboundChannelMessageResult | null> {
   const preview =
-    input.channel === "email"
+    input.channel === "email" || input.channel === "outlook"
       ? formatEmailListPreview(
           input.emailSubject ?? null,
           input.content,

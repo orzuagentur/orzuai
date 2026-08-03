@@ -50,10 +50,11 @@ export async function sendChannelAutoReplyText(input: {
   }
 
   const emailSubject =
-    input.channel === "email"
+    input.channel === "email" || input.channel === "outlook"
       ? await resolveEmailReplySubjectForConversation(
           input.admin,
           input.conversationId,
+          input.channel,
         )
       : undefined;
 

@@ -32,6 +32,8 @@ export const CHAT_MESSAGES = {
     "Enable Website Forms in Integrations to receive leads here.",
   emailNotConnected:
     "Gmail is not connected. Connect it in Integrations to send email replies.",
+  outlookNotConnected:
+    "Outlook is not connected. Connect it in Integrations to send Outlook replies.",
   emailSubjectLabel: "Subject",
   emailSubjectPlaceholder: "Re: Customer inquiry",
   emailBodyPlaceholder: "Write your email reply…",
