@@ -57,13 +57,13 @@ export async function resolveChannelRecipient(
   }
 
   if (input.channel === "whatsapp_web") {
-    if (contact?.phone_number) {
-      return toChannelExternalId(input.channel, contact.phone_number);
-    }
-
     const chatJid = getWhatsAppWebChatJid(contact?.custom_fields);
     if (chatJid) {
       return chatJid;
+    }
+
+    if (contact?.phone_number) {
+      return toChannelExternalId(input.channel, contact.phone_number);
     }
   }
 

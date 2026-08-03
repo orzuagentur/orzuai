@@ -11,6 +11,7 @@ export type WorkerConfig = {
   supabaseServiceRoleKey: string;
   encryptionKey: string;
   ingestUrl: string;
+  statusUrl: string;
   sharedSecret: string;
   port: number;
   refreshIntervalMs: number;
@@ -24,18 +25,29 @@ function required(name: string): string {
   return value;
 }
 
+function defaultStatusUrl(ingestUrl: string): string {
+  const normalized = ingestUrl.replace(/\/+$/, "");
+  if (normalized.endsWith("/ingest")) {
+    return `${normalized.slice(0, -"/ingest".length)}/status`;
+  }
+  return `${normalized}/status`;
+}
+
 export function loadConfig(): WorkerConfig {
   const rawPort = process.env.PORT?.trim();
   const port = rawPort ? Number.parseInt(rawPort, 10) : 8080;
 
   const rawInterval = process.env.WHATSAPP_WEB_REFRESH_MS?.trim();
   const refreshIntervalMs = rawInterval ? Number.parseInt(rawInterval, 10) : 15_000;
+  const ingestUrl = required("WHATSAPP_WEB_INGEST_URL");
 
   return {
     supabaseUrl: required("SUPABASE_URL"),
     supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
     encryptionKey: required("ENCRYPTION_KEY"),
-    ingestUrl: required("WHATSAPP_WEB_INGEST_URL"),
+    ingestUrl,
+    statusUrl:
+      process.env.WHATSAPP_WEB_STATUS_URL?.trim() || defaultStatusUrl(ingestUrl),
     sharedSecret: required("WHATSAPP_WEB_SECRET"),
     port: Number.isFinite(port) && port > 0 ? port : 8080,
     refreshIntervalMs:

@@ -9,7 +9,7 @@ import makeWASocket, {
   isLidUser,
   jidDecode,
   jidNormalizedUser,
-  type proto,
+  proto,
   type WAMessage,
   type WAMessageKey,
   type WASocket,
@@ -58,6 +58,8 @@ type ActiveSocket = {
   recentMessages: Map<string, proto.IMessage>;
   processedInboundIds: Set<string>;
 };
+
+type WorkerDeliveryStatus = "sent" | "delivered" | "read";
 
 const active = new Map<string, ActiveSocket>();
 /** Survives socket restarts so LID routing / decrypt cache is not lost. */
@@ -218,7 +220,7 @@ function rememberChatJid(
   }
 }
 
-/** Resolve outbound replies to the phone-number JID whenever possible. */
+/** Resolve outbound replies to the same chat JID observed on inbound messages. */
 async function resolveOutboundJid(
   entry: ActiveSocket,
   recipient: string,
@@ -226,17 +228,20 @@ async function resolveOutboundJid(
   const trimmed = recipient.trim();
 
   if (isLidUser(trimmed)) {
-    const normalized = jidNormalizedUser(trimmed) || trimmed;
-    const phone = entry.phoneByChatJid.get(normalized);
-    if (phone) {
-      return `${phone}@s.whatsapp.net`;
-    }
-
     return jidNormalizedUser(trimmed) || trimmed;
   }
 
   const digits = digitsOnly(trimmed);
   if (digits) {
+    const remembered =
+      entry.chatJidByRecipient.get(trimmed) ||
+      entry.chatJidByRecipient.get(digits) ||
+      entry.chatJidByRecipient.get(`+${digits}`);
+
+    if (remembered) {
+      return remembered;
+    }
+
     return `${digits}@s.whatsapp.net`;
   }
 
@@ -323,6 +328,55 @@ async function forwardInbound(
     }
   } catch (error) {
     log("ingest error", businessId, describe(error));
+  }
+}
+
+function mapBaileysDeliveryStatus(
+  status: proto.WebMessageInfo.Status | null | undefined,
+): WorkerDeliveryStatus | null {
+  if (status === proto.WebMessageInfo.Status.SERVER_ACK) {
+    return "sent";
+  }
+
+  if (status === proto.WebMessageInfo.Status.DELIVERY_ACK) {
+    return "delivered";
+  }
+
+  if (
+    status === proto.WebMessageInfo.Status.READ ||
+    status === proto.WebMessageInfo.Status.PLAYED
+  ) {
+    return "read";
+  }
+
+  return null;
+}
+
+async function forwardDeliveryStatuses(
+  businessId: string,
+  statuses: Array<{ providerMessageId: string; status: WorkerDeliveryStatus }>,
+): Promise<void> {
+  if (statuses.length === 0) {
+    return;
+  }
+
+  try {
+    const response = await fetch(config.statusUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-userbot-secret": config.sharedSecret,
+      },
+      body: JSON.stringify({ businessId, statuses }),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      log("status rejected", businessId, response.status, body.slice(0, 200));
+    } else {
+      log("status ok", businessId, statuses.length);
+    }
+  } catch (error) {
+    log("status error", businessId, describe(error));
   }
 }
 
@@ -655,19 +709,38 @@ async function startSocket(row: ConnectionRow): Promise<void> {
 
   sock.ev.on("messages.update", (updates) => {
     void (async () => {
+      const statusUpdates: Array<{
+        providerMessageId: string;
+        status: WorkerDeliveryStatus;
+      }> = [];
+
       for (const item of updates) {
-        if (!item.update.message) {
-          continue;
+        const deliveryStatus =
+          item.key.fromMe && item.key.id
+            ? mapBaileysDeliveryStatus(item.update.status)
+            : null;
+
+        if (deliveryStatus && item.key.id) {
+          statusUpdates.push({
+            providerMessageId: item.key.id,
+            status: deliveryStatus,
+          });
         }
 
-        const hydrated: WAMessage = {
-          key: item.key,
-          message: item.update.message,
-          messageTimestamp: item.update.messageTimestamp,
-          pushName: item.update.pushName,
-        } as WAMessage;
+        if (item.update.message) {
+          const hydrated: WAMessage = {
+            key: item.key,
+            message: item.update.message,
+            messageTimestamp: item.update.messageTimestamp,
+            pushName: item.update.pushName,
+          } as WAMessage;
 
-        await handleInboundMessage(businessId, entry, hydrated);
+          await handleInboundMessage(businessId, entry, hydrated);
+        }
+      }
+
+      if (statusUpdates.length > 0) {
+        await forwardDeliveryStatuses(businessId, statusUpdates);
       }
     })();
   });

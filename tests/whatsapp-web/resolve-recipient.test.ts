@@ -15,7 +15,7 @@ function adminWithConversation(conversation: unknown) {
 }
 
 describe("resolveChannelRecipient for WhatsApp Web", () => {
-  it("prefers the contact phone over a stored WhatsApp chat JID when available", async () => {
+  it("prefers the stored WhatsApp chat JID over the contact phone", async () => {
     const admin = adminWithConversation({
       contact_id: "contact-1",
       contact: {
@@ -33,7 +33,7 @@ describe("resolveChannelRecipient for WhatsApp Web", () => {
         conversationId: "conversation-1",
         channel: "whatsapp_web",
       }),
-    ).resolves.toBe("+992000000907");
+    ).resolves.toBe("249000000697@lid");
   });
 
   it("falls back to the stored WhatsApp chat JID when no phone is available", async () => {

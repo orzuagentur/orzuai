@@ -42,6 +42,7 @@ export async function advanceMessageDeliveryStatus(
   input: {
     messageId?: string;
     providerMessageId?: string;
+    businessId?: string;
     status: MessageDeliveryStatus;
   },
 ): Promise<boolean> {
@@ -61,6 +62,10 @@ export async function advanceMessageDeliveryStatus(
     query = query.eq("message_id", input.messageId);
   } else {
     query = query.eq("provider_message_id", input.providerMessageId!);
+  }
+
+  if (input.businessId) {
+    query = query.eq("business_id", input.businessId);
   }
 
   const { data: delivery } = await query.maybeSingle();
@@ -87,6 +92,7 @@ export async function advanceMessageDeliveryStatus(
 export async function applyWhatsAppDeliveryStatusUpdates(
   admin: MessagingDbClient,
   statuses: Array<{ providerMessageId: string; status: string }>,
+  businessId?: string,
 ): Promise<number> {
   let applied = 0;
 
@@ -99,6 +105,7 @@ export async function applyWhatsAppDeliveryStatusUpdates(
 
     const updated = await advanceMessageDeliveryStatus(admin, {
       providerMessageId: item.providerMessageId,
+      businessId,
       status: mapped,
     });
 

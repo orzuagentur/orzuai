@@ -38,7 +38,7 @@ export function createOptimisticChatMessage(input: {
     editedAt: null,
     isEdited: false,
     isPending: true,
-    deliveryStatus: "sent",
+    deliveryStatus: "pending",
   };
 }
 

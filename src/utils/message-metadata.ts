@@ -56,7 +56,7 @@ export function normalizeOutboundDeliveryStatus(
     return {
       ...message,
       isPending: false,
-      deliveryStatus: "sent",
+      deliveryStatus: message.deliveryStatus ?? "pending",
     };
   }
 
