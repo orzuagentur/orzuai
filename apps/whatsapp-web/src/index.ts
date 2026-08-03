@@ -37,6 +37,7 @@ type ConnectionRow = {
   business_id: string;
   status: string;
   creds_secret_key_name: string | null;
+  updated_at?: string | null;
 };
 
 type ActiveSocket = {
@@ -62,6 +63,7 @@ const sessionMemory = new Map<
   string,
   {
     everConnected: boolean;
+    failedPairingAttempts: number;
     chatJidByRecipient: Map<string, string>;
     recentMessages: Map<string, proto.IMessage>;
     processedInboundIds: Set<string>;
@@ -73,6 +75,7 @@ const reconnectTimers = new Map<string, NodeJS.Timeout>();
 const RECENT_INBOUND_MAX_AGE_MS = 15 * 60 * 1000;
 const RECENT_MESSAGE_CACHE_LIMIT = 200;
 const PROCESSED_ID_LIMIT = 500;
+const MAX_FAILED_PAIRING_ATTEMPTS = 3;
 
 function memoryFor(businessId: string) {
   const existing = sessionMemory.get(businessId);
@@ -82,6 +85,7 @@ function memoryFor(businessId: string) {
 
   const created = {
     everConnected: false,
+    failedPairingAttempts: 0,
     chatJidByRecipient: new Map<string, string>(),
     recentMessages: new Map<string, proto.IMessage>(),
     processedInboundIds: new Set<string>(),
@@ -510,6 +514,10 @@ async function startSocket(row: ConnectionRow): Promise<void> {
   if (row.status === "connected") {
     memory.everConnected = true;
   }
+  // Fresh "Connect" from the UI clears the creds key — reset pairing budget.
+  if (!row.creds_secret_key_name) {
+    memory.failedPairingAttempts = 0;
+  }
 
   const entry: ActiveSocket = {
     sock,
@@ -554,7 +562,9 @@ async function startSocket(row: ConnectionRow): Promise<void> {
         entry.starting = false;
         entry.open = true;
         entry.everConnected = true;
-        memoryFor(businessId).everConnected = true;
+        const memory = memoryFor(businessId);
+        memory.everConnected = true;
+        memory.failedPairingAttempts = 0;
         const phone = connectedAccountPhone(sock);
         await updateRow(businessId, {
           status: "connected",
@@ -574,6 +584,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         const restartRequired =
           statusCode === DisconnectReason.restartRequired;
+        const memory = memoryFor(businessId);
 
         entry.open = false;
         entry.starting = false;
@@ -586,6 +597,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
         }
 
         if (loggedOut) {
+          memory.failedPairingAttempts = 0;
           await updateRow(businessId, {
             status: "disconnected",
             qr_code: null,
@@ -596,11 +608,29 @@ async function startSocket(row: ConnectionRow): Promise<void> {
           return;
         }
 
+        if (!memory.everConnected && !entry.everConnected) {
+          memory.failedPairingAttempts += 1;
+
+          if (memory.failedPairingAttempts >= MAX_FAILED_PAIRING_ATTEMPTS) {
+            await updateRow(businessId, {
+              status: "disconnected",
+              qr_code: null,
+              qr_expires_at: null,
+            });
+            log(
+              "pairing abandoned after failed attempts",
+              businessId,
+              memory.failedPairingAttempts,
+            );
+            return;
+          }
+        }
+
         // QR pairing sockets flap often — back off harder than connected ones
         // so abandoned pending_qr rows do not hammer WhatsApp every few seconds.
         const delayMs = restartRequired
           ? 1_000
-          : memoryFor(businessId).everConnected || entry.everConnected
+          : memory.everConnected || entry.everConnected
             ? 2_500
             : 45_000;
 
@@ -678,7 +708,7 @@ async function stopSocket(
 async function reconcile(): Promise<void> {
   const { data, error } = await supabase
     .from("whatsapp_web_connections")
-    .select("business_id, status, creds_secret_key_name")
+    .select("business_id, status, creds_secret_key_name, updated_at")
     .in("status", ["pending_qr", "connected"]);
 
   if (error) {
@@ -687,7 +717,33 @@ async function reconcile(): Promise<void> {
   }
 
   const rows = (data ?? []) as ConnectionRow[];
-  const wanted = new Set(rows.map((row) => row.business_id));
+  const wanted = new Set<string>();
+
+  for (const row of rows) {
+    // Stale QR pairing attempts (no successful connect) should not keep
+    // reconnecting forever — they fight keepalive for real sessions.
+    if (row.status === "pending_qr") {
+      const updatedAtMs = row.updated_at
+        ? Date.parse(row.updated_at)
+        : Number.NaN;
+      const stale =
+        !Number.isFinite(updatedAtMs) ||
+        Date.now() - updatedAtMs > 3 * 60 * 1000;
+
+      if (stale && !memoryFor(row.business_id).everConnected) {
+        await updateRow(row.business_id, {
+          status: "disconnected",
+          qr_code: null,
+          qr_expires_at: null,
+        });
+        await stopSocket(row.business_id);
+        log("stale pending_qr cleared", row.business_id);
+        continue;
+      }
+    }
+
+    wanted.add(row.business_id);
+  }
 
   for (const businessId of [...active.keys()]) {
     if (!wanted.has(businessId)) {
@@ -696,6 +752,10 @@ async function reconcile(): Promise<void> {
   }
 
   for (const row of rows) {
+    if (!wanted.has(row.business_id)) {
+      continue;
+    }
+
     const entry = active.get(row.business_id);
 
     if (entry?.open || entry?.starting) {
