@@ -73,11 +73,23 @@ async function graphFetch<T>(
     };
   }
 
-  if (response.status === 204) {
+  // sendMail returns 202 Accepted with an empty body. Parsing JSON here used to
+  // throw AFTER Microsoft already queued the email, leaving delivery jobs stuck
+  // in "processing" and causing endless duplicate sends via stale recovery.
+  if (response.status === 202 || response.status === 204) {
     return { ok: true, data: {} as T };
   }
 
-  return { ok: true, data: (await response.json()) as T };
+  const raw = await response.text();
+  if (!raw.trim()) {
+    return { ok: true, data: {} as T };
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(raw) as T };
+  } catch {
+    return { ok: true, data: {} as T };
+  }
 }
 
 function stripHtml(value: string): string {
@@ -235,12 +247,18 @@ export async function sendOutlookMessage(input: {
   toEmail: string;
   subject: string;
   body: string;
+  /** Stable key so Graph/provider retries do not create duplicate emails. */
+  idempotencyKey?: string;
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const idempotencyKey = input.idempotencyKey?.trim();
   const result = await graphFetch<{ id?: string }>(
     input.accessToken,
     "/me/sendMail",
     {
       method: "POST",
+      headers: idempotencyKey
+        ? { "Idempotency-Key": idempotencyKey.slice(0, 64) }
+        : undefined,
       body: JSON.stringify({
         message: {
           subject: input.subject,
@@ -265,6 +283,11 @@ export async function sendOutlookMessage(input: {
     return { success: false, error: result.error.message };
   }
 
-  // sendMail returns 202/204 with empty body; use opaque marker for delivery log.
-  return { success: true, messageId: `outlook:${Date.now()}` };
+  // sendMail returns 202/204 with empty body; use stable marker when provided.
+  return {
+    success: true,
+    messageId: idempotencyKey
+      ? `outlook:${idempotencyKey}`
+      : `outlook:sent`,
+  };
 }

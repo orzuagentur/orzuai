@@ -33,6 +33,7 @@ export async function deliverChannelTextMessage(input: {
   recipientId: string;
   content: string;
   emailSubject?: string;
+  idempotencyKey?: string;
 }): Promise<ChannelTextDeliveryResult> {
   if (input.channel === "website_forms") {
     return { success: true };
@@ -145,6 +146,7 @@ export async function deliverChannelTextMessage(input: {
       recipientEmail: input.recipientId,
       subject: input.emailSubject?.trim() || "Message from your business",
       content: input.content,
+      idempotencyKey: input.idempotencyKey,
     });
   }
 

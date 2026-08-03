@@ -54,18 +54,55 @@ function getDeliveryRetryDelaySeconds(attemptCount: number): number {
   return DELIVERY_RETRY_BASE_SECONDS * 2 ** Math.max(0, attemptCount - 1);
 }
 
+function computeDeliveryRetryAt(attemptCount: number): string {
+  return new Date(
+    Date.now() + getDeliveryRetryDelaySeconds(attemptCount) * 1000,
+  ).toISOString();
+}
+
 export async function recoverStaleMessageDeliveries(): Promise<number> {
   const admin = createAdminClient();
   const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+  const now = new Date().toISOString();
 
-  const { data } = await admin
+  const { data: staleRows } = await admin
     .from("message_deliveries")
-    .update({ status: "pending" })
+    .select("id, message_id, attempt_count, max_attempts")
     .eq("status", "processing")
-    .lt("updated_at", staleBefore)
-    .select("id");
+    .lt("updated_at", staleBefore);
 
-  return data?.length ?? 0;
+  if (!staleRows?.length) {
+    return 0;
+  }
+
+  let recovered = 0;
+
+  for (const row of staleRows) {
+    const attemptCount = (row.attempt_count ?? 0) + 1;
+    const maxAttempts = row.max_attempts ?? 5;
+    const exhausted = attemptCount >= maxAttempts;
+
+    const { error } = await admin
+      .from("message_deliveries")
+      .update({
+        status: exhausted ? "failed" : "pending",
+        attempt_count: attemptCount,
+        next_attempt_at: exhausted ? now : computeDeliveryRetryAt(attemptCount),
+        last_error: exhausted
+          ? "Delivery timed out while processing."
+          : "Recovered stale processing delivery.",
+        failed_at: exhausted ? now : null,
+        updated_at: now,
+      })
+      .eq("id", row.id)
+      .eq("status", "processing");
+
+    if (!error && !exhausted) {
+      recovered += 1;
+    }
+  }
+
+  return recovered;
 }
 
 async function processDeliveryRow(
@@ -73,26 +110,6 @@ async function processDeliveryRow(
   delivery: DeliveryRow,
   now: string,
 ): Promise<DeliveryProcessResult> {
-  const { data: message } = await admin
-    .from("messages")
-    .select(
-      "id, conversation_id, channel, content, email_subject, sender_type, hidden_for_business",
-    )
-    .eq("id", delivery.message_id)
-    .maybeSingle();
-
-  if (!message || message.hidden_for_business || message.sender_type !== "user") {
-    await admin
-      .from("message_deliveries")
-      .update({
-        status: "failed",
-        failed_at: now,
-        last_error: "Message unavailable.",
-      })
-      .eq("id", delivery.id);
-    return "failed";
-  }
-
   const failDelivery = async (
     messageId: string,
     errorMessage: string,
@@ -113,84 +130,143 @@ async function processDeliveryRow(
     return "failed";
   };
 
-  const recipientId = await resolveChannelRecipient(admin, {
-    businessId: delivery.business_id,
-    conversationId: message.conversation_id,
-    channel: delivery.channel,
-  });
-
-  if (!recipientId) {
-    return failDelivery(message.id, "Recipient unavailable.");
-  }
-
-  const { media } = parseMediaMessage(message.content);
-  let result: Awaited<ReturnType<typeof deliverChannelTextMessage>>;
-
-  if (media?.path) {
-    const { data: attachment } = await admin
-      .from("message_attachments")
-      .select(
-        "storage_path, mime_type, file_name, kind, provider_media_url, provider_media_url_expires_at",
-      )
-      .eq("message_id", message.id)
+  try {
+    const { data: existingDelivery } = await admin
+      .from("message_deliveries")
+      .select("status, sent_at, provider_message_id")
+      .eq("id", delivery.id)
       .maybeSingle();
 
-    const storagePath = attachment?.storage_path ?? media.path;
-    const mediaUrl = await resolveAttachmentProviderMediaUrl(admin, {
-      messageId: message.id,
-      storagePath,
-      providerMediaUrl: attachment?.provider_media_url ?? null,
-      providerMediaUrlExpiresAt:
-        attachment?.provider_media_url_expires_at ?? null,
-    });
-
-    if (!mediaUrl) {
-      return failDelivery(message.id, "Media URL unavailable.");
+    if (
+      existingDelivery?.status === "sent" ||
+      existingDelivery?.sent_at ||
+      (existingDelivery?.provider_message_id &&
+        existingDelivery.provider_message_id.startsWith("outlook:"))
+    ) {
+      if (existingDelivery.status !== "sent") {
+        await recordMessageDeliverySuccess(admin, {
+          messageId: delivery.message_id,
+          providerMessageId: existingDelivery.provider_message_id,
+        });
+      }
+      return "skipped";
     }
 
-    result = await deliverChannelMediaMessage({
-      admin,
-      businessId: delivery.business_id,
-      channel: delivery.channel,
-      recipientId,
-      content: message.content,
-      mediaUrl,
-      fileName: attachment?.file_name ?? media.fileName,
-      mimeType: attachment?.mime_type ?? media.mimeType,
-      mediaKind: attachment?.kind ?? media.kind,
-    });
-  } else {
-    result = await deliverChannelTextMessage({
-      admin,
-      businessId: delivery.business_id,
-      channel: delivery.channel,
-      recipientId,
-      content: message.content,
-      emailSubject: message.email_subject ?? undefined,
-    });
-  }
+    const { data: message } = await admin
+      .from("messages")
+      .select(
+        "id, conversation_id, channel, content, email_subject, sender_type, hidden_for_business",
+      )
+      .eq("id", delivery.message_id)
+      .maybeSingle();
 
-  if (result.success) {
-    await recordMessageDeliverySuccess(admin, {
-      messageId: message.id,
-      providerMessageId: result.providerMessageId,
+    if (!message || message.hidden_for_business || message.sender_type !== "user") {
+      await admin
+        .from("message_deliveries")
+        .update({
+          status: "failed",
+          failed_at: now,
+          last_error: "Message unavailable.",
+        })
+        .eq("id", delivery.id);
+      return "failed";
+    }
+
+    const recipientId = await resolveChannelRecipient(admin, {
+      businessId: delivery.business_id,
+      conversationId: message.conversation_id,
+      channel: delivery.channel,
     });
 
-    if (delivery.channel === "telegram") {
-      await advanceMessageDeliveryStatus(admin, {
+    if (!recipientId) {
+      return failDelivery(message.id, "Recipient unavailable.");
+    }
+
+    const { media } = parseMediaMessage(message.content);
+    let result: Awaited<ReturnType<typeof deliverChannelTextMessage>>;
+
+    if (media?.path) {
+      const { data: attachment } = await admin
+        .from("message_attachments")
+        .select(
+          "storage_path, mime_type, file_name, kind, provider_media_url, provider_media_url_expires_at",
+        )
+        .eq("message_id", message.id)
+        .maybeSingle();
+
+      const storagePath = attachment?.storage_path ?? media.path;
+      const mediaUrl = await resolveAttachmentProviderMediaUrl(admin, {
         messageId: message.id,
-        status: "delivered",
+        storagePath,
+        providerMediaUrl: attachment?.provider_media_url ?? null,
+        providerMediaUrlExpiresAt:
+          attachment?.provider_media_url_expires_at ?? null,
+      });
+
+      if (!mediaUrl) {
+        return failDelivery(message.id, "Media URL unavailable.");
+      }
+
+      result = await deliverChannelMediaMessage({
+        admin,
+        businessId: delivery.business_id,
+        channel: delivery.channel,
+        recipientId,
+        content: message.content,
+        mediaUrl,
+        fileName: attachment?.file_name ?? media.fileName,
+        mimeType: attachment?.mime_type ?? media.mimeType,
+        mediaKind: attachment?.kind ?? media.kind,
+      });
+    } else {
+      result = await deliverChannelTextMessage({
+        admin,
+        businessId: delivery.business_id,
+        channel: delivery.channel,
+        recipientId,
+        content: message.content,
+        emailSubject: message.email_subject ?? undefined,
+        idempotencyKey: message.id,
       });
     }
 
-    await incrementMessagingAnalytics(admin, delivery.business_id, delivery.channel, {
-      totalMessages: 1,
+    if (result.success) {
+      await recordMessageDeliverySuccess(admin, {
+        messageId: message.id,
+        providerMessageId: result.providerMessageId,
+      });
+
+      if (delivery.channel === "telegram") {
+        await advanceMessageDeliveryStatus(admin, {
+          messageId: message.id,
+          status: "delivered",
+        });
+      }
+
+      await incrementMessagingAnalytics(
+        admin,
+        delivery.business_id,
+        delivery.channel,
+        {
+          totalMessages: 1,
+        },
+      );
+
+      return "sent";
+    }
+
+    return await failDelivery(message.id, result.error);
+  } catch (error) {
+    const messageText =
+      error instanceof Error ? error.message : "Delivery crashed unexpectedly.";
+    console.error("[message-delivery] process crashed", {
+      deliveryId: delivery.id,
+      messageId: delivery.message_id,
+      channel: delivery.channel,
+      error: messageText,
     });
-
-    return "sent";
+    return await failDelivery(delivery.message_id, messageText);
   }
-
-  return await failDelivery(message.id, result.error);
 }
 
 function scheduleInProcessDeliveryDrain(): void {

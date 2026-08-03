@@ -18,6 +18,7 @@ export async function deliverOutlookTextMessage(input: {
   recipientEmail: string;
   subject: string;
   content: string;
+  idempotencyKey?: string;
 }): Promise<ChannelTextDeliveryResult> {
   const recipient = input.recipientEmail.trim().toLowerCase();
 
@@ -36,6 +37,7 @@ export async function deliverOutlookTextMessage(input: {
     toEmail: recipient,
     subject: input.subject,
     body: input.content,
+    idempotencyKey: input.idempotencyKey,
   });
 
   if (!sendResult.success) {
