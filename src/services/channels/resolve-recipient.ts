@@ -57,8 +57,11 @@ export async function resolveChannelRecipient(
   }
 
   if (input.channel === "whatsapp_web") {
-    const chatJid = getWhatsAppWebChatJid(contact?.custom_fields);
+    if (contact?.phone_number) {
+      return toChannelExternalId(input.channel, contact.phone_number);
+    }
 
+    const chatJid = getWhatsAppWebChatJid(contact?.custom_fields);
     if (chatJid) {
       return chatJid;
     }
@@ -72,9 +75,6 @@ export async function resolveChannelRecipient(
     return contact.phone_number;
   }
 
-  // For WhatsApp Web, reply to the exact chat JID when available. Some linked
-  // device chats use @lid addresses, and sending to the phone JID can be
-  // accepted by Baileys without appearing in the customer's visible chat.
   const externalId = toChannelExternalId(input.channel, contact.phone_number);
 
   if (conversation?.contact_id) {

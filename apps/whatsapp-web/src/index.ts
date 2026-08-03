@@ -218,7 +218,7 @@ function rememberChatJid(
   }
 }
 
-/** Resolve outbound replies to the same chat JID observed on inbound messages. */
+/** Resolve outbound replies to the phone-number JID whenever possible. */
 async function resolveOutboundJid(
   entry: ActiveSocket,
   recipient: string,
@@ -226,20 +226,17 @@ async function resolveOutboundJid(
   const trimmed = recipient.trim();
 
   if (isLidUser(trimmed)) {
+    const normalized = jidNormalizedUser(trimmed) || trimmed;
+    const phone = entry.phoneByChatJid.get(normalized);
+    if (phone) {
+      return `${phone}@s.whatsapp.net`;
+    }
+
     return jidNormalizedUser(trimmed) || trimmed;
   }
 
   const digits = digitsOnly(trimmed);
   if (digits) {
-    const remembered =
-      entry.chatJidByRecipient.get(trimmed) ||
-      entry.chatJidByRecipient.get(digits) ||
-      entry.chatJidByRecipient.get(`+${digits}`);
-
-    if (remembered) {
-      return remembered;
-    }
-
     return `${digits}@s.whatsapp.net`;
   }
 
