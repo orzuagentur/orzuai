@@ -1,5 +1,6 @@
 import { ChannelContactsPanel } from "@/components/channel-workspace/ChannelContactsPanel";
 import { EmailActivatePanelClient } from "@/components/email/EmailActivatePanelClient";
+import { OutlookActivatePanelClient } from "@/components/email/OutlookActivatePanelClient";
 import { GoogleCalendarConnectPanelClient } from "@/components/google-calendar/GoogleCalendarConnectPanelClient";
 import { ActivateFirstPrompt } from "@/components/integrations/ActivateFirstPrompt";
 import { SmsActivatePanel } from "@/components/sms/SmsActivatePanel";
@@ -64,6 +65,10 @@ import type {
   GmailConnectionData,
 } from "@/types/gmail-integration.types";
 import type {
+  OutlookConnectConfig,
+  OutlookConnectionData,
+} from "@/types/outlook-integration.types";
+import type {
   GoogleCalendarConnectConfig,
   GoogleCalendarConnectionData,
 } from "@/types/google-calendar.types";
@@ -116,6 +121,10 @@ type IntegrationSectionPanelsProps = {
     connection: GmailConnectionData | null;
     connectConfig: GmailConnectConfig;
   };
+  outlook?: {
+    connection: OutlookConnectionData | null;
+    connectConfig: OutlookConnectConfig;
+  };
   channelContacts?: ChannelContactsData | null;
   channelAiSettings?: ChannelAiSettingsData | null;
 };
@@ -135,6 +144,7 @@ export function IntegrationSectionPanels({
   sms,
   googleCalendar,
   gmail,
+  outlook,
   channelContacts,
 }: IntegrationSectionPanelsProps) {
   const isConnected = isChannelConnectedForWorkspace(channel, channelStatuses);
@@ -156,6 +166,7 @@ export function IntegrationSectionPanels({
           sms={sms}
           googleCalendar={googleCalendar}
           gmail={gmail}
+          outlook={outlook}
         />
       </div>
     );
@@ -191,6 +202,7 @@ function ActivateSection({
   sms,
   googleCalendar,
   gmail,
+  outlook,
 }: {
   channel: IntegrationChannelId;
   hasBusiness: boolean;
@@ -204,6 +216,7 @@ function ActivateSection({
   sms?: IntegrationSectionPanelsProps["sms"];
   googleCalendar?: IntegrationSectionPanelsProps["googleCalendar"];
   gmail?: IntegrationSectionPanelsProps["gmail"];
+  outlook?: IntegrationSectionPanelsProps["outlook"];
 }) {
   if (channel === "whatsapp" && whatsapp) {
     return (
@@ -295,14 +308,26 @@ function ActivateSection({
     );
   }
 
-  if (channel === "email" && gmail) {
+  if (channel === "email" && (gmail || outlook)) {
     return (
-      <EmailActivatePanelClient
-        connection={gmail.connection}
-        hasBusiness={hasBusiness}
-        config={gmail.connectConfig}
-        embeddedInHub
-      />
+      <div className="flex w-full flex-col gap-8">
+        {gmail ? (
+          <EmailActivatePanelClient
+            connection={gmail.connection}
+            hasBusiness={hasBusiness}
+            config={gmail.connectConfig}
+            embeddedInHub
+          />
+        ) : null}
+        {outlook ? (
+          <OutlookActivatePanelClient
+            connection={outlook.connection}
+            hasBusiness={hasBusiness}
+            config={outlook.connectConfig}
+            embeddedInHub
+          />
+        ) : null}
+      </div>
     );
   }
 

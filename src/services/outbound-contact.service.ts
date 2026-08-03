@@ -16,6 +16,7 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { toChannelExternalId } from "@/services/channels/contact-identity";
 import { getGmailConnection } from "@/services/gmail-integration.service";
+import { getOutlookConnection } from "@/services/outlook-integration.service";
 import { resolveInboundMessageContext } from "@/services/inbound-ingest.service";
 import type { MessagingChannel } from "@/types/database.types";
 
@@ -99,9 +100,15 @@ export async function listConnectedAddContactChannels(): Promise<
     return [];
   }
 
-  const gmail = await getGmailConnection(businessId);
+  const [gmail, outlook] = await Promise.all([
+    getGmailConnection(businessId),
+    getOutlookConnection(businessId),
+  ]);
 
-  if (gmail?.status === "connected" && gmail.gmailAddress) {
+  if (
+    (gmail?.status === "connected" && gmail.gmailAddress) ||
+    (outlook?.status === "connected" && outlook.outlookAddress)
+  ) {
     return ["email"];
   }
 
@@ -148,13 +155,21 @@ export async function verifyOutboundContact(input: {
   }
 
   const email = emailParsed.data;
-  const gmail = await getGmailConnection(businessId);
+  const [gmail, outlook] = await Promise.all([
+    getGmailConnection(businessId),
+    getOutlookConnection(businessId),
+  ]);
+  const gmailAddress = gmail?.gmailAddress?.toLowerCase() ?? null;
+  const outlookAddress = outlook?.outlookAddress?.toLowerCase() ?? null;
+  const emailConnected =
+    (gmail?.status === "connected" && Boolean(gmailAddress)) ||
+    (outlook?.status === "connected" && Boolean(outlookAddress));
 
-  if (gmail?.status !== "connected" || !gmail.gmailAddress) {
+  if (!emailConnected) {
     return { success: false, message: CHAT_MESSAGES.emailNotConnected };
   }
 
-  if (email === gmail.gmailAddress.toLowerCase()) {
+  if (email === gmailAddress || email === outlookAddress) {
     return { success: false, message: CHAT_MESSAGES.addContactOwnEmail };
   }
 

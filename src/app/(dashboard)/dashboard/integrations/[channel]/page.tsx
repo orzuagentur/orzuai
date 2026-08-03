@@ -39,6 +39,10 @@ import {
   getGmailConnectConfig,
 } from "@/services/gmail-integration.service";
 import {
+  getOutlookConnection,
+  getOutlookConnectConfig,
+} from "@/services/outlook-integration.service";
+import {
   getGoogleCalendarConnection,
   getGoogleCalendarConnectConfig,
 } from "@/services/google-calendar.service";
@@ -123,6 +127,8 @@ export default async function IntegrationsChannelPage({
     googleCalendarConnectConfig,
     gmailConnection,
     gmailConnectConfig,
+    outlookConnection,
+    outlookConnectConfig,
   ] = await Promise.all([
     business ? getWhatsAppConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getWhatsAppConnectConfig()),
@@ -151,6 +157,8 @@ export default async function IntegrationsChannelPage({
     Promise.resolve(getGoogleCalendarConnectConfig()),
     business ? getGmailConnection(business.id) : Promise.resolve(null),
     Promise.resolve(getGmailConnectConfig()),
+    business ? getOutlookConnection(business.id) : Promise.resolve(null),
+    Promise.resolve(getOutlookConnectConfig()),
   ]);
 
   const channelStatuses = buildIntegrationChannelStatuses({
@@ -165,6 +173,7 @@ export default async function IntegrationsChannelPage({
     voiceSmsEnabled: voiceSettings?.smsEnabled ?? false,
     googleCalendarConnection,
     gmailConnection,
+    outlookConnection,
   });
 
   const isActivated = isChannelActivated(channel, channelStatuses);
@@ -248,6 +257,10 @@ export default async function IntegrationsChannelPage({
           gmail={{
             connection: gmailConnection,
             connectConfig: gmailConnectConfig,
+          }}
+          outlook={{
+            connection: outlookConnection,
+            connectConfig: outlookConnectConfig,
           }}
           channelContacts={channelContacts}
           channelAiSettings={channelAiSettings}

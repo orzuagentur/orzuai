@@ -110,6 +110,22 @@ export function hasGoogleOAuthEnv(): boolean {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
+export function getMicrosoftClientId(): string | undefined {
+  return readEnv(ENV_KEYS.MICROSOFT_CLIENT_ID);
+}
+
+export function getMicrosoftClientSecret(): string | undefined {
+  return readEnv(ENV_KEYS.MICROSOFT_CLIENT_SECRET);
+}
+
+export function getMicrosoftTenantId(): string | undefined {
+  return readEnv(ENV_KEYS.MICROSOFT_TENANT_ID);
+}
+
+export function hasMicrosoftOAuthEnv(): boolean {
+  return Boolean(getMicrosoftClientId() && getMicrosoftClientSecret());
+}
+
 export function getGmailPubsubTopic(): string | undefined {
   return readEnv(ENV_KEYS.GMAIL_PUBSUB_TOPIC);
 }

@@ -28,6 +28,7 @@ import {
 } from "@/services/llm.service";
 import { generateFastAssistantReply } from "@/services/auto-reply-pipeline.service";
 import { getGmailConnection } from "@/services/gmail-integration.service";
+import { getOutlookConnection } from "@/services/outlook-integration.service";
 import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getTelegramUserConnection } from "@/services/telegram-user.service";
@@ -393,6 +394,7 @@ export async function getChannelConnectionStatuses(businessId: string) {
     voiceSettings,
     googleCalendar,
     gmail,
+    outlook,
   ] = await Promise.all([
     getWhatsAppConnection(businessId),
     getWhatsAppWebConnection(businessId),
@@ -405,6 +407,7 @@ export async function getChannelConnectionStatuses(businessId: string) {
     getVoiceAgentSettings(businessId),
     getGoogleCalendarConnection(businessId),
     getGmailConnection(businessId),
+    getOutlookConnection(businessId),
   ]);
 
   return buildIntegrationChannelStatuses({
@@ -419,6 +422,7 @@ export async function getChannelConnectionStatuses(businessId: string) {
     voiceSmsEnabled: voiceSettings?.smsEnabled ?? false,
     googleCalendarConnection: googleCalendar,
     gmailConnection: gmail,
+    outlookConnection: outlook,
   });
 }
 

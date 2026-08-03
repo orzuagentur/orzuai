@@ -10,6 +10,7 @@ import { getWhatsAppConnection } from "@/services/whatsapp.service";
 import { getTelegramConnection } from "@/services/telegram.service";
 import { getWebsiteFormConnection } from "@/services/website-forms.service";
 import { getGmailConnection } from "@/services/gmail-integration.service";
+import { getOutlookConnection } from "@/services/outlook-integration.service";
 import { getGoogleCalendarConnection } from "@/services/google-calendar.service";
 import { getBusinessBookingSetup } from "@/services/business-calendar-setup.service";
 import { getWebsiteKnowledgeSync } from "@/services/website-knowledge.service";
@@ -55,6 +56,7 @@ export async function buildPlatformCopilotContextBlock(
     telegramConnection,
     websiteFormConnection,
     gmailConnection,
+    outlookConnection,
     googleCalendarConnection,
     bookingSetup,
     websiteKnowledgeSync,
@@ -100,6 +102,7 @@ export async function buildPlatformCopilotContextBlock(
     getTelegramConnection(businessId),
     getWebsiteFormConnection(businessId),
     getGmailConnection(businessId),
+    getOutlookConnection(businessId),
     getGoogleCalendarConnection(businessId),
     getBusinessBookingSetup(businessId),
     getWebsiteKnowledgeSync(businessId),
@@ -111,6 +114,7 @@ export async function buildPlatformCopilotContextBlock(
     websiteFormConnection,
     websiteKnowledgeSync,
     gmailConnection,
+    outlookConnection,
   });
 
   const contacts = (contactsResult.data ?? []).map((row) => ({

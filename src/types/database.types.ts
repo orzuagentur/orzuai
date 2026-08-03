@@ -722,6 +722,59 @@ export type Database = {
           },
         ];
       };
+      outlook_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          status: EmailConnectionStatus;
+          outlook_address: string | null;
+          access_token_secret_key_name: string | null;
+          refresh_token_secret_key_name: string | null;
+          token_expires_at: string | null;
+          delta_link: string | null;
+          last_synced_at: string | null;
+          connected_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          status?: EmailConnectionStatus;
+          outlook_address?: string | null;
+          access_token_secret_key_name?: string | null;
+          refresh_token_secret_key_name?: string | null;
+          token_expires_at?: string | null;
+          delta_link?: string | null;
+          last_synced_at?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          status?: EmailConnectionStatus;
+          outlook_address?: string | null;
+          access_token_secret_key_name?: string | null;
+          refresh_token_secret_key_name?: string | null;
+          token_expires_at?: string | null;
+          delta_link?: string | null;
+          last_synced_at?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "outlook_connections_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: true;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       billing_invoices: {
         Row: {
           id: string;

@@ -57,7 +57,7 @@ import {
   resolveContactFromRow,
 } from "@/utils/chat";
 import { resolveAvatarUrlFromMap } from "@/utils/contact-avatar";
-import { isGmailConnected } from "@/services/gmail-integration.service";
+import { isEmailMailboxConnected } from "@/services/outlook-integration.service";
 import { listConversationsMonitorPage, listConversationsPage } from "@/services/chat-inbox-query.service";
 import { isSmsInboxVisible, isVoiceInboxVisible } from "@/services/voice-inbox.service";
 import { getConversationRepository } from "@/repositories/conversation.repository";
@@ -381,7 +381,7 @@ export async function isChatChannelConnected(
   }
 
   if (channel === "email") {
-    return isGmailConnected(businessId);
+    return isEmailMailboxConnected(businessId);
   }
 
   if (channel === "website_forms" || channel === "website_chat") {
@@ -1023,9 +1023,9 @@ export async function sendChatMessage(
       };
     }
   } else if (conversation.channel === "email") {
-    const gmailConnected = await isGmailConnected(businessId);
+    const emailConnected = await isEmailMailboxConnected(businessId);
 
-    if (!gmailConnected) {
+    if (!emailConnected) {
       return {
         success: false,
         error: {

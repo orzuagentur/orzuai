@@ -20,7 +20,7 @@ import {
   insertChannelMessage,
 } from "@/services/messaging.service";
 import { scheduleOutboundMessageDelivery } from "@/services/message-delivery.service";
-import { isGmailConnected } from "@/services/gmail-integration.service";
+import { isEmailMailboxConnected } from "@/services/outlook-integration.service";
 import { buildPendingOutboundChatMessage } from "@/services/outbound-message.service";
 import { createReadyMessageAttachment } from "@/services/message-attachment.service";
 import { normalizeStoredVoiceNoteAsset } from "@/services/voice-note-transcode.service";
@@ -169,7 +169,7 @@ async function isChannelConnected(
   }
 
   if (channel === "email") {
-    return isGmailConnected(businessId);
+    return isEmailMailboxConnected(businessId);
   }
 
   return false;

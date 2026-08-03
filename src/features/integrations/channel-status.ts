@@ -1,5 +1,6 @@
 import type { VoiceConnectionData } from "@/types/voice-agent.types";
 import type { GmailConnectionData } from "@/types/gmail-integration.types";
+import type { OutlookConnectionData } from "@/types/outlook-integration.types";
 import type { GoogleCalendarConnectionData } from "@/types/google-calendar.types";
 import type { TelegramConnectionData } from "@/types/telegram.types";
 import type { TelegramUserConnection } from "@/services/telegram-user.service";
@@ -42,6 +43,7 @@ type BuildChannelStatusesInput = {
   voiceSmsEnabled?: boolean;
   googleCalendarConnection?: GoogleCalendarConnectionData | null;
   gmailConnection?: GmailConnectionData | null;
+  outlookConnection?: OutlookConnectionData | null;
 };
 
 export function buildIntegrationChannelStatuses({
@@ -56,6 +58,7 @@ export function buildIntegrationChannelStatuses({
   voiceSmsEnabled = false,
   googleCalendarConnection,
   gmailConnection,
+  outlookConnection,
 }: BuildChannelStatusesInput): IntegrationChannelStatusMap {
   let whatsappStatus: IntegrationChannelStatus = "disconnected";
   let whatsappDetail: string | undefined;
@@ -162,8 +165,25 @@ export function buildIntegrationChannelStatuses({
   if (gmailConnection?.status === "connected") {
     emailStatus = "connected";
     emailDetail = gmailConnection.gmailAddress ?? undefined;
-  } else if (gmailConnection?.status === "pending") {
+  } else if (outlookConnection?.status === "connected") {
+    emailStatus = "connected";
+    emailDetail = outlookConnection.outlookAddress ?? undefined;
+  } else if (
+    gmailConnection?.status === "pending" ||
+    outlookConnection?.status === "pending"
+  ) {
     emailStatus = "pending";
+  }
+
+  if (
+    gmailConnection?.status === "connected" &&
+    outlookConnection?.status === "connected"
+  ) {
+    const gmailAddress = gmailConnection.gmailAddress?.trim();
+    const outlookAddress = outlookConnection.outlookAddress?.trim();
+    if (gmailAddress && outlookAddress) {
+      emailDetail = `${gmailAddress} · ${outlookAddress}`;
+    }
   }
 
   let websiteChatStatus: IntegrationChannelStatus = "disconnected";
