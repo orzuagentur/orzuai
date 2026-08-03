@@ -15,6 +15,8 @@ export type ContactCustomFields = {
   additionalContacts?: AdditionalContactEntry[];
   /** User-defined fields on the contact info card. */
   profileFields?: ContactProfileFieldEntry[];
+  /** Preferred WhatsApp Web chat JID (often `@lid`) for reliable outbound. */
+  whatsappChatJid?: string;
   /** AI data-collection answers (namespaced). */
   collection?: Record<string, string>;
 };

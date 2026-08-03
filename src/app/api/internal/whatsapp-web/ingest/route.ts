@@ -16,6 +16,7 @@ const payloadSchema = z.object({
     .array(
       z.object({
         from: z.string().min(1),
+        chatJid: z.string().min(1).nullish(),
         externalMessageId: z.string().min(1),
         senderName: z.string().nullish(),
         text: z.string(),

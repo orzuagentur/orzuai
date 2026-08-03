@@ -9,7 +9,9 @@ import makeWASocket, {
   isLidUser,
   jidDecode,
   jidNormalizedUser,
+  type proto,
   type WAMessage,
+  type WAMessageKey,
   type WASocket,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
@@ -42,11 +44,51 @@ type ActiveSocket = {
   credsKeyName: string | null;
   serialize: () => string;
   saveTimer: NodeJS.Timeout | null;
+  reconnectTimer: NodeJS.Timeout | null;
   starting: boolean;
+  open: boolean;
+  /** True once this socket (or a prior one for the business) reached open. */
+  everConnected: boolean;
+  /** phone digits / raw recipient → preferred WhatsApp chat JID (often @lid). */
+  chatJidByRecipient: Map<string, string>;
+  /** Recent outbound/inbound messages for Baileys retry/decrypt (getMessage). */
+  recentMessages: Map<string, proto.IMessage>;
+  processedInboundIds: Set<string>;
 };
 
 const active = new Map<string, ActiveSocket>();
+/** Survives socket restarts so LID routing / decrypt cache is not lost. */
+const sessionMemory = new Map<
+  string,
+  {
+    everConnected: boolean;
+    chatJidByRecipient: Map<string, string>;
+    recentMessages: Map<string, proto.IMessage>;
+    processedInboundIds: Set<string>;
+  }
+>();
 let stopping = false;
+const reconnectTimers = new Map<string, NodeJS.Timeout>();
+
+const RECENT_INBOUND_MAX_AGE_MS = 15 * 60 * 1000;
+const RECENT_MESSAGE_CACHE_LIMIT = 200;
+const PROCESSED_ID_LIMIT = 500;
+
+function memoryFor(businessId: string) {
+  const existing = sessionMemory.get(businessId);
+  if (existing) {
+    return existing;
+  }
+
+  const created = {
+    everConnected: false,
+    chatJidByRecipient: new Map<string, string>(),
+    recentMessages: new Map<string, proto.IMessage>(),
+    processedInboundIds: new Set<string>(),
+  };
+  sessionMemory.set(businessId, created);
+  return created;
+}
 
 function log(...args: unknown[]): void {
   console.log("[whatsapp-web]", ...args);
@@ -59,6 +101,30 @@ function credsKeyNameFor(businessId: string): string {
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+function messageCacheKey(key: WAMessageKey): string | null {
+  const jid = key.remoteJid;
+  const id = key.id;
+  if (!jid || !id) {
+    return null;
+  }
+  return `${jid}|${id}|${key.fromMe ? "1" : "0"}`;
+}
+
+function rememberMessage(entry: ActiveSocket, message: WAMessage): void {
+  const cacheKey = messageCacheKey(message.key);
+  if (!cacheKey || !message.message) {
+    return;
+  }
+
+  entry.recentMessages.set(cacheKey, message.message);
+  if (entry.recentMessages.size > RECENT_MESSAGE_CACHE_LIMIT) {
+    const first = entry.recentMessages.keys().next().value;
+    if (first) {
+      entry.recentMessages.delete(first);
+    }
+  }
 }
 
 /**
@@ -105,7 +171,6 @@ function resolveInboundFrom(message: WAMessage): string | null {
 
   const remoteJid = message.key.remoteJid ?? "";
   if (remoteJid && isLidUser(remoteJid)) {
-    // Keep the LID JID so replies can still be routed; never treat LID as a phone.
     return jidNormalizedUser(remoteJid);
   }
 
@@ -127,6 +192,57 @@ function toJid(recipient: string): string {
     return jidNormalizedUser(trimmed) || trimmed;
   }
   return `${digitsOnly(trimmed)}@s.whatsapp.net`;
+}
+
+function rememberChatJid(
+  entry: ActiveSocket,
+  from: string,
+  remoteJid: string,
+): void {
+  const normalized = jidNormalizedUser(remoteJid) || remoteJid;
+  entry.chatJidByRecipient.set(from, normalized);
+
+  const phone = phoneDigitsFromAddress(from);
+  if (phone) {
+    entry.chatJidByRecipient.set(phone, normalized);
+    entry.chatJidByRecipient.set(`+${phone}`, normalized);
+  }
+}
+
+async function resolveOutboundJid(
+  entry: ActiveSocket,
+  recipient: string,
+): Promise<string> {
+  const trimmed = recipient.trim();
+  const cached =
+    entry.chatJidByRecipient.get(trimmed) ||
+    entry.chatJidByRecipient.get(digitsOnly(trimmed)) ||
+    entry.chatJidByRecipient.get(`+${digitsOnly(trimmed)}`);
+
+  if (cached) {
+    return cached;
+  }
+
+  if (trimmed.includes("@")) {
+    return toJid(trimmed);
+  }
+
+  const phoneJid = toJid(trimmed);
+
+  try {
+    const results = await entry.sock.onWhatsApp(digitsOnly(trimmed));
+    const match = results?.[0];
+    if (match?.exists && match.jid) {
+      const resolved = jidNormalizedUser(match.jid) || match.jid;
+      entry.chatJidByRecipient.set(digitsOnly(trimmed), resolved);
+      entry.chatJidByRecipient.set(`+${digitsOnly(trimmed)}`, resolved);
+      return resolved;
+    }
+  } catch (error) {
+    log("onWhatsApp lookup failed", describe(error));
+  }
+
+  return phoneJid;
 }
 
 async function updateRow(
@@ -181,6 +297,7 @@ async function forwardInbound(
   businessId: string,
   message: {
     from: string;
+    chatJid: string;
     externalMessageId: string;
     senderName: string | null;
     text: string;
@@ -197,7 +314,10 @@ async function forwardInbound(
       body: JSON.stringify({ businessId, messages: [message] }),
     });
     if (!response.ok) {
-      log("ingest rejected", businessId, response.status);
+      const body = await response.text().catch(() => "");
+      log("ingest rejected", businessId, response.status, body.slice(0, 200));
+    } else {
+      log("ingest ok", businessId, message.externalMessageId);
     }
   } catch (error) {
     log("ingest error", businessId, describe(error));
@@ -229,14 +349,132 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error ?? "unknown");
 }
 
-async function startSocket(row: ConnectionRow): Promise<void> {
-  const businessId = row.business_id;
-  const existing = active.get(businessId);
-  if (existing?.starting) {
+function isRecentInbound(message: WAMessage): boolean {
+  const timestamp = Number(message.messageTimestamp ?? 0);
+  if (!timestamp) {
+    return true;
+  }
+
+  const ageMs = Date.now() - timestamp * 1000;
+  return ageMs <= RECENT_INBOUND_MAX_AGE_MS;
+}
+
+async function handleInboundMessage(
+  businessId: string,
+  entry: ActiveSocket,
+  message: WAMessage,
+): Promise<void> {
+  if (message.key.fromMe) {
+    rememberMessage(entry, message);
     return;
   }
 
-  // Load stored creds unless a fresh pairing was requested (key name cleared).
+  const remoteJid = message.key.remoteJid ?? "";
+  if (!remoteJid || remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast") {
+    return;
+  }
+
+  if (!isRecentInbound(message)) {
+    return;
+  }
+
+  rememberMessage(entry, message);
+
+  const externalMessageId =
+    message.key.id ?? `${remoteJid}:${Number(message.messageTimestamp ?? 0)}`;
+
+  if (entry.processedInboundIds.has(externalMessageId)) {
+    return;
+  }
+
+  const from = resolveInboundFrom(message);
+  if (!from) {
+    log("skip inbound without resolvable sender", businessId, remoteJid);
+    return;
+  }
+
+  const text = extractText(
+    message.message as Record<string, unknown> | null,
+  ).trim();
+  if (!text) {
+    // Ciphertext often arrives empty until retry/decrypt fills it in later.
+    return;
+  }
+
+  entry.processedInboundIds.add(externalMessageId);
+  if (entry.processedInboundIds.size > PROCESSED_ID_LIMIT) {
+    const first = entry.processedInboundIds.values().next().value;
+    if (first) {
+      entry.processedInboundIds.delete(first);
+    }
+  }
+
+  rememberChatJid(entry, from, remoteJid);
+
+  const timestamp = Number(message.messageTimestamp ?? 0);
+
+  await forwardInbound(businessId, {
+    from,
+    chatJid: jidNormalizedUser(remoteJid) || remoteJid,
+    externalMessageId,
+    senderName: message.pushName ?? null,
+    text,
+    sentAt: timestamp
+      ? new Date(timestamp * 1000).toISOString()
+      : new Date().toISOString(),
+  });
+}
+
+function scheduleReconnect(businessId: string, delayMs = 2_000): void {
+  if (stopping) {
+    return;
+  }
+
+  const existingTimer = reconnectTimers.get(businessId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(businessId);
+
+    void (async () => {
+      const { data } = await supabase
+        .from("whatsapp_web_connections")
+        .select("business_id, status, creds_secret_key_name")
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      if (!data || !["pending_qr", "connected"].includes(data.status)) {
+        return;
+      }
+
+      if (active.get(businessId)?.open || active.get(businessId)?.starting) {
+        return;
+      }
+
+      try {
+        await startSocket(data as ConnectionRow);
+      } catch (error) {
+        log("reconnect failed", businessId, describe(error));
+      }
+    })();
+  }, delayMs);
+
+  reconnectTimers.set(businessId, timer);
+}
+
+async function startSocket(row: ConnectionRow): Promise<void> {
+  const businessId = row.business_id;
+  const existing = active.get(businessId);
+  if (existing?.starting || existing?.open) {
+    return;
+  }
+
+  if (existing) {
+    await stopSocket(businessId, { reconnect: false });
+  }
+
   let stored = null;
   if (row.creds_secret_key_name) {
     try {
@@ -255,16 +493,41 @@ async function startSocket(row: ConnectionRow): Promise<void> {
     printQRInTerminal: false,
     browser: Browsers.appropriate("Chrome"),
     syncFullHistory: false,
+    markOnlineOnConnect: false,
+    connectTimeoutMs: 60_000,
+    keepAliveIntervalMs: 25_000,
+    getMessage: async (key) => {
+      const entry = active.get(businessId);
+      if (!entry) {
+        return undefined;
+      }
+      const cacheKey = messageCacheKey(key);
+      return cacheKey ? entry.recentMessages.get(cacheKey) : undefined;
+    },
   });
+
+  const memory = memoryFor(businessId);
+  if (row.status === "connected") {
+    memory.everConnected = true;
+  }
 
   const entry: ActiveSocket = {
     sock,
     credsKeyName: row.creds_secret_key_name,
     serialize: bundle.serialize,
     saveTimer: null,
+    reconnectTimer: null,
     starting: true,
+    open: false,
+    everConnected: memory.everConnected,
+    chatJidByRecipient: memory.chatJidByRecipient,
+    recentMessages: memory.recentMessages,
+    processedInboundIds: memory.processedInboundIds,
   };
   active.set(businessId, entry);
+
+  // Persist ephemeral QR-session creds immediately so reconnects reuse them.
+  void persistCreds(businessId);
 
   sock.ev.on("creds.update", () => {
     void persistCreds(businessId);
@@ -289,6 +552,9 @@ async function startSocket(row: ConnectionRow): Promise<void> {
 
       if (connection === "open") {
         entry.starting = false;
+        entry.open = true;
+        entry.everConnected = true;
+        memoryFor(businessId).everConnected = true;
         const phone = connectedAccountPhone(sock);
         await updateRow(businessId, {
           status: "connected",
@@ -306,8 +572,13 @@ async function startSocket(row: ConnectionRow): Promise<void> {
         const statusCode = (lastDisconnect?.error as Boom | undefined)?.output
           ?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
+        const restartRequired =
+          statusCode === DisconnectReason.restartRequired;
 
+        entry.open = false;
+        entry.starting = false;
         active.delete(businessId);
+
         try {
           sock.end(undefined);
         } catch {
@@ -325,60 +596,60 @@ async function startSocket(row: ConnectionRow): Promise<void> {
           return;
         }
 
-        log("connection closed, will retry on next reconcile", businessId, statusCode);
+        // QR pairing sockets flap often — back off harder than connected ones
+        // so abandoned pending_qr rows do not hammer WhatsApp every few seconds.
+        const delayMs = restartRequired
+          ? 1_000
+          : memoryFor(businessId).everConnected || entry.everConnected
+            ? 2_500
+            : 45_000;
+
+        log("connection closed, reconnecting", businessId, statusCode, `in ${delayMs}ms`);
+        scheduleReconnect(businessId, delayMs);
       }
     })();
   });
 
   sock.ev.on("messages.upsert", (event) => {
     void (async () => {
-      if (event.type !== "notify") {
+      // `notify` = live; `append` often carries the first decrypted message
+      // after a session/prekey exchange — do not ignore recent appends.
+      if (event.type !== "notify" && event.type !== "append") {
         return;
       }
 
       for (const message of event.messages) {
-        if (message.key.fromMe) {
-          continue;
-        }
-
-        const remoteJid = message.key.remoteJid ?? "";
-        if (!remoteJid || remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast") {
-          continue;
-        }
-
-        const from = resolveInboundFrom(message);
-        if (!from) {
-          log("skip inbound without resolvable sender", businessId, remoteJid);
-          continue;
-        }
-
-        const text = extractText(
-          message.message as Record<string, unknown> | null,
-        ).trim();
-        if (!text) {
-          continue;
-        }
-
-        const timestamp = Number(message.messageTimestamp ?? 0);
-
-        await forwardInbound(businessId, {
-          from,
-          externalMessageId: message.key.id ?? `${remoteJid}:${timestamp}`,
-          senderName: message.pushName ?? null,
-          text,
-          sentAt: timestamp
-            ? new Date(timestamp * 1000).toISOString()
-            : new Date().toISOString(),
-        });
+        await handleInboundMessage(businessId, entry, message);
       }
     })();
   });
 
-  entry.starting = false;
+  sock.ev.on("messages.update", (updates) => {
+    void (async () => {
+      for (const item of updates) {
+        if (!item.update.message) {
+          continue;
+        }
+
+        const hydrated: WAMessage = {
+          key: item.key,
+          message: item.update.message,
+          messageTimestamp: item.update.messageTimestamp,
+          pushName: item.update.pushName,
+        } as WAMessage;
+
+        await handleInboundMessage(businessId, entry, hydrated);
+      }
+    })();
+  });
+
   log("socket started", businessId);
 }
 
-async function stopSocket(businessId: string): Promise<void> {
+async function stopSocket(
+  businessId: string,
+  options: { reconnect?: boolean } = {},
+): Promise<void> {
   const entry = active.get(businessId);
   if (!entry) {
     return;
@@ -387,12 +658,21 @@ async function stopSocket(businessId: string): Promise<void> {
   if (entry.saveTimer) {
     clearTimeout(entry.saveTimer);
   }
+  const pendingReconnect = reconnectTimers.get(businessId);
+  if (pendingReconnect && !options.reconnect) {
+    clearTimeout(pendingReconnect);
+    reconnectTimers.delete(businessId);
+  }
   try {
     entry.sock.end(undefined);
   } catch {
     // ignore
   }
   log("socket stopped", businessId);
+
+  if (options.reconnect) {
+    scheduleReconnect(businessId, 1_500);
+  }
 }
 
 async function reconcile(): Promise<void> {
@@ -418,7 +698,18 @@ async function reconcile(): Promise<void> {
   for (const row of rows) {
     const entry = active.get(row.business_id);
 
-    // Restart when a fresh pairing was requested (creds key name changed/cleared).
+    if (entry?.open || entry?.starting) {
+      // Refresh creds key name if the DB row caught up after first persist.
+      if (
+        entry.credsKeyName !== row.creds_secret_key_name &&
+        row.creds_secret_key_name
+      ) {
+        entry.credsKeyName = row.creds_secret_key_name;
+      }
+      continue;
+    }
+
+    // Restart when a fresh pairing was requested (creds key name cleared).
     if (entry && entry.credsKeyName !== row.creds_secret_key_name) {
       await stopSocket(row.business_id);
     }
@@ -448,11 +739,15 @@ async function handleSend(
   }
 
   const entry = active.get(businessId);
-  if (!entry) {
-    return { status: 409, payload: { success: false, error: "WhatsApp Web is not connected." } };
+  if (!entry?.open) {
+    return {
+      status: 409,
+      payload: { success: false, error: "WhatsApp Web is not connected." },
+    };
   }
 
-  const jid = toJid(to);
+  const jid = await resolveOutboundJid(entry, to);
+  log("send", businessId, "to", to, "jid", jid);
 
   try {
     let sent;
@@ -480,11 +775,16 @@ async function handleSend(
       sent = await entry.sock.sendMessage(jid, { text: text ?? "" });
     }
 
+    if (sent) {
+      rememberMessage(entry, sent as WAMessage);
+    }
+
     return {
       status: 200,
-      payload: { success: true, providerMessageId: sent?.key?.id ?? null },
+      payload: { success: true, providerMessageId: sent?.key?.id ?? null, jid },
     };
   } catch (error) {
+    log("send failed", businessId, jid, describe(error));
     return { status: 502, payload: { success: false, error: describe(error) } };
   }
 }
@@ -509,8 +809,20 @@ function startHttpServer(): void {
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     void (async () => {
       if (request.method === "GET" && request.url === "/health") {
+        const sockets = [...active.entries()].map(([businessId, entry]) => ({
+          businessId,
+          open: entry.open,
+          starting: entry.starting,
+        }));
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ ok: true, sockets: active.size }));
+        response.end(
+          JSON.stringify({
+            ok: true,
+            sockets: active.size,
+            open: sockets.filter((item) => item.open).length,
+            details: sockets,
+          }),
+        );
         return;
       }
 

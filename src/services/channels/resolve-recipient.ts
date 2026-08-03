@@ -16,7 +16,7 @@ export async function resolveChannelRecipient(
 ): Promise<string | null> {
   const { data: conversation } = await admin
     .from("conversations")
-    .select("contact_id, contact:contacts(phone_number, email)")
+    .select("contact_id, contact:contacts(phone_number, email, custom_fields)")
     .eq("id", input.conversationId)
     .eq("business_id", input.businessId)
     .maybeSingle();
@@ -45,6 +45,23 @@ export async function resolveChannelRecipient(
 
   if (input.channel === "website_forms") {
     return contact.phone_number;
+  }
+
+  if (input.channel === "whatsapp_web") {
+    const customFields =
+      contact.custom_fields &&
+      typeof contact.custom_fields === "object" &&
+      !Array.isArray(contact.custom_fields)
+        ? (contact.custom_fields as Record<string, unknown>)
+        : {};
+    const chatJid =
+      typeof customFields.whatsappChatJid === "string"
+        ? customFields.whatsappChatJid.trim()
+        : "";
+
+    if (chatJid.includes("@")) {
+      return chatJid;
+    }
   }
 
   const externalId = toChannelExternalId(input.channel, contact.phone_number);

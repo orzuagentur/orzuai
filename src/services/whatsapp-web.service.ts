@@ -185,8 +185,10 @@ export async function disconnectWhatsAppWeb(): Promise<WhatsAppWebActionResult> 
 }
 
 export type WhatsAppWebInboundMessage = {
-  /** Sender phone number (digits, no domain). */
+  /** Sender phone number (digits, no domain) or LID JID fallback. */
   from: string;
+  /** Raw WhatsApp chat JID used for outbound replies (often `@lid`). */
+  chatJid?: string | null;
   externalMessageId: string;
   senderName?: string | null;
   text: string;
@@ -251,6 +253,36 @@ export async function ingestWhatsAppWebMessages(
     }
 
     const { contactId, conversationId, createdContact } = context;
+
+    const chatJid = message.chatJid?.trim();
+    if (chatJid && chatJid.includes("@")) {
+      const { data: contactRow } = await admin
+        .from("contacts")
+        .select("custom_fields")
+        .eq("id", contactId)
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      const existingFields =
+        contactRow?.custom_fields &&
+        typeof contactRow.custom_fields === "object" &&
+        !Array.isArray(contactRow.custom_fields)
+          ? (contactRow.custom_fields as Record<string, unknown>)
+          : {};
+
+      if (existingFields.whatsappChatJid !== chatJid) {
+        await admin
+          .from("contacts")
+          .update({
+            custom_fields: {
+              ...existingFields,
+              whatsappChatJid: chatJid,
+            } as unknown as Record<string, string>,
+          })
+          .eq("id", contactId)
+          .eq("business_id", businessId);
+      }
+    }
 
     const insertResult = await insertInboundChannelMessage(admin, {
       conversationId,

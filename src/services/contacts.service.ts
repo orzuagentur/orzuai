@@ -124,6 +124,12 @@ function parseCustomFields(
   const collection = parseCollectionFields(
     "collection" in value ? value.collection : undefined,
   );
+  const whatsappChatJid =
+    "whatsappChatJid" in value &&
+    typeof value.whatsappChatJid === "string" &&
+    value.whatsappChatJid.trim().length > 0
+      ? value.whatsappChatJid.trim()
+      : undefined;
 
   return {
     company:
@@ -141,6 +147,7 @@ function parseCustomFields(
     additionalContacts:
       additionalContacts.length > 0 ? additionalContacts : undefined,
     profileFields: profileFields.length > 0 ? profileFields : undefined,
+    whatsappChatJid,
     collection,
   };
 }
