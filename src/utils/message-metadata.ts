@@ -40,7 +40,10 @@ export function shouldIgnoreOutboundDeliveryDowngrade(
 export function normalizeOutboundDeliveryStatus(
   message: ChatMessageData,
 ): ChatMessageData {
-  if (message.senderType !== "user" || message.hiddenForBusiness) {
+  if (
+    (message.senderType !== "user" && message.senderType !== "ai") ||
+    message.hiddenForBusiness
+  ) {
     return message;
   }
 
@@ -76,7 +79,7 @@ export function mergeIncomingChatMessage(
     isPending: false,
   };
 
-  if (merged.senderType === "user") {
+  if (merged.senderType === "user" || merged.senderType === "ai") {
     return normalizeOutboundDeliveryStatus(merged);
   }
 

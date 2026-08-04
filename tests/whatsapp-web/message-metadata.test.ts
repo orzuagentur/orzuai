@@ -49,4 +49,12 @@ describe("WhatsApp Web outbound message metadata", () => {
       }).deliveryStatus,
     ).toBe("pending");
   });
+
+  it("normalizes AI outbound messages with missing delivery status as pending", () => {
+    expect(
+      normalizeOutboundDeliveryStatus(
+        outboundMessage({ senderType: "ai" }),
+      ).deliveryStatus,
+    ).toBe("pending");
+  });
 });

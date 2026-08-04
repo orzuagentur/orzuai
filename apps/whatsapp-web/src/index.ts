@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { Boom } from "@hapi/boom";
@@ -60,8 +61,14 @@ type ActiveSocket = {
 };
 
 type WorkerDeliveryStatus = "sent" | "delivered" | "read";
+type PendingOutboundAck = {
+  resolve: (status: WorkerDeliveryStatus) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+};
 
 const active = new Map<string, ActiveSocket>();
+const pendingOutboundAcks = new Map<string, PendingOutboundAck>();
 /** Survives socket restarts so LID routing / decrypt cache is not lost. */
 const sessionMemory = new Map<
   string,
@@ -81,6 +88,7 @@ const RECENT_INBOUND_MAX_AGE_MS = 15 * 60 * 1000;
 const RECENT_MESSAGE_CACHE_LIMIT = 200;
 const PROCESSED_ID_LIMIT = 500;
 const MAX_FAILED_PAIRING_ATTEMPTS = 3;
+const SERVER_ACK_TIMEOUT_MS = 15_000;
 
 function memoryFor(businessId: string) {
   const existing = sessionMemory.get(businessId);
@@ -102,6 +110,29 @@ function memoryFor(businessId: string) {
 
 function log(...args: unknown[]): void {
   console.log("[whatsapp-web]", ...args);
+}
+
+function stableWhatsAppMessageId(input: string): string {
+  return `3EB0${createHash("sha256")
+    .update(input)
+    .digest("hex")
+    .toUpperCase()
+    .slice(0, 18)}`;
+}
+
+function transientWhatsAppMessageId(): string {
+  return `3EB0${randomBytes(9).toString("hex").toUpperCase()}`;
+}
+
+function outboundMessageIdFor(
+  businessId: string,
+  idempotencyKey: string | null | undefined,
+): string {
+  if (!idempotencyKey?.trim()) {
+    return transientWhatsAppMessageId();
+  }
+
+  return stableWhatsAppMessageId(`${businessId}:${idempotencyKey.trim()}`);
 }
 
 function credsKeyNameFor(businessId: string): string {
@@ -350,6 +381,49 @@ function mapBaileysDeliveryStatus(
   }
 
   return null;
+}
+
+function resolvePendingOutboundAck(
+  providerMessageId: string,
+  status: WorkerDeliveryStatus,
+): void {
+  const pending = pendingOutboundAcks.get(providerMessageId);
+  if (!pending) {
+    return;
+  }
+
+  clearTimeout(pending.timer);
+  pendingOutboundAcks.delete(providerMessageId);
+  pending.resolve(status);
+}
+
+function rejectPendingOutboundAck(providerMessageId: string, error: Error): void {
+  const pending = pendingOutboundAcks.get(providerMessageId);
+  if (!pending) {
+    return;
+  }
+
+  clearTimeout(pending.timer);
+  pendingOutboundAcks.delete(providerMessageId);
+  pending.reject(error);
+}
+
+function waitForOutboundServerAck(
+  providerMessageId: string,
+  timeoutMs = SERVER_ACK_TIMEOUT_MS,
+): Promise<WorkerDeliveryStatus> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingOutboundAcks.delete(providerMessageId);
+      reject(new Error("WhatsApp Web did not acknowledge the message."));
+    }, timeoutMs);
+
+    pendingOutboundAcks.set(providerMessageId, {
+      resolve,
+      reject,
+      timer,
+    });
+  });
 }
 
 async function forwardDeliveryStatuses(
@@ -721,6 +795,7 @@ async function startSocket(row: ConnectionRow): Promise<void> {
             : null;
 
         if (deliveryStatus && item.key.id) {
+          resolvePendingOutboundAck(item.key.id, deliveryStatus);
           statusUpdates.push({
             providerMessageId: item.key.id,
             status: deliveryStatus,
@@ -881,10 +956,11 @@ async function handleSend(
     businessId?: string;
     to?: string;
     text?: string;
+    idempotencyKey?: string;
     media?: { url?: string; mimeType?: string; fileName?: string; kind?: string } | null;
   },
 ): Promise<{ status: number; payload: Record<string, unknown> }> {
-  const { businessId, to, text, media } = body;
+  const { businessId, to, text, idempotencyKey, media } = body;
 
   if (!businessId || !to) {
     return { status: 400, payload: { success: false, error: "Missing businessId or to." } };
@@ -899,6 +975,12 @@ async function handleSend(
   }
 
   const jid = await resolveOutboundJid(entry, to);
+  const providerMessageId = outboundMessageIdFor(businessId, idempotencyKey);
+  const sendOptions = { messageId: providerMessageId };
+  const ackPromise = waitForOutboundServerAck(providerMessageId).then(
+    () => null,
+    (error) => error,
+  );
   log("send", businessId, "to", to, "jid", jid);
 
   try {
@@ -919,37 +1001,71 @@ async function handleSend(
       const kind = media.kind ?? "document";
       const caption = text?.trim() || undefined;
       if (kind === "image") {
-        sent = await entry.sock.sendMessage(jid, { image: { url: media.url }, caption });
+        sent = await entry.sock.sendMessage(
+          jid,
+          { image: { url: media.url }, caption },
+          sendOptions,
+        );
       } else if (kind === "video") {
-        sent = await entry.sock.sendMessage(jid, { video: { url: media.url }, caption });
+        sent = await entry.sock.sendMessage(
+          jid,
+          { video: { url: media.url }, caption },
+          sendOptions,
+        );
       } else if (kind === "audio") {
-        sent = await entry.sock.sendMessage(jid, {
-          audio: { url: media.url },
-          mimetype: media.mimeType || "audio/ogg; codecs=opus",
-        });
+        sent = await entry.sock.sendMessage(
+          jid,
+          {
+            audio: { url: media.url },
+            mimetype: media.mimeType || "audio/ogg; codecs=opus",
+          },
+          sendOptions,
+        );
       } else {
-        sent = await entry.sock.sendMessage(jid, {
-          document: { url: media.url },
-          mimetype: media.mimeType || "application/octet-stream",
-          fileName: media.fileName || "file",
-          caption,
-        });
+        sent = await entry.sock.sendMessage(
+          jid,
+          {
+            document: { url: media.url },
+            mimetype: media.mimeType || "application/octet-stream",
+            fileName: media.fileName || "file",
+            caption,
+          },
+          sendOptions,
+        );
       }
     } else {
-      sent = await entry.sock.sendMessage(jid, { text: text ?? "" });
+      sent = await entry.sock.sendMessage(jid, { text: text ?? "" }, sendOptions);
     }
 
     if (sent) {
       rememberMessage(entry, sent as WAMessage);
     }
 
+    const ackError = await ackPromise;
+    if (ackError) {
+      log("send ack timeout", businessId, jid, providerMessageId, describe(ackError));
+      return {
+        status: 504,
+        payload: {
+          success: false,
+          providerMessageId,
+          jid,
+          error: describe(ackError),
+        },
+      };
+    }
+
     return {
       status: 200,
-      payload: { success: true, providerMessageId: sent?.key?.id ?? null, jid },
+      payload: { success: true, providerMessageId: sent?.key?.id ?? providerMessageId, jid },
     };
   } catch (error) {
+    rejectPendingOutboundAck(providerMessageId, error instanceof Error ? error : new Error(describe(error)));
     log("send failed", businessId, jid, describe(error));
-    return { status: 502, payload: { success: false, error: describe(error) } };
+    return {
+      status: 502,
+      payload: { success: false, providerMessageId, error: describe(error) },
+    };
   }
 }
 

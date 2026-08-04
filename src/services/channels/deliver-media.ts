@@ -33,6 +33,7 @@ export type ChannelMediaDeliveryInput = {
   fileName: string;
   mimeType: string;
   mediaKind: ChatMediaKind;
+  idempotencyKey?: string;
 };
 
 export async function deliverChannelMediaMessage(
@@ -211,6 +212,7 @@ export async function deliverChannelMediaMessage(
       businessId: input.businessId,
       to: input.recipientId,
       text: caption,
+      idempotencyKey: input.idempotencyKey,
       media: {
         url: input.mediaUrl,
         mimeType: input.mimeType,
@@ -222,6 +224,7 @@ export async function deliverChannelMediaMessage(
     if (!result.success) {
       return {
         success: false,
+        providerMessageId: result.providerMessageId,
         error: result.error ?? "WhatsApp Web is not connected.",
       };
     }

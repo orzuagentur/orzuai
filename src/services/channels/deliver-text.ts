@@ -114,11 +114,13 @@ export async function deliverChannelTextMessage(input: {
       businessId: input.businessId,
       to: input.recipientId,
       text: input.content,
+      idempotencyKey: input.idempotencyKey,
     });
 
     if (!result.success) {
       return {
         success: false,
+        providerMessageId: result.providerMessageId,
         error: result.error ?? "WhatsApp Web is not connected.",
       };
     }

@@ -110,7 +110,7 @@ function getSenderLabel(message: ChatMessageData): string {
 }
 
 function OutboundDeliveryIndicator({ message }: { message: ChatMessageData }) {
-  if (message.senderType !== "user") {
+  if (message.senderType !== "user" && message.senderType !== "ai") {
     return null;
   }
 

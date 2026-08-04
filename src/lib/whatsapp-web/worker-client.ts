@@ -6,6 +6,7 @@ export type WhatsAppWebWorkerSendInput = {
   businessId: string;
   to: string;
   text: string;
+  idempotencyKey?: string;
   media?: {
     url: string;
     mimeType: string;
@@ -105,6 +106,7 @@ export async function sendWhatsAppWebMessage(
     if (!response.ok || !data.success) {
       return {
         success: false,
+        providerMessageId: data.providerMessageId,
         error: data.error ?? `WhatsApp Web worker responded ${response.status}.`,
       };
     }

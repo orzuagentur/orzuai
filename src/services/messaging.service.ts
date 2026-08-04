@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { incrementChannelAnalytics } from "@/lib/channel-analytics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -118,6 +120,23 @@ export async function markOutboundMessageFailed(
 }
 
 const DELIVERY_RETRY_BASE_SECONDS = 30;
+
+function buildAutoReplyDeliveryIdempotencyKey(input: {
+  conversationId: string;
+  clientMessage: string;
+  replyText: string;
+}): string {
+  const digest = createHash("sha256")
+    .update(input.conversationId)
+    .update("\n")
+    .update(input.clientMessage)
+    .update("\n")
+    .update(input.replyText)
+    .digest("hex")
+    .slice(0, 32);
+
+  return `auto-reply:${input.conversationId}:${digest}`;
+}
 
 function computeDeliveryRetryAt(attemptCount: number): string {
   const delaySeconds =
@@ -446,6 +465,11 @@ export async function processChannelAutoReply(input: {
     channel,
     conversationId,
     text: reply.text,
+    idempotencyKey: buildAutoReplyDeliveryIdempotencyKey({
+      conversationId,
+      clientMessage,
+      replyText: reply.text,
+    }),
   });
 
   if (!sendResult.success) {
@@ -460,7 +484,7 @@ export async function processChannelAutoReply(input: {
     messageContent = sendResult.sentText;
   }
 
-  await insertChannelMessage(admin, {
+  const insertedMessage = await insertChannelMessage(admin, {
     conversationId,
     channel,
     senderType: "ai",
@@ -468,6 +492,19 @@ export async function processChannelAutoReply(input: {
     emailSubject: sendResult.emailSubject,
     aiGenerated: true,
   });
+
+  if (sendResult.providerMessageId) {
+    await createOutboundMessageDelivery(admin, {
+      messageId: insertedMessage.id,
+      businessId,
+      channel,
+      conversationId,
+    });
+    await recordMessageDeliverySuccess(admin, {
+      messageId: insertedMessage.id,
+      providerMessageId: sendResult.providerMessageId,
+    });
+  }
 
   await incrementMessagingAnalytics(admin, businessId, channel, {
     totalMessages: 1,

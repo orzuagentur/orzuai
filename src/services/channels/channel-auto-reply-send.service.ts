@@ -15,10 +15,12 @@ export async function sendChannelAutoReplyText(input: {
   channel: MessagingChannel;
   conversationId: string;
   text: string;
+  idempotencyKey?: string;
 }): Promise<{
   success: boolean;
   error?: string;
   emailSubject?: string;
+  providerMessageId?: string;
   sentText?: string;
 }> {
   const safeText = sanitizeCustomerFacingReply(input.text);
@@ -65,11 +67,21 @@ export async function sendChannelAutoReplyText(input: {
     recipientId: recipientId ?? "",
     content: safeText.text,
     emailSubject,
+    idempotencyKey: input.idempotencyKey,
   });
 
   if (!result.success) {
-    return { success: false, error: result.error };
+    return {
+      success: false,
+      providerMessageId: result.providerMessageId,
+      error: result.error,
+    };
   }
 
-  return { success: true, emailSubject, sentText: safeText.text };
+  return {
+    success: true,
+    emailSubject,
+    providerMessageId: result.providerMessageId,
+    sentText: safeText.text,
+  };
 }

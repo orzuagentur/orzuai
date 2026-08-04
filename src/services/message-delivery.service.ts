@@ -160,7 +160,7 @@ async function processDeliveryRow(
       .eq("id", delivery.message_id)
       .maybeSingle();
 
-    if (!message || message.hidden_for_business || message.sender_type !== "user") {
+    if (!message || message.hidden_for_business || message.sender_type === "client") {
       await admin
         .from("message_deliveries")
         .update({
@@ -217,6 +217,7 @@ async function processDeliveryRow(
         fileName: attachment?.file_name ?? media.fileName,
         mimeType: attachment?.mime_type ?? media.mimeType,
         mediaKind: attachment?.kind ?? media.kind,
+        idempotencyKey: message.id,
       });
     } else {
       result = await deliverChannelTextMessage({
@@ -253,6 +254,13 @@ async function processDeliveryRow(
       );
 
       return "sent";
+    }
+
+    if (result.providerMessageId) {
+      await admin
+        .from("message_deliveries")
+        .update({ provider_message_id: result.providerMessageId })
+        .eq("id", delivery.id);
     }
 
     return await failDelivery(message.id, result.error);
