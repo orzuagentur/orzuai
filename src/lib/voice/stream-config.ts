@@ -20,6 +20,20 @@ export function getVoiceStreamWsUrl(): string | undefined {
   return resolveSecretValue(ENV_KEYS.VOICE_STREAM_WS_URL)?.trim() || undefined;
 }
 
+export function getVoiceStreamConnectWsUrl(): string | undefined {
+  const streamUrl = getVoiceStreamWsUrl();
+  if (!streamUrl) {
+    return undefined;
+  }
+
+  const normalized = streamUrl.replace(/\/$/, "");
+  if (normalized.endsWith("/voice/stream")) {
+    return normalized;
+  }
+
+  return `${normalized}/voice/stream`;
+}
+
 export function getVoiceMonitorWsUrl(): string | null {
   const streamUrl = getVoiceStreamWsUrl();
   if (!streamUrl) {

@@ -20,7 +20,7 @@ import {
   mapVoiceLanguageToTwilioLocale,
   sanitizeForSpeech,
 } from "@/lib/voice/twiml";
-import { isVoiceStreamEnabledAsync, getVoiceStreamWsUrl } from "@/lib/voice/stream-config";
+import { isVoiceStreamEnabledAsync, getVoiceStreamConnectWsUrl } from "@/lib/voice/stream-config";
 import { buildMediaStreamConnectTwiml } from "@/lib/voice/stream-twiml";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getVoiceAiBusinessContext } from "@/repositories/business-context.repository";
@@ -692,9 +692,8 @@ export async function buildVoiceConversationTwiml(input: {
     realCallSid &&
     phoneVoice.voiceId
   ) {
-    const wsBase = getVoiceStreamWsUrl();
-    if (wsBase) {
-      const wsUrl = `${wsBase.replace(/\/$/, "")}/voice/stream`;
+    const wsUrl = getVoiceStreamConnectWsUrl();
+    if (wsUrl) {
       const recordingCallback = await resolveRecordingCallbackUrl(input.businessId);
 
       return applyCallRecordingToTwiml(

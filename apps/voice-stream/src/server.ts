@@ -58,6 +58,12 @@ const server = http.createServer(handleHttpRequest);
 const streamWss = new WebSocketServer({ noServer: true });
 const monitorWss = createVoiceMonitorWebSocketServer(streamSecret);
 
+type VoiceStreamRouteContext = {
+  businessId: string;
+  callSid: string;
+  streamToken: string;
+};
+
 function rejectUpgrade(socket: Duplex): void {
   socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
   socket.destroy();
@@ -67,6 +73,62 @@ function getHeaderValue(
   value: string | string[] | undefined,
 ): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function decodePathPart(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(value).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function getVoiceStreamRouteContext(
+  request: IncomingMessage,
+): VoiceStreamRouteContext | null {
+  const parsedUrl = new URL(request.url ?? "/", "http://localhost");
+  const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+
+  if (
+    pathParts.length === 5 &&
+    pathParts[0] === "voice" &&
+    pathParts[1] === "stream"
+  ) {
+    const businessId = decodePathPart(pathParts[2]);
+    const callSid = decodePathPart(pathParts[3]);
+    const streamToken = decodePathPart(pathParts[4]);
+
+    if (businessId && callSid && streamToken) {
+      return { businessId, callSid, streamToken };
+    }
+  }
+
+  const businessId = parsedUrl.searchParams.get("businessId")?.trim();
+  const callSid = parsedUrl.searchParams.get("callSid")?.trim();
+  const streamToken = parsedUrl.searchParams.get("streamToken")?.trim();
+
+  if (businessId && callSid && streamToken) {
+    return { businessId, callSid, streamToken };
+  }
+
+  return null;
+}
+
+function isVoiceStreamPath(pathname: string): boolean {
+  if (pathname === "/voice/stream") {
+    return true;
+  }
+
+  const pathParts = pathname.split("/").filter(Boolean);
+  return (
+    pathParts.length === 5 &&
+    pathParts[0] === "voice" &&
+    pathParts[1] === "stream"
+  );
 }
 
 function getTwilioSignatureUrlCandidates(request: IncomingMessage): string[] {
@@ -96,6 +158,17 @@ function getTwilioSignatureUrlCandidates(request: IncomingMessage): string[] {
 
   if (publicStreamUrl) {
     const parsed = new URL(publicStreamUrl);
+    const publicPath = parsed.pathname.replace(/\/$/, "");
+    if (
+      parsedRequestUrl.pathname.startsWith("/voice/stream/") &&
+      publicPath.endsWith("/voice/stream")
+    ) {
+      parsed.pathname = `${publicPath}${parsedRequestUrl.pathname.slice(
+        "/voice/stream".length,
+      )}`;
+    } else if (!publicPath || publicPath === "/") {
+      parsed.pathname = parsedRequestUrl.pathname;
+    }
     parsed.search = parsedRequestUrl.search;
     candidates.add(parsed.toString());
   }
@@ -139,23 +212,20 @@ async function fetchTwilioAuthContextForBusiness(
 async function resolveTwilioStreamAuthContext(
   request: IncomingMessage,
 ): Promise<{ authToken: string; expectedAccountSid: string | null } | null> {
-  const params = new URL(request.url ?? "/", "http://localhost").searchParams;
-  const businessId = params.get("businessId")?.trim();
-  const callSid = params.get("callSid")?.trim();
-  const streamToken = params.get("streamToken")?.trim();
+  const routeContext = getVoiceStreamRouteContext(request);
 
   if (
-    businessId &&
-    callSid &&
-    streamToken &&
+    routeContext &&
     verifyStreamToken({
-      businessId,
-      callSid,
+      businessId: routeContext.businessId,
+      callSid: routeContext.callSid,
       secret: streamSecret,
-      token: streamToken,
+      token: routeContext.streamToken,
     })
   ) {
-    const customerContext = await fetchTwilioAuthContextForBusiness(businessId);
+    const customerContext = await fetchTwilioAuthContextForBusiness(
+      routeContext.businessId,
+    );
 
     if (customerContext) {
       return customerContext;
@@ -203,7 +273,7 @@ async function handleUpgrade(
 ): Promise<void> {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
 
-  if (pathname === "/voice/stream") {
+  if (isVoiceStreamPath(pathname)) {
     if (!(await isTwilioStreamUpgradeValid(request))) {
       rejectUpgrade(socket);
       return;
