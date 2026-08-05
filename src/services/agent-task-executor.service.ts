@@ -1,6 +1,6 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { getMessageRepository } from "@/repositories/message.repository";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DASHBOARD_ROUTES } from "@/constants/routes";
@@ -9,7 +9,10 @@ import {
   AGENT_TOOL_NAMES,
   logAgentToolAudit,
 } from "@/lib/ai/tools";
-import { sanitizeCustomerFacingSummary } from "@/utils/customer-facing-agent-summary";
+import {
+  messagesAreLikelyDuplicates,
+  sanitizeCustomerFacingSummary,
+} from "@/utils/customer-facing-agent-summary";
 
 import type { RoutableAiAgent } from "@/utils/ai-agent-routing";
 import {
@@ -80,6 +83,30 @@ const GENERIC_CONTACT_NAMES = new Set([
   "user",
   "contact",
 ]);
+
+function calendarEventBelongsToContact(
+  event: { customer_name: string; customer_email: string },
+  contact: ContactSnapshot,
+): boolean {
+  const email = contact.email?.trim().toLowerCase() || "";
+  const name = contact.name.trim().toLowerCase();
+  const rowEmail = (event.customer_email ?? "").trim().toLowerCase();
+  const rowName = (event.customer_name ?? "").trim().toLowerCase();
+
+  if (email && rowEmail && rowEmail === email) {
+    return true;
+  }
+
+  if (
+    name &&
+    rowName &&
+    (rowName === name || rowName.includes(name) || name.includes(rowName))
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 function parseCustomFields(value: unknown): ContactCustomFields {
   if (!value || typeof value !== "object") {
@@ -739,13 +766,17 @@ async function applyGetBookingStatus(
   if (action.eventId) {
     const { data } = await admin
       .from("calendar_events")
-      .select("id, title, start_at, end_at, is_booking")
+      .select("id, title, start_at, end_at, is_booking, customer_name, customer_email")
       .eq("id", action.eventId)
       .eq("business_id", businessId)
       .maybeSingle();
 
     if (!data) {
       return "Booking status: event not found";
+    }
+
+    if (!calendarEventBelongsToContact(data, contact)) {
+      return "Booking status: event not found for this contact";
     }
 
     const started = new Date(data.start_at).getTime() <= Date.now();
@@ -777,11 +808,14 @@ async function resolveContactEventId(
   if (eventId) {
     const { data } = await admin
       .from("calendar_events")
-      .select("id, title, start_at, end_at")
+      .select("id, title, start_at, end_at, customer_name, customer_email")
       .eq("id", eventId)
       .eq("business_id", businessId)
       .maybeSingle();
     if (!data) return null;
+    if (!calendarEventBelongsToContact(data, contact)) {
+      return null;
+    }
     return {
       id: data.id,
       title: data.title,
@@ -1098,6 +1132,19 @@ async function applySendCustomerMessage(
   });
 
   if (await hasCrmIdempotencyKey(admin, businessId, idempotencyKey)) {
+    return null;
+  }
+
+  const recentAiMessage = await getMessageRepository(admin).findLatestAiMessage(
+    idempotencyContext.conversationId,
+    businessId,
+  );
+
+  if (
+    recentAiMessage?.content &&
+    Date.now() - new Date(recentAiMessage.created_at).getTime() < 2 * 60 * 1000 &&
+    messagesAreLikelyDuplicates(recentAiMessage.content, action.content)
+  ) {
     return null;
   }
 

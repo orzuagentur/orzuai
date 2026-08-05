@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { runAuthorizedCron } from "@/lib/cron/run-authorized-cron";
+import { evaluateAiOpsAlerts } from "@/services/ai-alerting.service";
 import { drainAiOrchestrationQueue } from "@/services/ai-orchestration-queue.service";
 import { drainAiReplyQueue } from "@/services/ai-reply-queue.service";
 import { getAiHealthSnapshot } from "@/services/ai-health.service";
@@ -16,11 +17,14 @@ export async function GET(request: NextRequest) {
         getAiHealthSnapshot(),
       ]);
 
+      const alerts = await evaluateAiOpsAlerts(health);
+
       return NextResponse.json({
         success: true,
         replyQueue,
         orchestrationQueue,
         health,
+        alerts,
       });
     },
   );

@@ -32,6 +32,7 @@ import { getConversationRepository } from "@/repositories/conversation.repositor
 import type { Database, MessagingChannel } from "@/types/database.types";
 import { findContactForChannelWithIdentities } from "@/services/contact-channel-identity.service";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
+import { withAiPipelineStep } from "@/lib/ai/tracing";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
@@ -373,6 +374,26 @@ export async function processChannelAutoReply(input: {
 }): Promise<void> {
   const { admin, businessId, channel, conversationId, clientMessage } = input;
 
+  const { isConversationAutoReplyBlocked } = await import(
+    "@/services/conversation-auto-reply.service"
+  );
+  const handoffBlock = await isConversationAutoReplyBlocked(admin, {
+    businessId,
+    conversationId,
+  });
+
+  if (handoffBlock.blocked) {
+    console.info(
+      "[messaging] skipped auto-reply (human handoff)",
+      JSON.stringify({
+        businessId,
+        conversationId,
+        reason: handoffBlock.reason,
+      }),
+    );
+    return;
+  }
+
   const aiEnabled = await isChannelAutoReplyEnabled({
     admin,
     businessId,
@@ -387,13 +408,22 @@ export async function processChannelAutoReply(input: {
     throw new Error("[ai_disabled] Auto-reply is off for this channel.");
   }
 
-  const reply = await generateFastAssistantReply({
-    admin,
-    businessId,
-    channel,
-    conversationId,
-    clientMessage,
-  });
+  const reply = await withAiPipelineStep(
+    {
+      step: "llm_fast",
+      businessId,
+      conversationId,
+      channel,
+    },
+    () =>
+      generateFastAssistantReply({
+        admin,
+        businessId,
+        channel,
+        conversationId,
+        clientMessage,
+      }),
+  );
 
   if (!reply.success) {
     const error = resolveAutoReplyErrorMessage(reply);

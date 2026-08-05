@@ -52,6 +52,15 @@ import {
   buildDefaultChannelAiBehavior,
   mapChannelAiBehaviorRow,
 } from "@/lib/ai/channel-behavior";
+import {
+  parseAiIntensity,
+  shouldDeferExtraInboundLlmCalls,
+  type AiIntensity,
+} from "@/lib/ai/ai-intensity";
+import {
+  readCachedAssistantProfileRow,
+  writeCachedAssistantProfileRow,
+} from "@/lib/cache/ai-assistant-profile-cache";
 import { messagesAreLikelyDuplicates } from "@/utils/customer-facing-agent-summary";
 import { sanitizeWorkerFacingReply } from "@/lib/ai/worker-reply-safety";
 import { resolveManagerHandoffPlan } from "@/utils/human-handoff-policy";
@@ -240,17 +249,66 @@ async function buildFastBookingReplyContext(input: {
   }
 }
 
+function scheduleConversationSummaryRefresh(
+  aiIntensity: AiIntensity,
+  input: {
+    admin: MessagingDbClient;
+    businessId: string;
+    conversationId: string;
+  },
+): void {
+  if (shouldDeferExtraInboundLlmCalls(aiIntensity)) {
+    return;
+  }
+
+  void refreshConversationSummaryIfNeeded(input);
+}
+
 export async function resolveAssistantProfile(
   admin: MessagingDbClient,
   businessId: string,
 ) {
-  const { data } = await admin
-    .from("ai_assistant_profile")
-    .select(
-      "business_id, name, system_prompt, communication_style, language, fallback_reply_message, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields",
-    )
-    .eq("business_id", businessId)
-    .maybeSingle();
+  type ProfileRow = {
+    business_id: string;
+    name: string;
+    system_prompt: string;
+    communication_style: string;
+    language: string;
+    fallback_reply_message: string | null;
+    ai_intensity: string | null;
+    can_reply: boolean | null;
+    can_create_task: boolean | null;
+    can_create_deal: boolean | null;
+    can_update_contact: boolean | null;
+    can_add_note: boolean | null;
+    can_add_internal_note: boolean | null;
+    can_create_calendar_event: boolean | null;
+    can_request_human: boolean | null;
+    can_notify_owner: boolean | null;
+    can_notify_on_actions: boolean | null;
+    can_summarize_actions_in_chat: boolean | null;
+    can_send_proactive_message: boolean | null;
+    collection_niche: string | null;
+    data_collection_fields: unknown;
+  };
+
+  const cached = await readCachedAssistantProfileRow<ProfileRow>(businessId);
+
+  const data =
+    cached ??
+    (
+      await admin
+        .from("ai_assistant_profile")
+        .select(
+          "business_id, name, system_prompt, communication_style, language, fallback_reply_message, ai_intensity, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields",
+        )
+        .eq("business_id", businessId)
+        .maybeSingle()
+    ).data;
+
+  if (data && !cached) {
+    void writeCachedAssistantProfileRow(businessId, data);
+  }
 
   if (data) {
     return {
@@ -260,6 +318,7 @@ export async function resolveAssistantProfile(
       communicationStyle: data.communication_style,
       language: data.language,
       fallbackReplyMessage: data.fallback_reply_message,
+      aiIntensity: parseAiIntensity(data.ai_intensity),
       canReply: data.can_reply ?? true,
       canCreateTask: data.can_create_task ?? true,
       canCreateDeal: data.can_create_deal ?? true,
@@ -288,6 +347,7 @@ export async function resolveAssistantProfile(
     system_prompt: defaults.systemPrompt,
     communication_style: defaults.communicationStyle,
     language: defaults.language,
+    ai_intensity: defaults.aiIntensity,
     can_reply: defaults.canReply,
     can_create_task: defaults.canCreateTask,
     can_create_deal: defaults.canCreateDeal,
@@ -315,6 +375,22 @@ async function resolveConversationContactId(
     conversationId,
     businessId,
   );
+}
+
+async function loadConversationContactLabel(
+  admin: MessagingDbClient,
+  businessId: string,
+  conversationId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("conversations")
+    .select("contacts(name)")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  const name = data?.contacts?.name?.trim();
+  return name || null;
 }
 
 async function fetchBusinessSubscriptionPlan(
@@ -894,7 +970,7 @@ export async function generateFastAssistantReply(input: {
   }
 
   if (prep.conversationId) {
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(prep.profile.aiIntensity, {
       admin: prep.admin,
       businessId: prep.businessId,
       conversationId: prep.conversationId,
@@ -1062,6 +1138,38 @@ export async function runAutoReplyBackgroundOrchestration(input: {
         ].join("\n")
       : undefined;
 
+  const [knowledgeEntries, conversationMemory] = await Promise.all([
+    retrieveKnowledgeForMessage({
+      admin: input.admin,
+      businessId: input.businessId,
+      query: input.clientMessage,
+    }),
+    loadConversationMemory(
+      input.admin,
+      input.conversationId,
+      input.businessId,
+    ),
+  ]);
+  const trimmedOrchestratorKnowledge = trimKnowledgeEntriesByTokenBudget(
+    knowledgeEntries,
+    AI_CONTEXT_LIMITS.maxKnowledgeEntries,
+    2_000,
+  );
+  const knowledgeContext =
+    trimmedOrchestratorKnowledge.length > 0
+      ? trimmedOrchestratorKnowledge
+          .map(
+            (entry) =>
+              `- ${entry.title}: ${entry.content.replace(/\s+/g, " ").slice(0, 500)}`,
+          )
+          .join("\n")
+      : undefined;
+  const memorySummary = conversationMemory?.aiSummary?.trim() || undefined;
+  const runtimeNotes =
+    input.channel === "website_forms"
+      ? "A CRM order was already created from this website form submission. Do not plan create_order; focus on tasks, deals, follow-ups, and contact field updates."
+      : undefined;
+
   const orchestrationResult = await runAutoReplyOrchestrator({
     businessId: input.businessId,
     message: input.clientMessage,
@@ -1073,6 +1181,9 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     bookingPagesText,
     availabilityText,
     orderFormFieldsText,
+    knowledgeContext,
+    memorySummary,
+    runtimeNotes,
     collectionContext: formatCollectionGapsForPrompt(
       computeCollectionGaps({
         niche: profile.collectionNiche ?? "generic",
@@ -1108,7 +1219,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
       errorMessage: `[${orchestrationResult.errorCode}] ${orchestrationResult.errorMessage}`,
     });
 
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
       admin: input.admin,
       businessId: input.businessId,
       conversationId: input.conversationId,
@@ -1156,6 +1267,42 @@ export async function runAutoReplyBackgroundOrchestration(input: {
         conversationId: input.conversationId,
         channel: input.channel,
         action: createContactAction,
+        clientMessage: input.clientMessage,
+      });
+
+      if (created) {
+        resolvedContactId = created.contactId;
+        contactCreationLabel = created.label;
+        contact = await loadContactSnapshot(
+          input.admin,
+          input.businessId,
+          created.contactId,
+        );
+      }
+    } else if (
+      permittedPlan.actions.length > 0 &&
+      !permittedPlan.actions.every(
+        (action) => action.type === "send_customer_message",
+      )
+    ) {
+      const defaultName =
+        contact?.name?.trim() ||
+        (await loadConversationContactLabel(
+          input.admin,
+          input.businessId,
+          input.conversationId,
+        )) ||
+        "Customer";
+
+      const created = await applyCreateContactFromPlan({
+        admin: input.admin,
+        businessId: input.businessId,
+        conversationId: input.conversationId,
+        channel: input.channel,
+        action: {
+          type: "create_contact",
+          name: defaultName,
+        },
         clientMessage: input.clientMessage,
       });
 
@@ -1245,11 +1392,13 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     actions: opsActions,
     success: executorResult?.success !== false,
     errorMessage: executorResult?.errorMessage ?? null,
+    intent: orchestration.intent,
   });
 
   if (
     resolvedContactId &&
-    (orchestration.intent === "sales" || orchestration.intent === "registration")
+    (orchestration.intent === "sales" || orchestration.intent === "registration") &&
+    !shouldDeferExtraInboundLlmCalls(profile.aiIntensity)
   ) {
     void processSalesAgentRules({
       admin: input.admin,
@@ -1298,7 +1447,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     !profile.canRequestHuman ||
     !profile.canNotifyOwner
   ) {
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
       admin: input.admin,
       businessId: input.businessId,
       conversationId: input.conversationId,
@@ -1313,7 +1462,20 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   });
 
   if (!handoffPlan.notifyManager) {
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
+      admin: input.admin,
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+    });
+    return { completed: true, actionsApplied, clientSummary };
+  }
+
+  const humanAlreadyRequested = actionsApplied.some((action) =>
+    /^Human requested:/i.test(action.trim()),
+  );
+
+  if (humanAlreadyRequested) {
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
       admin: input.admin,
       businessId: input.businessId,
       conversationId: input.conversationId,
@@ -1333,7 +1495,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
   });
 
   if (!handoffPlan.tellCustomerConfirmed || !input.sendFollowUp) {
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
       admin: input.admin,
       businessId: input.businessId,
       conversationId: input.conversationId,
@@ -1352,7 +1514,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     Date.now() - new Date(recentAiMessage.created_at).getTime() < 2 * 60 * 1000 &&
     messagesAreLikelyDuplicates(recentAiMessage.content, followUpText)
   ) {
-    void refreshConversationSummaryIfNeeded({
+    scheduleConversationSummaryRefresh(profile.aiIntensity, {
       admin: input.admin,
       businessId: input.businessId,
       conversationId: input.conversationId,
@@ -1369,7 +1531,7 @@ export async function runAutoReplyBackgroundOrchestration(input: {
     );
   }
 
-  void refreshConversationSummaryIfNeeded({
+  scheduleConversationSummaryRefresh(profile.aiIntensity, {
     admin: input.admin,
     businessId: input.businessId,
     conversationId: input.conversationId,

@@ -31,8 +31,13 @@ import { requireUser } from "@/services/auth.service";
 import { getPrimaryBusiness } from "@/services/business.service";
 import { sendLeadFollowUpEmail } from "@/services/email.service";
 import {
+  insertInboundChannelMessage,
+  resolveInboundMessageContext,
+} from "@/services/inbound-ingest.service";
+import {
   findContactForChannel,
   incrementMessagingAnalytics,
+  scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
 import type { WebsiteFormConnection } from "@/types/database.types";
 import type {
@@ -423,8 +428,10 @@ async function processWebsiteFormFollowUp(input: {
   connection: WebsiteFormConnection;
   submission: WebsiteFormSubmissionInput;
   clientMessage: string;
+  conversationId?: string | null;
 }): Promise<void> {
-  const { admin, businessId, connection, submission, clientMessage } = input;
+  const { admin, businessId, connection, submission, clientMessage, conversationId } =
+    input;
 
   if (!connection.auto_follow_up_enabled || connection.follow_up_channel === "none") {
     return;
@@ -441,11 +448,26 @@ async function processWebsiteFormFollowUp(input: {
     return;
   }
 
-  // Form leads go to Orders only — no Chats conversation. Use a short outbound
-  // acknowledgement without inbox message history.
-  const followUpText =
+  let followUpText =
     "Thanks for your request — we received it and will get back to you shortly.";
-  void clientMessage;
+
+  if (conversationId) {
+    const { generateFastAssistantReply } = await import(
+      "@/services/auto-reply-pipeline.service"
+    );
+    const reply = await generateFastAssistantReply({
+      admin,
+      businessId,
+      channel: "website_forms",
+      conversationId,
+      clientMessage,
+      skipWorkerActions: true,
+    });
+
+    if (reply.success && reply.text.trim()) {
+      followUpText = reply.text.trim();
+    }
+  }
 
   const channel = connection.follow_up_channel as WebsiteFormFollowUpChannel;
   let outboundSent = false;
@@ -559,6 +581,40 @@ export async function ingestWebsiteFormSubmission(
     return { success: false };
   }
 
+  let conversationId: string | null = null;
+
+  const inboundContext = await resolveInboundMessageContext(admin, {
+    businessId,
+    channel: "website_forms",
+    contactName: displayName,
+    contactPhone: phoneNumber,
+    identifier: phoneNumber,
+    displayLabel: displayName,
+  });
+
+  if (inboundContext) {
+    contactId = inboundContext.contactId;
+    conversationId = inboundContext.conversationId;
+    createdContact = createdContact || inboundContext.createdContact;
+
+    const insertResult = await insertInboundChannelMessage(admin, {
+      conversationId,
+      channel: "website_forms",
+      content: body,
+      externalMessageId: `webform:${connection.id}:${Date.now()}`,
+    });
+
+    if (insertResult && !insertResult.isDuplicate) {
+      await scheduleInboundMessageProcessing({
+        admin,
+        businessId,
+        channel: "website_forms",
+        conversationId,
+        clientMessage: body,
+      });
+    }
+  }
+
   const { createCrmOrder } = await import("@/services/crm-orders.service");
   const orderTitle =
     submission.formName?.trim() ||
@@ -579,7 +635,7 @@ export async function ingestWebsiteFormSubmission(
   await createCrmOrder({
     businessId,
     contactId,
-    conversationId: null,
+    conversationId,
     title: orderTitle,
     description: body,
     source: "website_forms",
@@ -600,7 +656,7 @@ export async function ingestWebsiteFormSubmission(
   );
   await processFormSubmitAutomations({
     businessId,
-    conversationId: null,
+    conversationId,
     contactId,
     contactName: displayName,
     message: body,
@@ -624,6 +680,7 @@ export async function ingestWebsiteFormSubmission(
     connection,
     submission,
     clientMessage: body,
+    conversationId,
   });
 
   if (phoneNumber && phoneNumber !== "website-form-lead") {

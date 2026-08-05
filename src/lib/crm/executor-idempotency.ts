@@ -1,42 +1,19 @@
 import "server-only";
 
-import { createHash } from "crypto";
-
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildCrmActionIdempotencyKey,
+  buildExecutorPlanIdempotencyKey,
+} from "@/lib/crm/executor-idempotency-keys";
 import type { Database } from "@/types/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-export function buildCrmActionIdempotencyKey(input: {
-  conversationId?: string | null;
-  clientMessage: string;
-  actionType: string;
-  actionFingerprint: string;
-}): string {
-  const conversationPart = input.conversationId?.trim() || "no-conversation";
-  const digest = createHash("sha256")
-    .update(
-      `${conversationPart}:${input.clientMessage.trim()}:${input.actionType}:${input.actionFingerprint.trim()}`,
-    )
-    .digest("hex")
-    .slice(0, 24);
-
-  return `${conversationPart}:${input.actionType}:${digest}`;
-}
-
-export function buildExecutorPlanIdempotencyKey(input: {
-  conversationId?: string | null;
-  clientMessage: string;
-}): string {
-  const conversationPart = input.conversationId?.trim() || "no-conversation";
-  const digest = createHash("sha256")
-    .update(`${conversationPart}:${input.clientMessage.trim()}`)
-    .digest("hex")
-    .slice(0, 32);
-
-  return `plan:${conversationPart}:${digest}`;
-}
+export {
+  buildCrmActionIdempotencyKey,
+  buildExecutorPlanIdempotencyKey,
+} from "@/lib/crm/executor-idempotency-keys";
 
 export async function hasCrmIdempotencyKey(
   admin: MessagingDbClient,

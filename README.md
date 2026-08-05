@@ -125,6 +125,8 @@ See `.env.example` → Load tests section for credentials.
 2. **Reply first, CRM after** — Phase 1: fast assistant reply (knowledge + memory + CRM snapshot) → send. Phase 2: durable `ai_orchestration_jobs` runs native tool calling (Gemini / OpenAI / Claude) → Zod-validated CRM executor.
 3. **Channel toggle** — per-channel `ai_enabled` only. Provider/model come from platform AI config, not per-channel settings.
 4. **Workers & queues** — `/api/workers/ai-reply-queue`, `/api/workers/ai-orchestration-queue`; follow-ups via `follow_up_jobs`; health via `/api/cron/ai-health`; handoff SLA via `/api/cron/ai-human-handoff-sla`.
-5. **Memory & RAG** — rolling conversation summary + hybrid vector/keyword Knowledge Base + short CRM context in replies.
+5. **Memory & RAG** — rolling conversation summary + hybrid vector/keyword Knowledge Base + short CRM context in replies and in the background orchestrator.
+6. **Channels** — WhatsApp, Telegram, email, website chat, website forms (order + inbox + AI follow-up), voice. Instagram DM is not supported in product UI yet.
+7. **Human handoff** — pending handoff or `ai_auto_reply_paused` stops auto-reply until the conversation is resolved.
 
 Product roadmap: `TASKS.md` · AI orchestration: `TasksAI.md` · Performance/reliability: `TasksCat.md`

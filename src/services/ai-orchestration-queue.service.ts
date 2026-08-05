@@ -6,6 +6,10 @@ import {
   getWorkerConcurrency,
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
+import {
+  getAiOrchestrationQueueBatchSize,
+  getAiQueueMaxDrainBatches,
+} from "@/lib/queue/worker-tuning";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runAutoReplyBackgroundOrchestration } from "@/services/auto-reply-pipeline.service";
 import { sendChannelAutoReplyText } from "@/services/channels/channel-auto-reply-send.service";
@@ -17,8 +21,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MessagingDbClient = SupabaseClient<Database>;
 
-const BATCH_SIZE = 20;
-const MAX_DRAIN_BATCHES = 20;
 const BASE_RETRY_SECONDS = 30;
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
@@ -412,49 +414,63 @@ async function processClaimedAiOrchestrationJob(
 
     const language = profile?.language?.trim() || "English";
 
-    await runAutoReplyBackgroundOrchestration({
-      admin,
-      businessId: job.business_id,
-      channel: job.channel,
-      conversationId: job.conversation_id,
-      clientMessage: job.client_message,
-      language,
-      sendFollowUp: async (text) => {
-        const customerText = sanitizeCustomerFacingSummary(text);
+    const sendFollowUp = async (text: string) => {
+      const customerText = sanitizeCustomerFacingSummary(text);
 
-        if (!customerText) {
-          return { success: true };
-        }
+      if (!customerText) {
+        return { success: true };
+      }
 
-        const result = await sendChannelAutoReplyText({
-          admin,
-          businessId: job.business_id,
-          channel: job.channel,
+      const result = await sendChannelAutoReplyText({
+        admin,
+        businessId: job.business_id,
+        channel: job.channel,
+        conversationId: job.conversation_id,
+        text: customerText,
+      });
+
+      if (result.success) {
+        const { insertChannelMessage, incrementMessagingAnalytics } =
+          await import("@/services/messaging.service");
+
+        await insertChannelMessage(admin, {
           conversationId: job.conversation_id,
-          text: customerText,
+          channel: job.channel,
+          senderType: "ai",
+          content: result.sentText ?? customerText,
+          aiGenerated: true,
         });
 
-        if (result.success) {
-          const { insertChannelMessage, incrementMessagingAnalytics } =
-            await import("@/services/messaging.service");
+        await incrementMessagingAnalytics(admin, job.business_id, job.channel, {
+          totalMessages: 1,
+          aiReplies: 1,
+        });
+      }
 
-          await insertChannelMessage(admin, {
-            conversationId: job.conversation_id,
-            channel: job.channel,
-            senderType: "ai",
-            content: result.sentText ?? customerText,
-            aiGenerated: true,
-          });
+      return { success: result.success };
+    };
 
-          await incrementMessagingAnalytics(admin, job.business_id, job.channel, {
-            totalMessages: 1,
-            aiReplies: 1,
-          });
-        }
+    if (job.channel === "voice") {
+      const { runVoiceCrmOrchestrationFromQueue } = await import(
+        "@/services/voice-orchestrator.service"
+      );
 
-        return { success: result.success };
-      },
-    });
+      await runVoiceCrmOrchestrationFromQueue({
+        businessId: job.business_id,
+        conversationId: job.conversation_id,
+        clientMessage: job.client_message,
+      });
+    } else {
+      await runAutoReplyBackgroundOrchestration({
+        admin,
+        businessId: job.business_id,
+        channel: job.channel,
+        conversationId: job.conversation_id,
+        clientMessage: job.client_message,
+        language,
+        sendFollowUp,
+      });
+    }
 
     await admin
       .from("ai_orchestration_jobs")
@@ -491,7 +507,7 @@ async function processPendingAiOrchestrationJobs(): Promise<{
   retried: number;
   failed: number;
 }> {
-  const jobs = await claimAiOrchestrationJobs(BATCH_SIZE);
+  const jobs = await claimAiOrchestrationJobs(getAiOrchestrationQueueBatchSize());
 
   if (jobs.length === 0) {
     return { processed: 0, completed: 0, retried: 0, failed: 0 };
@@ -528,14 +544,14 @@ export async function drainAiOrchestrationQueue(): Promise<AiOrchestrationQueueD
 
   let batch = await processPendingAiOrchestrationJobs();
 
-  while (batch.processed > 0 && totals.batches < MAX_DRAIN_BATCHES) {
+  while (batch.processed > 0 && totals.batches < getAiQueueMaxDrainBatches()) {
     totals.batches += 1;
     totals.processed += batch.processed;
     totals.completed += batch.completed;
     totals.retried += batch.retried;
     totals.failed += batch.failed;
 
-    if (batch.processed < BATCH_SIZE) {
+    if (batch.processed < getAiOrchestrationQueueBatchSize()) {
       break;
     }
 

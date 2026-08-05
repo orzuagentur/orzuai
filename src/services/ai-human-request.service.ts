@@ -6,6 +6,7 @@ import {
   resolveHumanRequestNotification,
   upsertHumanRequestNotification,
 } from "@/services/business-notifications.service";
+import { pauseConversationAutoReply } from "@/services/conversation-auto-reply.service";
 import { scheduleAiHumanRequestPush } from "@/services/push-notifications.service";
 import { deliverChannelTextMessage } from "@/services/channels/deliver-text";
 import { resolveChannelRecipient } from "@/services/channels/resolve-recipient";
@@ -159,6 +160,11 @@ export async function createAiHumanRequest(input: {
       requestId: request.id,
     });
 
+    await pauseConversationAutoReply(input.admin, {
+      businessId: input.businessId,
+      conversationId: input.conversationId,
+    });
+
     console.info(
       "[ai-human-request]",
       JSON.stringify({
@@ -213,6 +219,11 @@ export async function createAiHumanRequest(input: {
     reason,
     messagePreview,
     requestId: request.id,
+  });
+
+  await pauseConversationAutoReply(input.admin, {
+    businessId: input.businessId,
+    conversationId: input.conversationId,
   });
 
   console.info(

@@ -40,6 +40,7 @@ export async function activateAiAgentAction(): Promise<{
     scheduleTimezone: profile.scheduleTimezone,
     scheduleSlots: profile.scheduleSlots,
     crmUpdateMode: profile.crmUpdateMode,
+    aiIntensity: profile.aiIntensity,
     canReply: true,
     canCreateTask: profile.canCreateTask,
     canCreateDeal: profile.canCreateDeal,

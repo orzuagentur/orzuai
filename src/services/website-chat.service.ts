@@ -25,10 +25,10 @@ import {
   insertInboundChannelMessage,
   resolveInboundMessageContext,
 } from "@/services/inbound-ingest.service";
-import { scheduleInboundMessageEffects } from "@/services/inbound-message-effects.service";
 import {
   findContactForChannel,
   resolveInboundConversation,
+  scheduleInboundMessageProcessing,
 } from "@/services/messaging.service";
 import { WEBSITE_CHAT_DEFAULT_APPEARANCE } from "@/features/website-chat/widget-appearance";
 import { normalizePhoneNumber } from "@/utils/whatsapp";
@@ -570,7 +570,7 @@ export async function processWebsiteChatMessage(
     return { success: false, message: "Unable to save message" };
   }
 
-  scheduleInboundMessageEffects({
+  await scheduleInboundMessageProcessing({
     admin,
     businessId: connection.business_id,
     channel: "website_chat",

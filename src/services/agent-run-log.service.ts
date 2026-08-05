@@ -11,6 +11,7 @@ import {
   formatBlockedAction,
   formatMetaIntent,
 } from "@/lib/ai/agent-run-actions";
+import { redactPiiForStorage } from "@/lib/ai/pii-redact";
 import type { ExecutorPlan } from "@/types/agent-executor.types";
 
 export async function logOrchestratorAgentRun(
@@ -22,18 +23,27 @@ export async function logOrchestratorAgentRun(
     channel: string;
     clientMessage: string;
     routingMethod?: string | null;
+    intent?: string | null;
     actions?: string[];
     success: boolean;
     errorMessage?: string | null;
   },
 ): Promise<void> {
+  const intent = input.intent?.trim() || null;
+  const routingMethod =
+    intent != null ? "intent" : (input.routingMethod ?? null);
+
   await admin.from("agent_runs").insert({
     business_id: input.businessId,
     conversation_id: input.conversationId,
     contact_id: input.contactId,
     channel: input.channel,
-    client_message: input.clientMessage.slice(0, 2000),
-    routing_method: input.routingMethod ?? null,
+    client_message: redactPiiForStorage(input.clientMessage.slice(0, 2000)),
+    routing_method: routingMethod,
+    ai_agent_snapshot:
+      intent != null
+        ? { intent, source: "orchestrator", label: "AI Agent" }
+        : null,
     actions: input.actions ?? [],
     success: input.success,
     error_message: input.errorMessage ?? null,
@@ -91,6 +101,7 @@ export async function logAgentOpsRun(
     channel: string;
     clientMessage: string;
     routingMethod?: string | null;
+    intent?: string | null;
     actions: string[];
     success: boolean;
     errorMessage?: string | null;

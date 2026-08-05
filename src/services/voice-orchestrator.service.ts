@@ -38,6 +38,41 @@ export async function scheduleVoiceTurnOrchestration(input: {
   clientMessage: string;
   conversationHistory: VoiceCallSessionTurn[];
 }): Promise<void> {
+  const admin = createAdminClient();
+  const conversationRepo = getConversationRepository(admin);
+  const contactId = await conversationRepo.findContactIdByPhone(
+    input.businessId,
+    input.callerPhone,
+  );
+
+  if (contactId) {
+    const conversation = await conversationRepo.findLatestForContact(
+      input.businessId,
+      contactId,
+      "voice",
+    );
+
+    if (conversation?.id) {
+      const { enqueueAiOrchestrationJob } = await import(
+        "@/services/ai-orchestration-queue.service"
+      );
+
+      await enqueueAiOrchestrationJob({
+        businessId: input.businessId,
+        channel: "voice",
+        conversationId: conversation.id,
+        clientMessage: input.clientMessage,
+      }).catch((error) => {
+        console.warn(
+          "[voice-orchestrator] failed to enqueue CRM orchestration",
+          error instanceof Error ? error.message : "unknown",
+        );
+      });
+
+      return;
+    }
+  }
+
   void runVoiceTurnOrchestration(input).catch((error) => {
     console.warn(
       "[voice-orchestrator] background orchestration failed",
@@ -49,12 +84,53 @@ export async function scheduleVoiceTurnOrchestration(input: {
   });
 }
 
+/** Durable queue worker entry for voice CRM (booking rules preserved). */
+export async function runVoiceCrmOrchestrationFromQueue(input: {
+  businessId: string;
+  conversationId: string;
+  clientMessage: string;
+  callerPhone?: string | null;
+  callSid?: string | null;
+  conversationHistory?: VoiceCallSessionTurn[];
+}): Promise<void> {
+  const admin = createAdminClient();
+  const conversationRepo = getConversationRepository(admin);
+  const contactId = await conversationRepo.findContactId(
+    input.conversationId,
+    input.businessId,
+  );
+
+  if (!contactId) {
+    return;
+  }
+
+  const { data: contactRow } = await admin
+    .from("contacts")
+    .select("phone_number")
+    .eq("id", contactId)
+    .eq("business_id", input.businessId)
+    .maybeSingle();
+
+  const callerPhone =
+    input.callerPhone?.trim() || contactRow?.phone_number?.trim() || "";
+
+  await runVoiceTurnOrchestration({
+    businessId: input.businessId,
+    callerPhone,
+    callSid: input.callSid ?? null,
+    clientMessage: input.clientMessage,
+    conversationHistory: input.conversationHistory ?? [],
+    conversationId: input.conversationId,
+  });
+}
+
 async function runVoiceTurnOrchestration(input: {
   businessId: string;
   callerPhone: string;
   callSid?: string | null;
   clientMessage: string;
   conversationHistory: VoiceCallSessionTurn[];
+  conversationId?: string | null;
 }): Promise<void> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "voice"))) {
     return;
@@ -179,7 +255,7 @@ async function runVoiceTurnOrchestration(input: {
     admin,
     businessId: input.businessId,
     contactId,
-    conversationId: null,
+    conversationId: input.conversationId ?? null,
     channel: "voice",
     clientMessage: input.clientMessage,
     agent: null,

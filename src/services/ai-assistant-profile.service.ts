@@ -25,6 +25,8 @@ import {
   type CollectionNiche,
   type DataCollectionField,
 } from "@/lib/ai/data-collection";
+import { parseAiIntensity } from "@/lib/ai/ai-intensity";
+import { invalidateAssistantProfileCache } from "@/lib/cache/ai-assistant-profile-cache";
 import type {
   AiAssistantProfileData,
   CrmUpdateMode,
@@ -44,7 +46,7 @@ function parseCrmUpdateMode(value: unknown): CrmUpdateMode {
 }
 
 const PROFILE_SELECT =
-  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, crm_update_mode, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
+  "business_id, name, system_prompt, communication_style, language, reply_wait_ms, schedule_enabled, schedule_timezone, schedule_slots, crm_update_mode, ai_intensity, can_reply, can_create_task, can_create_deal, can_update_contact, can_add_note, can_add_internal_note, can_create_calendar_event, can_request_human, can_notify_owner, can_notify_on_actions, can_summarize_actions_in_chat, can_send_proactive_message, collection_niche, data_collection_fields, voice_reply_enabled, elevenlabs_voice_id, elevenlabs_voice_name, voice_reply_mode";
 
 function parseCollectionNiche(value: unknown): CollectionNiche {
   return isCollectionNiche(value) ? value : "generic";
@@ -72,6 +74,7 @@ function mapProfileRow(row: {
   schedule_timezone?: string | null;
   schedule_slots?: unknown;
   crm_update_mode?: string | null;
+  ai_intensity?: string | null;
   can_reply?: boolean | null;
   can_create_task?: boolean | null;
   can_create_deal?: boolean | null;
@@ -102,6 +105,7 @@ function mapProfileRow(row: {
     scheduleTimezone: row.schedule_timezone?.trim() || "UTC",
     scheduleSlots: parseScheduleSlots(row.schedule_slots),
     crmUpdateMode: parseCrmUpdateMode(row.crm_update_mode),
+    aiIntensity: parseAiIntensity(row.ai_intensity),
     canReply: row.can_reply ?? true,
     canCreateTask: row.can_create_task ?? true,
     canCreateDeal: row.can_create_deal ?? true,
@@ -137,6 +141,7 @@ export function getDefaultAiAssistantProfile(
     scheduleTimezone: "UTC",
     scheduleSlots: [],
     crmUpdateMode: "every_message",
+    aiIntensity: "light",
     canReply: true,
     canCreateTask: true,
     canCreateDeal: true,
@@ -245,6 +250,7 @@ export async function saveAiAssistantProfile(
       schedule_timezone: parsed.data.scheduleTimezone,
       schedule_slots: parsed.data.scheduleSlots,
       crm_update_mode: parsed.data.crmUpdateMode,
+      ai_intensity: parsed.data.aiIntensity,
       can_reply: parsed.data.canReply,
       can_create_task: parsed.data.canCreateTask,
       can_create_deal: parsed.data.canCreateDeal,
@@ -266,6 +272,8 @@ export async function saveAiAssistantProfile(
   if (error) {
     return { success: false, message: "Unable to save assistant profile." };
   }
+
+  await invalidateAssistantProfileCache(business.id);
 
   const defaultModel = getDefaultGeminiModel();
 

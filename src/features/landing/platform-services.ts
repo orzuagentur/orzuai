@@ -20,7 +20,6 @@ export type PlatformServiceDefinition = {
 
 const PLATFORM_SERVICE_DEFINITIONS: PlatformServiceDefinition[] = [
   { id: "whatsapp", channel: "whatsapp" },
-  { id: "instagram", channel: "instagram" },
   { id: "telegram", channel: "telegram" },
   { id: "voice", channel: "voice" },
   { id: "website_forms", channel: "website_forms" },

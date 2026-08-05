@@ -173,6 +173,23 @@ const orchestratorActionProperties: { [k: string]: Schema } = {
     type: SchemaType.NUMBER,
     description: "Max events for list_upcoming_for_contact.",
   },
+  serviceType: {
+    type: SchemaType.STRING,
+    description: "Service type for create_order.",
+  },
+  amount: {
+    type: SchemaType.NUMBER,
+    description: "Order amount for create_order.",
+  },
+  customerName: {
+    type: SchemaType.STRING,
+    description: "Customer name for create_order.",
+  },
+  fields: {
+    type: SchemaType.OBJECT,
+    description: "Custom order form field values for create_order.",
+    properties: {},
+  },
 };
 
 export const ORCHESTRATOR_PLAN_FUNCTION: FunctionDeclaration = {
@@ -235,7 +252,7 @@ export const ORCHESTRATOR_PLAN_FUNCTION: FunctionDeclaration = {
       },
       actions: {
         type: SchemaType.ARRAY,
-        description: "Up to 10 concrete CRM/calendar actions.",
+        description: "Up to 5 concrete CRM/calendar actions.",
         items: {
           type: SchemaType.OBJECT,
           properties: orchestratorActionProperties,

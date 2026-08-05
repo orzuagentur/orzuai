@@ -12,6 +12,7 @@ import {
   SendIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
+  SparklesIcon,
   UsersIcon,
   Volume2Icon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import type {
   AgentRecentDialogue,
   AiAgentTab,
 } from "@/types/agent-dashboard.types";
+import type { AgentRunsMetrics } from "@/types/analytics.types";
 import type { AiAssistantPageData } from "@/types/channel-workspace.types";
 import {
   formatDurationMinutes,
@@ -50,6 +52,7 @@ import {
 type AgentDashboardPanelProps = {
   data: AiAssistantPageData;
   stats: AgentDashboardStats;
+  agentRuns: AgentRunsMetrics;
   recentDialogues: AgentRecentDialogue[];
   aiActivity: AgentActivityPoint[];
   onNavigate: (tab: AiAgentTab) => void;
@@ -353,6 +356,7 @@ function AgentTestChatCard() {
 export function AgentDashboardPanel({
   data,
   stats,
+  agentRuns,
   recentDialogues,
   aiActivity,
   onNavigate,
@@ -391,6 +395,37 @@ export function AgentDashboardPanel({
           value={formatMetricValue(stats.contactsServed)}
           icon={UsersIcon}
           iconClassName="bg-zinc-100 text-zinc-600"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="CRM runs (30d)"
+          value={formatMetricValue(agentRuns.runsLast30Days)}
+          hint={`${agentRuns.successRatePercent}% success`}
+          icon={SparklesIcon}
+          iconClassName="bg-emerald-100 text-emerald-700"
+        />
+        <MetricCard
+          label="CRM actions (30d)"
+          value={formatMetricValue(agentRuns.actionsAppliedLast30Days)}
+          hint={`${agentRuns.blockedActionsLast30Days} blocked`}
+          icon={BotIcon}
+          iconClassName="bg-amber-100 text-amber-700"
+        />
+        <MetricCard
+          label="AI cost (30d)"
+          value={`$${agentRuns.estimatedCostUsdLast30Days.toFixed(2)}`}
+          hint={`${agentRuns.autoReplyCallsLast30Days} replies · ${agentRuns.orchestratorCallsLast30Days} plans`}
+          icon={MessageSquareTextIcon}
+          iconClassName="bg-indigo-100 text-indigo-700"
+        />
+        <MetricCard
+          label="Failed runs (30d)"
+          value={formatMetricValue(agentRuns.failedRunsLast30Days)}
+          hint={`${agentRuns.bookingFailuresLast30Days} booking failures`}
+          icon={Settings2Icon}
+          iconClassName="bg-rose-100 text-rose-700"
         />
       </div>
 

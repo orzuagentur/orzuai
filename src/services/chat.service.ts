@@ -639,6 +639,14 @@ export async function updateConversationStatus(
     parsed.data.status === "resolved" ||
     parsed.data.status === "closed"
   ) {
+    const { resumeConversationAutoReply } = await import(
+      "@/services/conversation-auto-reply.service"
+    );
+    await resumeConversationAutoReply(supabase, {
+      businessId,
+      conversationId: parsed.data.conversationId,
+    });
+
     const { enqueueCrmOrchestrationOnResolve } = await import(
       "@/services/ai-orchestration-queue.service"
     );

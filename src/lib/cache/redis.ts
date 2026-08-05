@@ -68,6 +68,20 @@ export async function setRedisCacheValue(
   }
 }
 
+export async function deleteRedisCacheKey(key: string): Promise<void> {
+  const redis = getRedisClient();
+
+  if (!redis) {
+    return;
+  }
+
+  try {
+    await redis.del(key);
+  } catch (error) {
+    console.error("[redis-cache] del failed", error);
+  }
+}
+
 export function buildMediaUrlRedisKey(storagePath: string): string {
   return `media:url:${storagePath}`;
 }

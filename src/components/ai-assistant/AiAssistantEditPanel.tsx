@@ -55,6 +55,7 @@ import type {
   AiAssistantProfileData,
   CrmUpdateMode,
 } from "@/types/ai-assistant-profile.types";
+import type { AiIntensity } from "@/lib/ai/ai-intensity";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
 import type { AiWorkerReadiness } from "@/types/ai-worker-readiness.types";
 import type { SalesAgentSettings } from "@/types/ai-usage.types";
@@ -292,6 +293,9 @@ export function AiAssistantEditPanel({
   const [crmUpdateMode, setCrmUpdateMode] = useState<CrmUpdateMode>(
     profile.crmUpdateMode ?? "every_message",
   );
+  const [aiIntensity, setAiIntensity] = useState<AiIntensity>(
+    profile.aiIntensity ?? "light",
+  );
   const [collectionNiche, setCollectionNiche] = useState<CollectionNiche>(
     profile.collectionNiche ?? "generic",
   );
@@ -355,6 +359,7 @@ export function AiAssistantEditPanel({
         scheduleTimezone,
         scheduleSlots,
         crmUpdateMode,
+        aiIntensity,
         collectionNiche,
         dataCollectionFields,
         ...permissions,
@@ -415,6 +420,7 @@ export function AiAssistantEditPanel({
         scheduleTimezone,
         scheduleSlots,
         crmUpdateMode,
+        aiIntensity,
         collectionNiche,
         dataCollectionFields,
         ...nextPermissions,
@@ -701,6 +707,31 @@ export function AiAssistantEditPanel({
                 </option>
                 <option value="on_resolve">
                   {AI_ASSISTANT_MESSAGES.crmUpdateModeOnResolve}
+                </option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ai-intensity">
+                {AI_ASSISTANT_MESSAGES.aiIntensityLabel}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {AI_ASSISTANT_MESSAGES.aiIntensityDescription}
+              </p>
+              <select
+                id="ai-intensity"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={aiIntensity}
+                disabled={isSaving}
+                onChange={(event) => {
+                  setAiIntensity(event.target.value as AiIntensity);
+                }}
+              >
+                <option value="light">
+                  {AI_ASSISTANT_MESSAGES.aiIntensityLight}
+                </option>
+                <option value="full">
+                  {AI_ASSISTANT_MESSAGES.aiIntensityFull}
                 </option>
               </select>
             </div>

@@ -88,6 +88,9 @@ function buildOrchestratorPrompt(input: {
   availabilityText?: string;
   collectionContext?: string;
   orderFormFieldsText?: string;
+  knowledgeContext?: string;
+  memorySummary?: string;
+  runtimeNotes?: string;
   outputMode?: "tools" | "json";
 }): string {
   const outputMode = input.outputMode ?? "json";
@@ -171,6 +174,15 @@ function buildOrchestratorPrompt(input: {
     "Recent conversation:",
     historySection,
     "",
+    input.memorySummary?.trim()
+      ? ["Conversation memory summary:", input.memorySummary.trim(), ""].join("\n")
+      : "",
+    input.knowledgeContext?.trim()
+      ? ["Relevant business knowledge:", input.knowledgeContext.trim(), ""].join("\n")
+      : "",
+    input.runtimeNotes?.trim()
+      ? ["Runtime notes:", input.runtimeNotes.trim(), ""].join("\n")
+      : "",
     "Latest customer message:",
     input.message,
     "",
@@ -321,6 +333,9 @@ async function requestOrchestratorViaTools(input: {
   availabilityText?: string;
   collectionContext?: string;
   orderFormFieldsText?: string;
+  knowledgeContext?: string;
+  memorySummary?: string;
+  runtimeNotes?: string;
 }): Promise<OrchestratorRunResult | null> {
   const providers = (await getPlatformAiFallbackProviders("orchestrator")).filter(
     (provider) => {
@@ -457,6 +472,9 @@ async function requestOrchestratorJson(input: {
   availabilityText?: string;
   collectionContext?: string;
   orderFormFieldsText?: string;
+  knowledgeContext?: string;
+  memorySummary?: string;
+  runtimeNotes?: string;
 }): Promise<
   | { success: true; text: string; usedProvider?: string }
   | { success: false; errorMessage: string; attemptedProviders: string[] }
@@ -501,6 +519,9 @@ export async function runAutoReplyOrchestrator(input: {
   availabilityText?: string;
   collectionContext?: string;
   orderFormFieldsText?: string;
+  knowledgeContext?: string;
+  memorySummary?: string;
+  runtimeNotes?: string;
 }): Promise<OrchestratorRunResult> {
   if (!(await isPlatformFeatureAllowed(input.businessId, "ai"))) {
     return {
@@ -533,6 +554,9 @@ export async function runAutoReplyOrchestrator(input: {
     availabilityText,
     collectionContext: input.collectionContext,
     orderFormFieldsText: input.orderFormFieldsText,
+    knowledgeContext: input.knowledgeContext,
+    memorySummary: input.memorySummary,
+    runtimeNotes: input.runtimeNotes,
   };
 
   const toolAttempt = await requestOrchestratorViaTools(promptInput);

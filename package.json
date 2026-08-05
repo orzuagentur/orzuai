@@ -22,6 +22,8 @@
     "validate:env": "tsx --env-file=.env.local scripts/validate-env.ts",
     "load-test:webhooks": "tsx --env-file=.env.local scripts/load-tests/webhook-throughput.ts",
     "load-test:inbox": "tsx --env-file=.env.local scripts/load-tests/inbox-concurrent-sessions.ts",
+    "load-test:ai-replies": "tsx --env-file=.env.local scripts/load-tests/ai-replies-throughput.ts",
+    "ai-golden-path": "tsx --env-file=.env.local scripts/ai-golden-path/checklist.ts",
     "setup:stripe": "npx tsx scripts/setup-stripe-webhook.ts",
     "postinstall": "patch-package",
     "voice-stream": "npm run start --workspace=@orzu/voice-stream",

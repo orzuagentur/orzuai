@@ -1,0 +1,21 @@
+---
+description: When implementing OrzuX customer AI (reply, orchestrator, CRM, calendar, handoff), follow the approved master plan.
+globs:
+  - src/services/auto-reply-pipeline.service.ts
+  - src/services/ai-orchestrator.service.ts
+  - src/services/agent-task-executor.service.ts
+  - src/services/ai-*-queue.service.ts
+  - src/services/messaging.service.ts
+  - src/services/voice-orchestrator.service.ts
+  - src/services/website-chat.service.ts
+  - src/services/website-forms.service.ts
+  - src/lib/ai/**
+---
+
+# AI customer actions — master plan
+
+1. **Source of truth:** `.cursor/plans/ai-customer-actions-master-plan.md`
+2. **Do not start implementation** until the user explicitly approves that plan (status `APPROVED`).
+3. Work **phase by phase, step by step**; update §7 progress in the plan file after each step.
+4. Preserve two-phase architecture: reply first, durable orchestration second; single customer voice (`ai_assistant_profile`).
+5. After schema changes under `supabase/migrations/`, apply via Supabase MCP immediately (orzuit project).

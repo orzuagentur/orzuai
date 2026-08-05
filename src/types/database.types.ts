@@ -1960,6 +1960,7 @@ export type Database = {
           ai_summary: string | null;
           ai_summary_updated_at: string | null;
           ai_summary_message_count: number;
+          ai_auto_reply_paused: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -1984,6 +1985,7 @@ export type Database = {
           ai_summary?: string | null;
           ai_summary_updated_at?: string | null;
           ai_summary_message_count?: number;
+          ai_auto_reply_paused?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -2008,6 +2010,7 @@ export type Database = {
           ai_summary?: string | null;
           ai_summary_updated_at?: string | null;
           ai_summary_message_count?: number;
+          ai_auto_reply_paused?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -2734,6 +2737,64 @@ export type Database = {
             columns: ["business_id"];
             isOneToOne: false;
             referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_tool_audit_events: {
+        Row: {
+          id: string;
+          business_id: string;
+          conversation_id: string | null;
+          contact_id: string | null;
+          tool_name: string;
+          success: boolean;
+          label: string | null;
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          tool_name: string;
+          success?: boolean;
+          label?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          conversation_id?: string | null;
+          contact_id?: string | null;
+          tool_name?: string;
+          success?: boolean;
+          label?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_tool_audit_events_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_tool_audit_events_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_tool_audit_events_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
             referencedColumns: ["id"];
           },
         ];
@@ -3891,6 +3952,7 @@ export type Database = {
           schedule_timezone: string;
           schedule_slots: Json;
           crm_update_mode: string;
+          ai_intensity: string;
           fallback_reply_message: string | null;
           can_reply: boolean;
           can_create_task: boolean;
@@ -3924,6 +3986,7 @@ export type Database = {
           schedule_timezone?: string;
           schedule_slots?: Json;
           crm_update_mode?: string;
+          ai_intensity?: string;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;
@@ -3957,6 +4020,7 @@ export type Database = {
           schedule_timezone?: string;
           schedule_slots?: Json;
           crm_update_mode?: string;
+          ai_intensity?: string;
           fallback_reply_message?: string | null;
           can_reply?: boolean;
           can_create_task?: boolean;

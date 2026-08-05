@@ -30,6 +30,9 @@ const EMPTY_AGENT_RUNS: AgentRunsMetrics = {
   blockedActionsLast30Days: 0,
   skippedDuplicatesLast30Days: 0,
   bookingFailuresLast30Days: 0,
+  estimatedCostUsdLast30Days: 0,
+  autoReplyCallsLast30Days: 0,
+  orchestratorCallsLast30Days: 0,
 };
 
 function startOfDaysAgo(days: number): Date {
@@ -42,8 +45,53 @@ function startOfDaysAgo(days: number): Date {
 export async function listAgentsAnalyticsRollup(
   businessId: string,
 ): Promise<AgentAnalyticsRollupItem[]> {
-  void businessId;
-  return [];
+  if (!hasSupabaseEnv()) {
+    return [];
+  }
+
+  const admin = createAdminClient();
+  const sevenDaysAgo = startOfDaysAgo(7);
+  const thirtyDaysAgo = startOfDaysAgo(30);
+
+  const { data: runs } = await admin
+    .from("agent_runs")
+    .select("contact_id, created_at, success")
+    .eq("business_id", businessId)
+    .gte("created_at", thirtyDaysAgo.toISOString());
+
+  const rows = runs ?? [];
+  const contactIds = new Set<string>();
+  let totalAiReplies = 0;
+  let aiRepliesLast7Days = 0;
+
+  for (const row of rows) {
+    if (row.success) {
+      totalAiReplies += 1;
+    }
+
+    if (new Date(row.created_at) >= sevenDaysAgo && row.success) {
+      aiRepliesLast7Days += 1;
+    }
+
+    if (row.contact_id) {
+      contactIds.add(row.contact_id);
+    }
+  }
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      agentId: "assistant",
+      agentName: "AI Agent",
+      enabled: true,
+      contactsServed: contactIds.size,
+      totalAiReplies,
+      aiRepliesLast7Days,
+    },
+  ];
 }
 
 export async function getAutomationOpsMetrics(
@@ -136,6 +184,12 @@ export async function getAgentRunsMetrics(
     .eq("business_id", businessId)
     .gte("created_at", thirtyDaysAgo.toISOString());
 
+  const { data: usageRows } = await admin
+    .from("ai_usage_logs")
+    .select("call_type, estimated_cost_usd, created_at")
+    .eq("business_id", businessId)
+    .gte("created_at", thirtyDaysAgo.toISOString());
+
   const rows = runs ?? [];
   let runsToday = 0;
   let successCount = 0;
@@ -147,6 +201,19 @@ export async function getAgentRunsMetrics(
   let blockedActionsLast30Days = 0;
   let skippedDuplicatesLast30Days = 0;
   let bookingFailuresLast30Days = 0;
+  let estimatedCostUsdLast30Days = 0;
+  let autoReplyCallsLast30Days = 0;
+  let orchestratorCallsLast30Days = 0;
+
+  for (const row of usageRows ?? []) {
+    estimatedCostUsdLast30Days += Number(row.estimated_cost_usd) || 0;
+
+    if (row.call_type === "auto_reply") {
+      autoReplyCallsLast30Days += 1;
+    } else if (row.call_type === "orchestrator") {
+      orchestratorCallsLast30Days += 1;
+    }
+  }
 
   for (const row of rows) {
     const createdAt = new Date(row.created_at);
@@ -193,6 +260,9 @@ export async function getAgentRunsMetrics(
     blockedActionsLast30Days,
     skippedDuplicatesLast30Days,
     bookingFailuresLast30Days,
+    estimatedCostUsdLast30Days: Math.round(estimatedCostUsdLast30Days * 100) / 100,
+    autoReplyCallsLast30Days,
+    orchestratorCallsLast30Days,
   };
 }
 
@@ -208,7 +278,7 @@ export async function listRecentAgentRuns(
   const { data } = await admin
     .from("agent_runs")
     .select(
-      "id, channel, client_message, routing_method, actions, success, error_message, created_at, contact_id",
+      "id, channel, client_message, routing_method, actions, success, error_message, created_at, contact_id, ai_agent_snapshot",
     )
     .eq("business_id", businessId)
     .order("created_at", { ascending: false })
@@ -232,18 +302,27 @@ export async function listRecentAgentRuns(
   const contactNames = new Map(
     (contactsResult.data ?? []).map((row) => [row.id, row.name]),
   );
-  return rows.map((row) => ({
+  return rows.map((row) => {
+    const snapshot =
+      row.ai_agent_snapshot &&
+      typeof row.ai_agent_snapshot === "object" &&
+      !Array.isArray(row.ai_agent_snapshot)
+        ? (row.ai_agent_snapshot as { intent?: string; label?: string })
+        : null;
+
+    return {
     id: row.id,
     createdAt: row.created_at,
     channel: row.channel,
     contactId: row.contact_id,
     contactName: row.contact_id ? contactNames.get(row.contact_id) ?? null : null,
-    agentId: null,
-    agentName: "AI Agent",
+    agentId: snapshot?.intent ?? "assistant",
+    agentName: snapshot?.label ?? "AI Agent",
     routingMethod: row.routing_method,
     actions: parseAgentRunActions(row.actions),
     success: row.success,
     errorMessage: row.error_message,
     messagePreview: row.client_message.slice(0, 120),
-  }));
+  };
+  });
 }

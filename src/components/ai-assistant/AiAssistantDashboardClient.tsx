@@ -24,6 +24,7 @@ export function AiAssistantDashboardClient({
     <AgentDashboardPanel
       data={data}
       stats={data.agentDashboardStats}
+      agentRuns={data.agentRuns}
       recentDialogues={data.recentDialogues}
       aiActivity={data.aiActivity}
       onNavigate={handleNavigate}

@@ -71,6 +71,9 @@ export type AgentRunsMetrics = {
   blockedActionsLast30Days: number;
   skippedDuplicatesLast30Days: number;
   bookingFailuresLast30Days: number;
+  estimatedCostUsdLast30Days: number;
+  autoReplyCallsLast30Days: number;
+  orchestratorCallsLast30Days: number;
 };
 
 export type AgentRunListItem = {

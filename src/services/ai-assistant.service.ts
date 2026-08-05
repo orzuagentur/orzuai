@@ -158,6 +158,9 @@ export async function getAiAssistantPageData(
         blockedActionsLast30Days: 0,
         skippedDuplicatesLast30Days: 0,
         bookingFailuresLast30Days: 0,
+        estimatedCostUsdLast30Days: 0,
+        autoReplyCallsLast30Days: 0,
+        orchestratorCallsLast30Days: 0,
       },
     };
   }

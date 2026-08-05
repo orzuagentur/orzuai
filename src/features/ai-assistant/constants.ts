@@ -433,6 +433,11 @@ export const AI_ASSISTANT_MESSAGES = {
   crmUpdateModeEveryMessage: "Every message",
   crmUpdateModeIdle5Min: "After 5 minutes idle",
   crmUpdateModeOnResolve: "When conversation is resolved",
+  aiIntensityLabel: "AI processing depth",
+  aiIntensityDescription:
+    "Light (recommended): fast reply plus CRM plan — about two LLM calls per message. Full: also runs BANT scoring and rolling conversation summaries.",
+  aiIntensityLight: "Light — lower cost, faster",
+  aiIntensityFull: "Full — BANT + summaries",
   dataCollectionTitle: "Data Collection Fields",
   dataCollectionDescription:
     "Define what the AI must gather from customers. Niche presets seed defaults; the AI only asks for missing values and writes them into CRM.",

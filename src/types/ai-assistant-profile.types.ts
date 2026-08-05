@@ -11,6 +11,8 @@ import { isValidAiReplyLanguage, REPLY_WAIT_MS_OPTIONS } from "@/lib/ai/language
 import { agentScheduleSlotsSchema } from "@/types/ai-assistant-schedule.types";
 import type { VoiceReplyMode } from "@/types/elevenlabs.types";
 import type { AgentScheduleSlot } from "@/types/ai-assistant-schedule.types";
+import type { AiIntensity } from "@/lib/ai/ai-intensity";
+import { parseAiIntensity } from "@/lib/ai/ai-intensity";
 
 const replyWaitValues = REPLY_WAIT_MS_OPTIONS as [number, ...number[]];
 
@@ -55,6 +57,7 @@ export const saveAiAssistantProfileSchema = z.object({
   crmUpdateMode: z
     .enum(["every_message", "idle_5min", "on_resolve"])
     .default("every_message"),
+  aiIntensity: z.enum(["light", "full"]).default("light"),
   canReply: z.boolean().default(true),
   canCreateTask: z.boolean().default(true),
   canCreateDeal: z.boolean().default(true),
@@ -89,6 +92,7 @@ export type AiAssistantProfileData = {
   scheduleTimezone: string;
   scheduleSlots: AgentScheduleSlot[];
   crmUpdateMode: CrmUpdateMode;
+  aiIntensity: AiIntensity;
   canReply: boolean;
   canCreateTask: boolean;
   canCreateDeal: boolean;

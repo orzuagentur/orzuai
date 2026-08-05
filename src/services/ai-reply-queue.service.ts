@@ -10,6 +10,10 @@ import {
   getWorkerConcurrency,
   runWithConcurrency,
 } from "@/lib/queue/worker-concurrency";
+import {
+  getAiQueueBatchSize,
+  getAiQueueMaxDrainBatches,
+} from "@/lib/queue/worker-tuning";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatSupabaseError } from "@/lib/supabase/format-error";
 import {
@@ -25,8 +29,6 @@ type MessagingDbClient = SupabaseClient<Database>;
 
 export const DEFAULT_AUTO_REPLY_DEBOUNCE_MS = 1_500;
 
-const BATCH_SIZE = 20;
-const MAX_DRAIN_BATCHES = 20;
 const BASE_RETRY_SECONDS = 15;
 /** Recover stuck jobs faster so a dead webhook drain cannot silence a chat for minutes. */
 const STALE_PROCESSING_MS = 2 * 60 * 1000;
@@ -648,7 +650,7 @@ async function processPendingAiReplyJobs(): Promise<{
   retried: number;
   failed: number;
 }> {
-  const jobs = await claimAiReplyJobs(BATCH_SIZE);
+  const jobs = await claimAiReplyJobs(getAiQueueBatchSize());
 
   if (jobs.length === 0) {
     return { processed: 0, completed: 0, requeued: 0, retried: 0, failed: 0 };
@@ -686,7 +688,7 @@ export async function drainAiReplyQueue(): Promise<AiReplyQueueDrainResult> {
 
   let batch = await processPendingAiReplyJobs();
 
-  while (batch.processed > 0 && totals.batches < MAX_DRAIN_BATCHES) {
+  while (batch.processed > 0 && totals.batches < getAiQueueMaxDrainBatches()) {
     totals.batches += 1;
     totals.processed += batch.processed;
     totals.completed += batch.completed;
@@ -694,7 +696,7 @@ export async function drainAiReplyQueue(): Promise<AiReplyQueueDrainResult> {
     totals.retried += batch.retried;
     totals.failed += batch.failed;
 
-    if (batch.processed < BATCH_SIZE) {
+    if (batch.processed < getAiQueueBatchSize()) {
       break;
     }
 

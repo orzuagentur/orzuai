@@ -52,7 +52,7 @@ export const ORCHESTRATOR_PLAN_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      maxItems: 10,
+      maxItems: 5,
       items: {
         type: "object",
         additionalProperties: false,
@@ -117,6 +117,23 @@ export const ORCHESTRATOR_PLAN_JSON_SCHEMA = {
           limit: {
             type: "number",
             description: "Max events for list_upcoming_for_contact.",
+          },
+          serviceType: {
+            type: "string",
+            description: "Service type for create_order.",
+          },
+          amount: {
+            type: "number",
+            description: "Order amount for create_order.",
+          },
+          customerName: {
+            type: "string",
+            description: "Customer name for create_order.",
+          },
+          fields: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            description: "Custom order form field values for create_order.",
           },
         },
       },
