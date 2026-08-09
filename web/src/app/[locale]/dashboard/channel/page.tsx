@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { ChannelStudioPage } from "@/components/ChannelStudioPage";
 
 export default function ChannelPage() {
-  redirect("/dashboard/content");
+  return <ChannelStudioPage />;
 }
