@@ -65,6 +65,7 @@ type MenuItemIcon =
   | "ai-video"
   | "ai-clip"
   | "ai-present"
+  | "youtube"
   | "photo-edit"
   | "video-edit"
   | "present"
@@ -98,6 +99,7 @@ const MENU_GROUPS: MenuGroup[] = [
     items: [
       { href: "/dashboard/content", labelKey: "aiVideo", icon: "ai-video" },
       { href: "/dashboard/clipping", labelKey: "aiClipping", icon: "ai-clip" },
+      { href: "/dashboard/youtube", labelKey: "youtube", icon: "youtube" },
     ],
   },
   {
@@ -350,6 +352,17 @@ function MenuEntryIcon({ name }: { name: MenuItemIcon }) {
   };
 
   switch (name) {
+    case "youtube":
+      return (
+        <svg {...common} viewBox="0 0 28 20" width="20" height="15">
+          <path
+            fill="#FF0000"
+            stroke="none"
+            d="M27.43 3.13A3.52 3.52 0 0 0 24.95.64C22.74 0 14 0 14 0S5.26 0 3.05.64A3.52 3.52 0 0 0 .57 3.13 36.8 36.8 0 0 0 0 10a36.8 36.8 0 0 0 .57 6.87 3.52 3.52 0 0 0 2.48 2.49C5.26 20 14 20 14 20s8.74 0 10.95-.64a3.52 3.52 0 0 0 2.48-2.49A36.8 36.8 0 0 0 28 10a36.8 36.8 0 0 0-.57-6.87Z"
+          />
+          <path fill="#fff" stroke="none" d="M11.2 14.29V5.71L18.4 10l-7.2 4.29Z" />
+        </svg>
+      );
     case "ai-video":
       return (
         <svg {...common}>
